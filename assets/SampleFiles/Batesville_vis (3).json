@@ -1,0 +1,261 @@
+{
+    "location": "Batesville",
+    "details": {
+        "date_created": "Apr 2025",
+        "contact_name": "Pitamber",
+        "contact_email": "waglep@byu.edu",
+        "stage_unit": "ft",
+        "discharge_unit": "cfs",
+        "terms_of_use": "provisional - not for regulatory use",
+        "depth_service_url": ""
+    },
+    "gauge_info": {
+        "river": "MsTallahatchie",
+        "gauge_id": "15290460",
+        "latitude": 33.956,
+        "longitude": -90.165,
+        "flood_level": "15 ft",
+        "last_reported_value": "",
+        "last_reported_time": ""
+    },
+    "scenarios": [
+        {
+            "model": "HAND",
+            "scenario_list": [
+                {
+                    "vector_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/0-0-EXT-14320.shp",
+                    "raster_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/0-0-DEP-14320.tif",
+                    "stage": 14.0,
+                    "discharge": 14320.0,
+                    "annual_chance": "2 year",
+                    "layer_id": 0
+                },
+                {
+                    "vector_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/0-0-EXT-21290.shp",
+                    "raster_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/0-0-DEP-21290.tif",
+                    "stage": 17.0,
+                    "discharge": 21290.0,
+                    "annual_chance": "5 year",
+                    "layer_id": 1
+                },
+                {
+                    "vector_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/0-0-EXT-25905.shp",
+                    "raster_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/0-0-DEP-25905.tif",
+                    "stage": 18.0,
+                    "discharge": 25905.0,
+                    "annual_chance": "10 year",
+                    "layer_id": 2
+                },
+                {
+                    "vector_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/0-0-EXT-31736.shp",
+                    "raster_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/0-0-DEP-31736.tif",
+                    "stage": 19.0,
+                    "discharge": 31736.0,
+                    "annual_chance": "25 year",
+                    "layer_id": 3
+                },
+                {
+                    "vector_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/0-0-EXT-36061.shp",
+                    "raster_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/0-0-DEP-36061.tif",
+                    "stage": 20.0,
+                    "discharge": 36061.0,
+                    "annual_chance": "50 year",
+                    "layer_id": 4
+                },
+                {
+                    "vector_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/0-0-EXT-40355.shp",
+                    "raster_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/0-0-DEP-40355.tif",
+                    "stage": 21.0,
+                    "discharge": 40355.0,
+                    "annual_chance": "100 year",
+                    "layer_id": 5
+                },
+                {
+                    "vector_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/0-0-EXT-60506.shp",
+                    "raster_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/0-0-DEP-60506.tif",
+                    "stage": 25.0,
+                    "discharge": 60506.0,
+                    "annual_chance": "500 year",
+                    "layer_id": 6
+                },
+                {
+                    "vector_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/0-0-EXT-70998.shp",
+                    "raster_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/0-0-DEP-70998.tif",
+                    "stage": 28.0,
+                    "discharge": 70998.0,
+                    "annual_chance": "1000 year",
+                    "layer_id": 7
+                }
+            ],
+            "time_series": [
+                {
+                    "stage": 14.0,
+                    "discharge": 14320.0,
+                    "timestamp": "2025-04-21 10:00:00",
+                    "type": "o"
+                },
+                {
+                    "stage": 17.0,
+                    "discharge": 21290.0,
+                    "timestamp": "2025-04-21 11:00:00",
+                    "type": "o"
+                },
+                {
+                    "stage": 18.0,
+                    "discharge": 25905.0,
+                    "timestamp": "2025-04-21 12:00:00",
+                    "type": "o"
+                },
+                {
+                    "stage": 19.0,
+                    "discharge": 31736.0,
+                    "timestamp": "2025-04-21 13:00:00",
+                    "type": "o"
+                },
+                {
+                    "stage": 20.0,
+                    "discharge": 36061.0,
+                    "timestamp": "2025-04-21 14:00:00",
+                    "type": "o"
+                },
+                {
+                    "stage": 21.0,
+                    "discharge": 40355.0,
+                    "timestamp": "2025-04-21 15:00:00",
+                    "type": "f"
+                },
+                {
+                    "stage": 25.0,
+                    "discharge": 60506.0,
+                    "timestamp": "2025-04-21 16:00:00",
+                    "type": "f"
+                },
+                {
+                    "stage": 28.0,
+                    "discharge": 70998.0,
+                    "timestamp": "2025-04-21 17:00:00",
+                    "type": "f"
+                }
+            ]
+        },
+        {
+            "model": "SRH-2D",
+            "scenario_list": [
+                {
+                    "vector_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/1-1-EXT-14320.shp",
+                    "raster_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/1-1-DEP-14320.tif",
+                    "stage": 7.0,
+                    "discharge": 14320.0,
+                    "annual_chance": "2 year",
+                    "layer_id": 0
+                },
+                {
+                    "vector_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/1-1-EXT-21290.shp",
+                    "raster_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/1-1-DEP-21290.tif",
+                    "stage": 8.0,
+                    "discharge": 21290.0,
+                    "annual_chance": "5 year",
+                    "layer_id": 1
+                },
+                {
+                    "vector_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/1-1-EXT-25905.shp",
+                    "raster_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/1-1-DEP-25905.tif",
+                    "stage": 9.0,
+                    "discharge": 25905.0,
+                    "annual_chance": "10 year",
+                    "layer_id": 2
+                },
+                {
+                    "vector_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/1-1-EXT-31736.shp",
+                    "raster_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/1-1-DEP-31736.tif",
+                    "stage": 10.0,
+                    "discharge": 31736.0,
+                    "annual_chance": "25 year",
+                    "layer_id": 3
+                },
+                {
+                    "vector_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/1-1-EXT-36061.shp",
+                    "raster_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/1-1-DEP-36061.tif",
+                    "stage": 11.0,
+                    "discharge": 36061.0,
+                    "annual_chance": "50 year",
+                    "layer_id": 4
+                },
+                {
+                    "vector_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/1-1-EXT-40355.shp",
+                    "raster_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/1-1-DEP-40355.tif",
+                    "stage": 12.0,
+                    "discharge": 40355.0,
+                    "annual_chance": "100 year",
+                    "layer_id": 5
+                },
+                {
+                    "vector_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/1-1-EXT-60506.shp",
+                    "raster_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/1-1-DEP-60506.tif",
+                    "stage": 13.0,
+                    "discharge": 60506.0,
+                    "annual_chance": "500 year",
+                    "layer_id": 6
+                },
+                {
+                    "vector_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/1-1-EXT-70998.shp",
+                    "raster_file": "https://www.hydroshare.org/resource/3edba3668337475aae7a228c76cb8263/data/contents/1-1-DEP-70998.tif",
+                    "stage": 14.0,
+                    "discharge": 70998.0,
+                    "annual_chance": "1000 year",
+                    "layer_id": 7
+                }
+            ],
+            "time_series": [
+                {
+                    "stage": 7.0,
+                    "discharge": 14320.0,
+                    "timestamp": "2025-04-21 10:00:00",
+                    "type": "o"
+                },
+                {
+                    "stage": 8.0,
+                    "discharge": 21290.0,
+                    "timestamp": "2025-04-21 11:00:00",
+                    "type": "o"
+                },
+                {
+                    "stage": 9.0,
+                    "discharge": 25905.0,
+                    "timestamp": "2025-04-21 12:00:00",
+                    "type": "o"
+                },
+                {
+                    "stage": 10.0,
+                    "discharge": 31736.0,
+                    "timestamp": "2025-04-21 13:00:00",
+                    "type": "o"
+                },
+                {
+                    "stage": 11.0,
+                    "discharge": 36061.0,
+                    "timestamp": "2025-04-21 14:00:00",
+                    "type": "o"
+                },
+                {
+                    "stage": 12.0,
+                    "discharge": 40355.0,
+                    "timestamp": "2025-04-21 15:00:00",
+                    "type": "f"
+                },
+                {
+                    "stage": 13.0,
+                    "discharge": 60506.0,
+                    "timestamp": "2025-04-21 16:00:00",
+                    "type": "f"
+                },
+                {
+                    "stage": 14.0,
+                    "discharge": 70998.0,
+                    "timestamp": "2025-04-21 17:00:00",
+                    "type": "f"
+                }
+            ]
+        }
+    ]
+}

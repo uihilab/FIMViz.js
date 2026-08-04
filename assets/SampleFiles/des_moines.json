@@ -1,0 +1,1094 @@
+{
+    "location": "Des Moines",
+    "details": {
+        "date_created": "Nov 2010",
+        "contact_name": "",
+        "contact_email": "",
+        "stage_unit": "ft",
+        "discharge_unit": "cfs",
+        "terms_of_use": "provisional - not for regulatory use",
+        "depth_service_url": "https://ifis.iowafloodcenter.org/ifis/app/inc/inc_get_inundepth.php?lat=[lat]&lng=[lng]&tid=[layer_id]"
+    },
+    "gauge_info": {
+        "river": "Des Moines River blw Raccoon R.",
+        "gauge_id": "05485500",
+        "latitude": 41.577767,
+        "longitude": -93.605495,
+        "flood_level": "24 ft",
+        "last_reported_value": "9 ft 3 in",
+        "last_reported_time": "Tue, October 15, 2024 7:00 am"
+    },
+    "scenarios": [
+        {
+            "model": "HEC-RAS",
+            "scenario_list": [
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_19p0.kmz",
+                    "raster_file": "",
+                    "stage": 19.0,
+                    "discharge": 16400,
+                    "annual_chance": "",
+                    "layer_id": 5805
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_19p5.kmz",
+                    "raster_file": "",
+                    "stage": 19.5,
+                    "discharge": 17500,
+                    "annual_chance": "",
+                    "layer_id": 5806
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_20p0.kmz",
+                    "raster_file": "",
+                    "stage": 20.0,
+                    "discharge": 18600,
+                    "annual_chance": "",
+                    "layer_id": 5807
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_20p5.kmz",
+                    "raster_file": "",
+                    "stage": 20.5,
+                    "discharge": 19700,
+                    "annual_chance": "",
+                    "layer_id": 5809
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_21p0.kmz",
+                    "raster_file": "",
+                    "stage": 21.0,
+                    "discharge": 20900,
+                    "annual_chance": "",
+                    "layer_id": 5810
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_21p5.kmz",
+                    "raster_file": "",
+                    "stage": 21.5,
+                    "discharge": 22100,
+                    "annual_chance": "",
+                    "layer_id": 5811
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_22p0.kmz",
+                    "raster_file": "",
+                    "stage": 22.0,
+                    "discharge": 23300,
+                    "annual_chance": "",
+                    "layer_id": 5812
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_22p5.kmz",
+                    "raster_file": "",
+                    "stage": 22.5,
+                    "discharge": 24600,
+                    "annual_chance": "",
+                    "layer_id": 5813
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_23p0.kmz",
+                    "raster_file": "",
+                    "stage": 23.0,
+                    "discharge": 26000,
+                    "annual_chance": "",
+                    "layer_id": 5815
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_23p5.kmz",
+                    "raster_file": "",
+                    "stage": 23.5,
+                    "discharge": 27400,
+                    "annual_chance": "",
+                    "layer_id": 5816
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_24p0.kmz",
+                    "raster_file": "",
+                    "stage": 24.0,
+                    "discharge": 28900,
+                    "annual_chance": "",
+                    "layer_id": 5817
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_24p5.kmz",
+                    "raster_file": "",
+                    "stage": 24.5,
+                    "discharge": 30600,
+                    "annual_chance": "",
+                    "layer_id": 5818
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_25p0.kmz",
+                    "raster_file": "",
+                    "stage": 25.0,
+                    "discharge": 32400,
+                    "annual_chance": "",
+                    "layer_id": 5819
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_25p5.kmz",
+                    "raster_file": "",
+                    "stage": 25.5,
+                    "discharge": 34200,
+                    "annual_chance": "",
+                    "layer_id": 5820
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_26p0.kmz",
+                    "raster_file": "",
+                    "stage": 26.0,
+                    "discharge": 36000,
+                    "annual_chance": "5",
+                    "layer_id": 5821
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_26p5.kmz",
+                    "raster_file": "",
+                    "stage": 26.5,
+                    "discharge": 37900,
+                    "annual_chance": "",
+                    "layer_id": 5822
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_27p0.kmz",
+                    "raster_file": "",
+                    "stage": 27.0,
+                    "discharge": 39800,
+                    "annual_chance": "10",
+                    "layer_id": 5823
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_27p5.kmz",
+                    "raster_file": "",
+                    "stage": 27.5,
+                    "discharge": 41800,
+                    "annual_chance": "",
+                    "layer_id": 5824
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_28p0.kmz",
+                    "raster_file": "",
+                    "stage": 28.0,
+                    "discharge": 43800,
+                    "annual_chance": "",
+                    "layer_id": 5825
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_28p5.kmz",
+                    "raster_file": "",
+                    "stage": 28.5,
+                    "discharge": 45800,
+                    "annual_chance": "",
+                    "layer_id": 5826
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_29p0.kmz",
+                    "raster_file": "",
+                    "stage": 29.0,
+                    "discharge": 47900,
+                    "annual_chance": "",
+                    "layer_id": 5827
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_29p5.kmz",
+                    "raster_file": "",
+                    "stage": 29.5,
+                    "discharge": 50000,
+                    "annual_chance": "50",
+                    "layer_id": 5828
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_30p0.kmz",
+                    "raster_file": "",
+                    "stage": 30.0,
+                    "discharge": 52200,
+                    "annual_chance": "",
+                    "layer_id": 5829
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_30p5.kmz",
+                    "raster_file": "",
+                    "stage": 30.5,
+                    "discharge": 54400,
+                    "annual_chance": "",
+                    "layer_id": 5830
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_31p0.kmz",
+                    "raster_file": "",
+                    "stage": 31.0,
+                    "discharge": 56700,
+                    "annual_chance": "",
+                    "layer_id": 5831
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_31p5.kmz",
+                    "raster_file": "",
+                    "stage": 31.5,
+                    "discharge": 59000,
+                    "annual_chance": "100",
+                    "layer_id": 5832
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_32p0.kmz",
+                    "raster_file": "",
+                    "stage": 32.0,
+                    "discharge": 61300,
+                    "annual_chance": "",
+                    "layer_id": 5833
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_32p5.kmz",
+                    "raster_file": "",
+                    "stage": 32.5,
+                    "discharge": 63700,
+                    "annual_chance": "200",
+                    "layer_id": 5834
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_33p0.kmz",
+                    "raster_file": "",
+                    "stage": 33.0,
+                    "discharge": 66100,
+                    "annual_chance": "",
+                    "layer_id": 5835
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_33p5.kmz",
+                    "raster_file": "",
+                    "stage": 33.5,
+                    "discharge": 68600,
+                    "annual_chance": "",
+                    "layer_id": 5836
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_34p0.kmz",
+                    "raster_file": "",
+                    "stage": 34.0,
+                    "discharge": 71200,
+                    "annual_chance": "500",
+                    "layer_id": 5837
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_34p5.kmz",
+                    "raster_file": "",
+                    "stage": 34.5,
+                    "discharge": 73800,
+                    "annual_chance": "",
+                    "layer_id": 5838
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_35p0.kmz",
+                    "raster_file": "",
+                    "stage": 35.0,
+                    "discharge": 76500,
+                    "annual_chance": "",
+                    "layer_id": 5839
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_35p5.kmz",
+                    "raster_file": "",
+                    "stage": 35.5,
+                    "discharge": 79200,
+                    "annual_chance": "",
+                    "layer_id": 5840
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_36p0.kmz",
+                    "raster_file": "",
+                    "stage": 36.0,
+                    "discharge": 82000,
+                    "annual_chance": "",
+                    "layer_id": 5841
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_36p5.kmz",
+                    "raster_file": "",
+                    "stage": 36.5,
+                    "discharge": 84800,
+                    "annual_chance": "",
+                    "layer_id": 5842
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_37p0.kmz",
+                    "raster_file": "",
+                    "stage": 37.0,
+                    "discharge": 87700,
+                    "annual_chance": "",
+                    "layer_id": 5843
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_37p5.kmz",
+                    "raster_file": "",
+                    "stage": 37.5,
+                    "discharge": 90600,
+                    "annual_chance": "",
+                    "layer_id": 5844
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_38p0.kmz",
+                    "raster_file": "",
+                    "stage": 38.0,
+                    "discharge": 93600,
+                    "annual_chance": "",
+                    "layer_id": 5845
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_38p5.kmz",
+                    "raster_file": "",
+                    "stage": 38.5,
+                    "discharge": 96600,
+                    "annual_chance": "",
+                    "layer_id": 5846
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_39p0.kmz",
+                    "raster_file": "",
+                    "stage": 39.0,
+                    "discharge": 99700,
+                    "annual_chance": "",
+                    "layer_id": 5847
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_39p5.kmz",
+                    "raster_file": "",
+                    "stage": 39.5,
+                    "discharge": 102700,
+                    "annual_chance": "",
+                    "layer_id": 5848
+                },
+                {
+                    "vector_file": "https://ifis.iowafloodcenter.org/ifis/layers/inundation/des_moines/55_40p0.kmz",
+                    "raster_file": "",
+                    "stage": 40.0,
+                    "discharge": 105700,
+                    "annual_chance": "",
+                    "layer_id": 5849
+                }
+            ]
+        }
+    ],
+    "time_series": [
+        {
+            "stage": 31.0,
+            "discharge": 56700,
+            "timestamp": "2025-03-27 10:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 71200,
+            "timestamp": "2025-03-27 11:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 36.5,
+            "discharge": 84800,
+            "timestamp": "2025-03-27 12:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 29.5,
+            "discharge": 50000,
+            "timestamp": "2025-03-27 13:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 63700,
+            "timestamp": "2025-03-27 14:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 39.5,
+            "discharge": 102700,
+            "timestamp": "2025-03-27 15:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 59000,
+            "timestamp": "2025-03-27 16:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 35.0,
+            "discharge": 76500,
+            "timestamp": "2025-03-27 17:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 31.0,
+            "discharge": 56700,
+            "timestamp": "2025-03-27 18:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 35.0,
+            "discharge": 76500,
+            "timestamp": "2025-03-27 19:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 61300,
+            "timestamp": "2025-03-27 20:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 61300,
+            "timestamp": "2025-03-27 21:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 37.0,
+            "discharge": 87700,
+            "timestamp": "2025-03-27 22:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 39.0,
+            "discharge": 99700,
+            "timestamp": "2025-03-27 23:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 63700,
+            "timestamp": "2025-03-28 00:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 30.0,
+            "discharge": 52200,
+            "timestamp": "2025-03-28 01:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 71200,
+            "timestamp": "2025-03-28 02:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 35.5,
+            "discharge": 79200,
+            "timestamp": "2025-03-28 03:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 71200,
+            "timestamp": "2025-03-28 04:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 68600,
+            "timestamp": "2025-03-28 05:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 39.0,
+            "discharge": 99700,
+            "timestamp": "2025-03-28 06:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 68600,
+            "timestamp": "2025-03-28 07:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 59000,
+            "timestamp": "2025-03-28 08:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 35.0,
+            "discharge": 76500,
+            "timestamp": "2025-03-28 09:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 59000,
+            "timestamp": "2025-03-28 10:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.0,
+            "discharge": 56700,
+            "timestamp": "2025-03-28 11:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 61300,
+            "timestamp": "2025-03-28 12:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 40.0,
+            "discharge": 105700,
+            "timestamp": "2025-03-28 13:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 38.5,
+            "discharge": 96600,
+            "timestamp": "2025-03-28 14:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 30.5,
+            "discharge": 54400,
+            "timestamp": "2025-03-28 15:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 36.0,
+            "discharge": 82000,
+            "timestamp": "2025-03-28 16:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 39.0,
+            "discharge": 99700,
+            "timestamp": "2025-03-28 17:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 30.0,
+            "discharge": 52200,
+            "timestamp": "2025-03-28 18:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 63700,
+            "timestamp": "2025-03-28 19:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 61300,
+            "timestamp": "2025-03-28 20:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 59000,
+            "timestamp": "2025-03-28 21:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 38.5,
+            "discharge": 96600,
+            "timestamp": "2025-03-28 22:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 61300,
+            "timestamp": "2025-03-28 23:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 39.0,
+            "discharge": 99700,
+            "timestamp": "2025-03-29 00:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.0,
+            "discharge": 56700,
+            "timestamp": "2025-03-29 01:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 63700,
+            "timestamp": "2025-03-29 02:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 63700,
+            "timestamp": "2025-03-29 03:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 59000,
+            "timestamp": "2025-03-29 04:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 29.0,
+            "discharge": 47900,
+            "timestamp": "2025-03-29 05:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 35.5,
+            "discharge": 79200,
+            "timestamp": "2025-03-29 06:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 59000,
+            "timestamp": "2025-03-29 07:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 35.0,
+            "discharge": 76500,
+            "timestamp": "2025-03-29 08:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 68600,
+            "timestamp": "2025-03-29 09:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 30.5,
+            "discharge": 54400,
+            "timestamp": "2025-03-29 10:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 30.0,
+            "discharge": 52200,
+            "timestamp": "2025-03-29 11:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 35.5,
+            "discharge": 79200,
+            "timestamp": "2025-03-29 12:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 61300,
+            "timestamp": "2025-03-29 13:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 37.5,
+            "discharge": 90600,
+            "timestamp": "2025-03-29 14:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 36.0,
+            "discharge": 82000,
+            "timestamp": "2025-03-29 15:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 35.5,
+            "discharge": 79200,
+            "timestamp": "2025-03-29 16:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 61300,
+            "timestamp": "2025-03-29 17:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 37.5,
+            "discharge": 90600,
+            "timestamp": "2025-03-29 18:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 40.0,
+            "discharge": 105700,
+            "timestamp": "2025-03-29 19:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 59000,
+            "timestamp": "2025-03-29 20:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 36.5,
+            "discharge": 84800,
+            "timestamp": "2025-03-29 21:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 73800,
+            "timestamp": "2025-03-29 22:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 39.5,
+            "discharge": 102700,
+            "timestamp": "2025-03-29 23:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.0,
+            "discharge": 66100,
+            "timestamp": "2025-03-30 00:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 40.0,
+            "discharge": 105700,
+            "timestamp": "2025-03-30 01:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 36.0,
+            "discharge": 82000,
+            "timestamp": "2025-03-30 02:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 40.0,
+            "discharge": 105700,
+            "timestamp": "2025-03-30 03:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.0,
+            "discharge": 56700,
+            "timestamp": "2025-03-30 04:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 63700,
+            "timestamp": "2025-03-30 05:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 29.5,
+            "discharge": 50000,
+            "timestamp": "2025-03-30 06:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 39.5,
+            "discharge": 102700,
+            "timestamp": "2025-03-30 07:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 29.5,
+            "discharge": 50000,
+            "timestamp": "2025-03-30 08:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 36.0,
+            "discharge": 82000,
+            "timestamp": "2025-03-30 09:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 40.0,
+            "discharge": 105700,
+            "timestamp": "2025-03-30 10:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 37.0,
+            "discharge": 87700,
+            "timestamp": "2025-03-30 11:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 29.5,
+            "discharge": 50000,
+            "timestamp": "2025-03-30 12:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 35.5,
+            "discharge": 79200,
+            "timestamp": "2025-03-30 13:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 59000,
+            "timestamp": "2025-03-30 14:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 30.5,
+            "discharge": 54400,
+            "timestamp": "2025-03-30 15:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 59000,
+            "timestamp": "2025-03-30 16:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 61300,
+            "timestamp": "2025-03-30 17:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 68600,
+            "timestamp": "2025-03-30 18:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 59000,
+            "timestamp": "2025-03-30 19:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 37.0,
+            "discharge": 87700,
+            "timestamp": "2025-03-30 20:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 63700,
+            "timestamp": "2025-03-30 21:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 30.5,
+            "discharge": 54400,
+            "timestamp": "2025-03-30 22:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 68600,
+            "timestamp": "2025-03-30 23:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 39.5,
+            "discharge": 102700,
+            "timestamp": "2025-03-31 00:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 36.0,
+            "discharge": 82000,
+            "timestamp": "2025-03-31 01:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 40.0,
+            "discharge": 105700,
+            "timestamp": "2025-03-31 02:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 29.5,
+            "discharge": 50000,
+            "timestamp": "2025-03-31 03:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 35.5,
+            "discharge": 79200,
+            "timestamp": "2025-03-31 04:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 71200,
+            "timestamp": "2025-03-31 05:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 61300,
+            "timestamp": "2025-03-31 06:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 38.5,
+            "discharge": 96600,
+            "timestamp": "2025-03-31 07:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 39.0,
+            "discharge": 99700,
+            "timestamp": "2025-03-31 08:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 35.5,
+            "discharge": 79200,
+            "timestamp": "2025-03-31 09:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 59000,
+            "timestamp": "2025-03-31 10:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 30.0,
+            "discharge": 52200,
+            "timestamp": "2025-03-31 11:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 36.0,
+            "discharge": 82000,
+            "timestamp": "2025-03-31 12:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 68600,
+            "timestamp": "2025-03-31 13:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.0,
+            "discharge": 66100,
+            "timestamp": "2025-03-31 14:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.0,
+            "discharge": 66100,
+            "timestamp": "2025-03-31 15:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 35.0,
+            "discharge": 76500,
+            "timestamp": "2025-03-31 16:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 39.5,
+            "discharge": 102700,
+            "timestamp": "2025-03-31 17:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.0,
+            "discharge": 56700,
+            "timestamp": "2025-03-31 18:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 38.5,
+            "discharge": 96600,
+            "timestamp": "2025-03-31 19:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.0,
+            "discharge": 56700,
+            "timestamp": "2025-03-31 20:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 68600,
+            "timestamp": "2025-03-31 21:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 36.5,
+            "discharge": 84800,
+            "timestamp": "2025-03-31 22:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 61300,
+            "timestamp": "2025-03-31 23:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 61300,
+            "timestamp": "2025-04-01 00:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.0,
+            "discharge": 66100,
+            "timestamp": "2025-04-01 01:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 59000,
+            "timestamp": "2025-04-01 02:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 39.5,
+            "discharge": 102700,
+            "timestamp": "2025-04-01 03:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 38.5,
+            "discharge": 96600,
+            "timestamp": "2025-04-01 04:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 36.0,
+            "discharge": 82000,
+            "timestamp": "2025-04-01 05:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 30.5,
+            "discharge": 54400,
+            "timestamp": "2025-04-01 06:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 73800,
+            "timestamp": "2025-04-01 07:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 73800,
+            "timestamp": "2025-04-01 08:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.0,
+            "discharge": 56700,
+            "timestamp": "2025-04-01 09:00:00",
+            "type": "f"
+        }
+    ]
+}

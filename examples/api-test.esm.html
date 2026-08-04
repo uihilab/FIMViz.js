@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — ESM API test bench</title>
+<style>
+  :root { --bg:#0f1216; --panel:#161b22; --line:#2b3440; --fg:#e6edf3; --dim:#8b949e;
+          --ok:#3fb950; --bad:#f85149; --warn:#d29922; --accent:#58a6ff; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#fff; --panel:#f6f8fa; --line:#d0d7de; --fg:#1f2328; --dim:#656d76; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:14px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { padding:20px 24px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:18px; }
+  header p { margin:0; color:var(--dim); font-size:13px; }
+  main { padding:16px 24px 64px; max-width:1100px; }
+  section { border:1px solid var(--line); border-radius:8px; margin:14px 0; background:var(--panel); }
+  section > h2 { margin:0; padding:10px 14px; font-size:14px; border-bottom:1px solid var(--line);
+                 display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .body { padding:12px 14px; }
+  button { background:var(--accent); color:#08111f; border:0; border-radius:6px;
+           padding:6px 12px; font-weight:600; cursor:pointer; font-size:13px; }
+  button.sec { background:transparent; color:var(--accent); border:1px solid var(--line); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  pre { margin:10px 0 0; padding:10px; background:var(--bg); border:1px solid var(--line);
+        border-radius:6px; overflow:auto; max-height:360px; font-size:12px;
+        font-family:ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-wrap; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .pill { font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); color:var(--dim); }
+  .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); } .dim { color:var(--dim); }
+  code { font-family:ui-monospace,Menlo,monospace; font-size:12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FIMViz — ESM API test bench</h1>
+  <p><code>import { … } from "fimviz"</code> — a bare specifier, resolved by an import map. No
+     bundler, no build step, no UMD global. Serve from the <strong>repo root</strong>
+     (<code>npx serve .</code>) and open <code>/examples/api-test.esm.html</code>; ES modules,
+     IndexedDB and <code>fetch</code> all fail on <code>file://</code>.</p>
+</header>
+
+<main>
+  <section>
+    <h2>0 · Exports <span class="pill" id="pill">loading…</span></h2>
+    <div class="body"><pre id="out-exports">importing "fimviz" …</pre></div>
+  </section>
+
+  <section>
+    <h2>1 · Run all headless checks <button id="runAll">Run</button>
+        <span id="summary" class="dim"></span></h2>
+    <div class="body"><pre id="out-all">Not run yet.</pre></div>
+  </section>
+
+  <section>
+    <h2>2 · ColorScale + palettes <span class="pill">pure</span></h2>
+    <div class="body">
+      <div class="row">
+        <button data-run="colorScale">ColorScale</button>
+        <button class="sec" data-run="palettes">Palettes</button>
+        <button class="sec" data-run="registerPalette">registerPalette()</button>
+      </div>
+      <pre data-out="colorScale">—</pre>
+    </div>
+  </section>
+
+  <section>
+    <h2>3 · Legend <span class="pill">pure</span></h2>
+    <div class="body">
+      <div class="row"><button data-run="legend">Run</button></div>
+      <pre data-out="legend">—</pre>
+    </div>
+  </section>
+
+  <section>
+    <h2>4 · Stats + Filters <span class="pill">pure</span></h2>
+    <div class="body">
+      <div class="row">
+        <button data-run="stats">Stats.raster()</button>
+        <button class="sec" data-run="filters">Filters</button>
+      </div>
+      <pre data-out="stats">—</pre>
+    </div>
+  </section>
+
+  <section>
+    <h2>5 · Dataset &amp; Layer <span class="pill">pure</span></h2>
+    <div class="body">
+      <div class="row">
+        <button data-run="dataset">Dataset</button>
+        <button class="sec" data-run="layer">Layer events</button>
+      </div>
+      <pre data-out="dataset">—</pre>
+    </div>
+  </section>
+
+  <section>
+    <h2>6 · Storage <span class="pill">IndexedDB</span></h2>
+    <div class="body">
+      <div class="row">
+        <button data-run="storage">Round-trip</button>
+        <button class="sec" data-run="storageClean">Delete test DB</button>
+      </div>
+      <pre data-out="storage">—</pre>
+    </div>
+  </section>
+
+  <section>
+    <h2>7 · parseFile <span class="pill">needs a real file</span></h2>
+    <div class="body">
+      <p class="dim" style="margin:0 0 8px">
+<code>parseFile(source)</code> from <code>fimviz/data</code> — File | Blob | ArrayBuffer | URL.
+        .tif/.tiff · .geojson/.json · .kml · .kmz · .zip (shapefile)
+      </p>
+      <div class="row">
+        <input type="file" id="fileInput" multiple accept=".tif,.tiff,.geojson,.json,.kml,.kmz,.zip" />
+        <button class="sec" data-run="parseUrl">Parse from URL…</button>
+      </div>
+      <pre data-out="parse">—</pre>
+    </div>
+  </section>
+
+  <section>
+    <h2>8 · warp <span class="pill warn">GDAL WASM — ~38 MB on first use</span></h2>
+    <div class="body">
+      <p class="dim" style="margin:0 0 8px">Parse a projected GeoTIFF above first. Browser-only —
+         gdal3.js has no Node build, so this path has no automated coverage.</p>
+      <div class="row"><button data-run="warp" id="reprojectBtn" disabled>warp(ds, 'EPSG:4326')</button></div>
+      <pre data-out="warp">Parse a raster first.</pre>
+    </div>
+  </section>
+
+  <section>
+    <h2>9 · mount / registerRuntime <span class="pill warn">headless engine</span></h2>
+    <div class="body">
+      <p class="dim" style="margin:0 0 8px">
+        The library ships no UI tier, so <code>mount()</code> from the bare package fails with a
+        <em>coded</em> error. A stub runtime then proves the seam works without the widget.
+      </p>
+      <div class="row">
+        <button data-run="mount">mount() with no runtime</button>
+        <button class="sec" data-run="runtime">registerRuntime() stub → mount()</button>
+      </div>
+      <div id="mountTarget" style="width:100%;height:200px;margin-top:10px;
+           border:1px dashed var(--line);border-radius:6px"></div>
+      <pre data-out="mount">—</pre>
+    </div>
+  </section>
+</main>
+
+<!--
+  IMPORT MAP — this is what makes the page below read exactly like a consumer's code.
+  The bare specifier "fimviz" resolves to the built ESM bundle, the same way a bundler or a
+  published package would resolve it. Change this one line to point at a CDN or node_modules
+  and nothing else in the page changes.
+-->
+<script type="importmap">
+{
+  "imports": {
+    "fimviz":          "../dist/fimviz.js",
+    "fimviz/data":     "../dist/fimviz.js",
+    "fimviz/storage":  "../dist/fimviz.js",
+    "fimviz/style":    "../dist/fimviz.js",
+    "fimviz/analysis": "../dist/fimviz.js",
+    "fimviz/layers":   "../dist/fimviz.js",
+    "fimviz/vendor":   "../dist/fimviz.js"
+  }
+}
+</script>
+
+<script type="module">
+// ─────────────────────────────────────────────────────────────────────────────
+// The whole public surface, grouped by what you are doing. Six subpaths + an escape hatch —
+// the engine's internal file layout is not reachable and not part of the contract.
+//
+// The package is ESM-only; the named imports below ARE the API. A published consumer writes
+// exactly these lines; only the import map above stands in for node_modules resolution.
+// ─────────────────────────────────────────────────────────────────────────────
+import { mount, FimViz, registerRuntime }                             from "fimviz";
+import { Dataset, warp, parseFile }                              from "fimviz/data";
+import { Storage }                                                    from "fimviz/storage";
+import { ColorScale, PALETTES, registerPalette, hasPalette,
+         paletteNames, Legend }                                       from "fimviz/style";
+import { Stats, Filter, SpatialFilter, PredicateFilter }              from "fimviz/analysis";
+import { Layer, RasterLayer, VectorLayer, registerLayerType }         from "fimviz/layers";
+import { fromArrayBuffer, kml, shp, Loader }                          from "fimviz/vendor";
+
+const $ = (s) => document.querySelector(s);
+const out = (k, s) => { const el = document.querySelector(`[data-out="${k}"]`); if (el) el.textContent = s; };
+const j = (v) => JSON.stringify(v, (_k, x) => (x instanceof ArrayBuffer ? `ArrayBuffer(${x.byteLength})` : x), 2);
+
+let lastDataset = null;
+
+// ── 0. export inventory ──────────────────────────────────────────────────────
+const GROUPS = {
+  "fimviz":          { mount, FimViz, registerRuntime },
+  "fimviz/data":     { Dataset, warp, parseFile },
+  "fimviz/storage":  { Storage },
+  "fimviz/style":    { ColorScale, PALETTES, registerPalette, hasPalette, paletteNames, Legend },
+  "fimviz/analysis": { Stats, Filter, SpatialFilter, PredicateFilter },
+  "fimviz/layers":   { Layer, RasterLayer, VectorLayer, registerLayerType },
+  "fimviz/vendor":   { fromArrayBuffer, kml, shp, Loader },
+};
+const EXPECTED = Object.assign({}, ...Object.values(GROUPS));
+
+(function inventory() {
+  const lines = [];
+  let missing = 0;
+  for (const [subpath, exports] of Object.entries(GROUPS)) {
+    lines.push(subpath);
+    for (const [name, val] of Object.entries(exports)) {
+      const t = typeof val;
+      const ok = t === "function" || t === "object";
+      if (!ok) missing++;
+      lines.push((ok ? "  ok   " : "  MISS ") + name.padEnd(22) + t);
+    }
+    lines.push("");
+  }
+  lines.push("  app namespace:");
+  for (const m of ["mount", "create", "parseFile", "current", "reset"]) {
+    const ok = typeof FimViz[m] === "function";
+    if (!ok) missing++;
+    lines.push((ok ? "  ok   " : "  MISS ") + ("FimViz." + m).padEnd(22) + typeof FimViz[m]);
+  }
+  const pill = $("#pill");
+  pill.textContent = missing ? `${missing} missing` : `${Object.keys(EXPECTED).length + 5} OK`;
+  pill.className = "pill " + (missing ? "bad" : "ok");
+  out("exports", lines.join("\n"));
+})();
+
+// ── checks ───────────────────────────────────────────────────────────────────
+// Each returns a printable string; throwing marks it failed.
+const checks = {
+
+  colorScale() {
+    const cs = new ColorScale({ palette: "viridis", min: 0, max: 10 });
+    const L = [];
+    L.push("stops (classed):        " + j(cs.getStops().slice(0, 2)) + " ...");
+    L.push("getColor(5):            " + cs.getColor(5));
+    L.push("getRgb(5):              " + j(cs.getRgb(5)));
+    L.push("getValues():            " + j(cs.getValues()));
+    L.push("getRange(0):            " + j(cs.getRange(0)));
+    L.push("kind / isExplicit:      " + cs.kind + " / " + cs.isExplicit);
+    cs.set({ continuous: true });
+    L.push("continuous(true) -> 5:  " + cs.getColor(5));
+    cs.set({ min: 0, max: 100 });
+    L.push("setDomain(0,100) -> 5:  " + cs.getColor(5));
+    cs.setColor(0, "#ff0000"); cs.setLabel(0, "low"); cs.setRange(0, { min: 0, max: 1 });
+    L.push("after per-band edits:   " + j(cs.getStops()[0]) + "  source=" + cs.source);
+
+    const gdal = ColorScale.fromGdalLegend(
+      [{ value: 1, color: "#0000ff", label: "wet" }, { value: 2, color: "#00ff00", label: "dry" }], "m");
+    L.push("fromGdalLegend -> 1:    " + gdal.getColor(1) + "  discrete=" + gdal.discrete);
+
+    let fired = 0; gdal.onChange(() => fired++); gdal.set({ palette: "heat" });
+    if (fired !== 1) throw new Error("onChange did not fire");
+    L.push("onChange fired:         " + fired);
+
+    gdal.colorFor = (v) => (v > 1 ? "#ffffff" : null);
+    L.push("colorFor override(2):   " + gdal.getColor(2));
+
+    let threw = "";
+    try { new ColorScale({ palette: "nope" }); } catch (e) { threw = e.message.slice(0, 60); }
+    if (!threw) throw new Error("unknown palette should have thrown");
+    L.push("unknown palette throws: " + threw + "...");
+    return L.join("\n");
+  },
+
+  palettes() {
+    return "paletteNames(): " + j(paletteNames()) +
+      "\nhasPalette('viridis'): " + hasPalette("viridis") +
+      "\nhasPalette('nope'):    " + hasPalette("nope") +
+      "\nPALETTES.viridis:      " + j(PALETTES.viridis);
+  },
+
+  registerPalette() {
+    registerPalette("test-mono", ["#000000", "#ffffff"]);
+    if (!hasPalette("test-mono")) throw new Error("palette not registered");
+    const cs = new ColorScale({ palette: "test-mono", min: 0, max: 1 });
+    return "registered 'test-mono'\ngetColor(0): " + cs.getColor(0) +
+      "\ngetColor(1): " + cs.getColor(1) + "\npaletteNames(): " + j(paletteNames());
+  },
+
+  legend() {
+    const cs = new ColorScale({ palette: "blues", min: 0, max: 4, unit: "m" });
+    const lg = Legend.fromColorScale(cs);
+    return "Legend.fromColorScale(cs).toJSON():\n" + j(lg.toJSON()) +
+      "\n\ntoHtml() (first 200 chars):\n" + String(lg.toHtml()).slice(0, 200) + "..." +
+      "\n\ndirect construction:\n" +
+      j(new Legend({ unit: "ft", kind: "classed",
+                     stops: [{ min: 0, max: 1, color: "#eee", label: "shallow" }] }).toJSON());
+  },
+
+  stats() {
+    const w = 8, h = 8, px = new Float32Array(w * h);
+    for (let i = 0; i < px.length; i++) px[i] = i % 16;
+    px[0] = -9999;                                   // a no-data hole
+    const meta = { width: w, height: h, bw: -92, be: -91, bs: 41, bn: 42, noData: -9999 };
+    const s = Stats.raster(px, meta);
+    const L = [];
+    L.push("Stats.raster():     " + j(s.toJSON()));
+    L.push("percentile(50):     " + s.percentile(50));
+    L.push("describe():         " + j(s.describe()));
+    L.push("toCSV() (head):     " + String(s.toCSV()).split("\n").slice(0, 2).join(" | "));
+    const s2 = Stats.raster(px.map((v) => (v === -9999 ? v : v * 2)), meta);
+    L.push("diff(other):        " + j(s2.diff(s)));
+    const masked = Stats.raster(px, meta, {
+      filter: new SpatialFilter([{ lat: 41.4, lng: -91.8 }, { lat: 41.4, lng: -91.2 },
+                                 { lat: 41.9, lng: -91.2 }, { lat: 41.9, lng: -91.8 }]),
+    });
+    L.push("with SpatialFilter: count " + s.count + " -> " + masked.count);
+    L.push("skipZero:           count " + Stats.raster(px, meta, { skipZero: true }).count);
+    return L.join("\n");
+  },
+
+  filters() {
+    const square = [{ lat: 0, lng: 0 }, { lat: 0, lng: 10 }, { lat: 10, lng: 10 }, { lat: 10, lng: 0 }];
+    const sf = new SpatialFilter(square);
+    const pf = new PredicateFilter((u) => u.value > 5);
+    const both = Filter.all([sf, pf]);
+    if (sf.contains(5, 5) !== true) throw new Error("contains(5,5) should be true");
+    if (sf.contains(50, 50) !== false) throw new Error("contains(50,50) should be false");
+    return [
+      "SpatialFilter.contains(5,5):     " + sf.contains(5, 5),
+      "SpatialFilter.contains(50,50):   " + sf.contains(50, 50),
+      "SpatialFilter.isEmpty():         " + sf.isEmpty(),
+      "SpatialFilter.pixelBbox(meta):   " +
+        j(sf.pixelBbox({ width: 100, height: 100, bw: 0, be: 20, bs: 0, bn: 20 })),
+      "multi-polygon (array of rings):  " +
+        new SpatialFilter([square, [{lat:20,lng:20},{lat:20,lng:30},{lat:30,lng:30}]]).contains(25, 24),
+      "[lat,lng] tuples also accepted:  " +
+        new SpatialFilter([[0,0],[0,10],[10,10],[10,0]]).contains(5, 5),
+      "PredicateFilter.test({value:9}): " + pf.test({ value: 9 }),
+      "Filter.all().test(inside+match): " + both.test({ lat: 5, lng: 5, value: 9 }),
+      "Filter.all().test(outside):      " + both.test({ lat: 50, lng: 50, value: 9 }),
+      "Filter.from(fn) is Predicate:    " + (Filter.from((u) => !!u) instanceof PredicateFilter),
+      "base Filter.test() permissive:   " + new Filter().test({}),
+    ].join("\n");
+  },
+
+  dataset() {
+    const ds = new Dataset({
+      name: "demo.geojson", kind: "vector", format: "geojson", crs: "EPSG:4326",
+      bounds: { north: 42, south: 41, east: -91, west: -92 },
+      meta: { featureCount: 2 },
+      data: { type: "FeatureCollection", features: [] },
+    });
+    const rec = ds.toRecord();
+    const back = Dataset.fromRecord(rec);
+    if (back.id !== ds.id) throw new Error("fromRecord lost the id");
+    if (!(back instanceof Dataset)) throw new Error("fromRecord did not rehydrate the prototype");
+    return [
+      "id (auto):                " + ds.id,
+      "toJSON() (metadata only, no payload):",
+      j(ds.toJSON()),
+      "",
+      "toRecord() keys:          " + j(Object.keys(rec)),
+      "round-trip keeps id:      " + (back.id === ds.id),
+      "round-trip is a Dataset:  " + (back instanceof Dataset),
+      "",
+      "ds.download() exists (writes a file) - not run automatically.",
+    ].join("\n");
+  },
+
+  layer() {
+    const log = [];
+    const fakeMap = { emit: (e) => log.push("map bus -> " + e), _unregisterLayer: () => log.push("unregistered") };
+    const layer = new RasterLayer({ map: fakeMap, type: "userRaster" });
+    layer.on("rendered", () => log.push("layer.on('rendered')"));
+    layer.once("removed", () => log.push("layer.once('removed')"));
+    layer.emit("rendered", { pixels: 42 });
+    layer._teardown = () => log.push("_teardown ran");
+    layer.remove();
+    if (!log.includes("map bus -> userRaster:rendered")) {
+      throw new Error("Layer did not forward to the map bus: " + j(log));
+    }
+    registerLayerType("demo-type", (fim, opts) => new Layer({ ...opts, type: "demo-type" }));
+    return [
+      "event log (ONE event, TWO subscriptions):",
+      log.map((l) => "  " + l).join("\n"),
+      "",
+      "layer.toJSON():               " + j(layer.toJSON()),
+      "instanceof RasterLayer/Layer: " + (layer instanceof RasterLayer) + " / " + (layer instanceof Layer),
+      "VectorLayer is a constructor: " + (typeof VectorLayer === "function"),
+      "registerLayerType('demo-type') registered.",
+    ].join("\n");
+  },
+
+  async storage() {
+    const db = new Storage({ name: "fimviz-api-test", version: 1, tables: ["demo"] });
+    const L = [];
+    L.push("name:                 " + db.name);
+    L.push("tables():             " + j(await db.tables()));
+    const buf = new Uint8Array([1, 2, 3, 250]).buffer;
+    await db.put("demo", "a.tif", { filename: "a.tif", data: buf, type: "geotif" });
+    await db.put("demo", "b.json", { filename: "b.json", data: { hello: "world" } });
+    const got = await db.get("demo", "a.tif");
+    if (!(got.data instanceof ArrayBuffer)) throw new Error("ArrayBuffer was not stored verbatim");
+    L.push("ArrayBuffer verbatim: " + (got.data instanceof ArrayBuffer) + " (" + got.data.byteLength + " bytes)");
+    L.push("has(present/absent):  " + (await db.has("demo", "a.tif")) + " / " + (await db.has("demo", "nope")));
+    L.push("get(absent):          " + (await db.get("demo", "nope")));
+    L.push("list({keys:true}):    " + j(await db.list("demo", { keys: true })));
+    L.push("list() length:        " + (await db.list("demo")).length);
+    await db.delete("demo", "b.json");
+    L.push("after delete:         " + j(await db.list("demo", { keys: true })));
+    L.push("createTable('t2'):    " + (await db.createTable("t2")) + "  tables: " + j(await db.tables()));
+    L.push("dropTable('t2'):      " + (await db.dropTable("t2")));
+    await db.clear("demo");
+    L.push("after clear():        " + j(await db.list("demo", { keys: true })));
+    await db.close();
+    L.push("close() ok.");
+    return L.join("\n");
+  },
+
+  async storageClean() {
+    await new Storage({ name: "fimviz-api-test" }).destroy();
+    return "destroy() -> database 'fimviz-api-test' deleted.";
+  },
+
+  // The engine is headless, so mount() without a runtime fails with a CODED error.
+  // WHICH code depends on how far it gets:
+  //   • no markup registered and no #map in the page → 'config-invalid'
+  //   • markup present but no bootstrap()            → 'boot-failed'
+  // The markup check runs first, so a bare package hits config-invalid.
+  async mount() {
+    try {
+      await mount("mountTarget", { apiKey: "not-a-real-key" });
+      throw new Error("UNEXPECTED: mount() resolved without a registered runtime.");
+    } catch (e) {
+      if (!e.code) throw e;
+      return "mount() rejected as documented.\n" +
+             "  code:    " + e.code + "\n" +
+             "  message: " + e.message + "\n\n" +
+             "(The markup check precedes the bootstrap check, so a bare package\n" +
+             " reports config-invalid rather than boot-failed.)";
+    }
+  },
+
+  async runtime() {
+    const called = [];
+    registerRuntime({
+      bootstrap: async () => { called.push("bootstrap()"); },
+      getMountedMap: () => ({ stub: true }),
+      teardownMap: () => { called.push("teardownMap()"); },
+      createPanel: (root) => ({ root, deactivate() { called.push("panel.deactivate()"); } }),
+      markup: '<div id="map" style="height:100%;display:grid;place-items:center">stub runtime mounted</div>',
+    });
+    try {
+      const fim = await mount("mountTarget", { apiKey: "stub" });
+      let storageMsg;
+      try { fim.storage; storageMsg = "did NOT throw (unexpected)"; }
+      catch { storageMsg = "throws until config.storage is set (correct)"; }
+      const L = [
+        "mount() resolved with a registered runtime.",
+        "runtime calls:       " + j(called),
+        "fim.root:            " + (fim.root && fim.root.id),
+        "fim.map:             " + j(fim.map) + "   <- adopted from the runtime; the INSTANCE owns it",
+        "fim.config:          dataSource=" + JSON.stringify(fim.config.dataSource) +
+          "  (empty = the engine ships no deployment topology)",
+        "fim.layerPanel:      " + (fim.layerPanel ? "built via createPanel" : "none"),
+        "fim.datasets/layers: " + fim.datasets.length + " / " + fim.layers.length,
+        "fim.$('#map'):       " + (fim.$("#map") ? "found (scoped to this root)" : "not found"),
+        "fim.actionNames:     " + j(fim.actionNames),
+        "fim.storage:         " + storageMsg,
+        "FimViz.current():    " + (FimViz.current() ? "the ambient default app" : "null"),
+      ];
+      fim.destroy();
+      L.push("after destroy(), fim.map: " + j(fim.map));
+      L.push("teardown calls:      " + j(called));
+      return L.join("\n");
+    } catch (e) {
+      return "mount() failed: " + (e.code || "") + " " + e.message +
+        "\n(Only one map may be mounted at a time - reload to retry.)";
+    }
+  },
+
+  async parseUrl() {
+    const url = prompt("URL of a .tif / .geojson / .kml / .kmz / .zip to parse:");
+    if (!url) return "cancelled";
+    const ds = await parseFile(url);
+    lastDataset = ds;
+    $("#reprojectBtn").disabled = false;
+    return describeDataset(ds);
+  },
+
+  async warp() {
+    if (!lastDataset) return "Parse a raster first.";
+    out("warp", "Warping… (the first run downloads GDAL wasm/data — this can take a while)");
+    const t0 = performance.now();
+    const ds = await warp(lastDataset, "EPSG:4326");
+    return "warp(ds, 'EPSG:4326') in " + Math.round(performance.now() - t0) + " ms\n\n" +
+      "before: crs=" + lastDataset.crs + "  bounds=" + j(lastDataset.bounds) + "\n" +
+      "after:  crs=" + ds.crs + "  bounds=" + j(ds.bounds) + "\n\n" +
+      "returns a NEW Dataset (input untouched): " + (ds !== lastDataset);
+  },
+};
+
+function describeDataset(ds) {
+  return [
+    "name:    " + ds.name,
+    "id:      " + ds.id,
+    "kind:    " + ds.kind,
+    "format:  " + ds.format,
+    "crs:     " + ds.crs + (ds.crs === "EPSG:4326" ? "" : "   <- native; parseFile never reprojects"),
+    "bounds:  " + j(ds.bounds),
+    "meta:    " + j(ds.meta),
+    "data:    " + (ds.data instanceof ArrayBuffer ? "ArrayBuffer(" + ds.data.byteLength + ")" : typeof ds.data),
+  ].join("\n");
+}
+
+// ── file input ───────────────────────────────────────────────────────────────
+$("#fileInput").addEventListener("change", async (e) => {
+  const files = [...e.target.files];
+  if (!files.length) return;
+  out("parse", "Parsing " + files.length + " file(s)…");
+  const results = [];
+  for (const file of files) {
+    try {
+      const t0 = performance.now();
+      const ds = await parseFile(file);
+      lastDataset = ds;
+      results.push("-- " + file.name + "  (" + Math.round(performance.now() - t0) + " ms)\n" + describeDataset(ds));
+    } catch (err) {
+      results.push("-- " + file.name + "\nFAILED: " + err.message);
+    }
+  }
+  $("#reprojectBtn").disabled = !lastDataset;
+  out("parse", results.join("\n\n"));
+});
+
+// ── wiring ───────────────────────────────────────────────────────────────────
+const OUT_FOR = { palettes: "colorScale", registerPalette: "colorScale", filters: "stats",
+                  layer: "dataset", storageClean: "storage", runtime: "mount", parseUrl: "parse" };
+
+document.querySelectorAll("[data-run]").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const key = btn.dataset.run;
+    const target = OUT_FOR[key] || key;
+    out(target, "Running…");
+    try { out(target, await checks[key]()); }
+    catch (err) { out(target, "FAILED: " + (err && err.stack ? err.stack : err)); }
+  });
+});
+
+const HEADLESS = ["colorScale", "palettes", "registerPalette", "legend", "stats",
+                  "filters", "dataset", "layer", "storage"];
+
+$("#runAll").addEventListener("click", async () => {
+  const lines = []; let pass = 0, fail = 0;
+  for (const key of HEADLESS) {
+    try { await checks[key](); lines.push("ok    " + key); pass++; }
+    catch (err) { lines.push("FAIL  " + key + " — " + err.message); fail++; }
+  }
+  out("all", lines.join("\n"));
+  const s = $("#summary");
+  s.textContent = pass + " passed, " + fail + " failed";
+  s.className = fail ? "bad" : "ok";
+});
+
+// Expose for console poking.
+window.FIM = { mount, FimViz, registerRuntime, Dataset, warp, Storage, ColorScale, PALETTES,
+               registerPalette, hasPalette, paletteNames, Legend, Stats, Filter, SpatialFilter,
+               PredicateFilter, Layer, RasterLayer, VectorLayer, registerLayerType,
+               fromArrayBuffer, kml, shp, Loader, checks };
+console.log("[fimviz] ESM bench ready — everything is on window.FIM");
+</script>
+</body>
+</html>

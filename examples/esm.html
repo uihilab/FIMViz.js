@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FIMViz — native ESM import</title>
+  <style>
+    html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
+    #fim { width: 100%; height: 100vh; }
+    #hint { padding: 1rem; }
+  </style>
+</head>
+<body>
+  <div id="fim"></div>
+
+  <!-- The bare specifier "fimviz" is resolved by this import map — the same thing a bundler
+       or a published package does. Point it at node_modules or a CDN and the code is unchanged. -->
+  <script type="importmap">
+  { "imports": { "fimviz": "../dist/fimviz.js" } }
+  </script>
+
+  <script type="module">
+    import { FimViz } from "fimviz";
+
+    const apiKey = new URLSearchParams(location.search).get("apiKey");
+    if (!apiKey) {
+      document.getElementById("fim").innerHTML =
+        '<p id="hint">Open with <code>?apiKey=YOUR_GOOGLE_MAPS_KEY</code> to mount via ESM import.</p>';
+    } else {
+      // NOTE: the engine is headless and no runtime is registered here, so this takes the
+      // bare-map boot path — a real google.maps.Map with no FIMViz widget chrome (no Layer
+      // Panel, no flood layers). See docs/usage/USAGE.md "Booting the widget".
+      const w = FimViz.mount("#fim", { apiKey });
+      w.on("ready", () => console.log("[esm] ready"));
+      w.then((widget) => console.log("[esm] mounted", widget))
+        .catch((e) => console.error("[esm] failed", e.code, e.message));
+    }
+  </script>
+</body>
+</html>

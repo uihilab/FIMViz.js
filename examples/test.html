@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>fimviz — quick test</title>
+<style>
+  body { margin:0; padding:24px; background:#0f1216; color:#e6edf3;
+         font:14px/1.6 ui-sans-serif,system-ui,sans-serif; }
+  @media (prefers-color-scheme:light){ body{ background:#fff; color:#1f2328; } }
+  h1 { font-size:18px; margin:0 0 4px; }
+  p  { color:#8b949e; margin:0 0 16px; font-size:13px; }
+  pre { background:rgba(127,127,127,.12); padding:12px; border-radius:6px; overflow:auto;
+        font:12px/1.5 ui-monospace,Menlo,monospace; white-space:pre-wrap; }
+  input[type=file] { margin:8px 0 16px; }
+</style>
+</head>
+<body>
+
+<h1>fimviz — quick test</h1>
+<p>Serve from the repo root (<code>npx serve .</code>) and open this file. Results appear below.</p>
+
+<input type="file" id="f" multiple accept=".tif,.tiff,.geojson,.json,.kml,.kmz,.zip" />
+<pre id="out">running…</pre>
+
+<!--
+  Maps each public subpath to its bundle — the same job node_modules + package.json "exports" does.
+  The engine's file layout is NOT here, and that is the point: consumers see six entry points.
+-->
+<script type="importmap">
+{
+  "imports": {
+    "fimviz":          "../dist/fimviz.js",
+    "fimviz/data":     "../dist/fimviz.js",
+    "fimviz/storage":  "../dist/fimviz.js",
+    "fimviz/style":    "../dist/fimviz.js",
+    "fimviz/analysis": "../dist/fimviz.js",
+    "fimviz/layers":   "../dist/fimviz.js",
+    "fimviz/vendor":   "../dist/fimviz.js"
+  }
+}
+</script>
+
+<script type="module">
+import { parseFile, Dataset }                          from "fimviz/data";
+import { Storage }                                     from "fimviz/storage";
+import { ColorScale, Legend, paletteNames }            from "fimviz/style";
+import { Stats, SpatialFilter, PredicateFilter, Filter } from "fimviz/analysis";
+import { RasterLayer }                                 from "fimviz/layers";
+
+const log = [];
+const p = (s) => log.push(s);
+const show = () => document.getElementById("out").textContent = log.join("\n");
+
+try {
+  p("✓ imported fimviz\n");
+
+  // ColorScale
+  const cs = new ColorScale({ palette: "viridis", min: 0, max: 10 });
+  p("ColorScale.getColor(5)   " + cs.getColor(5));
+  p("ColorScale.getRgb(5)     " + JSON.stringify(cs.getRgb(5)));
+  p("paletteNames()           " + paletteNames().join(", "));
+
+  // Legend
+  p("Legend.stops             " + Legend.fromColorScale(cs).toJSON().stops.length + " stops");
+
+  // Stats over a synthetic 8x8 raster with a no-data hole
+  const px = new Float32Array(64).map((_, i) => i % 16);
+  px[0] = -9999;
+  const meta = { width: 8, height: 8, bw: -92, be: -91, bs: 41, bn: 42, noData: -9999 };
+  const st = Stats.raster(px, meta);
+  p(`Stats.raster             min=${st.min} max=${st.max} mean=${st.mean.toFixed(2)} count=${st.count}`);
+  p("Stats.percentile(50)     " + st.percentile(50));
+
+  // Filters
+  const sq = [{lat:0,lng:0},{lat:0,lng:10},{lat:10,lng:10},{lat:10,lng:0}];
+  const sf = new SpatialFilter(sq);
+  p("SpatialFilter inside/out " + sf.contains(5,5) + " / " + sf.contains(50,50));
+  p("Filter.all()             " + Filter.all([sf, new PredicateFilter(u => u.value > 5)])
+                                        .test({ lat:5, lng:5, value:9 }));
+
+  // Dataset round-trip
+  const ds = new Dataset({ name:"x.tif", kind:"raster", format:"geotiff", crs:"EPSG:26915" });
+  p("Dataset round-trip       " + (Dataset.fromRecord(ds.toRecord()).id === ds.id));
+
+  // Layer events — one event reaches both the layer and the map bus
+  const seen = [];
+  const layer = new RasterLayer({ map:{ emit:(e)=>seen.push(e), _unregisterLayer(){} }, type:"userRaster" });
+  layer.on("rendered", () => seen.push("local"));
+  layer.emit("rendered");
+  p("Layer events             " + JSON.stringify(seen));
+
+  // Storage — real IndexedDB
+  const db = new Storage({ name:"fimviz-quick-test", version:1, tables:["t"] });
+  await db.put("t", "a.tif", { data: new Uint8Array([1,2,3]).buffer });
+  const got = await db.get("t", "a.tif");
+  p("Storage ArrayBuffer      " + (got.data instanceof ArrayBuffer) + ` (${got.data.byteLength}B)`);
+  p("Storage keys             " + JSON.stringify(await db.list("t", { keys:true })));
+  await db.destroy();
+
+  p("\n✓ all checks passed — now drop a file above to test parseFile()");
+} catch (err) {
+  p("\n✗ FAILED: " + (err && err.stack ? err.stack : err));
+}
+show();
+
+// parseFile with a real file
+document.getElementById("f").addEventListener("change", async (e) => {
+  for (const file of e.target.files) {
+    log.push("\n── " + file.name);
+    try {
+      const ds = await parseFile(file);
+      log.push(`   kind=${ds.kind} format=${ds.format} crs=${ds.crs}`);
+      log.push("   bounds=" + JSON.stringify(ds.bounds));
+      log.push("   meta=" + JSON.stringify(ds.meta));
+    } catch (err) {
+      log.push("   FAILED: " + err.message);
+    }
+    show();
+  }
+});
+
+window.FIM = { parseFile, Dataset, Storage, ColorScale, Legend, Stats, SpatialFilter, Filter, RasterLayer };
+</script>
+</body>
+</html>

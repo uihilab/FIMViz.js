@@ -1,0 +1,300 @@
+{
+    "location": "Cedar Rapids",
+    "details": {
+        "river": "Iowa River",
+        "gauge_id": "05464500 (reference)",
+        "flood_level": "12 ft",
+        "date_created": "Jan 2011",
+        "terms_of_use": "provisional - not for regulatory use",
+        "depth_service_url": "https://ifis.iowafloodcenter.org/ifis/app/inc/inc_get_inundepth.php?lat=[lat]&lng=[lng]&tid=[layer_id]",
+    },
+    "coordinates": {
+        "latitude": 41.971945,
+        "longitude": -91.667124
+    },
+    "gauge_info": {
+        "usgs_id": "05464500",
+        "stage_height": "4 ft 2 in",
+        "last_reported": "Thu, March 27, 2025 2:45 pm"
+    },
+    "timestamp": "2024-10-04 01:00:00",
+    "scenarios": [
+        {
+            "model": "model1",
+            "river_stage_1_values": [
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/017.0.kmz",
+                    "flood_stage": 17,
+                    "discharge": 7180,
+                    "annual_chance": "0",
+                    "layer_id": 1029007
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/017.5.kmz",
+                    "flood_stage": 17.5,
+                    "discharge": 7780,
+                    "annual_chance": "0",
+                    "layer_id": 1029008
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/018.0.kmz",
+                    "flood_stage": 18,
+                    "discharge": 8400,
+                    "annual_chance": "0",
+                    "layer_id": 1029009
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/018.5.kmz",
+                    "flood_stage": 18.5,
+                    "discharge": 9030,
+                    "annual_chance": "0",
+                    "layer_id": 1029010
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/019.0.kmz",
+                    "flood_stage": 19,
+                    "discharge": 9600,
+                    "annual_chance": "0",
+                    "layer_id": 1029011
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/019.5.kmz",
+                    "flood_stage": 19.5,
+                    "discharge": 10200,
+                    "annual_chance": "0",
+                    "layer_id": 1029012
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/020.0.kmz",
+                    "flood_stage": 20,
+                    "discharge": 10900,
+                    "annual_chance": "0",
+                    "layer_id": 1029013
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/020.5.kmz",
+                    "flood_stage": 20.5,
+                    "discharge": 11600,
+                    "annual_chance": "0",
+                    "layer_id": 1029014
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/021.0.kmz",
+                    "flood_stage": 21,
+                    "discharge": 12300,
+                    "annual_chance": "0",
+                    "layer_id": 1029015
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/021.5.kmz",
+                    "flood_stage": 21.5,
+                    "discharge": 13000,
+                    "annual_chance": "0",
+                    "layer_id": 1029016
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/022.0.kmz",
+                    "flood_stage": 22,
+                    "discharge": 13800,
+                    "annual_chance": "0",
+                    "layer_id": 1029017
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/022.5.kmz",
+                    "flood_stage": 22.5,
+                    "discharge": 14600,
+                    "annual_chance": "0",
+                    "layer_id": 1029018
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/023.0.kmz",
+                    "flood_stage": 23,
+                    "discharge": 15600,
+                    "annual_chance": "0",
+                    "layer_id": 1029019
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/023.5.kmz",
+                    "flood_stage": 23.5,
+                    "discharge": 16700,
+                    "annual_chance": "0",
+                    "layer_id": 1029020
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/024.0.kmz",
+                    "flood_stage": 24,
+                    "discharge": 17800,
+                    "annual_chance": "0",
+                    "layer_id": 1029021
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/024.5.kmz",
+                    "flood_stage": 24.5,
+                    "discharge": 18900,
+                    "annual_chance": "0",
+                    "layer_id": 1029022
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/025.0.kmz",
+                    "flood_stage": 25,
+                    "discharge": 20100,
+                    "annual_chance": "0",
+                    "layer_id": 1029023
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/025.5.kmz",
+                    "flood_stage": 25.5,
+                    "discharge": 21300,
+                    "annual_chance": "0",
+                    "layer_id": 1029024
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/026.0.kmz",
+                    "flood_stage": 26,
+                    "discharge": 22600,
+                    "annual_chance": "0",
+                    "layer_id": 1029025
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/026.5.kmz",
+                    "flood_stage": 26.5,
+                    "discharge": 23800,
+                    "annual_chance": "0",
+                    "layer_id": 1029026
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/027.0.kmz",
+                    "flood_stage": 27,
+                    "discharge": 25100,
+                    "annual_chance": "0",
+                    "layer_id": 1029027
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/027.5.kmz",
+                    "flood_stage": 27.5,
+                    "discharge": 26500,
+                    "annual_chance": "0",
+                    "layer_id": 1029028
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/028.0.kmz",
+                    "flood_stage": 28,
+                    "discharge": 27800,
+                    "annual_chance": "0",
+                    "layer_id": 1029029
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/028.5.kmz",
+                    "flood_stage": 28.5,
+                    "discharge": 29400,
+                    "annual_chance": "0",
+                    "layer_id": 1029030
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/029.0.kmz",
+                    "flood_stage": 29,
+                    "discharge": 31200,
+                    "annual_chance": "0",
+                    "layer_id": 1029031
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/029.5.kmz",
+                    "flood_stage": 29.5,
+                    "discharge": 33000,
+                    "annual_chance": "0",
+                    "layer_id": 1029032
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/030.0.kmz",
+                    "flood_stage": 30,
+                    "discharge": 34900,
+                    "annual_chance": "0",
+                    "layer_id": 1029033
+                }
+            ],
+            "annual_chance_values": [
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/ff010.0.kmz",
+                    "flood_stage": 20.5,
+                    "discharge": 11680,
+                    "annual_chance": "10",
+                    "layer_id": 1029001
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/ff025.0.kmz",
+                    "flood_stage": 21.5,
+                    "discharge": 13130,
+                    "annual_chance": "25",
+                    "layer_id": 1029002
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/ff050.0.kmz",
+                    "flood_stage": 26.5,
+                    "discharge": 23820,
+                    "annual_chance": "50",
+                    "layer_id": 1029003
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/ff100.0.kmz",
+                    "flood_stage": 29,
+                    "discharge": 31010,
+                    "annual_chance": "100",
+                    "layer_id": 1029004
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/ff200.0.kmz",
+                    "flood_stage": 30.5,
+                    "discharge": 36430,
+                    "annual_chance": "200",
+                    "layer_id": 1029005
+                },
+                {
+                    "kmz_file": "https://iowawis.org/layers/inundation/iowa_city/ff500.0.kmz",
+                    "flood_stage": 32.5,
+                    "discharge": 45260,
+                    "annual_chance": "500",
+                    "layer_id": 1029006
+                }
+            ],
+            "forecast_stage_series": [
+                9.04,
+                9.03,
+                9.04,
+                9.04,
+                9.04,
+                9.05,
+                9.05,
+                9.05,
+                9.05,
+                9.05,
+                9.05,
+                9.05,
+                9.05,
+                9.05,
+                9.05,
+                9.05,
+                9.04,
+                9.04,
+                9.04,
+                9.04,
+                9.04,
+                9.04,
+                9.04,
+                9.04,
+                9.04,
+                9.04,
+                9.04,
+                9.04,
+                9.04,
+                9.04,
+                9.04,
+                9.03,
+                9.02,
+                9.01,
+                0,
+                9.01,
+                9.01
+            ]
+        }
+    ]
+}

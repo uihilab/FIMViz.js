@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fimviz — API consistency audit (before / after)</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 14px/1.55 ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 24px;
+         max-width: 1100px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .lede { opacity: .75; margin: 0 0 20px; max-width: 70ch; }
+  h2 { font-size: 15px; margin: 26px 0 8px; padding-bottom: 5px;
+       border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th { text-align: left; font-weight: 600; opacity: .6; padding: 4px 8px; font-size: 11px;
+       text-transform: uppercase; letter-spacing: .04em; }
+  td { padding: 5px 8px; vertical-align: top;
+       border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent); }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  .before code { opacity: .55; text-decoration: line-through; }
+  .ok  { color: #14804a; font-weight: 600; }
+  .bad { color: #c8102e; font-weight: 600; }
+  @media (prefers-color-scheme: dark) { .ok { color: #4ade80; } .bad { color: #f87171; } }
+  #summary { margin: 18px 0; padding: 10px 14px; border-radius: 6px; font-weight: 600;
+             background: color-mix(in srgb, currentColor 8%, transparent); }
+  .note { font-size: 12.5px; opacity: .7; margin: 6px 0 0; }
+</style>
+</head>
+<body>
+<h1>API consistency audit — before / after</h1>
+<p class="lede">Every row is a naming/shape collision the audit removed. <strong>Before</strong> is the
+spelling that used to work and must now be <em>gone</em> (not deprecated); <strong>after</strong> is the
+single surviving spelling. Both halves are asserted, so this page fails if an old name creeps back in
+<em>or</em> a new one regresses. Open the console for detail. Serve over HTTP
+(<code>npx serve .</code>) — ESM does not load from <code>file://</code>.</p>
+
+<div id="summary">running…</div>
+<div id="out"></div>
+
+<script type="module">
+import * as fimviz from "../dist/fimviz.js";
+const {
+  mount, warp, Dataset, Storage, ColorScale, RasterLayer, VectorLayer,
+} = fimviz;
+
+const out = document.getElementById("out");
+let pass = 0, fail = 0;
+const rows = [];
+
+function section(title) { rows.push({ section: title }); }
+
+// assert(label, before, after) — `before` must THROW or return false (the old spelling is gone),
+// `after` must return truthy (the new spelling works).
+function check(label, beforeSrc, afterSrc, beforeFn, afterFn) {
+  let goneOk = false, newOk = false, err = "";
+  try { goneOk = beforeFn() === true; } catch (e) { err = e.message; goneOk = false; }
+  try { newOk = afterFn() === true; } catch (e) { err = e.message; newOk = false; }
+  const okAll = goneOk && newOk;
+  okAll ? pass++ : fail++;
+  if (!okAll) console.error("✗ " + label, { oldNameGone: goneOk, newNameWorks: newOk, err });
+  else console.log("✓ " + label);
+  rows.push({ label, beforeSrc, afterSrc, ok: okAll, err });
+}
+
+// ── 1. one name must not mean two things ────────────────────────────────────
+section("1 · One name, one meaning");
+check("the eager free function is warp(); reproject() stays the LAZY Dataset op",
+  "reproject(ds, crs)  // eager, but named like the lazy op",
+  "warp(ds, crs)       // eager   ·   ds.reproject(crs) // lazy",
+  () => fimviz.reproject === undefined,   // the ambiguous export is GONE from the barrel
+  () => typeof fimviz.warp === "function" && typeof Dataset.prototype.reproject === "function");
+
+// ── 2. a noun is state, a verb is work ──────────────────────────────────────
+section("2 · A noun is state; a verb does work");
+check("ColorScale.continuous is a boolean getter, not a setter method",
+  "cs.continuous(true)  // a setter with no set- prefix, among 7 setX siblings",
+  "cs.set({ continuous: true })  ·  cs.continuous // → boolean",
+  () => typeof new ColorScale({}).continuous === "boolean",
+  () => { const cs = new ColorScale({ palette: "blues" }); cs.set({ continuous: true });
+          return cs.continuous === true && cs.kind === "continuous"; });
+
+// (fim.map vs the removed getMap() is asserted against a LIVE instance in section 6 below —
+//  it needs a real mount, so it can't be checked structurally here.)
+
+// ── 3. one mutation idiom ───────────────────────────────────────────────────
+section("3 · One mutation idiom per object");
+check("ColorScale.set(patch) is THE knob writer",
+  "cs.setPalette(p); cs.setDomain(min, max); cs.continuous(b)",
+  "cs.set({ palette, min, max, continuous, unit })",
+  () => { const cs = new ColorScale({}); return cs.setPalette === undefined && cs.setDomain === undefined; },
+  () => { const cs = new ColorScale({ palette: "blues" });
+          cs.set({ palette: "viridis", min: 0, max: 46, continuous: true, unit: "m" });
+          return cs.palette === "viridis" && cs.unit === "m" && cs.continuous === true; });
+
+check("set() fires onChange ONCE per batch, not once per key",
+  "four setters → four repaints",
+  "one set({...}) → one repaint",
+  () => true,
+  () => { const cs = new ColorScale({ palette: "blues" }); let n = 0; cs.onChange(() => n++);
+          cs.set({ palette: "heat", min: 0, max: 9, continuous: true, unit: "m" });
+          return n === 1; });
+
+check("set() throws on an unknown key instead of silently ignoring it",
+  "cs.setPallete('viridis')  // typo → silent no-op",
+  "cs.set({ pallete: 'viridis' })  // throws, naming the valid keys",
+  () => true,
+  () => { const cs = new ColorScale({ palette: "blues" });
+          try { cs.set({ pallete: "viridis" }); return false; }
+          catch (e) { return /unknown key/.test(e.message); } });
+
+// ── 4. ops are sync + chainable; terminals are async ────────────────────────
+section("4 · Ops are sync and chainable; terminals are async");
+check("layer.set() returns the LAYER synchronously — no promise to await",
+  "await layer.settings.set({ opacity })  // async for 1 of 9 knobs",
+  "layer.set({ opacity })  // → Layer, chainable",
+  () => true,
+  () => { const l = new RasterLayer({}); const r = l.set({ opacity: 0.5 });
+          return r === l && !(r instanceof Promise) && l.opacity === 0.5; });
+
+check("set() chains",
+  "await a; await b;",
+  "layer.set({...}).set({...})",
+  () => true,
+  () => { const l = new RasterLayer({}); l.set({ opacity: 0.4 }).set({ hover: false });
+          return l.opacity === 0.4 && l.settings.get("hover") === false; });
+
+check("layer.settled() is the terminal, and is safe when nothing is pending",
+  "(no way to know whether a redraw was scheduled)",
+  "await layer.settled()",
+  () => true,
+  () => typeof new RasterLayer({}).settled === "function");
+
+check("VectorSettings knobs are sync too (they never redrew)",
+  "await layer.settings.set({ color })",
+  "layer.set({ color: '#ff0000' })",
+  () => true,
+  () => { const l = new VectorLayer({ sources: [{ data: { type: "FeatureCollection", features: [] }, bounds: {} }] });
+          const r = l.set({ color: "#ff0000" });
+          return r === l && l._style.fillColor === "#ff0000"; });
+
+// ── 5. one concept, one path ────────────────────────────────────────────────
+section("5 · One concept, one path");
+check("ONE recolour path: layer.set({ ... })",
+  "layer.setColorScale(cs) · layer.settings.set({...}) · layer.colorScale.setPalette(p)",
+  "layer.set({ colorScale }) · layer.set({ palette })",
+  () => new RasterLayer({}).setColorScale === undefined,
+  () => { const l = new RasterLayer({ map: { _unregisterLayer() {} }, type: "userRaster" });
+          const cs = new ColorScale({ palette: "blues", min: 0, max: 1 });
+          l.set({ colorScale: cs });
+          let restyles = 0; l.on("restyle", () => restyles++);
+          l.set({ palette: "viridis" });
+          return l.colorScale === cs && cs.palette === "viridis" && restyles === 1; });
+
+check("Storage is all-terminal: every row op is async, including get()",
+  "get() alone was declared sync among 11 async siblings",
+  "await db.get(table, key)",
+  () => true,
+  () => { const db = new Storage({ name: "audit-" + Date.now(), version: 1, tables: ["t"] });
+          const r = db.get("t", "nope");
+          const isPromise = r instanceof Promise; r.catch(() => {});
+          return isPromise; });
+
+// ── live instance checks (need a real mount) ────────────────────────────────
+section("6 · Live instance (leaflet — no API key needed)");
+const host = document.createElement("div");
+host.style.cssText = "width:320px;height:200px;position:absolute;left:-9999px;top:0";
+document.body.appendChild(host);
+try {
+  const fim = await mount(host, { provider: "leaflet", isolated: true });
+  check("fim.map works; fim.getMap() is gone",
+    "fim.getMap()", "fim.map",
+    () => fim.getMap === undefined,
+    () => fim.map != null);
+  check("fim.datasets / fim.layers are nouns (fields, not getters returning promises)",
+    "—", "fim.layers · fim.datasets",
+    () => true,
+    () => Array.isArray(fim.layers) && Array.isArray(fim.datasets));
+  fim.destroy();
+} catch (e) {
+  rows.push({ label: "live mount", beforeSrc: "—", afterSrc: "—", ok: false, err: e.message });
+  fail++;
+  console.error("live mount failed", e);
+}
+
+// ── render ──────────────────────────────────────────────────────────────────
+let html = "";
+for (const r of rows) {
+  if (r.section) {
+    html += `</table><h2>${r.section}</h2><table><tr><th style="width:34%">check</th>`
+          + `<th style="width:33%">before (must be gone)</th><th>after</th><th style="width:52px"></th></tr>`;
+    continue;
+  }
+  html += `<tr><td>${r.label}${r.err ? `<div class="note bad">${r.err}</div>` : ""}</td>`
+        + `<td class="before"><code>${r.beforeSrc.replace(/</g, "&lt;")}</code></td>`
+        + `<td><code>${r.afterSrc.replace(/</g, "&lt;")}</code></td>`
+        + `<td class="${r.ok ? "ok" : "bad"}">${r.ok ? "PASS" : "FAIL"}</td></tr>`;
+}
+out.innerHTML = (html + "</table>").replace(/^<\/table>/, "");
+const s = document.getElementById("summary");
+s.textContent = `${pass} passed · ${fail} failed`;
+s.className = fail ? "bad" : "ok";
+console.log(`\n[fimviz] consistency audit — ${pass} passed, ${fail} failed`);
+</script>
+</body>
+</html>

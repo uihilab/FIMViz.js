@@ -1,0 +1,1223 @@
+{
+    "location": "Cedar Rapids",
+    "details": {
+        "date_created": "Jan 2011",
+        "contact_name": "",
+        "contact_email": "",
+        "stage_unit": "ft",
+        "discharge_unit": "cfs",
+        "terms_of_use": "provisional - not for regulatory use",
+        "depth_service_url": "https://ifis.iowafloodcenter.org/ifis/app/inc/inc_get_inundepth.php?lat=[lat]&lng=[lng]&tid=[layer_id]"
+    },
+    "gauge_info": {
+        "river": "Iowa River",
+        "gauge_id": "05464500",
+        "latitude": 41.971945,
+        "longitude": -91.667124,
+        "flood_level": "12 ft",
+        "last_reported_value": "4 ft 2 in",
+        "last_reported_time": "Thu, March 27, 2025 2:45 pm"
+    },
+    "scenarios": [
+        {
+            "model": "HEC-RAS",
+            "scenario_list": [
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/005.5.kmz",
+                    "raster_file": "",
+                    "stage": 5.5,
+                    "discharge": 7170,
+                    "annual_chance": "",
+                    "layer_id": 1021007
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/006.0.kmz",
+                    "raster_file": "",
+                    "stage": 6,
+                    "discharge": 9060,
+                    "annual_chance": "",
+                    "layer_id": 1021008
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/006.5.kmz",
+                    "raster_file": "",
+                    "stage": 6.5,
+                    "discharge": 11000,
+                    "annual_chance": "",
+                    "layer_id": 1021009
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/007.0.kmz",
+                    "raster_file": "",
+                    "stage": 7,
+                    "discharge": 13000,
+                    "annual_chance": "",
+                    "layer_id": 1021010
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/007.5.kmz",
+                    "raster_file": "",
+                    "stage": 7.5,
+                    "discharge": 15000,
+                    "annual_chance": "",
+                    "layer_id": 1021011
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/008.0.kmz",
+                    "raster_file": "",
+                    "stage": 8,
+                    "discharge": 17100,
+                    "annual_chance": "",
+                    "layer_id": 1021012
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/008.5.kmz",
+                    "raster_file": "",
+                    "stage": 8.5,
+                    "discharge": 19000,
+                    "annual_chance": "",
+                    "layer_id": 1021013
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/009.0.kmz",
+                    "raster_file": "",
+                    "stage": 9,
+                    "discharge": 21100,
+                    "annual_chance": "",
+                    "layer_id": 1021014
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/009.5.kmz",
+                    "raster_file": "",
+                    "stage": 9.5,
+                    "discharge": 23200,
+                    "annual_chance": "",
+                    "layer_id": 1021015
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/010.0.kmz",
+                    "raster_file": "",
+                    "stage": 10,
+                    "discharge": 25200,
+                    "annual_chance": "",
+                    "layer_id": 1021016
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/010.5.kmz",
+                    "raster_file": "",
+                    "stage": 10.5,
+                    "discharge": 27200,
+                    "annual_chance": "",
+                    "layer_id": 1021017
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/011.0.kmz",
+                    "raster_file": "",
+                    "stage": 11,
+                    "discharge": 29300,
+                    "annual_chance": "",
+                    "layer_id": 1021018
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/011.5.kmz",
+                    "raster_file": "",
+                    "stage": 11.5,
+                    "discharge": 31400,
+                    "annual_chance": "",
+                    "layer_id": 1021019
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/012.0.kmz",
+                    "raster_file": "",
+                    "stage": 12,
+                    "discharge": 33600,
+                    "annual_chance": "",
+                    "layer_id": 1021020
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/012.5.kmz",
+                    "raster_file": "",
+                    "stage": 12.5,
+                    "discharge": 35800,
+                    "annual_chance": "",
+                    "layer_id": 1021021
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/013.0.kmz",
+                    "raster_file": "",
+                    "stage": 13,
+                    "discharge": 38000,
+                    "annual_chance": "",
+                    "layer_id": 1021022
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/013.5.kmz",
+                    "raster_file": "",
+                    "stage": 13.5,
+                    "discharge": 40300,
+                    "annual_chance": "",
+                    "layer_id": 1021023
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/014.0.kmz",
+                    "raster_file": "",
+                    "stage": 14,
+                    "discharge": 42600,
+                    "annual_chance": "",
+                    "layer_id": 1021024
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/014.5.kmz",
+                    "raster_file": "",
+                    "stage": 14.5,
+                    "discharge": 45000,
+                    "annual_chance": "",
+                    "layer_id": 1021025
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/015.0.kmz",
+                    "raster_file": "",
+                    "stage": 15,
+                    "discharge": 47400,
+                    "annual_chance": "",
+                    "layer_id": 1021026
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/015.5.kmz",
+                    "raster_file": "",
+                    "stage": 15.5,
+                    "discharge": 49800,
+                    "annual_chance": "",
+                    "layer_id": 1021027
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/016.0.kmz",
+                    "raster_file": "",
+                    "stage": 16,
+                    "discharge": 52300,
+                    "annual_chance": "",
+                    "layer_id": 1021028
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/016.5.kmz",
+                    "raster_file": "",
+                    "stage": 16.5,
+                    "discharge": 54700,
+                    "annual_chance": "10",
+                    "layer_id": 1021029
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/017.0.kmz",
+                    "raster_file": "",
+                    "stage": 17,
+                    "discharge": 57300,
+                    "annual_chance": "",
+                    "layer_id": 1021030
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/017.5.kmz",
+                    "raster_file": "",
+                    "stage": 17.5,
+                    "discharge": 59800,
+                    "annual_chance": "",
+                    "layer_id": 1021031
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/018.0.kmz",
+                    "raster_file": "",
+                    "stage": 18,
+                    "discharge": 62400,
+                    "annual_chance": "",
+                    "layer_id": 1021032
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/018.5.kmz",
+                    "raster_file": "",
+                    "stage": 18.5,
+                    "discharge": 65000,
+                    "annual_chance": "",
+                    "layer_id": 1021033
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/019.0.kmz",
+                    "raster_file": "",
+                    "stage": 19,
+                    "discharge": 67600,
+                    "annual_chance": "",
+                    "layer_id": 1021034
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/019.5.kmz",
+                    "raster_file": "",
+                    "stage": 19.5,
+                    "discharge": 70300,
+                    "annual_chance": "25",
+                    "layer_id": 1021035
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/020.0.kmz",
+                    "raster_file": "",
+                    "stage": 20,
+                    "discharge": 73000,
+                    "annual_chance": "",
+                    "layer_id": 1021036
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/020.5.kmz",
+                    "raster_file": "",
+                    "stage": 20.5,
+                    "discharge": 75700,
+                    "annual_chance": "",
+                    "layer_id": 1021037
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/021.0.kmz",
+                    "raster_file": "",
+                    "stage": 21,
+                    "discharge": 78500,
+                    "annual_chance": "",
+                    "layer_id": 1021038
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/021.5.kmz",
+                    "raster_file": "",
+                    "stage": 21.5,
+                    "discharge": 81300,
+                    "annual_chance": "50",
+                    "layer_id": 1021039
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/022.0.kmz",
+                    "raster_file": "",
+                    "stage": 22,
+                    "discharge": 84100,
+                    "annual_chance": "",
+                    "layer_id": 1021040
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/022.5.kmz",
+                    "raster_file": "",
+                    "stage": 22.5,
+                    "discharge": 87000,
+                    "annual_chance": "",
+                    "layer_id": 1021041
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/023.0.kmz",
+                    "raster_file": "",
+                    "stage": 23,
+                    "discharge": 89900,
+                    "annual_chance": "",
+                    "layer_id": 1021042
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/023.5.kmz",
+                    "raster_file": "",
+                    "stage": 23.5,
+                    "discharge": 92800,
+                    "annual_chance": "100",
+                    "layer_id": 1021043
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/024.0.kmz",
+                    "raster_file": "",
+                    "stage": 24,
+                    "discharge": 95700,
+                    "annual_chance": "",
+                    "layer_id": 1021044
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/024.5.kmz",
+                    "raster_file": "",
+                    "stage": 24.5,
+                    "discharge": 98700,
+                    "annual_chance": "",
+                    "layer_id": 1021045
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/025.0.kmz",
+                    "raster_file": "",
+                    "stage": 25,
+                    "discharge": 102000,
+                    "annual_chance": "",
+                    "layer_id": 1021046
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/025.5.kmz",
+                    "raster_file": "",
+                    "stage": 25.5,
+                    "discharge": 105000,
+                    "annual_chance": "",
+                    "layer_id": 1021047
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/026.0.kmz",
+                    "raster_file": "",
+                    "stage": 26,
+                    "discharge": 108000,
+                    "annual_chance": "",
+                    "layer_id": 1021048
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/026.5.kmz",
+                    "raster_file": "",
+                    "stage": 26.5,
+                    "discharge": 111000,
+                    "annual_chance": "",
+                    "layer_id": 1021049
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/027.0.kmz",
+                    "raster_file": "",
+                    "stage": 27,
+                    "discharge": 114000,
+                    "annual_chance": "",
+                    "layer_id": 1021050
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/027.5.kmz",
+                    "raster_file": "",
+                    "stage": 27.5,
+                    "discharge": 117000,
+                    "annual_chance": "",
+                    "layer_id": 1021051
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/028.0.kmz",
+                    "raster_file": "",
+                    "stage": 28,
+                    "discharge": 120000,
+                    "annual_chance": "",
+                    "layer_id": 1021052
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/028.5.kmz",
+                    "raster_file": "",
+                    "stage": 28.5,
+                    "discharge": 123000,
+                    "annual_chance": "500",
+                    "layer_id": 1021053
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/029.0.kmz",
+                    "raster_file": "",
+                    "stage": 29,
+                    "discharge": 126000,
+                    "annual_chance": "",
+                    "layer_id": 1021054
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/029.5.kmz",
+                    "raster_file": "",
+                    "stage": 29.5,
+                    "discharge": 130000,
+                    "annual_chance": "",
+                    "layer_id": 1021055
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/030.0.kmz",
+                    "raster_file": "",
+                    "stage": 30,
+                    "discharge": 133000,
+                    "annual_chance": "",
+                    "layer_id": 1021056
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/030.5.kmz",
+                    "raster_file": "",
+                    "stage": 30.5,
+                    "discharge": 136000,
+                    "annual_chance": "",
+                    "layer_id": 1021057
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/031.0.kmz",
+                    "raster_file": "",
+                    "stage": 31,
+                    "discharge": 139000,
+                    "annual_chance": "",
+                    "layer_id": 1021058
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/031.5.kmz",
+                    "raster_file": "",
+                    "stage": 31.5,
+                    "discharge": 142630,
+                    "annual_chance": "",
+                    "layer_id": 1021059
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/032.0.kmz",
+                    "raster_file": "",
+                    "stage": 32,
+                    "discharge": 146090,
+                    "annual_chance": "",
+                    "layer_id": 1021060
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/032.5.kmz",
+                    "raster_file": "",
+                    "stage": 32.5,
+                    "discharge": 149640,
+                    "annual_chance": "",
+                    "layer_id": 1021061
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/033.0.kmz",
+                    "raster_file": "",
+                    "stage": 33,
+                    "discharge": 153260,
+                    "annual_chance": "",
+                    "layer_id": 1021062
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/033.5.kmz",
+                    "raster_file": "",
+                    "stage": 33.5,
+                    "discharge": 156970,
+                    "annual_chance": "",
+                    "layer_id": 1021063
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/034.0.kmz",
+                    "raster_file": "",
+                    "stage": 34,
+                    "discharge": 160750,
+                    "annual_chance": "",
+                    "layer_id": 1021064
+                },
+                {
+                    "vector_file": "https://iowawis.org/layers/inundation/cedar_rapids_bridges/034.5.kmz",
+                    "raster_file": "https://hydroshare.org/resource/c89a2f4733a747faabbb8c80d082cfca/data/contents/0-0-DEP-21930.tif",
+                    "stage": 34.5,
+                    "discharge": 164618,
+                    "annual_chance": "",
+                    "layer_id": 1021065
+                }
+            ]
+           
+        }
+    ],
+    "time_series": [
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-27 10:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-03-27 11:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-03-27 12:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-03-27 13:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 156970,
+            "timestamp": "2025-03-27 14:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-03-27 15:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-03-27 16:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-03-27 17:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-03-27 18:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-03-27 19:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-27 20:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-03-27 21:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-27 22:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-03-27 23:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-28 00:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 33.0,
+            "discharge": 153260,
+            "timestamp": "2025-03-28 01:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-03-28 02:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-28 03:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-28 04:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-03-28 05:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-28 06:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-28 07:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 33.0,
+            "discharge": 153260,
+            "timestamp": "2025-03-28 08:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 33.0,
+            "discharge": 153260,
+            "timestamp": "2025-03-28 09:00:00",
+            "type": "o"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 156970,
+            "timestamp": "2025-03-28 10:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-28 11:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.0,
+            "discharge": 153260,
+            "timestamp": "2025-03-28 12:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-28 13:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-28 14:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-03-28 15:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-28 16:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 156970,
+            "timestamp": "2025-03-28 17:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-28 18:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-03-28 19:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-03-28 20:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-03-28 21:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-03-28 22:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-28 23:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-29 00:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-03-29 01:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-03-29 02:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-29 03:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-03-29 04:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-29 05:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-03-29 06:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-29 07:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 156970,
+            "timestamp": "2025-03-29 08:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-29 09:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-03-29 10:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-29 11:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-03-29 12:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-03-29 13:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-29 14:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-29 15:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-03-29 16:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-29 17:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-03-29 18:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-03-29 19:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-29 20:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-03-29 21:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-03-29 22:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-29 23:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.0,
+            "discharge": 153260,
+            "timestamp": "2025-03-30 00:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-30 01:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-30 02:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-03-30 03:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-03-30 04:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-30 05:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 156970,
+            "timestamp": "2025-03-30 06:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 156970,
+            "timestamp": "2025-03-30 07:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-30 08:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-03-30 09:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-03-30 10:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-03-30 11:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 156970,
+            "timestamp": "2025-03-30 12:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 156970,
+            "timestamp": "2025-03-30 13:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-03-30 14:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-30 15:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-03-30 16:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-30 17:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-03-30 18:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-30 19:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-03-30 20:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.0,
+            "discharge": 153260,
+            "timestamp": "2025-03-30 21:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-30 22:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-30 23:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.0,
+            "discharge": 153260,
+            "timestamp": "2025-03-31 00:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-03-31 01:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-03-31 02:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-03-31 03:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.0,
+            "discharge": 153260,
+            "timestamp": "2025-03-31 04:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-31 05:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-03-31 06:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 156970,
+            "timestamp": "2025-03-31 07:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-03-31 08:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-31 09:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 156970,
+            "timestamp": "2025-03-31 10:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-31 11:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-03-31 12:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-31 13:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-03-31 14:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 156970,
+            "timestamp": "2025-03-31 15:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-03-31 16:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 156970,
+            "timestamp": "2025-03-31 17:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.0,
+            "discharge": 153260,
+            "timestamp": "2025-03-31 18:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-03-31 19:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-03-31 20:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-03-31 21:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-03-31 22:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 156970,
+            "timestamp": "2025-03-31 23:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-04-01 00:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 31.5,
+            "discharge": 142630,
+            "timestamp": "2025-04-01 01:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-04-01 02:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.5,
+            "discharge": 164618,
+            "timestamp": "2025-04-01 03:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.0,
+            "discharge": 146090,
+            "timestamp": "2025-04-01 04:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-04-01 05:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 34.0,
+            "discharge": 160750,
+            "timestamp": "2025-04-01 06:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-04-01 07:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 33.5,
+            "discharge": 156970,
+            "timestamp": "2025-04-01 08:00:00",
+            "type": "f"
+        },
+        {
+            "stage": 32.5,
+            "discharge": 149640,
+            "timestamp": "2025-04-01 09:00:00",
+            "type": "f"
+        }
+    ]
+}

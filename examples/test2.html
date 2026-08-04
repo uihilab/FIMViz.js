@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>fimviz — console API smoke test</title>
+    <!-- Leaflet needs its stylesheet for the map to lay out; that is the only asset the page loads. -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <!-- The only DOM here: two mount targets. A map needs a real, sized element to init into;
+         every result goes to the console (open DevTools). No panels, no styling. -->
+    <div id="g" style="width:480px;height:320px"></div>
+    <div id="l" style="width:480px;height:320px"></div>
+
+    <script type="module">
+    // Everything comes from the ONE public barrel — a consumer's exact import surface.
+    import {
+      mount, mapProviderNames,
+      Dataset, warp, Storage,
+      ColorScale, Legend, Stats,
+      Filter, SpatialFilter, PredicateFilter,
+      paletteNames, RasterLayer,
+    } from "../dist/fimviz.js";
+
+    // ── console logger ────────────────────────────────────────────────────────
+    const H = (t) => console.log("\n══ " + t + " ══════════════════════════════");
+    // check(label, fn): logs the return value on success, the error on failure.
+    const check = async (label, fn) => {
+      try { const r = await fn(); console.log("✓ " + label + (r !== undefined ? "  → " + r : "")); return r; }
+      catch (e) { console.error("✗ " + label + "  " + e.message); }
+    };
+
+    const center = { lat: 41.66, lng: -91.53 }, zoom = 11;
+
+    // ══ 0. README.md / TypeScript ════════════════════════════════════════════
+    // README.md documents this exact import surface — every snippet in it is one
+    // of the checks below. Nothing here to "run" for the TypeScript side: dist/types/*.d.ts is a
+    // BUILD-TIME artifact with zero runtime behavior, so it can't be exercised from a browser
+    // console. To verify it: open a .ts file that does
+    //   import { FimViz, Dataset, Storage, ColorScale } from "fimviz";
+    // in VS Code (or any TS-aware editor) — hovering `Dataset`/`Storage`/etc. should show real
+    // member types, not `any`, and `npx tsc --noEmit` against it should type-check clean. That's
+    // the whole test; nothing to click here.
+    H("0 · README.md + TypeScript — see the comment above, nothing to run");
+
+    // ══ 1. TWO MAP INSTANCES, TWO PROVIDERS ══════════════════════════════════
+    H("1 · mount — two providers");
+    const fim = await mount("g", {
+      isolated: true, provider: "google",
+      apiKey: new URLSearchParams(location.search).get("apiKey") || "",
+      center, zoom,
+    });
+    const fim2 = await mount("l", { isolated: true, provider: "leaflet", center, zoom });
+    console.log("✓ google + leaflet mounted");
+    // await check("mapProviderNames()", () => mapProviderNames().join(", "));
+
+    // ══ 2. STYLE — ColorScale / Legend ═══════════════════════════════════════
+    H("2 · style");
+    const cs = new ColorScale({ palette: "viridis", min: 0, max: 10 });
+    await check("paletteNames()", () => paletteNames().join(", "));
+    await check("ColorScale.getColor(5)", () => cs.getColor(5));
+    await check("ColorScale.getRgb(5)", () => JSON.stringify(cs.getRgb(5)));
+    await check("Legend.fromColorScale().stops", () => Legend.fromColorScale(cs).toJSON().stops.length + " stops");
+
+    // ══ 3. ANALYSIS — Stats / Filter ═════════════════════════════════════════
+    H("3 · analysis");
+    const px = new Float32Array(64).map((_, i) => i % 16); px[0] = -9999;   // 8×8 raster, no-data hole
+    const meta = { width: 8, height: 8, bw: -92, be: -91, bs: 41, bn: 42, noData: -9999 };
+    await check("Stats.raster()", () => {
+      const s = Stats.raster(px, meta);
+      return `min=${s.min} max=${s.max} mean=${s.mean.toFixed(2)} count=${s.count}`;
+    });
+    await check("Stats.percentile(50)", () => Stats.raster(px, meta).percentile(50));
+    const sf = new SpatialFilter([{lat:0,lng:0},{lat:0,lng:10},{lat:10,lng:10},{lat:10,lng:0}]);
+    await check("SpatialFilter.contains in/out", () => sf.contains(5,5) + " / " + sf.contains(50,50));
+    await check("Filter.all([spatial, predicate])", () =>
+      Filter.all([sf, new PredicateFilter(u => u.value > 5)]).test({ lat:5, lng:5, value:9 }));
+
+    // ══ 4. Dataset / warp ═══════════════════════════════════════════════
+    H("4 · Dataset / warp");
+    const dsx = new Dataset({ name:"x.tif", kind:"raster", format:"geotiff", crs:"EPSG:4326" });
+    await check("Dataset round-trip (toRecord/fromRecord)", () =>
+      Dataset.fromRecord(dsx.toRecord()).id === dsx.id);
+    await check("warp identity (same CRS returns same ds)", async () =>
+      (await warp(dsx, "EPSG:4326")) === dsx);
+    await check("warp vector → clear error", async () => {
+      try { await warp(new Dataset({ name:"v.geojson", kind:"vector", crs:"EPSG:4326" }), "EPSG:3857"); return "NO THROW (bug)"; }
+      catch (e) { return "threw: " + e.message.slice(0, 40) + "…"; }
+    });
+
+    // ══ 5. Storage — real IndexedDB ══════════════════════════════════════════
+    H("5 · Storage");
+    await check("Storage put/get ArrayBuffer + list", async () => {
+      const db = new Storage({ name:"fimviz-smoke", version:1, tables:["t"] });
+      await db.put("t", "a.tif", { data: new Uint8Array([1,2,3]).buffer });
+      const got = await db.get("t", "a.tif");
+      const keys = await db.list("t", { keys:true });
+      await db.destroy();
+      return `${got.data instanceof ArrayBuffer} (${got.data.byteLength}B), keys=${JSON.stringify(keys)}`;
+    });
+
+    // ══ 6. Layer events — dual dispatch ══════════════════════════════════════
+    H("6 · Layer events");
+    // One emit reaches BOTH the layer's own emitter and the owning map bus as `${type}:${evt}`.
+    await check("layer.emit → [local, map-bus]", () => {
+      const seen = [];
+      const tl = new RasterLayer({ map:{ emit:(e)=>seen.push("bus:"+e), _unregisterLayer(){} }, type:"userRaster" });
+      tl.on("rendered", () => seen.push("local"));
+      tl.emit("rendered");
+      return JSON.stringify(seen);
+    });
+
+    // ══ 7. VECTOR LAYERS — SAME API + SAME STYLE ON BOTH PROVIDERS ═══════════
+    H("7 · addLayer('vector') — google AND leaflet");
+    // ONE neutral style object; each provider translates it (google: strokeWidth→strokeWeight,
+    // strokeColor→strokeColor; leaflet: strokeWidth→weight, strokeColor→color). The consumer never
+    // writes two style shapes and never names a map SDK.
+    const boxStyle = { fillColor:"#e5484d", fillOpacity:0.22, strokeColor:"#e5484d", strokeWidth:2 };
+    const gj = { type:"FeatureCollection", features:[{ type:"Feature", properties:{ name:"demo box" },
+      geometry:{ type:"Polygon", coordinates:[[[-91.58,41.62],[-91.48,41.62],[-91.48,41.70],[-91.58,41.70],[-91.58,41.62]]] } }] };
+    const boxBlob = () => new Blob([JSON.stringify(gj)], { type:"application/geo+json" });
+
+    // The two KMZ copies live in different instances, so give them DIFFERENT colors — derived from
+    // ONE ColorScale. getColor(value) maps a single-band scalar → a css color (rgb(...) string,
+    // which both providers accept), so sampling the ramp at two points yields two distinct colors.
+    const kmzScale = new ColorScale({ palette: "viridis", min: 0, max: 1, continuous: true });
+    const kmzStyle = (c) => ({ fillColor: c, fillOpacity: 0.35, strokeColor: c, strokeWidth: 1 });
+    const googleColor  = kmzScale.getColor(0.15);   // dark end of viridis
+    const leafletColor = kmzScale.getColor(0.85);   // bright end
+
+    // Layer A — a KMZ over the network (may fail on CORS/proxy; logged, does not abort the run).
+    // Parsed ONCE; the Dataset is provider-neutral, so the same one renders on both maps below.
+    const KMZ    = "https://iowawis.org/layers/inundation/iowa_city/017.0.kmz";
+    const PROXY  = "https://hydroinformatics.tulane.edu/lab/cors/";
+    let kmzDs = null;
+    await check("A · google · KMZ url → vector layer", async () => {
+      kmzDs = await fim.addDataset(PROXY + KMZ, { name: "017.0.kmz" });
+      const layer = await fim.addLayer("vector", { source: kmzDs, style: kmzStyle(googleColor) });
+      layer.fit();
+      return `${kmzDs.kind}/${kmzDs.format}, color ${googleColor}, layer ${layer.id}`;
+    });
+
+    // Same KMZ Dataset on LEAFLET — no re-fetch, no re-parse; just render the parsed Dataset on the
+    // other provider, in a DIFFERENT color from the same scale. Skips cleanly if the fetch failed.
+    await check("A2 · leaflet · SAME KMZ Dataset, different color", async () => {
+      if (!kmzDs) return "skipped — KMZ fetch/parse failed above";
+      const layer = await fim2.addLayer("vector", { source: kmzDs, style: kmzStyle(googleColor) });
+      layer.fit();
+      return `color ${leafletColor}, layer ${layer.id} on ${fim2.app.config.provider}`;
+    });
+
+    // Layer B — the inline box on GOOGLE (Blob source, self-contained so it always renders).
+    let layerB;
+    await check("B · google · inline GeoJSON blob → vector layer", async () => {
+      const ds2 = await fim.addDataset(boxBlob(), { name:"demo.geojson" });
+      layerB = await fim.addLayer("vector", { source: ds2, style: boxStyle });
+      return `${ds2.kind}/${ds2.format}, layer ${layerB.id}`;
+    });
+
+    // Layer C — the SAME box, SAME style object, on LEAFLET. This is the generalization: the exact
+    // addDataset → addLayer('vector') call, unchanged, on the other provider.
+    await check("C · leaflet · SAME call + SAME style → vector layer", async () => {
+      const ds3 = await fim2.addDataset(boxBlob(), { name:"demo.geojson" });
+      const layerC = await fim2.addLayer("vector", { source: ds3, style: boxStyle });
+      layerC.fit();
+      return `${ds3.kind}/${ds3.format}, layer ${layerC.id} on ${fim2.app.config.provider}`;
+    });
+
+    // ══ 8. FimMap registry ═══════════════════════════════════════════════════
+    H("8 · FimMap registry");
+    await check("fim.datasets", () => fim.datasets.map(d => d.name).join(", "));
+    await check("fim.layers", () => fim.layers.map(l => `${l.type}:${l.id.slice(-4)}`).join(", "));
+    await check("fim.getLayer(id) resolves", () => layerB && fim.getLayer(layerB.id) === layerB);
+    await check("layer.remove() fires 'removed' + drops from fim.layers", async () => {
+      const tmp = await fim.addLayer("vector", { source: layerB.dataset });   // throwaway
+      const before = fim.layers.length;
+      let removed = false;
+      tmp.on("removed", () => { removed = true; });
+      tmp.remove();
+      const gone = fim.layers.indexOf(tmp) === -1;
+      return `removed-event=${removed}, dropped=${gone}, count ${before}→${fim.layers.length}`;
+    });
+
+    console.log("\n✓ smoke test complete.");
+    </script>
+</body>
+</html>

@@ -1,0 +1,228 @@
+# Dataset operations — usage reference
+
+`Dataset` (barrel-exported) is a **lazy, immutable** node in an op-chain: a
+ROOT wraps a source (inline bytes/GeoJSON, or a URL); a DERIVED node is a parent + one op. Nothing
+decodes/warps/transforms until a **terminal** forces it. Every op returns a **new** Dataset — the
+original is never mutated, so one Dataset safely backs many Layers. `kind` is `'raster'` or
+`'vector'` — most ops are gated to one kind and **throw immediately** (not at force time) if called
+on the wrong kind.
+
+## Contents
+
+[Construction](#construction) · [Kind-agnostic](#kind-agnostic) · [Terminals](#terminals-force-the-chain--nothing-exists-until-one-of-these-runs) ·
+[Raster — unary](#raster--unary) · [Raster — binary / N-ary](#raster--binary--n-ary) ·
+[Vector](#vector--the-one-kind-changing-op) · [Notes](#notes) ·
+[Standalone grid functions](#standalone-grid-functions-no-dataset-needed) ·
+[Standalone reproject()](#standalone-reproject-distinct-from-datasetreproject) ·
+[Vendored primitives](#vendored-primitives) ·
+[GDAL escape hatch (callGdal)](#gdal-escape-hatch-callgdal)
+
+## Construction
+
+```js
+new Dataset({ id?, name?, kind?, format?, crs?, bounds?, meta?, data?, url?, axis?, axes? })
+// id: auto ("ds_...") · name: defaults to id · kind: 'raster'|'vector'|null
+// format: 'geotiff'|'geojson'|'kml'|'kmz'|'shp'|'hazus'|null · crs: native CRS string|null
+// bounds: {north,south,east,west}|null · data: ArrayBuffer|Object (inline payload) · url: a URI root
+// axis: one DatasetAxis (sugar for axes:[axis]) · axes: DatasetAxis[] (selection-axis series)
+
+Dataset.fromURL(url, { format?, name?, kind?, crs?, bounds?, meta? })
+// A lazy URL root — fetches + decodes only on force. format/kind inferred from the URL extension
+// when omitted; crs defaults to EPSG:4326 for vector formats, null (unknown) for raster.
+
+Dataset.fromRecord(record)   // rehydrate a toRecord() snapshot (recipe or materialized)
+```
+
+Normally you don't construct directly — `fim.addDataset(file)` / `FimViz.parseFile(source)` parse a
+raw File/Blob/ArrayBuffer/URL into a Dataset for you.
+
+## Kind-agnostic
+
+
+| Method                          | Params                                                                                                    | Returns                                      | Notes                                                                                                                                                                                                                                                       |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `select(coord, opts?)`          | `coord: number|string`; `opts.axis=0` (index/name), `opts.nearest=true`, `opts.variant`, `opts.base`      | `Dataset|null`                               | Resolves one axis entry to a child URL-rooted Dataset. Only meaningful on a Dataset with `.axes` (a selection-axis series) — a plain parsed file has none. `null` on no match. `opts.variant` required when the entry's `ref` is `{raster, vector}`-shaped. |
+| `selectAxisEntry(coord, opts?)` | same `opts` (no `variant`/`base`)                                                                         | `DatasetAxisEntry|null`                      | What `select` looks up before resolving the URL — exact match first, nearest **numeric** coord on a miss (`nearest:true`, default).                                                                                                                         |
+| `reduce(op?, opts?)`            | `op: 'sum'|'mean'|'min'|'max'` (default `'mean'`); `opts.axis=0`, `opts.method='nearest'`, `opts.variant` | `Dataset`                                    | Collapse a temporal/vertical axis to one grid — sugar over `select()` every entry + `combine()`. Throws if no axis / empty axis / an entry fails to resolve.                                                                                                |
+| `toRecord(opts?)`               | `opts.storeMaterialized=false`                                                                            | `Object`                                     | Structured-cloneable snapshot for `Storage.put()`. Default = source + op recipe (small); `storeMaterialized:true` also embeds the decoded grid/features (call `await ds.load()` first, or it throws).                                                       |
+| `toJSON()`                      | —                                                                                                         | `{id,name,kind,format,crs,bounds,meta,axes}` | Metadata view, no heavy `data` payload.                                                                                                                                                                                                                     |
+| `download()`                    | —                                                                                                         | `void`                                       | Saves the original bytes to disk. Inline roots only (a URL root has no local bytes yet).                                                                                                                                                                    |
+
+
+
+
+## Terminals (force the chain — nothing exists until one of these runs)
+
+
+| Method                | Returns                       | Notes                                                                                                   |
+| --------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `await ds.load()`     | `RasterGrid | VectorFeatures` | Decodes the root (or forces the parent + applies this node's op), **memoized** — repeat calls are free. |
+| `await ds.grid()`     | `RasterGrid`                  | `load()` + assert raster; throws if this Dataset is vector.                                             |
+| `await ds.features()` | `VectorFeatures`              | `load()` + assert vector; throws if this Dataset is raster.                                             |
+| `ds.release()`        | `void`                        | Evicts the memoized result (not async).                                                                 |
+| `ds.isMaterialized`   | `boolean` (getter)            | Has this exact node been forced yet.                                                                    |
+| `ds.warnings`         | `string[]` (getter)           | Collected at force time (e.g. "reprojected X→Y", "resampled onto...") — empty until forced.             |
+
+
+
+
+## Raster — unary
+
+All throw `"<op>: raster-only op"` if called on a vector Dataset.
+
+
+| Method                                           | Params                                                                                                                                                                               | Notes                                                                                                                                                                                                                       |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reproject(toCrs)`                               | `toCrs: string` (required, `"EPSG:<code>"` — validated + case-normalized)                                                                                                            | Lazy CRS warp. Same-CRS request (case-insensitive) → no-op, returns `this`. The actual GDAL warp runs on force, JIT-loaded automatically — see [COLOR_SCALE.md](./COLOR_SCALE.md)-adjacent reprojector note, or just call it; no setup needed. Works on a plain source, a reproject-only chain (reuses the original file's bytes — cheap), **and** on a node derived via `combine`/`clip`/`mask`/`reclassify`/`resample`/`rasterize` (the actually-computed grid is encoded to a fresh GeoTIFF and warped directly — see `geo/gdal.js`'s `warpGrid`/`encodeGridAsGeoTiff` — rather than silently re-warping the untouched original file). |
+| `clip(bbox)`                                     | `bbox: {north,south,east,west}` (required)                                                                                                                                           | Crop to overlap, snapped to pixel edges.                                                                                                                                                                                    |
+| `mask(polygon, opts?)`                           | `polygon`: `SpatialFilter` or a ring/multi-ring of `{lat,lng}`|`[lat,lng]`; `opts.invert=false`                                                                                      | Pixels outside the polygon → transparent (or inside, with `invert:true`). Footprint unchanged.                                                                                                                              |
+| `reclassify(rules, opts?)`                       | `rules: [{min?,max?,value?}]` (non-empty) **or** `(value, index) => number\|null\|undefined` (required either way); `opts.unmatched='nodata'|'keep'`                                                                                                | Remap pixel values. The **rules-array** form is first-match-wins (unbounded `{min:-Infinity,max:Infinity,value:v}` maps every valid pixel to one constant, e.g. a single-color silhouette; a range with no `value` = "keep in range" band). The **callback** form is called once per valid pixel with its raw value and its flat row-major index (`row*width+col`), returning the new value directly — not limited to a contiguous range (any per-pixel or index-dependent logic), and cheaper than the rules form once you need more than a couple of ranges (one call per pixel instead of a per-rule scan). Either form: `null`/`undefined` (or no rule match) → unmatched. Existing noData/NaN pixels are never passed to a rule or the callback — shape/footprint is always preserved. On force, a pixel that matched no rule/returned nullish becomes noData under the default `unmatched:'nodata'` — if that actually happened (a real hole, not pre-existing noData), it's reported on `ds.warnings` naming how many pixels, so incomplete coverage doesn't silently punch holes. A callback does NOT survive `toRecord()` (functions can't structured-clone) — use range rules for a chain you need to persist. |
+| `resampleTo(target, opts?)`                      | `target`: `{width,height,bw,bs,be,bn}` **or** grid-shaped `{width,height,bounds:{north,south,east,west}}` (e.g. another Dataset's `.grid()`); `opts.method='nearest'`, `opts.noData` | Resample onto an explicit target grid. `crs` unchanged (resamples, doesn't reproject). GDAL-only methods (`cubic`/`lanczos`/...) need `registerResampler` or force throws.                                                  |
+| `slope(opts?)`                                   | `opts.zFactor`, `opts.cellsizeX`, `opts.cellsizeY`, `opts.unit='degrees'|'percent'`                                                                                                  | Horn's method, pure JS, no GDAL.                                                                                                                                                                                            |
+| `aspect()`                                       | —                                                                                                                                                                                    | Downslope compass bearing, Horn's method.                                                                                                                                                                                   |
+| `hillshade(opts?)`                               | `opts.altitude`, `opts.azimuth`, `opts.zFactor`, `opts.cellsizeX`, `opts.cellsizeY`                                                                                                  | Shaded-relief illumination.                                                                                                                                                                                                 |
+| `zonalStats(zones, opts?)` — **terminal, async** | `zones: [{id?,polygon?,filter?}]`; `opts.noData`                                                                                                                                     | Returns data (an array), not a Dataset. Forces the grid.                                                                                                                                                                    |
+
+
+
+
+## Raster — binary / N-ary
+
+
+| Method                   | Params                                                                                                                         | Notes                                                                                                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `combine(others, opts?)` | `others: Dataset | Dataset[]` (required, ≥1); `opts.op='difference'|'ratio'|'sum'|'mean'|'min'|'max'`, `opts.method='nearest'` | Band math, **LHS-conform** (every other input resampled onto *this* grid). `difference`/`ratio` are strictly binary (this + 1 other); `sum`/`mean`/`min`/`max` are N-ary (this + many). |
+| `difference(other)`      | `other: Dataset`                                                                                                               | Sugar for `combine([other], {op:'difference'})`.                                                                                                                                        |
+
+
+```js
+ds128.combine(ds177, { op: 'difference' });        // ds128 − ds177
+ds128.combine([ds177, ds3], { op: 'mean' });        // N-ary
+ds128.difference(ds177);                            // same as combine(..., {op:'difference'})
+```
+
+
+
+## Vector — the one kind-changing op
+
+
+| Method            | Params                                                                                                                                                                                                            | Notes                                                           |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `rasterize(opts)` | `opts.width`, `opts.height` (required); `opts.bounds` (defaults to the Dataset's own footprint — throws if neither is available); `opts.field` (burn a feature property; omit for a constant); `opts.burnValue=1` | Vector → raster. Throws `"vector-only op"` on a raster Dataset. |
+
+
+
+
+## Notes
+
+- **Kind gating throws immediately** at op-build time (not on force) — a mistake is caught the moment you call the wrong op, not several awaits later.'
+- **Op-chain replay**: every op above also has a matching case in `Dataset.fromRecord`'s internal replay, so a `toRecord()`'d chain round-trips through `Storage` and rebuilds identically via `fromRecord()`.
+- **Sharing**: a "hot-modify" (e.g. via a `Layer.deriveSources`) that changes only the tail op reuses the shared parent's memoized decode — cheap compared to a cold new chain.
+- **Across maps**: a Dataset has no back-pointer to a map, so one instance can back Layers on several maps (even of different providers) at once, decoded once. The registry and the reference count live on the **app** (`app.datasets`), so a Layer removed on one map never evicts a decode another map is still rendering.
+
+
+
+## Standalone grid functions (no Dataset needed)
+
+Every raster `Dataset` op above is a thin lazy wrapper over a **pure, directly-callable function** on
+an already-decoded `RasterGrid` — barrel-exported, so if you already have a grid (e.g. from
+`await ds.grid()`, or built by hand), you can call these without a `Dataset` at all. Same signatures
+as the `Dataset` methods, minus the laziness — each takes a `RasterGrid` first and returns a new one:
+
+```js
+maskGrid(grid, polygon, opts?)          // opts: { invert? }
+clipGrid(grid, bbox)
+reclassifyGrid(grid, rules, opts?)      // opts: { unmatched? }
+combineGrids(grids, opts?)               // grids: RasterGrid[]; opts: { op?, method? }
+zonalStats(grid, zones, opts?)          // → data, not a RasterGrid
+slopeGrid(grid, opts?)
+aspectGrid(grid)
+hillshadeGrid(grid, opts?)
+rasterizeFeatures(featureCollection, bounds, opts)   // opts: { width, height, field?, burnValue? }
+```
+
+Resample/align (`geo/resample.js`, also barrel-exported):
+
+```js
+GRID_POLICY                 // { LOW, HIGH, AVERAGE } — target-resolution policy
+RESAMPLE_METHODS             // ['nearest','bilinear','average', 'cubic','cubicspline','lanczos','mode','min','max','med','q1','q3']
+resolveTargetGrid(metas, policy)          // metas: [{width,height,bw,bs,be,bn}, ...] → the common target grid
+resampleGrid(pixels, srcMeta, dstMeta, opts?)   // opts: { method?, noData? }
+alignRasters(rasters, opts?)              // rasters: [{pixels,meta}, ...] → { grid, rasters: [{pixels,meta}, ...] }
+registerResampler(fn)        // the escape hatch for cubic/lanczos/etc. — nothing registered by default
+```
+
+Colorize (`package/rasterImage.js`, also barrel-exported — see [COLOR_SCALE.md](./COLOR_SCALE.md) for
+the `ColorScale` side of this):
+
+```js
+colorizeGrid(grid, opts?)     // opts: { colorScale?, alpha?, skipZero?, noData? } → Uint8ClampedArray RGBA
+gridToDataURL(grid, opts?)    // colorizeGrid + canvas encode → a PNG data URL
+```
+
+
+
+## Standalone `warp()` (the EAGER twin of `Dataset.reproject()`)
+
+```js
+import { warp } from 'fimviz';   // geo/warp.js — NOT the same as ds.reproject(toCrs)
+
+const warped = await warp(ds, toCrs);   // async — warps immediately, returns a NEW Dataset
+```
+
+`Dataset.reproject(toCrs)` (documented above) is **lazy** — it builds an op node, and the warp only
+runs when something forces the chain. This standalone `warp(ds, toCrs)` is the **eager**
+equivalent — it warps immediately and returns a new, already-reprojected `Dataset` (still rasters
+only; same-CRS request returns `ds` unchanged, no copy). Both dispatch to the same GDAL warp
+underneath; pick the lazy method for a chain you're building up before rendering, or this function
+when you want the result right away.
+
+## Vendored primitives
+
+Re-exported so the engine stays the single owner of these third-party dependencies — a host never
+imports `geotiff`/`@tmcw/togeojson`/`shpjs`/`@googlemaps/js-api-loader` directly:
+
+```js
+fromArrayBuffer   // geotiff's buffer → GeoTIFF image accessor (pixel-level access beyond parseFile)
+kml               // @tmcw/togeojson's KML XML DOM → GeoJSON
+shp               // shpjs's zipped shapefile buffer → GeoJSON
+Loader            // @googlemaps/js-api-loader's script loader class
+```
+
+
+
+## GDAL escape hatch (`callGdal`)
+
+`Dataset.reproject`/`resampleTo` (above) cover the one GDAL utility (`gdalwarp`) most callers need.
+For anything else gdal3.js offers — `gdal_translate`, `gdal_rasterize`, `ogr2ogr`, `gdalinfo`,
+`ogrinfo`, `gdaltransform`, or `gdalwarp` options those two don't expose — `callGdal(method, ...params)` dispatches to **any** method on the gdal3.js instance by name, passing your params
+through verbatim. No fimviz-specific wrapper exists (or is needed) per GDAL utility:
+
+```js
+import { callGdal } from 'fimviz';
+
+const file = new File([arrayBuffer], 'in.tif', { type: 'image/tiff' });
+const { datasets } = await callGdal('open', file);
+const outPath = await callGdal('gdal_translate', datasets[0],
+  ['-of', 'GTiff', '-outsize', '50%', '50%'], 'out.tif');
+await callGdal('close', datasets[0]);
+const bytes = await callGdal('getFileBytes', outPath);   // Uint8Array
+```
+
+gdal3.js's methods fall into a few parameter shapes (see its own `index.d.ts` for exact
+signatures): **lifecycle** — `open(fileOrFiles, options?, VFSHandlers?)` → `{datasets, errors}`,
+`close(dataset)`, `getFileBytes(path)`, `getOutputFiles()`, `getInfo(dataset)`; **dataset-based
+utilities**, output written to gdal3.js's virtual FS — `gdalwarp`/`gdal_translate`/
+`gdal_rasterize`/`ogr2ogr(dataset, options?, outputName?)`; **info-only**, no output file —
+`gdalinfo`/`ogrinfo(dataset, options?)`; **no dataset at all** — `gdaltransform(coords, options)`.
+An unknown method name throws immediately, listing every real method available.
+
+`callGdal` dynamically imports `geo/gdal.js` (→ gdal3.js, ~38 MB wasm) on first call — never just
+from importing the `fimviz` barrel, so a consumer who never calls it pays nothing for GDAL, same as
+the reproject seam. Browser-only (gdal3.js's Emscripten loader fails in Node), so — like `reproject`
+and the warp path generally — this isn't covered by `npm test`; verify it by exercising the site or
+an example page.
+
+`callGdal` is deliberately raw — it dispatches by method name but leaves the whole open/run/close/
+read-bytes lifecycle to the caller, spelled out in full above. For `gdalwarp` specifically, `warpTo`
+and `warpToGrid` already hide that ceremony.
