@@ -1,2 +1,2 @@
-# fim-lib
+# FIMViz.js
 A JS library for rendering FIM products
