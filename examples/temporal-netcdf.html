@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — temporal NetCDF (time axis + reduce)</title>
+<style>
+  :root { --bg:#0f1216; --panel:#161b22; --line:#2b3440; --fg:#e6edf3; --dim:#8b949e;
+          --ok:#3fb950; --bad:#f85149; --warn:#d29922; --accent:#58a6ff; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#fff; --panel:#f6f8fa; --line:#d0d7de; --fg:#1f2328; --dim:#656d76; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:14px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { padding:20px 24px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:18px; }
+  header p { margin:0; color:var(--dim); font-size:13px; max-width:90ch; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+  main { padding:16px 24px 64px; max-width:1100px; }
+  section { border:1px solid var(--line); border-radius:8px; margin:14px 0; background:var(--panel); }
+  section > h2 { margin:0; padding:10px 14px; font-size:14px; border-bottom:1px solid var(--line);
+                 display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .body { padding:12px 14px; }
+  button { background:var(--accent); color:#08111f; border:0; border-radius:6px;
+           padding:6px 12px; font-weight:600; cursor:pointer; font-size:13px; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  button.ghost { background:transparent; color:var(--fg); border:1px solid var(--line); }
+  select, input[type=file] { background:var(--bg); color:var(--fg); border:1px solid var(--line);
+                             border-radius:6px; padding:5px 8px; font-size:13px; }
+  input[type=range] { width:100%; accent-color:var(--accent); }
+  pre { margin:10px 0 0; padding:10px; background:var(--bg); border:1px solid var(--line);
+        border-radius:6px; overflow:auto; max-height:260px; font-size:12px;
+        font-family:ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-wrap; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .pill { font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); color:var(--dim); }
+  .dim { color:var(--dim); } .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+  #map { width:100%; height:460px; border-radius:0 0 8px 8px; }
+  .stamp { font:600 15px ui-monospace,Menlo,monospace; }
+  .legend { display:flex; align-items:center; gap:8px; font-size:12px; }
+  .ramp { height:12px; width:200px; border:1px solid var(--line); border-radius:3px; }
+  .grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FIMViz — temporal NetCDF: a time axis you can scrub</h1>
+  <p>The first slice of <code>docs/PACKAGE_ROADMAP.md</code> §8. <code>parseSciwrid(file)</code> scans a
+     multi-dimensional file into a <strong>lazy Dataset with a real time axis</strong> — one entry per
+     timestep, each an <em>in-file selector</em> rather than a separate download. Scrubbing the slider is
+     <code>layer.setSources([ds.select(coord)])</code>: one slice decodes off the same bytes. The two
+     reduce buttons collapse <em>every</em> timestep via <code>ds.reduce(op)</code>, which is sugar over
+     <code>select()</code>&nbsp;+&nbsp;<code>combine()</code> — no bespoke temporal machinery.
+     No GDAL: the decoder resamples onto a geographic bbox, so grids arrive in EPSG:4326 and render
+     directly.<br />
+     <strong>Serve from the repo root</strong> (<code>npx serve .</code>) and open
+     <code>/examples/temporal-netcdf.html</code> — ES modules and <code>fetch</code> fail on
+     <code>file://</code>. Run <code>npm run build</code> first (this page loads
+     <code>../dist/fimviz.js</code>).</p>
+</header>
+
+<main>
+  <section>
+    <h2>1 · Source <span class="pill" id="pill-src">idle</span></h2>
+    <div class="body">
+      <div class="row">
+        <button id="btn-sample">Load bundled sample</button>
+        <input type="file" id="file" accept=".nc,.nc4,.grb2,.grib2,.zip,.zarr" />
+        <label class="dim">variable <select id="var" disabled></select></label>
+      </div>
+      <p class="dim" style="margin:8px 0 0">
+        The bundled sample is <code>assets/SampleFiles/idalia-nldas2.nc</code> — NLDAS-2 rainfall over
+        Hurricane Idalia, 120 hourly steps on a 104×96 grid (~900&nbsp;KB). Any NetCDF4/NetCDF3/GRIB2/Zarr
+        file with a CF time axis works; the first NetCDF4 decode pulls <code>h5wasm</code> from a CDN.
+      </p>
+      <pre id="scan">— nothing loaded —</pre>
+    </div>
+  </section>
+
+  <section>
+    <h2>2 · Scrub the time axis <span class="pill" id="pill-t">—</span></h2>
+    <div class="body">
+      <div class="row" style="justify-content:space-between">
+        <span class="stamp" id="stamp">—</span>
+        <span class="row">
+          <button id="btn-play" class="ghost" disabled>▶ Play</button>
+          <button id="btn-fit" class="ghost" disabled>Fit map</button>
+        </span>
+      </div>
+      <input type="range" id="slider" min="0" max="0" value="0" disabled />
+      <div class="row" style="justify-content:space-between">
+        <span class="dim" id="t-first">—</span><span class="dim" id="t-last">—</span>
+      </div>
+      <div class="legend" style="margin-top:8px">
+        <span class="dim" id="legend-min">—</span>
+        <div class="ramp" id="ramp"></div>
+        <span class="dim" id="legend-max">—</span>
+        <span class="dim" id="legend-unit"></span>
+      </div>
+    </div>
+    <div id="map"></div>
+  </section>
+
+  <section>
+    <h2>3 · Collapse the whole axis <span class="pill" id="pill-r">—</span></h2>
+    <div class="body">
+      <div class="row">
+        <button id="btn-mean" disabled>reduce('mean')</button>
+        <button id="btn-max" disabled>reduce('max')</button>
+        <button id="btn-back" class="ghost" disabled>Back to the slider</button>
+      </div>
+      <p class="dim" style="margin:8px 0 0">
+        Each button forces every entry on the axis and reduces per pixel — 120 decodes, so it takes a few
+        seconds. <code>max</code> is the storm peak; it must exceed the mean, which is the cheapest proof
+        the axis was really traversed.
+      </p>
+      <div class="grid2" style="margin-top:10px">
+        <pre id="stats">— per-frame statistics appear here —</pre>
+        <pre id="log">— log —</pre>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "sciwrid-toolkit": "../node_modules/sciwrid-toolkit/dist/index.js"
+} }
+</script>
+
+<script type="module">
+// The engine comes from the built bundle; the SciWrid adapter is INTERNAL (deliberately not on the
+// barrel — see DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md's "what is public" rule), so it is reached
+// through `fimviz/src/*`, the documented escape hatch. Its whole import closure (dataset/materialize/
+// rasterOps/filter/resample) is relative-only, so a raw browser loads it with no bundler.
+//
+// That leaves two copies of the model live: the one inside dist/fimviz.js and the one under src/. It
+// stays coherent because the engine is duck-typed end to end (there is no `instanceof Dataset`
+// anywhere) and the adapter registers its decoder into the same src registry the src Dataset reads —
+// a Dataset built here decodes here, and the layer only ever sees a plain grid. A real app bundles
+// both halves together and has one copy; this is an example page, not a pattern to copy.
+//
+// `sciwrid-toolkit` maps straight to its OWN browser bundle rather than being re-bundled, which is
+// what keeps its h5wasm CDN fallback working: it loads h5wasm through `await import(c)` with a
+// variable, and a bundler compiles that into a build-time lookup that can never reach the network.
+import { FimViz, ColorScale, Stats } from "fimviz";
+import { parseSciwrid } from "../src/io/sciwrid.js";
+
+const $ = (s) => document.querySelector(s);
+const log = (msg, cls = "") => {
+  const el = $("#log");
+  el.innerHTML = `<span class="${cls}">${new Date().toLocaleTimeString()} — ${msg}</span>\n` + el.innerHTML;
+};
+const pill = (sel, text, cls = "") => { const p = $(sel); p.textContent = text; p.className = `pill ${cls}`; };
+
+// Leaflet needs no credentials, so this page boots with no key. `provider` is mandatory either way —
+// the engine never picks a backend for you.
+const fim = await FimViz.mount("#map", { provider: "leaflet" });
+log("map ready (leaflet)", "ok");
+
+let ds = null;        // the axis Dataset — a lazy series, never forced directly
+let layer = null;     // the one RasterLayer we keep swapping sources on
+let scale = null;     // one ColorScale for every frame, so the animation is comparable
+let seq = 0;          // monotonic guard: a slow frame must never overwrite a newer one
+let playing = null;
+
+async function open(source, name) {
+  pill("#pill-src", "scanning…", "warn");
+  try {
+    // scan() only — no pixels are decoded here, however many timesteps the file holds.
+    ds = await parseSciwrid(source, { name });
+  } catch (e) {
+    pill("#pill-src", "failed", "bad");
+    $("#scan").textContent = `${e.name}: ${e.message}`;
+    log(`parseSciwrid failed — ${e.message}`, "bad");
+    return;
+  }
+
+  const entries = ds.axis?.entries ?? [];
+  $("#scan").textContent = JSON.stringify({
+    name: ds.name, format: ds.format, kind: ds.kind, crs: ds.crs,
+    variable: ds.meta.variable, unit: ds.meta.unit,
+    nativeGrid: `${ds.meta.grid.width}×${ds.meta.grid.height}`,
+    bounds: ds.bounds, timeRange: ds.meta.timeRange,
+    timesteps: entries.length,
+    materialized: ds.isMaterialized,   // false — the whole point
+  }, null, 2);
+  pill("#pill-src", `${ds.format} · ${entries.length} steps`, "ok");
+  log(`scanned ${ds.name}: ${ds.meta.variable} (${ds.meta.unit ?? "no unit"}), ${entries.length} steps`, "ok");
+
+  if (!entries.length) { log("no time axis in this file — nothing to scrub", "warn"); return; }
+
+  $("#slider").max = String(entries.length - 1);
+  $("#slider").value = "0";
+  $("#slider").disabled = false;
+  $("#t-first").textContent = entries[0].meta.time;
+  $("#t-last").textContent = entries.at(-1).meta.time;
+  for (const id of ["#btn-play", "#btn-fit", "#btn-mean", "#btn-max"]) $(id).disabled = false;
+
+  // One scale for every frame. Ranged off the FIRST frame's own statistics rather than a guess; the
+  // reduce('max') button below re-ranges it to the true storm peak.
+  const first = ds.select(entries[0].coord);
+  const g0 = await first.grid();
+  const s0 = statsOf(g0);
+  scale = new ColorScale({ palette: "viridis", min: 0, max: Math.max(s0.max, 1e-6), continuous: true,
+                           unit: ds.meta.unit ?? "" });
+  paintLegend();
+
+  if (layer) { layer.remove(); layer = null; }
+  layer = await fim.addLayer(first);          // kind 'raster' → the registered raster factory renders it
+  layer.set({ colorScale: scale, opacity: 0.85 });
+  layer.fit();
+  showFrame(0, g0);
+  log(`rendered frame 0 — ${g0.width}×${g0.height} ${g0.crs}`, "ok");
+}
+
+function statsOf(grid) {
+  const s = Stats.raster(grid.pixels, {
+    bw: grid.bounds.west, bs: grid.bounds.south, be: grid.bounds.east, bn: grid.bounds.north,
+    width: grid.width, height: grid.height, unit: grid.meta?.unit,
+  });
+  return s;
+}
+
+function showFrame(i, grid) {
+  const e = ds.axis.entries[i];
+  $("#stamp").textContent = e.meta.time;
+  pill("#pill-t", `step ${i + 1} / ${ds.axis.entries.length}`, "ok");
+  if (grid) {
+    const s = statsOf(grid);
+    $("#stats").textContent = JSON.stringify({
+      timestep: e.meta.time, selector: ds.select(e.coord).selector,
+      valid: s.count, min: round(s.min), max: round(s.max), mean: round(s.mean),
+      note: "NaN cells (outside the model domain) are excluded — Stats and colorize agree on absent",
+    }, null, 2);
+  }
+}
+
+const round = (n) => (typeof n === "number" ? Number(n.toFixed(5)) : n);
+
+function paintLegend() {
+  const stops = [];
+  for (let i = 0; i <= 10; i++) stops.push(scale.getColor(scale.min + (i / 10) * (scale.max - scale.min)));
+  $("#ramp").style.background = `linear-gradient(to right, ${stops.join(",")})`;
+  $("#legend-min").textContent = round(scale.min);
+  $("#legend-max").textContent = round(scale.max);
+  $("#legend-unit").textContent = ds?.meta.unit ?? "";
+}
+
+// Scrubbing = swapping the layer's source to a different axis entry. setSources re-renders a live
+// layer atomically (it rolls back on failure), so this is the whole interaction.
+async function goto(i) {
+  const mine = ++seq;
+  const entry = ds.axis.entries[i];
+  showFrame(i, null);
+  try {
+    const child = ds.select(entry.coord);     // lazy — no decode yet, no second fetch
+    await layer.setSources([child]);
+    if (mine !== seq) return;                  // a newer frame won while we were decoding — drop this one
+    showFrame(i, await child.grid());          // memoized by now, so this is free
+  } catch (e) {
+    if (mine === seq) log(`frame ${i} failed — ${e.message}`, "bad");
+  }
+}
+
+async function reduceTo(op) {
+  const btns = ["#btn-mean", "#btn-max", "#btn-back", "#slider", "#btn-play"];
+  btns.forEach((b) => ($(b).disabled = true));
+  stop();
+  pill("#pill-r", `reducing ${ds.axis.entries.length} steps…`, "warn");
+  const t0 = performance.now();
+  try {
+    const reduced = ds.reduce(op);             // lazy — select() every entry, then combine() per pixel
+    const grid = await reduced.grid();          // this is where all 120 decodes happen
+    ++seq;                                      // any in-flight slider frame is now stale
+    await layer.setSources([reduced]);
+    const s = statsOf(grid);
+    scale.set({ min: 0, max: Math.max(s.max, 1e-6) });   // one write, one repaint
+    paintLegend();
+    $("#stamp").textContent = `${op} over the whole axis`;
+    $("#stats").textContent = JSON.stringify({
+      reduce: op, steps: ds.axis.entries.length,
+      valid: s.count, min: round(s.min), max: round(s.max), mean: round(s.mean),
+      seconds: Number(((performance.now() - t0) / 1000).toFixed(1)),
+    }, null, 2);
+    pill("#pill-r", `${op} done`, "ok");
+    log(`reduce('${op}') over ${ds.axis.entries.length} steps in ` +
+        `${((performance.now() - t0) / 1000).toFixed(1)}s — max ${round(s.max)}`, "ok");
+  } catch (e) {
+    pill("#pill-r", "failed", "bad");
+    log(`reduce('${op}') failed — ${e.message}`, "bad");
+  } finally {
+    btns.forEach((b) => ($(b).disabled = false));
+  }
+}
+
+function stop() {
+  if (playing) { clearInterval(playing); playing = null; $("#btn-play").textContent = "▶ Play"; }
+}
+
+$("#slider").addEventListener("input", (e) => { stop(); goto(+e.target.value); });
+$("#btn-fit").addEventListener("click", () => layer?.fit());
+$("#btn-mean").addEventListener("click", () => reduceTo("mean"));
+$("#btn-max").addEventListener("click", () => reduceTo("max"));
+$("#btn-back").addEventListener("click", () => { pill("#pill-r", "—"); goto(+$("#slider").value); });
+$("#btn-play").addEventListener("click", () => {
+  if (playing) return stop();
+  $("#btn-play").textContent = "⏸ Pause";
+  playing = setInterval(async () => {
+    const next = (+$("#slider").value + 1) % ds.axis.entries.length;
+    $("#slider").value = String(next);
+    await goto(next);
+  }, 400);
+});
+
+$("#file").addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  if (f) { stop(); open(f, f.name); }
+});
+$("#btn-sample").addEventListener("click", async () => {
+  stop();
+  pill("#pill-src", "fetching…", "warn");
+  const res = await fetch("../assets/SampleFiles/idalia-nldas2.nc");
+  if (!res.ok) {
+    pill("#pill-src", "fetch failed", "bad");
+    return log(`could not fetch the sample (${res.status}) — serve from the REPO ROOT, not /examples`, "bad");
+  }
+  open(await res.arrayBuffer(), "idalia-nldas2.nc");
+});
+</script>
+</body>
+</html>

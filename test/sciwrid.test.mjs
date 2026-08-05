@@ -9,12 +9,11 @@ import { Dataset } from "../src/package/dataset.js";
 import { Stats } from "../src/package/stats.js";
 import { parseSciwrid, registerSciwridFormats, SCIWRID_FORMATS } from "../src/io/sciwrid.js";
 
-// A real multi-dim fixture is far too big to vendor (SciWrid's own are 194 MB in total), so the
-// integration tests below run against the sibling checkout when it is present and SKIP otherwise —
-// `npm test` stays green on a clone that has only this repo.
+// A real 120-step NetCDF4 (NLDAS-2 rainfall over Hurricane Idalia, ~900 KB) is vendored in
+// assets/SampleFiles so these run on any clone — a skipped integration test is one nobody notices is
+// gone. Override with FIMVIZ_NC_FIXTURE to point at a bigger/different file.
 const FIXTURE = process.env.FIMVIZ_NC_FIXTURE ||
-  fileURLToPath(new URL("../../SciWrid-Toolkit/examples/idalia/idalia-nldas2.nc", import.meta.url));
-const haveFixture = existsSync(FIXTURE);
+  fileURLToPath(new URL("../assets/SampleFiles/idalia-nldas2.nc", import.meta.url));
 
 const range = (pixels) => {
   let n = 0, min = Infinity, max = -Infinity;
@@ -57,8 +56,12 @@ describe("sciwrid adapter: registration + preconditions", () => {
   });
 });
 
-describe("sciwrid adapter: real NetCDF4", { skip: haveFixture ? false : `fixture not found: ${FIXTURE}` }, () => {
+describe("sciwrid adapter: real NetCDF4", () => {
   const load = () => parseSciwrid(readFileSync(FIXTURE), { name: "idalia-nldas2.nc" });
+
+  test("the vendored fixture is present — these tests must not silently stop running", () => {
+    assert.ok(existsSync(FIXTURE), `missing NetCDF fixture: ${FIXTURE}`);
+  });
 
   test("scan() becomes a lazy Dataset with a real time axis — nothing decoded yet", async () => {
     const ds = await load();
