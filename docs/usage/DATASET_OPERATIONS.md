@@ -48,7 +48,7 @@ raw File/Blob/ArrayBuffer/URL into a Dataset for you.
 
 | Method                          | Params                                                                                                    | Returns                                      | Notes                                                                                                                                                                                                                                                       |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `select(coord, opts?)`          | `coord: number|string`; `opts.axis=0` (index/name), `opts.nearest=true`, `opts.variant`, `opts.base`      | `Dataset|null`                               | Resolves one axis entry to a child URL-rooted Dataset. Only meaningful on a Dataset with `.axes` (a selection-axis series) — a plain parsed file has none. `null` on no match. `opts.variant` required when the entry's `ref` is `{raster, vector}`-shaped. |
+| `select(coord, opts?)`          | `coord: number|string`; `opts.axis=0` (index/name), `opts.nearest=true`, `opts.variant`, `opts.base`      | `Dataset|null`                               | Resolves one axis entry to a child Dataset — URL-rooted, or rooted on this Dataset's own source for an in-file selector ([below](#axis-entries-one-file-per-entry-or-one-file-many-entries)). Only meaningful on a Dataset with `.axes` (a selection-axis series) — a plain parsed file has none. `null` on no match. `opts.variant` required when the entry's `ref` is `{raster, vector}`-shaped. |
 | `selectAxisEntry(coord, opts?)` | same `opts` (no `variant`/`base`)                                                                         | `DatasetAxisEntry|null`                      | What `select` looks up before resolving the URL — exact match first, nearest **numeric** coord on a miss (`nearest:true`, default).                                                                                                                         |
 | `reduce(op?, opts?)`            | `op: 'sum'|'mean'|'min'|'max'` (default `'mean'`); `opts.axis=0`, `opts.method='nearest'`, `opts.variant` | `Dataset`                                    | Collapse a temporal/vertical axis to one grid — sugar over `select()` every entry + `combine()`. Throws if no axis / empty axis / an entry fails to resolve.                                                                                                |
 | `toRecord(opts?)`               | `opts.storeMaterialized=false`                                                                            | `Object`                                     | Structured-cloneable snapshot for `Storage.put()`. Default = source + op recipe (small); `storeMaterialized:true` also embeds the decoded grid/features (call `await ds.load()` first, or it throws).                                                       |
@@ -57,6 +57,43 @@ raw File/Blob/ArrayBuffer/URL into a Dataset for you.
 
 
 
+
+### Axis entries: one file per entry, or one file many entries
+
+An axis entry's `ref` says how to GET that entry's payload, and takes three forms. `select()` and
+`reduce()` behave identically across all three — the axis model doesn't care which you built:
+
+```js
+// 1. A URL — one file per entry (the FIM Scenario shape: each stage/timestep its own raster).
+{ coord: 19.5, ref: 'stage_19p5.tif' }                       // → a URL-rooted child
+
+// 2. Named URL variants — pick one with select(coord, { variant }).
+{ coord: 19.5, ref: { raster: 'a.tif', vector: 'a.kmz' } }    // → select(19.5, { variant: 'raster' })
+
+// 3. An IN-FILE selector — the entry is a slice of the SAME source, not a separate download.
+{ coord: 6, ref: { select: { variable: 'TMP', t: 1 } } }      // → a child sharing this file's bytes
+```
+
+Form 3 is what lets **one multi-dimensional file** (NetCDF/GRIB2/Zarr, every timestep inside it) back a
+whole temporal axis. The child shares the parent's bytes or URL — no second fetch — carries the same
+`format`, and the selection reaches the decoder as `root.select`:
+
+```js
+const child = ds.select(6);      // ds.format 'netcdf4', ds.data the file's bytes
+child.selector;                   // → { variable: 'TMP', t: 1 }
+child.axes;                       // → null — a child is ONE payload, so it forces like any Dataset
+await child.grid();               // materializer receives { kind:'inline', data, select: {…} }
+await ds.reduce('mean').grid();   // every entry resolved + reduced — no extra machinery
+```
+
+`select`'s `base` applies to URL refs only. A selector ref may also carry `name`/`crs`/`bounds` to
+override what the child would otherwise inherit from its parent. Selecting on a Dataset with no source
+of its own (no `data`, no `url`) throws — there is nothing to select *from*. Selector children round-trip
+through `toRecord()`/`fromRecord()` like any root.
+
+Writing a materializer that understands selectors is one `if`: `root.select` is simply absent for
+ordinary sources, so existing decoders are unaffected. See
+[APP_STARTUP_ADVANCED.md → Materialize / decode extension seam](./APP_STARTUP_ADVANCED.md#materialize--decode-extension-seam).
 
 ## Terminals (force the chain — nothing exists until one of these runs)
 

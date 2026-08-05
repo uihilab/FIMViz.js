@@ -99,6 +99,11 @@ reprojection implementation. They are **statics on `Dataset`**, the type they se
 ```js
 Dataset.registerMaterializer(format, fn)  // fn: async (root, ds) => RasterGrid | VectorFeatures
                                           //   root: {kind:'inline', data} | {kind:'url', url}
+                                          //   root.select: present ONLY when the Dataset came from an
+                                          //     in-file selector ref — {variable, t, …}, the slice of a
+                                          //     multi-dim source to decode. Absent for ordinary sources,
+                                          //     so ignoring it is the correct default. See
+                                          //     DATASET_OPERATIONS.md → "Axis entries".
 Dataset.formats()                          // → string[] — every format decodable right now
                                           //   (built-ins + your own). Outside a custom decoder this
                                           //   is the one to reach for: build a file picker's

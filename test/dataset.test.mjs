@@ -220,3 +220,108 @@ describe("warp (eager free function)", () => {
   // its Emscripten loader fails in Node ("sn.readFileSync is not a function") — so the warp path
   // needs browser verification. Everything up to the getGdal() call is covered above.
 });
+
+// An axis entry's `ref` can be an IN-FILE selector instead of a URL, so one multi-dimensional source
+// (NetCDF/GRIB2/Zarr) backs a whole temporal axis. See docs/PACKAGE_ROADMAP.md §8.
+describe("Dataset: selection axis — in-file selector refs", () => {
+  // A stand-in for a multi-dim reader: decodes whichever slice `root.select` names, and records the
+  // (root, select) pairs it was handed so a test can assert what actually reached the materializer.
+  const seen = [];
+  registerMaterializer("test-nd", async (root, ds) => {
+    seen.push({ kind: root.kind, url: root.url ?? null, select: root.select ?? null, name: ds.name });
+    const v = root.select ? root.select.t * 10 : -1;
+    return new RasterGrid({
+      pixels: Float32Array.from([v, v, v, v]), width: 2, height: 2,
+      bounds: { north: 1, south: 0, east: 1, west: 0 }, crs: "EPSG:4326",
+    });
+  });
+
+  const ndAxis = {
+    name: "time", unit: "h",
+    entries: [
+      { coord: 0, ref: { select: { variable: "TMP", t: 0 } }, meta: { valid: "T00" } },
+      { coord: 6, ref: { select: { variable: "TMP", t: 1 } }, meta: { valid: "T06" } },
+    ],
+  };
+  const ndSource = () => new Dataset({
+    name: "forecast.nc", kind: "raster", format: "test-nd", crs: "EPSG:4326",
+    bounds: { north: 1, south: 0, east: 1, west: 0 },
+    data: new ArrayBuffer(8), axis: ndAxis,
+  });
+
+  test("a selector entry yields a child on the SAME source, carrying the selection", () => {
+    const ds = ndSource();
+    const child = ds.select(6);
+    assert.deepEqual(child.selector, { variable: "TMP", t: 1 }, "the selection rides on the child");
+    assert.equal(child.data, ds.data, "shares the parent's bytes — not a second download");
+    assert.equal(child.format, "test-nd", "same file, so the same materializer decodes it");
+    assert.equal(child.kind, "raster");
+    assert.equal(child.axes, null, "a child is ONE payload, not a series — so it can force");
+    assert.equal(child.meta.valid, "T06", "the entry's meta is merged over the parent's");
+  });
+
+  test("nearest-coord lookup works the same as it does for URL refs", () => {
+    assert.deepEqual(ndSource().select(5).selector, { variable: "TMP", t: 1 }, "5 → nearest coord 6");
+  });
+
+  test("forcing a selector child hands the materializer BOTH the source and the selection", async () => {
+    seen.length = 0;
+    const grid = await ndSource().select(6).grid();
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].kind, "inline", "the parent's inline source, unchanged");
+    assert.deepEqual(seen[0].select, { variable: "TMP", t: 1 }, "…plus which slice to decode");
+    assert.deepEqual([...grid.pixels], [10, 10, 10, 10]);
+  });
+
+  test("a URL-rooted series selects in-file too, resolver and all", async () => {
+    seen.length = 0;
+    const ds = new Dataset({
+      name: "remote.nc", kind: "raster", format: "test-nd",
+      url: "https://data.example/f.nc", resolveUrl: (u) => `https://proxy.example/${u}`,
+      axis: ndAxis,
+    });
+    await ds.select(0).grid();
+    assert.equal(seen[0].kind, "url");
+    assert.equal(seen[0].url, "https://proxy.example/https://data.example/f.nc",
+      "the carried resolver still applies — a proxied series stays proxied across select()");
+    assert.deepEqual(seen[0].select, { variable: "TMP", t: 0 });
+  });
+
+  test("reduce() collapses a selector axis — the payoff of routing through select()", async () => {
+    const mean = await ndSource().reduce("mean").grid();
+    assert.deepEqual([...mean.pixels], [5, 5, 5, 5], "(0*10 + 1*10) / 2");
+    const max = await ndSource().reduce("max").grid();
+    assert.deepEqual([...max.pixels], [10, 10, 10, 10]);
+  });
+
+  test("a selector child round-trips through toRecord/fromRecord", async () => {
+    const back = Dataset.fromRecord(ndSource().select(6).toRecord());
+    assert.deepEqual(back.selector, { variable: "TMP", t: 1 });
+    assert.equal(back.format, "test-nd");
+    assert.equal(back.axes, null);
+    assert.deepEqual([...(await back.grid()).pixels], [10, 10, 10, 10], "and still forces correctly");
+  });
+
+  test("a selector entry with no source to select FROM throws, naming the cause", () => {
+    const orphan = new Dataset({ name: "no-source", format: "test-nd", axis: ndAxis });
+    assert.throws(() => orphan.select(0), /in-file selector.*no source/s);
+  });
+
+  test("URL refs and named variants are untouched by the selector branch", () => {
+    const urlAxis = {
+      name: "stage",
+      entries: [
+        { coord: 1, ref: "a/one.tif" },
+        { coord: 2, ref: { raster: "a/two.tif", vector: "a/two.kmz" } },
+        { coord: 3, ref: { select: "not-an-object" } },
+      ],
+    };
+    const ds = new Dataset({ name: "series", axis: urlAxis, data: new ArrayBuffer(1) });
+    assert.equal(ds.select(1).selector, null, "a bare URL ref is still a URL root");
+    assert.equal(ds.select(2, { variant: "vector" }).name, "two.kmz", "named variants still resolve");
+    assert.throws(() => ds.select(2), /named variants/, "…and still demand a variant");
+    // A variant that happens to be CALLED "select" holds a string, so it is not read as a selector.
+    assert.throws(() => ds.select(3), /named variants/,
+      "the discriminator is an object-valued `select`, not merely the key's presence");
+  });
+});

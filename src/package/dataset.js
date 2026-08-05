@@ -71,10 +71,32 @@ function formatFromName(name) {
 }
 const kindOfFormat = (fmt) => (fmt === "geotiff" ? "raster" : fmt ? "vector" : null);
 
+// Is this axis-entry `ref` an in-file selector rather than a URL / named URL variants? Discriminated
+// on an OBJECT-valued `select` key: named variants are string-valued throughout, so a variant literally
+// named "select" (holding a URL string) is still read as a variant, not mistaken for a selector.
+const isSelectorRef = (ref) =>
+  !!ref && typeof ref === "object" && !!ref.select && typeof ref.select === "object";
+
 /**
+ * One entry on a selection axis. `ref` says how to GET this entry's payload, and has three forms —
+ * the axis model is agnostic about which, so `select()`/`reduce()` work the same over all of them:
+ *
+ * - `'stage_12.tif'` — a **URL** (relative to `select`'s `base`). One file per entry: the FIM Scenario
+ *   shape, where each timestep/stage is its own downloadable raster.
+ * - `{ raster: 'a.tif', vector: 'a.geojson' }` — **named URL variants**; `select({ variant })` picks one.
+ * - `{ select: { variable: 'TMP', date: '…' } }` — an **in-file selector**. The entry is not a separate
+ *   file: it is a slice of the SAME source this Dataset already points at (a NetCDF/GRIB2/Zarr file
+ *   holding every timestep). The child shares the parent's bytes/URL and carries the selector through
+ *   to the materializer as `root.select`. Optional siblings `name`/`crs`/`bounds` override what the
+ *   child would otherwise inherit from its parent.
+ *
+ * The third form is what lets one multi-dimensional file back a whole temporal axis. Without it an
+ * axis entry must be separately fetchable, which is true of FIM Scenario and false of every
+ * scientific multi-dim format.
+ *
  * @typedef {Object} DatasetAxisEntry
  * @property {number|string} coord
- * @property {string|Object<string,string>} ref
+ * @property {string|Object<string,string>|{select: Object, name?: string, crs?: string, bounds?: DatasetBounds}} ref
  * @property {Object} [meta]
  */
 /**
@@ -93,6 +115,9 @@ export class Dataset {
   #url = null;          // root only: a URI source (fromURL). Mutually exclusive with inline `data`.
   #resolveUrl = null;   // url root only: an optional (url)=>string resolver (host CORS-proxy/mirror),
                         //   applied at force time. Instance-supplied, never serialized (a function).
+  #selector = null;     // root only: an IN-FILE selection (e.g. { variable, date }), handed to the
+                        //   materializer as `root.select`. What lets one multi-dimensional source back
+                        //   a whole axis without one file per entry — see select()'s selector refs.
   #inputs = null;       // derived only: the INPUT Datasets (array — unary ops are length-1, N-ary ops
                         //   like combine/difference hold several). null on a root.
   #op = null;           // derived only: a declarative op descriptor, e.g. { op:'reproject', crs }
@@ -115,10 +140,12 @@ export class Dataset {
    * @param {((url: string) => string)|null} [init.resolveUrl] - url root only: resolver applied to the URL at force time
    * @param {DatasetAxis|null} [init.axis] - 1-D sugar for a single selection axis
    * @param {DatasetAxis[]|null} [init.axes]
+   * @param {Object|null} [init.selector] - an in-file selection passed to the materializer as `root.select`
+   *   (normally produced by `select()` off a selector ref, not passed by hand)
    */
   constructor({ id, name, kind = null, format = null, crs = null,
                 bounds = null, meta = {}, data = null, url = null, resolveUrl = null,
-                axis = null, axes = null } = {}) {
+                selector = null, axis = null, axes = null } = {}) {
     this.id = id || nextId();
     this.name = name || this.id;
     this.kind = kind;
@@ -129,6 +156,7 @@ export class Dataset {
     this.data = data;                  // inlined payload (root). null for url roots + derived nodes.
     this.#url = url;
     this.#resolveUrl = resolveUrl;
+    this.#selector = selector;
     this.axes = axes ?? (axis ? [axis] : null);
   }
 
@@ -499,22 +527,52 @@ export class Dataset {
   }
 
   /**
-   * Resolve one selection-axis entry into a child URL-rooted Dataset (lazy). Sugar over
-   * selectAxisEntry: it picks the entry, resolves its `ref` (a bare URL, or a named variant chosen via
-   * `opts.variant`), infers the format from the URL, and carries the entry's opaque `meta`. Returns
-   * null when no entry matches. Kind-neutral: which variant (raster vs vector) is the caller's call.
+   * Resolve one selection-axis entry into a child Dataset (lazy). Sugar over selectAxisEntry: it picks
+   * the entry, resolves its `ref`, and carries the entry's opaque `meta`. Returns null when no entry
+   * matches. Kind-neutral: which variant (raster vs vector) is the caller's call.
+   *
+   * The `ref` decides what kind of child comes back (see {@link DatasetAxisEntry}):
+   * - a **URL** (bare, or a named variant picked via `opts.variant`) → a URL-rooted child, format
+   *   inferred from the URL. One file per entry.
+   * - an **in-file selector** (`{ select: {…} }`) → a child rooted on the SAME source as this Dataset
+   *   (its bytes or URL, plus resolver), carrying the selector for the materializer. One file, many
+   *   entries — a NetCDF/GRIB2/Zarr time axis.
+   *
+   * Either way the child has no `axes` of its own: it is one payload, not a series, so it forces
+   * through `load()`/`grid()` like any other Dataset and every op chains off it normally.
+   *
    * @param {number|string} coord
    * @param {Object} [opts]
    * @param {number|string} [opts.axis=0] - which axis (index or name) to look up on
    * @param {boolean} [opts.nearest=true] - fall back to the closest numeric coord on a miss
-   * @param {string} [opts.variant] - required when the matched entry's `ref` has named variants (e.g. `{raster, vector}`)
-   * @param {string} [opts.base] - URL prefix prepended to the resolved `ref`
+   * @param {string} [opts.variant] - required when the matched entry's `ref` has named URL variants (e.g. `{raster, vector}`)
+   * @param {string} [opts.base] - URL prefix prepended to a resolved URL `ref` (ignored by selector refs)
    * @returns {Dataset|null}
    */
   select(coord, opts = {}) {
     const entry = this.selectAxisEntry(coord, opts);
     if (!entry) return null;
     let ref = entry.ref;
+
+    // In-file selector: this entry is a SLICE of the source we already hold, not a separate download.
+    // Checked before the variant branch because both are objects — a selector is discriminated by an
+    // object-valued `select` key, while named variants are string-valued throughout.
+    if (isSelectorRef(ref)) {
+      if (!this.#url && this.data == null) {
+        throw new Error(`select: "${this.name}"'s axis entry ${JSON.stringify(entry.coord)} is an ` +
+          "in-file selector, but this Dataset has no source to select from (no data, no url).");
+      }
+      return new Dataset({
+        name: ref.name || `${this.name}[${entry.coord}]`,
+        kind: this.kind, format: this.format,
+        crs: ref.crs ?? this.crs,
+        bounds: ref.bounds ?? this.#bounds,
+        meta: { ...(this.#meta || {}), ...(entry.meta || {}) },
+        data: this.data, url: this.#url, resolveUrl: this.#resolveUrl,
+        selector: ref.select,
+      });
+    }
+
     if (ref && typeof ref === "object") {
       if (!opts.variant) throw new Error(`select: entry ref has named variants (${Object.keys(ref).join(", ")}); pass { variant }`);
       ref = ref[opts.variant];
@@ -526,6 +584,9 @@ export class Dataset {
     return Dataset.fromURL(url, { name: String(ref).split("/").pop(), meta: entry.meta || {},
       resolveUrl: this.#resolveUrl });
   }
+
+  /** The in-file selection this Dataset forces with, or null. @returns {Object|null} */
+  get selector() { return this.#selector; }
 
   /**
    * Look up an entry on one axis by coordinate. Exact match first; with { nearest: true } (default) and
@@ -598,6 +659,10 @@ export class Dataset {
     // the resolved URL — keeps the resolution here (instance-supplied) and materializers dumb.
     const url = this.#url && this.#resolveUrl ? this.#resolveUrl(this.#url) : this.#url;
     const root = this.#url ? { kind: "url", url } : { kind: "inline", data: this.data };
+    // An in-file selector rides on the root, so a materializer reads the source and which slice of it
+    // to decode from ONE argument. Absent (the common case) the key is simply not there, so every
+    // existing materializer is unaffected.
+    if (this.#selector) root.select = this.#selector;
     return mat(root, this);
   }
 
@@ -748,6 +813,9 @@ export class Dataset {
     } else {                                   // inline root — classic shape (with data)
       base.data = this.data;
     }
+    // A selector root round-trips as a root + its in-file selection. Only present when set, so an
+    // ordinary record is byte-identical to what it was before selectors existed.
+    if (!this.#inputs && this.#selector) base.selector = this.#selector;
     if (opts.storeMaterialized) {
       if (!this.isMaterialized) throw new Error("toRecord({storeMaterialized}): call await ds.load() first");
       base.materialized = { ...this.#materialized };   // plain snapshot; revived by kind in fromRecord
