@@ -95,6 +95,43 @@ Writing a materializer that understands selectors is one `if`: `root.select` is 
 ordinary sources, so existing decoders are unaffected. See
 [APP_STARTUP_ADVANCED.md → Materialize / decode extension seam](./APP_STARTUP_ADVANCED.md#materialize--decode-extension-seam).
 
+### Reading NetCDF / GRIB2 / Zarr (`parseSciwrid`)
+
+The concrete producer of selector axes — multi-dimensional scientific formats, via
+[SciWrid Toolkit](https://github.com/uihilab/SciWrid-Toolkit). **Opt-in and not on the barrel**: the
+engine never imports it, so the ~193 KB wasm stays out of every other consumer's bundle.
+
+```js
+import { parseSciwrid } from 'fimviz/src/io/sciwrid.js';
+
+const ds = await parseSciwrid(file);              // scan() only — nothing decoded
+ds.axis.entries.length;                            // 120 timesteps
+ds.meta.grid;                                      // { width, height, bbox, bounds } — the file's NATIVE grid
+ds.meta.unit;                                      // 'kg m-2'
+
+const t = ds.select(Date.parse('2023-08-28T06:00:00Z'));   // → one grid, lazily, off the same bytes
+await fim.addLayer(t);                                       // renders like any raster (already EPSG:4326)
+
+await ds.reduce('mean').grid();    // temporal mean over the whole axis
+await ds.reduce('max').grid();     // …or the storm peak
+```
+
+| Option | Notes |
+|---|---|
+| `variable` | which variable; defaults to the first `supported` one. **One variable per Dataset** — call it again for another. |
+| `grid` | `{ width, height, bbox }` — override the native grid (coarser decodes faster). |
+| `workers` | `extractGrid`'s worker count. Defaults to SciWrid's own in a browser, and to `0` under Node, where the worker pool never resolves. |
+| `name` / `resolveUrl` | as elsewhere. |
+
+**Axis coordinates are epoch milliseconds**, not ISO strings — `select()`'s nearest-match is
+numeric-only, and that is what a time slider needs. The ISO timestamp is on each entry's `meta.time`,
+so `ds.selectAxisEntry(Date.parse(iso)).meta.time` reads it back.
+
+No GDAL is involved: `extractGrid` resamples onto a geographic bbox, so these arrive as `EPSG:4326`
+and render directly. Missing values arrive as `NaN`, which colorize and `Stats` already treat as
+absent. Rehydrating a stored selector Dataset skips the parser, so call `registerSciwridFormats()`
+once at boot before `Dataset.fromRecord`.
+
 ## Terminals (force the chain — nothing exists until one of these runs)
 
 

@@ -445,6 +445,42 @@ end-to-end on the format §3 already picked; GRIB2 and Zarr then become repeat a
 same glue rather than new design. `Stats`/`SpatialFilter`/`PredicateFilter`/`ColorScale`/`Legend` are
 grid-agnostic and need no work — a temporal statistic is a loop over `select()`.
 
+✅ **Landed: the axis-`ref` generalization** (`package/dataset.js`, node-tested). An entry's `ref` may
+now be `{ select: {…} }` — an in-file selector — alongside the existing URL and named-variant forms;
+`select()` then returns a child rooted on the parent's own bytes/URL (no second fetch, same `format`,
+no `axes` of its own) and the selection reaches the decoder as `root.select`. Discriminated on an
+**object-valued** `select` key, so a named URL variant that happens to be called `select` is still a
+variant. Round-trips through `toRecord`/`fromRecord`. Existing materializers are untouched:
+`root.select` is simply absent for ordinary sources.
+
+✅ **Landed: the NetCDF4 vertical** (`io/sciwrid.js` + `test/sciwrid.test.mjs`).
+`parseSciwrid(source, opts?)` turns a `scan()` into a lazy `Dataset` carrying a **time axis of
+selector refs**, one entry per timestep; `registerSciwridFormats()` registers the decoder for
+netcdf4/netcdf3/grib2/zarr. Verified end-to-end against a real 120-step NLDAS-2 NetCDF4 (Hurricane
+Idalia): `select()` → one decoded slice, `clip()`/`Stats` unchanged on it, and
+**`reduce('mean'|'max')` collapsing all 120 timesteps in ~3 s with no new grid math** — the predicted
+payoff of routing selectors through `select()`. Four decisions worth keeping:
+
+- **Native grid derived at parse time.** `extractGrid` is a resample, so `nativeGridOf()` reads the
+  variable's own shape from `scan()` — `'120x96x104'` (string, NetCDF/GRIB) or `[120,96,104]` (array,
+  Zarr), CF order, so height/width are the **last two** dims however many lead them — plus
+  `scan().bbox`, and stores it on `meta.grid`. A Dataset then has a native grid like any other raster
+  and the ops' assumptions hold; `opts.grid` overrides it. A file with no geographic bbox throws
+  rather than silently landing on synthetic index axes.
+- **Axis coords are epoch milliseconds, not ISO strings.** `selectAxisEntry`'s nearest-match is
+  numeric-only, and a time slider needs it; the ISO string stays on `entry.meta.time`. This
+  deliberately diverges from the WaterML/NWIS adapter's string coords.
+- **Workers off under Node.** `extractGrid` fans out over 5 Web Workers by default — the point of it
+  in a browser, and a silent **hang** under Node (no `Worker` global, the pool never resolves, the
+  promise never settles). The materializer forces `workers: 0` when `Worker` is undefined;
+  `meta.workers` overrides.
+- **Preconditions are checked before the dynamic `import()`**, so a misconfigured Dataset fails
+  immediately instead of pulling a ~193 KB chunk and a wasm compile to reach an error.
+
+`h5wasm` is a **devDependency** only: SciWrid lazy-loads it from a CDN in the browser and from npm
+under Node, so it is needed to run the tests and not to ship. A source-scan test asserts
+`io/materializers.js` never names the adapter, which is what keeps the wasm out of the default bundle.
+
 **Deliberately out of this slice:**
 
 - **Cubing** (holding an N-D cube as a value and operating on it) — `RasterGrid` and `VectorFeatures`
