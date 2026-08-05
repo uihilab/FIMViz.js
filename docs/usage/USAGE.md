@@ -202,6 +202,13 @@ name/extension). Supported: `geotiff` (.tif/.tiff), `geojson` (.geojson/.json, i
 reprojects** — the Dataset comes back in its **native** `crs`; warp deliberately with
 [`warp`](#warp).
 
+**Multi-dimensional scientific formats — NetCDF4/NetCDF3/GRIB2/Zarr — are deliberately NOT here.**
+They need a decoder carrying a ~193 KB wasm, so they live behind an opt-in adapter that the engine
+never imports: `parseSciwrid()` in `fimviz/src/io/sciwrid.js`. It returns a `Dataset` with a real
+**time axis**, so `select()` scrubs a timestep and `reduce()` collapses the series. See
+[DATASET_OPERATIONS.md → Reading NetCDF / GRIB2 / Zarr](./DATASET_OPERATIONS.md#reading-netcdf--grib2--zarr-parsesciwrid)
+and the live page at `examples/temporal-netcdf.html`.
+
 ### `FimVizInstance` (via `FimViz.current()` or `fim.app`)
 
 | Member | Notes |

@@ -161,6 +161,18 @@ is the *why*, those are the *what*.
   *catalog* does not (unrelated members) → stays a shape. Division of labor: the library owns axis metadata
   + lazy `select()`; the app owns the slider UI and the domain adapter, building the slider generically
   from `ds.axes` without the engine ever learning "stage" vs. "time".
+  - **An axis entry's `ref` says how to GET the payload, not only where to fetch it.** The original
+    shape assumed *one file per entry* — a URL (or named URL variants) — which is FIM Scenario's shape
+    and no multi-dimensional format's. A third form, `{ select: {…} }`, marks the entry as a **slice of
+    the source this Dataset already holds**: `select()` returns a child rooted on the parent's own
+    bytes/URL (no second fetch, same `format`, no `axes` of its own) and the selection reaches the
+    decoder as `root.select`. It is discriminated on an *object-valued* `select` key, so a named URL
+    variant that happens to be called `select` is still a variant. **Rejected: a second bypass.** The
+    WaterML/NWIS adapter met the same "entries aren't separately fetchable" problem and routed *around*
+    `select()` (`ref: null`, bespoke accessors) — correct there, but repeating it would have left three
+    incompatible axis shapes and a `reduce()` that works on only one. Because `reduce()` is already
+    sugar over `select()` + `combine()`, folding the in-file case into `select()` bought temporal
+    aggregation for free. Landed with the NetCDF4/GRIB2/Zarr adapter — [PACKAGE_ROADMAP.md §8](./PACKAGE_ROADMAP.md#8-multi-dimensional-formats--real-temporal-datasets-sciwrid-toolkit-as-a-materializer).
 - **App-specific domain formats get adapters; the neutral core never learns a proprietary schema.**
   `parseFile` handles only generic formats (geojson/kml/kmz/shp/geotiff; HAZUS damage is included because
   it's a FEMA *standard*, not one lab's schema). Two FIMViz-specific JSON formats stayed out, **not

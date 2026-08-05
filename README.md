@@ -93,6 +93,27 @@ const cs = new ColorScale({ palette: 'viridis', min: 0, max: 10 });
 const legend = Legend.fromColorScale(cs);
 ```
 
+## Temporal & multi-dimensional data
+
+NetCDF4/NetCDF3/GRIB2/Zarr are read through an **opt-in** adapter (the engine never imports it, so its
+decoder stays out of everyone else's bundle). One file with many timesteps becomes a `Dataset` with a
+real **time axis**:
+
+```js
+import { parseSciwrid } from 'fimviz/src/io/sciwrid.js';
+
+const ds = await parseSciwrid(file);                       // scan() only — nothing decoded
+const t  = ds.select(Date.parse('2023-08-28T06:00:00Z'));  // one slice, off the same bytes
+await fim.addLayer(t);                                      // already EPSG:4326 — no GDAL warp
+
+await ds.reduce('mean').grid();                             // collapse every timestep
+```
+
+Every `Dataset` op, `Stats`, `ColorScale` and `Legend` work on the result unchanged. Scope and the
+grid geometries that need a manual extent are in
+[PACKAGE_ROADMAP.md §8.1](docs/PACKAGE_ROADMAP.md#81-which-grids-we-actually-support-scope-and-the-silent-failure-guard);
+`examples/temporal-netcdf.html` is a live page (scrub, play, reduce) with NetCDF4/Zarr/GRIB2 samples.
+
 ## Docs
 
 - **API reference** (generated): [docs/api/](docs/api/) — run `npm run docs:api` to regenerate.
