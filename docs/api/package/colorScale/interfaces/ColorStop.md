@@ -6,7 +6,7 @@
 
 # Interface: ColorStop
 
-Defined in: [package/colorScale.js:141](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/colorScale.js#L141)
+Defined in: [package/colorScale.js:156](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/colorScale.js#L156)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [package/colorScale.js:141](https://github.com/uihilab/FIMViz.js/blo
 
 > **color**: `string`
 
-Defined in: [package/colorScale.js:145](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/colorScale.js#L145)
+Defined in: [package/colorScale.js:160](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/colorScale.js#L160)
 
 hex or css color
 
@@ -24,7 +24,7 @@ hex or css color
 
 > `optional` **label?**: `string`
 
-Defined in: [package/colorScale.js:146](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/colorScale.js#L146)
+Defined in: [package/colorScale.js:161](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/colorScale.js#L161)
 
 ***
 
@@ -32,7 +32,7 @@ Defined in: [package/colorScale.js:146](https://github.com/uihilab/FIMViz.js/blo
 
 > `optional` **max?**: `number`
 
-Defined in: [package/colorScale.js:144](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/colorScale.js#L144)
+Defined in: [package/colorScale.js:159](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/colorScale.js#L159)
 
 classed mode: band upper bound
 
@@ -42,7 +42,7 @@ classed mode: band upper bound
 
 > `optional` **min?**: `number`
 
-Defined in: [package/colorScale.js:143](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/colorScale.js#L143)
+Defined in: [package/colorScale.js:158](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/colorScale.js#L158)
 
 classed mode: band lower bound
 
@@ -52,6 +52,6 @@ classed mode: band lower bound
 
 > `optional` **value?**: `number`
 
-Defined in: [package/colorScale.js:142](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/colorScale.js#L142)
+Defined in: [package/colorScale.js:157](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/colorScale.js#L157)
 
 discrete mode: the exact value this stop matches

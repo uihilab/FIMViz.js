@@ -6,7 +6,7 @@
 
 # Class: Filter
 
-Defined in: [package/filter.js:26](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/filter.js#L26)
+Defined in: [package/filter.js:26](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/filter.js#L26)
 
 ## Extended by
 
@@ -29,7 +29,7 @@ Defined in: [package/filter.js:26](https://github.com/uihilab/FIMViz.js/blob/4b8
 
 > **isEmpty**(): `boolean`
 
-Defined in: [package/filter.js:34](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/filter.js#L34)
+Defined in: [package/filter.js:34](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/filter.js#L34)
 
 #### Returns
 
@@ -41,7 +41,7 @@ Defined in: [package/filter.js:34](https://github.com/uihilab/FIMViz.js/blob/4b8
 
 > **test**(`unit`): `boolean`
 
-Defined in: [package/filter.js:32](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/filter.js#L32)
+Defined in: [package/filter.js:32](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/filter.js#L32)
 
 #### Parameters
 
@@ -59,7 +59,7 @@ Defined in: [package/filter.js:32](https://github.com/uihilab/FIMViz.js/blob/4b8
 
 > `static` **all**(`filters`): `Filter`
 
-Defined in: [package/filter.js:59](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/filter.js#L59)
+Defined in: [package/filter.js:59](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/filter.js#L59)
 
 Combine filters as a conjunction (AND) — the semantics of chaining applyFilter().
 
@@ -79,7 +79,7 @@ Combine filters as a conjunction (AND) — the semantics of chaining applyFilter
 
 > `static` **from**(`input`): `Filter`
 
-Defined in: [package/filter.js:45](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/filter.js#L45)
+Defined in: [package/filter.js:45](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/filter.js#L45)
 
 Coerce any friendly input into a Filter.
   Filter        → returned as-is

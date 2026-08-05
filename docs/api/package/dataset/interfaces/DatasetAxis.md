@@ -6,7 +6,7 @@
 
 # Interface: DatasetAxis
 
-Defined in: [package/dataset.js:81](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L81)
+Defined in: [package/dataset.js:103](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/dataset.js#L103)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [package/dataset.js:81](https://github.com/uihilab/FIMViz.js/blob/4b
 
 > **entries**: [`DatasetAxisEntry`](DatasetAxisEntry.md)[]
 
-Defined in: [package/dataset.js:84](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L84)
+Defined in: [package/dataset.js:106](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/dataset.js#L106)
 
 ***
 
@@ -22,7 +22,7 @@ Defined in: [package/dataset.js:84](https://github.com/uihilab/FIMViz.js/blob/4b
 
 > **name**: `string`
 
-Defined in: [package/dataset.js:82](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L82)
+Defined in: [package/dataset.js:104](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/dataset.js#L104)
 
 ***
 
@@ -30,4 +30,4 @@ Defined in: [package/dataset.js:82](https://github.com/uihilab/FIMViz.js/blob/4b
 
 > `optional` **unit?**: `string`
 
-Defined in: [package/dataset.js:83](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L83)
+Defined in: [package/dataset.js:105](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/dataset.js#L105)

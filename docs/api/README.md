@@ -10,6 +10,7 @@
 - [io/materializers](io/materializers/README.md)
 - [io/parse](io/parse/README.md)
 - [io/reprojector](io/reprojector/README.md)
+- [io/sciwrid](io/sciwrid/README.md)
 - [io/storage](io/storage/README.md)
 - [package/colorScale](package/colorScale/README.md)
 - [package/comparisonLayer](package/comparisonLayer/README.md)
