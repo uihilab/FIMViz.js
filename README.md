@@ -19,6 +19,32 @@ cd FIMViz.js && npm install
 npm run build   # → dist/fimviz.js (+ dist/ui.js) and dist/types/
 ```
 
+### Vendored dependency: SciWrid Toolkit
+
+[SciWrid Toolkit](https://github.com/uihilab/SciWrid-Toolkit) is a sibling lab library that reads
+GRIB2 / NetCDF / Zarr / COG. It is **not on npm**, so it is vendored as a packed tarball
+(`vendor/sciwrid-toolkit-<version>.tgz`, referenced from `package.json` as a `file:` dependency) —
+which is what keeps a fresh clone installable with a plain `npm install`, and pins the version at the
+same time. Nothing in the engine imports it yet; it backs the planned multi-dimensional/temporal
+format support in
+[docs/PACKAGE_ROADMAP.md §8](docs/PACKAGE_ROADMAP.md#8-multi-dimensional-formats--real-temporal-datasets-sciwrid-toolkit-as-a-materializer).
+
+**You only need the steps below to pull in a newer SciWrid** — a normal `npm install` already
+installs the committed tarball. `npm pack` ships SciWrid's built `dist/`, not its `lib/` sources, so
+the rebuild is required or you will repack a stale bundle:
+
+```bash
+cd ../SciWrid-Toolkit && git pull && npm run build      # dist/ is what gets packed
+npm pack --pack-destination ../FIMViz.js/vendor
+cd ../FIMViz.js && npm install file:vendor/sciwrid-toolkit-<version>.tgz --omit=optional
+```
+
+The tarball carries the built bundle only (11 files, ~386 KB unpacked) — SciWrid's own
+`files: ["dist", "README.md", "LICENSE"]` keeps its 194 MB of test fixtures and 219 MB of history
+out. `--omit=optional` skips `h5wasm`/`numcodecs`/`hyparquet`/`jsfive`/`jpeg-js`, which lazy-load
+from a CDN in the browser; add only the ones a given format actually needs under Node. Delete the
+superseded tarball from `vendor/` after bumping the version.
+
 ## Quick start — a bare map
 
 No runtime, no widget markup needed — `mount()` builds a real map itself via the map-provider seam:

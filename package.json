@@ -46,6 +46,7 @@
     "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "proj4": "^2.20.8",
+    "sciwrid-toolkit": "file:vendor/sciwrid-toolkit-0.1.0.tgz",
     "shpjs": "^6.1.0"
   },
   "devDependencies": {

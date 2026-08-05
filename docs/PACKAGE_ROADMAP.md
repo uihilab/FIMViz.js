@@ -350,6 +350,115 @@ GDAL utilities beyond `gdalwarp` callers actually reach for.
 
 ---
 
+## 8. Multi-dimensional formats & real temporal datasets (SciWrid Toolkit as a materializer)
+
+**Problem.** §3 names NetCDF as its first slice — "exercises the axes model end-to-end, unlocks
+temporal/ensemble" — and it is still unwritten, along with GRIB2 and Zarr. Meanwhile the axes model
+itself has only ever been driven by **FIM Scenario**, whose shape is *one file per timestep*: an axis
+entry's `ref` is a URL, and `select()` "resolves one axis entry to a child URL-rooted Dataset". Every
+real multi-dimensional scientific format is the inverse — **one file, many timesteps**, addressed by
+index or date. So the engine has a temporal axis that has never met a temporal *file*, and no way to
+read one.
+
+Writing GRIB2/NetCDF/HDF5/Zarr decoders ourselves is the §3 "research needed" item (browser viability
+and size of each WASM/JS parser) and is a project in its own right.
+
+**Design.** Treat [SciWrid Toolkit](https://github.com/uihilab/SciWrid-Toolkit) — a sibling lab
+library, WASM + JS, reading GRIB2/NetCDF3/NetCDF4-HDF5/Zarr/TIFF-COG/Parquet/Kerchunk — as an
+**implementation behind `Dataset.registerMaterializer`**, not as a dependency of the engine. The
+seam already exists and is exactly one function wide; nothing in `package/` learns these formats.
+
+The shapes line up unusually well, which is what makes this a materializer rather than a port:
+
+| | SciWrid `extractGrid` | FIMViz `RasterGrid` |
+|---|---|---|
+| pixels | `data: Float32Array` | `pixels` |
+| order | row-major, **row 0 = maxLat** | row 0 = north (`rasterOps.js`'s `zonalStats`/`maskGrid` row→lat math) |
+| missing | `NaN` | `NaN` → transparent on colorize, excluded from `Stats` |
+| extent | `bbox [minLon,minLat,maxLon,maxLat]` | `bounds {west,south,east,north}` |
+| CRS | resampled to WGS84 lat/lon | `EPSG:4326` — what both providers already accept |
+
+The CRS row is the quiet payoff: `extractGrid` resamples onto a geographic bbox, so these formats
+arrive **already renderable** and never touch the GDAL warp. Unlike `reproject()`, this path also runs
+under Node, so it is coverable by `npm test` rather than joining §5.3's owed browser verification.
+
+- **The one architectural change: generalize an axis entry's `ref`.** Today `ref` is a URL to fetch.
+  It becomes *an instruction the materializer understands* — a URL for FIM Scenario, a
+  `{ variable, date|index }` selector for NetCDF. `select(coord)` then returns a lazy child whose
+  force calls `extractGrid(source, { variable, date, bbox, width, height })`. Because `reduce()` is
+  already sugar over `select()` + `combine()`, temporal `mean`/`sum`/`min`/`max` come **for free** the
+  moment `select()` works, with no new grid math. And the scenario slider — already resolved as an
+  *operation*, `deriveSources(ds => ds.select(t))`, not a setting
+  ([DECISIONS §1.1](DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md#11-the-object-models-shape)) — drives a
+  NetCDF time axis with no UI change at all.
+- **Rejected: the NWIS bypass, a second time.** The WaterML/NWIS adapter (§3) hit this same
+  "entries aren't separately-fetchable files" problem and resolved it by routing *around* `select()`
+  — `ref: null`, the reading in `meta`, and bespoke `latest()`/`at()`/`series_()` accessors. Correct
+  there (a gauge reading is not a grid), but repeating it for NetCDF would leave three mutually
+  incompatible axis shapes and a `reduce()` that works on only one of them. Generalizing `ref` folds
+  the in-file case into the existing model instead of forking it.
+- **Variable becomes a second axis.** A GRIB2/NetCDF file holds N variables; a `Dataset` is one grid.
+  `select(coord, { axis })` already takes multiple axes, so variable folds in as axis 1 — with a guard,
+  since `reduce()` across a *variable* axis is meaningless in a way it isn't across time.
+- **Take the readers, not the renderers.** SciWrid also ships `gridToImageData`/`gridToPNG`/`RAMPS`/
+  `gridToGeoTIFF`, which duplicate `colorizeGrid`/`gridToDataURL`/`ColorScale`/the GDAL writer. Ours
+  stay — they are the ones wired into `Legend`, `Stats.byClass`, and the `LayerSettings` knobs. The
+  dependency is scoped to **decode only**.
+- **Bundle discipline is non-negotiable here.** SciWrid carries a ~193 KB wasm plus lazily-loaded
+  h5wasm/numcodecs/hyparquet/jsfive. It hangs off an opt-in adapter behind a dynamic `import()` —
+  never `io/materializers.js`'s module-scope auto-run, which would put it in every consumer's initial
+  bundle and undo §6's 678 KB → 201 KB reduction. Same rule as HDF5/full-GDAL/netcdf in
+  Cross-cutting notes below.
+
+**Known friction, priced in rather than discovered later:**
+
+- **`extractGrid` is a resample, not a decode.** It requires the caller to pre-commit to
+  `bbox`/`width`/`height`, while the ops (`clip`, `mask`, `combine`'s LHS-conform) assume a Dataset
+  has a *native* grid. The adapter must derive one at scan time from `variables[].nx/ny` (GRIB2) or
+  `shape` (NetCDF) plus `scan().bbox` — and SciWrid's own docs note that bbox is exact for TIFF but
+  not for GRIB2/NetCDF. This is the largest piece of real work and it is format-specific glue, not
+  one function.
+- **SciWrid is a work in progress** — its test suite is out-of-tree (does not run from a fresh clone)
+  and its docs disagree with its code in several places. Mitigation is structural rather than
+  procedural: pin a version, and keep the coupling to the one materializer function, so replacing it
+  later costs one file instead of a refactor.
+
+**How it is wired today (not yet a published dependency).** SciWrid is vendored as a **packed
+tarball**, `vendor/sciwrid-toolkit-<version>.tgz`, referenced from `package.json` as
+`"sciwrid-toolkit": "file:vendor/sciwrid-toolkit-0.1.0.tgz"`. `npm pack` honours SciWrid's own
+`files: ["dist", "README.md", "LICENSE"]`, so what lands is the built bundle only — 11 files, ~386 KB
+unpacked, no `examples/` fixtures (194 MB), no `.git` (219 MB), no C sources. Installed with
+`--omit=optional`: `h5wasm`/`numcodecs`/`hyparquet`/`jsfive`/`jpeg-js` are SciWrid's
+`optionalDependencies` and are lazy-loaded from a CDN in the browser anyway — add only the ones a
+landed slice actually needs under Node (NetCDF4 will want `h5wasm`). The tarball **is** the version
+pin, and it keeps a fresh clone installable without a second repository. To refresh:
+
+```bash
+cd ../SciWrid-Toolkit && git pull && npm run build      # dist/ is what gets packed
+npm pack --pack-destination ../FIMViz.js/vendor
+cd ../FIMViz.js && npm install file:vendor/sciwrid-toolkit-<version>.tgz --omit=optional
+```
+
+**First slice.** **NetCDF4 only, one vertical:** generalized axis `ref` → materializer → `select()`/
+`reduce()` → `RasterLayer.render()` → a time slider on an example page. That proves the seam
+end-to-end on the format §3 already picked; GRIB2 and Zarr then become repeat applications of the
+same glue rather than new design. `Stats`/`SpatialFilter`/`PredicateFilter`/`ColorScale`/`Legend` are
+grid-agnostic and need no work — a temporal statistic is a loop over `select()`.
+
+**Deliberately out of this slice:**
+
+- **Cubing** (holding an N-D cube as a value and operating on it) — `RasterGrid` and `VectorFeatures`
+  are the only two value types, and `reduce()` exists precisely to collapse an axis *to a grid*. A
+  third value type would touch materialize, the ops, `Stats`, and `toRecord` round-tripping. Worth
+  doing eventually; folding it in here is how the NetCDF slice slips.
+- **Temporal range selection** — `select()` resolves a single entry. A `selectRange(from, to)`
+  narrowing the axis is genuinely new surface, though SciWrid backs it natively (`t1`/`t2`/
+  `dateRange`). A follow-on once single-entry `select()` is proven.
+- **Parquet/Kerchunk** — SciWrid reads both, and they are vector/reference-shaped rather than gridded.
+  Out of scope until the raster path lands.
+
+---
+
 ## Cross-cutting notes
 
 - **Every item hangs off an existing seam** (`registerMaterializer`/`registerReprojector`/
