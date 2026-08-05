@@ -52,10 +52,17 @@ function nativeGridOf(scanResult, variable, override) {
   const dims = Array.isArray(variable.shape)
     ? variable.shape.map(Number)
     : String(variable.shape || "").split(/[x×,]/).map((n) => Number(n.trim()));
-  const usable = dims.filter((n) => Number.isFinite(n) && n > 0);
+  let usable = dims.filter((n) => Number.isFinite(n) && n > 0);
+  // GRIB2 reports no `shape` — a message IS one 2-D field, so scan() gives `nx`/`ny` (+ `messages`
+  // for the count) instead. Same (height, width) order as the trailing pair of a CF shape.
+  if (usable.length < 2 && Number.isFinite(variable.nx) && Number.isFinite(variable.ny)
+      && variable.nx > 0 && variable.ny > 0) {
+    usable = [variable.ny, variable.nx];
+  }
   if (usable.length < 2) {
     throw new Error(`sciwrid: variable "${variable.name}" has no usable 2-D shape ` +
-      `(got ${JSON.stringify(variable.shape)}) — a griddable variable needs at least (lat, lon).`);
+      `(shape=${JSON.stringify(variable.shape)}, nx=${variable.nx}, ny=${variable.ny}) — a griddable ` +
+      "variable needs at least (lat, lon).");
   }
   const height = override?.height ?? usable.at(-2);
   const width = override?.width ?? usable.at(-1);

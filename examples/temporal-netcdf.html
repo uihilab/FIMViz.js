@@ -65,7 +65,10 @@
     <h2>1 · Source <span class="pill" id="pill-src">idle</span></h2>
     <div class="body">
       <div class="row">
-        <button id="btn-sample">Load bundled sample</button>
+        <button class="sample" data-file="idalia-nldas2.nc">NetCDF4 sample</button>
+        <button class="sample ghost" data-file="idalia-aorc.zarr.zip">Zarr sample</button>
+        <button class="sample ghost" data-file="idalia-stage4-4h.grb2"
+                data-bbox="-87.98, 24.02, -75.01, 36.99">GRIB2 sample</button>
         <input type="file" id="file" accept=".nc,.nc4,.grb2,.grib2,.zip,.zarr" />
         <label class="dim">variable <select id="var" disabled></select></label>
       </div>
@@ -78,9 +81,13 @@
         <button id="btn-global" class="ghost" title="Fill the box with the whole world">world</button>
       </div>
       <p class="dim" style="margin:8px 0 0">
-        The bundled sample is <code>assets/SampleFiles/idalia-nldas2.nc</code> — NLDAS-2 rainfall over
-        Hurricane Idalia, 120 hourly steps on a 104×96 grid (~900&nbsp;KB). Any NetCDF4/NetCDF3/GRIB2/Zarr
-        file with a CF time axis works; the first NetCDF4 decode pulls <code>h5wasm</code> from a CDN.
+        Three bundled samples, all Hurricane Idalia so the reductions are comparable:
+        <strong>NetCDF4</strong> (NLDAS-2, 120 hourly steps, 104×96), <strong>Zarr</strong> (AORC, 120
+        steps, 390×390) and <strong>GRIB2</strong> (NCEP Stage IV, trimmed to 4 steps, 1121×881).
+        The GRIB2 one pre-fills the extent box, because Stage IV is polar-stereographic and
+        <code>scan()</code> derives no bbox from a curvilinear grid — the same override any such file
+        needs. Any NetCDF4/NetCDF3/GRIB2/Zarr file with a time axis works; the first NetCDF4 decode
+        pulls <code>h5wasm</code> from a CDN.
       </p>
       <pre id="scan">— nothing loaded —</pre>
     </div>
@@ -371,16 +378,23 @@ $("#btn-global").addEventListener("click", () => {
 $("#bbox").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && lastSource) { stop(); open(lastSource.source, lastSource.name); }
 });
-$("#btn-sample").addEventListener("click", async () => {
-  stop();
-  pill("#pill-src", "fetching…", "warn");
-  const res = await fetch("../assets/SampleFiles/idalia-nldas2.nc");
-  if (!res.ok) {
-    pill("#pill-src", "fetch failed", "bad");
-    return log(`could not fetch the sample (${res.status}) — serve from the REPO ROOT, not /examples`, "bad");
-  }
-  open(await res.arrayBuffer(), "idalia-nldas2.nc");
-});
+// Three bundled samples, all Hurricane Idalia so the reductions are comparable across formats. The
+// GRIB2 one carries a data-bbox: NCEP Stage IV is polar-stereographic, so scan() derives no extent
+// and it needs the override — the same thing you do for any curvilinear file.
+for (const btn of document.querySelectorAll("button.sample")) {
+  btn.addEventListener("click", async () => {
+    stop();
+    const file = btn.dataset.file;
+    $("#bbox").value = btn.dataset.bbox || "";
+    pill("#pill-src", "fetching…", "warn");
+    const res = await fetch(`../assets/SampleFiles/${file}`);
+    if (!res.ok) {
+      pill("#pill-src", "fetch failed", "bad");
+      return log(`could not fetch ${file} (${res.status}) — serve from the REPO ROOT, not /examples`, "bad");
+    }
+    open(await res.arrayBuffer(), file);
+  });
+}
 </script>
 </body>
 </html>

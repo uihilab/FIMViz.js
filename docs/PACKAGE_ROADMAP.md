@@ -481,6 +481,32 @@ payoff of routing selectors through `select()`. Four decisions worth keeping:
 under Node, so it is needed to run the tests and not to ship. A source-scan test asserts
 `io/materializers.js` never names the adapter, which is what keeps the wasm out of the default bundle.
 
+✅ **Landed: GRIB2 and Zarr v2**, the predicted "repeat applications of the same glue" — nearly true,
+with one format difference worth recording. Both are node-tested against vendored Idalia fixtures
+(Zarr as-is at 1.9 MB; the 26 MB Stage IV GRIB2 trimmed to 4 messages / 930 KB with SciWrid's own
+`trim()`), so all three formats the adapter registers are now exercised rather than merely claimed.
+
+- **GRIB2 reports no `shape`.** A message *is* one 2-D field, so `scan()` gives `nx`/`ny` (plus
+  `messages` for the count) and nothing else; reading `shape` alone threw "no usable 2-D shape".
+  `nativeGridOf` now falls back to `(ny, nx)` — the same (height, width) order as a CF shape's
+  trailing pair. That is the whole delta: selectors, `select()`, `reduce()` and the render path are
+  untouched.
+- **Zarr needed nothing** — its `shape` is an array rather than a string (already handled), and the
+  AORC store carries CF coordinates, so it gets a real extent with no override.
+- **Curvilinear files are the recurring real-world snag, not a format issue.** Stage IV is
+  polar-stereographic, so `scan()` derives no bbox — the identical situation as ocean `tos` products.
+  `opts.grid` is therefore a **partial** override: pass `bbox` alone and the pixel dims still come
+  from the variable's own shape. The engine still refuses to guess an extent (a wrong one silently
+  misplaces every pixel), but the thrown error now names the variable, its shape, the variables
+  present, the likely cause, and the exact call that fixes it.
+
+**Surfaced by the example, fixed in the engine:** `ColorScale.getColor(null)`/`('')` coerced to `0`
+and returned the domain **minimum's** colour — "no data" rendering as "the lowest reading", the one
+confusion `missingColor` exists to prevent — while `NaN` escaped as the malformed string
+`rgb(NaN, NaN, NaN)`, `missingColor` was ignored on the palette path entirely, and `getValues()`
+returned `undefined`s for every continuous scale. All four fixed with regression tests; the raster
+path was never affected because `colorizeGrid` pre-filters `NaN` itself.
+
 **Deliberately out of this slice:**
 
 - **Cubing** (holding an N-D cube as a value and operating on it) — `RasterGrid` and `VectorFeatures`

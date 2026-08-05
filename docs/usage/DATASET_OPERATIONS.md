@@ -101,6 +101,10 @@ The concrete producer of selector axes — multi-dimensional scientific formats,
 [SciWrid Toolkit](https://github.com/uihilab/SciWrid-Toolkit). **Opt-in and not on the barrel**: the
 engine never imports it, so the ~193 KB wasm stays out of every other consumer's bundle.
 
+Tested end-to-end on **NetCDF4**, **GRIB2** and **Zarr v2** (`netcdf3` is registered but not yet
+exercised). One call covers all of them — the differences between formats live inside the adapter:
+GRIB2 reports `nx`/`ny` instead of a `shape`, Zarr reports `shape` as an array rather than a string.
+
 ```js
 import { parseSciwrid } from 'fimviz/src/io/sciwrid.js';
 

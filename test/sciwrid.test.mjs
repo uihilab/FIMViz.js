@@ -154,3 +154,67 @@ describe("sciwrid adapter: real NetCDF4", () => {
     assert.equal((await back.grid()).width, 104, "and still decodes");
   });
 });
+
+// "GRIB2 and Zarr become repeat applications of the same glue" (PACKAGE_ROADMAP.md §8). They are —
+// but only after the one format-specific difference below, which is why they are tested and not
+// merely registered: registering a format the adapter cannot actually read is a false claim.
+describe("sciwrid adapter: GRIB2", () => {
+  // NCEP Stage IV precipitation, trimmed to 4 messages with SciWrid's own trim() (26 MB → 930 KB).
+  const FIX = fileURLToPath(new URL("../assets/SampleFiles/idalia-stage4-4h.grb2", import.meta.url));
+  const EXTENT = { bbox: [-87.98, 24.02, -75.01, 36.99], width: 200, height: 200 };
+
+  test("dimensions come from nx/ny — GRIB2 reports no `shape` at all", async () => {
+    // A GRIB2 message IS one 2-D field, so scan() gives nx/ny (+ `messages` for the count) rather
+    // than a CF shape string. Reading `shape` alone threw "no usable 2-D shape".
+    const ds = await parseSciwrid(readFileSync(FIX), { grid: EXTENT });
+    assert.equal(ds.format, "grib2");
+    assert.equal(ds.meta.variable, "Total precipitation");
+    assert.equal(ds.axis.entries.length, 4, "one axis entry per message");
+  });
+
+  test("a polar-stereographic file has no derivable extent, and says so actionably", async () => {
+    // Stage IV is curvilinear (grid template 20), so scan() reports no bbox — the real-world case.
+    // The pixels are readable; only the extent is unknown, so the error must point at the fix.
+    await assert.rejects(() => parseSciwrid(readFileSync(FIX)), (e) => {
+      assert.match(e.message, /no geographic bbox/);
+      assert.match(e.message, /curvilinear/, "must name the likely cause");
+      assert.match(e.message, /parseSciwrid\(file, \{/, "and show the call that fixes it");
+      return true;
+    });
+  });
+
+  test("decodes and reduces once an extent is given", async () => {
+    const ds = await parseSciwrid(readFileSync(FIX), { grid: EXTENT });
+    const g = await ds.select(ds.axis.entries[1].coord).grid();
+    assert.equal(g.width, 200);
+    assert.equal(g.crs, "EPSG:4326", "resampled off the polar grid onto the requested window");
+    const max = await ds.reduce("max").grid();
+    assert.ok(range(max.pixels).max > 0, "accumulated precipitation over 4 hours");
+    assert.ok(range(max.pixels).max >= range(g.pixels).max, "a max over the axis bounds any one step");
+  });
+});
+
+describe("sciwrid adapter: Zarr v2", () => {
+  // AORC precipitation. Unlike the GRIB2 above this store HAS CF coordinates, so it needs no override
+  // — the same code path, no format-specific handling, which is the claim §8 makes.
+  const FIX = fileURLToPath(new URL("../assets/SampleFiles/idalia-aorc.zarr.zip", import.meta.url));
+
+  test("works with no override at all — real coordinates give a real extent", async () => {
+    const ds = await parseSciwrid(readFileSync(FIX));
+    assert.equal(ds.format, "zarr");
+    assert.equal(ds.meta.variable, "APCP_surface");
+    assert.equal(ds.meta.grid.width, 390);
+    assert.equal(ds.meta.grid.height, 390);
+    assert.equal(ds.axis.entries.length, 120);
+    assert.ok(ds.bounds.west < -87 && ds.bounds.east > -76, `real extent, got ${JSON.stringify(ds.bounds)}`);
+  });
+
+  test("shape arrives as an ARRAY here, not a string — both parse to the same dims", async () => {
+    const ds = await parseSciwrid(readFileSync(FIX));
+    const g = await ds.select(ds.axis.entries[10].coord).grid();
+    assert.equal(g.width, 390);
+    assert.equal(g.height, 390);
+    assert.equal(g.crs, "EPSG:4326");
+    assert.ok(range(g.pixels).n > 0);
+  });
+});
