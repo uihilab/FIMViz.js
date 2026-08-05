@@ -119,7 +119,7 @@ await ds.reduce('max').grid();     // …or the storm peak
 | Option | Notes |
 |---|---|
 | `variable` | which variable; defaults to the first `supported` one. **One variable per Dataset** — call it again for another. |
-| `grid` | `{ width, height, bbox }` — override the native grid (coarser decodes faster). |
+| `grid` | **Partial** override of the native grid — anything omitted comes from the variable's own shape and `scan().bbox`. Pass `width`/`height` alone to decode coarser than native; pass `bbox` alone when the file's extent can't be derived (below). |
 | `workers` | `extractGrid`'s worker count. Defaults to SciWrid's own in a browser, and to `0` under Node, where the worker pool never resolves. |
 | `name` / `resolveUrl` | as elsewhere. |
 
@@ -131,6 +131,26 @@ No GDAL is involved: `extractGrid` resamples onto a geographic bbox, so these ar
 and render directly. Missing values arrive as `NaN`, which colorize and `Stats` already treat as
 absent. Rehydrating a stored selector Dataset skips the parser, so call `registerSciwridFormats()`
 once at boot before `Dataset.fromRecord`.
+
+#### "has no geographic bbox in scan()"
+
+A common failure on real-world files, and a recoverable one. `scan()` derives a file's extent from
+**1-D** coordinate variables only. Plenty of products don't have those:
+
+- **Curvilinear / rotated grids** — ocean output (`tos` and friends on tripolar grids), NEMO, CORDEX:
+  the coordinates are 2-D `lat(j,i)` / `lon(j,i)`, so nothing 1-D matches.
+- **Zarr with no CF coordinates** — the store reports synthetic index axes.
+
+The pixels are perfectly readable; only the *extent* is unknown, so nothing can place them on a map.
+FIMViz will not guess one — a wrong extent silently puts every pixel in the wrong place, which is the
+same failure the CRS precondition exists to prevent. Supply it instead:
+
+```js
+await parseSciwrid(file, { grid: { bbox: [-180, -90, 180, 90] } });   // width/height stay native
+```
+
+The thrown error names the variable, its shape, and the variables present, so you can tell which case
+you are in. `examples/temporal-netcdf.html` has an "extent override" box that does exactly this.
 
 ## Terminals (force the chain — nothing exists until one of these runs)
 

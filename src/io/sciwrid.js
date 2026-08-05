@@ -48,7 +48,7 @@ const boundsOf = (bbox) =>
  * `shape` is `'120x96x104'` (NetCDF/GRIB) or `[120, 96, 104]` (Zarr), in CF order — the two trailing
  * dimensions are (lat, lon), so height/width are the LAST two regardless of how many lead them.
  */
-function nativeGridOf(scanResult, variable) {
+function nativeGridOf(scanResult, variable, override) {
   const dims = Array.isArray(variable.shape)
     ? variable.shape.map(Number)
     : String(variable.shape || "").split(/[x×,]/).map((n) => Number(n.trim()));
@@ -57,13 +57,38 @@ function nativeGridOf(scanResult, variable) {
     throw new Error(`sciwrid: variable "${variable.name}" has no usable 2-D shape ` +
       `(got ${JSON.stringify(variable.shape)}) — a griddable variable needs at least (lat, lon).`);
   }
-  const bounds = boundsOf(scanResult.bbox);
-  if (!bounds) {
-    throw new Error(`sciwrid: "${variable.name}" has no geographic bbox in scan() — this file cannot ` +
-      "be placed on a map. (Zarr stores without CF coordinates report synthetic index axes; pass " +
-      "{ grid: { width, height, bbox } } explicitly if you know the real extent.)");
+  const height = override?.height ?? usable.at(-2);
+  const width = override?.width ?? usable.at(-1);
+  const bbox = override?.bbox ?? scanResult.bbox;
+  if (override?.bbox && !(Array.isArray(bbox) && bbox.length === 4 && bbox.every(Number.isFinite)
+      && bbox[2] > bbox[0] && bbox[3] > bbox[1])) {
+    throw new Error("sciwrid: opts.grid.bbox must be [minLon, minLat, maxLon, maxLat] with max > min " +
+      `(got ${JSON.stringify(override.bbox)}).`);
   }
-  return { height: usable.at(-2), width: usable.at(-1), bbox: scanResult.bbox, bounds };
+  const bounds = boundsOf(bbox);
+  if (!bounds) {
+    // We will NOT invent an extent. A guessed bbox (global, say) silently places every pixel in the
+    // wrong location, which is the failure mode the CRS precondition exists to prevent — a wrong map
+    // is worse than no map. So this throws, but tells the caller everything needed to supply one.
+    //
+    // The usual cause is a CURVILINEAR grid: scan() derives its bbox only from 1-D coordinate
+    // variables, and ocean/rotated-pole products (`tos`, NEMO, CORDEX, tripolar grids) carry 2-D
+    // lat(j,i)/lon(j,i) instead, which the scan skips. The pixels are still readable — only the
+    // extent is unknown — so passing `grid` makes the file work.
+    throw new Error(
+      `sciwrid: "${variable.name}" has no geographic bbox in scan(), so its extent is unknown and it ` +
+      "cannot be placed on a map. Pass one explicitly:\n" +
+      `  parseSciwrid(file, { variable: ${JSON.stringify(variable.name)}, ` +
+      `grid: { width: ${width}, height: ${height}, bbox: [minLon, minLat, maxLon, maxLat] } })\n` +
+      "Common causes: a curvilinear/rotated grid (2-D lat(j,i)/lon(j,i) coordinates, e.g. ocean `tos` " +
+      "files) or a Zarr store with no CF coordinates — scan() reads 1-D coordinate variables only. " +
+      `Scan reported: format=${scanResult.format}, shape=${JSON.stringify(variable.shape)}, ` +
+      `variables=[${(scanResult.variable_names || []).join(", ")}].`);
+  }
+  // `bbox` (possibly overridden), never scanResult.bbox — the materializer resamples onto grid.bbox,
+  // so shipping the native one here while `bounds` carried the override made the two disagree and the
+  // decoded grid silently land on the file's own extent instead of the requested one.
+  return { height, width, bbox, bounds };
 }
 
 /** The decoded time axis for a variable — hoisted to the file when every variable shares one. */
@@ -159,8 +184,11 @@ export function registerSciwridFormats(formats = SCIWRID_FORMATS) {
  * @param {Object} [opts]
  * @param {string} [opts.variable] - which variable; defaults to the first `supported` one
  * @param {string} [opts.name] - Dataset name; defaults to the filename/URL tail
- * @param {{width: number, height: number, bbox: number[]}} [opts.grid] - override the native grid
- *   (a coarser one decodes faster; a finer one over-samples)
+ * @param {{width?: number, height?: number, bbox?: number[]}} [opts.grid] - PARTIAL override of the
+ *   native grid; anything omitted comes from the variable's own shape / `scan().bbox`. Pass `bbox`
+ *   alone for a file whose extent scan() could not derive (2-D curvilinear coordinates — ocean
+ *   `tos`-style products, rotated poles, Zarr with no CF coords); pass `width`/`height` alone to
+ *   decode coarser than native
  * @param {number} [opts.workers] - extractGrid's worker count; defaults to SciWrid's own in a browser
  *   and to `0` (inline) under Node, where the worker pool never resolves
  * @param {(url: string) => string} [opts.resolveUrl] - host CORS-proxy/mirror, applied at force time
@@ -195,9 +223,10 @@ export async function parseSciwrid(source, opts = {}) {
       `available: ${(scanned.variable_names || []).join(", ") || "(none)"}`);
   }
 
-  const grid = opts.grid
-    ? { ...opts.grid, bounds: boundsOf(opts.grid.bbox) }
-    : nativeGridOf(scanned, variable);
+  // `opts.grid` is a partial override, not a replacement: supply just `bbox` for a file whose extent
+  // scan() could not derive (curvilinear coords) and the pixel dims still come from the variable's
+  // own shape; supply width/height alone to decode coarser than native.
+  const grid = nativeGridOf(scanned, variable, opts.grid);
 
   const name = opts.name || (isUrl ? url.split("/").pop().split("?")[0] : null) ||
     `${variable.name}.${scanned.format}`;

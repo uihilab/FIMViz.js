@@ -63,6 +63,21 @@ export function paletteNames() {
  * @param {string} hex
  * @returns {[number,number,number]}
  */
+/**
+ * Is this "a value that isn't one"? — `null`, `undefined`, `''`, `NaN`, a non-numeric string, or an
+ * infinity. Checked BEFORE any arithmetic, because numeric coercion is what makes this dangerous:
+ * `Number(null)` and `Number('')` are both `0`, so an absent value would silently take the colour of
+ * the domain minimum — "no data" rendering as "the lowest reading", the one confusion the
+ * `missingColor` contract exists to prevent (docs/usage/COLOR_SCALE.md). `NaN` and `'abc'` coerce to
+ * `NaN` instead, which used to escape as the malformed string `rgb(NaN, NaN, NaN)` — painting
+ * nothing, and undetectable by a caller checking for null.
+ * @param {*} v
+ * @returns {boolean}
+ */
+function isAbsentValue(v) {
+  return v == null || v === "" || !Number.isFinite(typeof v === "number" ? v : Number(v));
+}
+
 export function hexToRgb(hex) {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [0, 0, 0];
@@ -324,7 +339,10 @@ export class ColorScale {
     if (this._colorStopValues) return [...this._colorStopValues];
     const stops = this.getStops();
     if (this.discrete) return stops.map((s) => s.value);
-    const vals = stops.map((s) => s.min);
+    // Band stops are {min,max}; CONTINUOUS stops are {value} control points. Reading `s.min`
+    // unconditionally returned an array of `undefined` for every continuous scale — so the public way
+    // to read a scale's domain back was broken exactly where a legend/ramp needs it most.
+    const vals = stops.map((s) => s.min ?? s.value);
     const last = stops[stops.length - 1];
     if (last && last.max != null && isFinite(last.max)) vals.push(last.max);
     return vals;
@@ -340,7 +358,8 @@ export class ColorScale {
   }
 
   /**
-   * Resolve any value → css color string (colorFor override wins; null if nothing matches).
+   * Resolve any value → css color string. `colorFor` wins; a value that isn't one resolves to
+   * `missingColor` (or null); null when nothing matches.
    * @param {number} value
    * @returns {string|null}
    */
@@ -349,12 +368,16 @@ export class ColorScale {
       const c = this.colorFor(value);
       if (c != null) return c;
     }
+    // Returned VERBATIM rather than round-tripped through rgb, so any CSS colour works here —
+    // hexToRgb only parses 6-digit hex and would turn `#ccc` or `grey` into black.
+    if (isAbsentValue(value)) return this.missingColor || null;
     const rgb = this._scaleRgb(value);
     return rgb ? rgbCss(rgb) : null;
   }
 
   /**
-   * Hot-path [r,g,b] for the render loop; null → pixel is transparent (no matching stop).
+   * Hot-path [r,g,b] for the render loop; null → pixel is transparent (no matching stop, or an
+   * absent value with no `missingColor`).
    * @param {number} value
    * @returns {[number,number,number]|null}
    */
@@ -363,6 +386,7 @@ export class ColorScale {
       const c = this.colorFor(value);
       if (typeof c === "string" && c[0] === "#") return hexToRgb(c);
     }
+    if (isAbsentValue(value)) return this.missingColor ? hexToRgb(this.missingColor) : null;
     return this._scaleRgb(value);
   }
 

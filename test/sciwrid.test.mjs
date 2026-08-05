@@ -126,6 +126,25 @@ describe("sciwrid adapter: real NetCDF4", () => {
       "a storm peak must exceed the 5-day mean — the axis really was traversed");
   });
 
+  test("opts.grid is a PARTIAL override — a bbox alone keeps the file's own pixel dims", async () => {
+    // The escape hatch for files whose extent scan() cannot derive (2-D curvilinear coordinates).
+    const ds = await parseSciwrid(readFileSync(FIXTURE), {
+      name: "override", grid: { bbox: [-90, 24, -74, 38] },
+    });
+    assert.deepEqual(ds.bounds, { west: -90, south: 24, east: -74, north: 38 }, "the supplied extent");
+    assert.equal(ds.meta.grid.width, 104, "width still from the variable's own shape");
+    assert.equal(ds.meta.grid.height, 96, "height too");
+    const g = await ds.select(ds.axis.entries[0].coord).grid();
+    assert.equal(g.width, 104);
+    assert.deepEqual(g.bounds, { west: -90, south: 24, east: -74, north: 38 }, "and it decodes there");
+  });
+
+  test("a malformed bbox override is rejected rather than silently misplacing the data", async () => {
+    await assert.rejects(
+      () => parseSciwrid(readFileSync(FIXTURE), { grid: { bbox: [10, 10, 5, 5] } }),
+      /bbox must be \[minLon, minLat, maxLon, maxLat\] with max > min/);
+  });
+
   test("a selected timestep round-trips through toRecord/fromRecord", async () => {
     const ds = await load();
     const rec = ds.select(Date.parse("2023-08-28T06:00:00Z")).toRecord();

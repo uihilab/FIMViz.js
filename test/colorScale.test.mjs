@@ -88,3 +88,59 @@ describe("registerPalette", () => {
     assert.equal(Object.keys(PALETTES).length, before, "built-ins stay immutable");
   });
 });
+
+// "A value that isn't one must never take a colour from the ramp" (docs/usage/COLOR_SCALE.md).
+// Numeric coercion is what made this dangerous: Number(null) and Number('') are 0, so an absent value
+// used to render as the domain MINIMUM — "no data" indistinguishable from "the lowest reading".
+describe("ColorScale: absent values vs. real ones", () => {
+  const scale = () => new ColorScale({ palette: "viridis", min: 0, max: 10, continuous: true });
+
+  test("null / undefined / '' / NaN / non-numeric all resolve to no colour", () => {
+    const cs = scale();
+    for (const v of [null, undefined, "", NaN, "abc", Infinity, -Infinity]) {
+      assert.equal(cs.getColor(v), null, `getColor(${String(v)}) must be null`);
+      assert.equal(cs.getRgb(v), null, `getRgb(${String(v)}) must be null`);
+    }
+  });
+
+  test("…but 0 is a real value and still takes the minimum colour", () => {
+    const cs = scale();
+    assert.deepEqual(cs.getRgb(0), cs.getRgb(0.0), "sanity");
+    assert.ok(cs.getColor(0), "zero must colour — it is a reading, not an absence");
+    assert.notEqual(cs.getColor(0), cs.getColor(10), "and not be confused with the top of the ramp");
+    assert.ok(cs.getColor("5"), "a numeric string is a value too");
+  });
+
+  test("missingColor is honoured on the palette path, verbatim for CSS colours", () => {
+    const cs = new ColorScale({ palette: "viridis", min: 0, max: 10, continuous: true,
+      missingColor: "#cccccc" });
+    assert.equal(cs.getColor(null), "#cccccc", "returned as given, not round-tripped through rgb");
+    assert.deepEqual(cs.getRgb(NaN), [204, 204, 204], "and parsed for the hot path");
+    assert.equal(cs.getColor(5), "rgb(39, 173, 129)", "real values still come off the ramp");
+  });
+
+  test("a malformed rgb string can never escape — the old failure was undetectable", () => {
+    const cs = scale();
+    for (const v of [NaN, "abc"]) {
+      assert.ok(!String(cs.getColor(v)).includes("NaN"), `getColor(${String(v)}) leaked NaN`);
+    }
+  });
+});
+
+describe("ColorScale: reading the domain back", () => {
+  test("getValues() works for a CONTINUOUS scale, whose stops are {value} not {min,max}", () => {
+    const cs = new ColorScale({ palette: "viridis", min: 0, max: 10, continuous: true });
+    const vals = cs.getValues();
+    assert.ok(vals.length >= 2);
+    assert.ok(vals.every(Number.isFinite), `every breakpoint must be a number, got ${JSON.stringify(vals)}`);
+    assert.equal(vals[0], 0, "first breakpoint is the domain min");
+    assert.equal(vals[vals.length - 1], 10, "last is the domain max");
+  });
+
+  test("…and still works for a banded scale, whose stops are {min,max}", () => {
+    const vals = new ColorScale({ palette: "viridis", min: 0, max: 10, continuous: false }).getValues();
+    assert.ok(vals.every(Number.isFinite));
+    assert.equal(vals[0], 0);
+    assert.equal(vals[vals.length - 1], 10);
+  });
+});

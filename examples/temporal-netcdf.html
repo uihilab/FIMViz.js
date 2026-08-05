@@ -69,6 +69,14 @@
         <input type="file" id="file" accept=".nc,.nc4,.grb2,.grib2,.zip,.zarr" />
         <label class="dim">variable <select id="var" disabled></select></label>
       </div>
+      <div class="row" style="margin-top:8px">
+        <label class="dim" style="flex:1;min-width:320px">
+          extent override
+          <input type="text" id="bbox" style="width:100%"
+                 placeholder="minLon, minLat, maxLon, maxLat — only needed when scan() finds no extent" />
+        </label>
+        <button id="btn-global" class="ghost" title="Fill the box with the whole world">world</button>
+      </div>
       <p class="dim" style="margin:8px 0 0">
         The bundled sample is <code>assets/SampleFiles/idalia-nldas2.nc</code> — NLDAS-2 rainfall over
         Hurricane Idalia, 120 hourly steps on a 104×96 grid (~900&nbsp;KB). Any NetCDF4/NetCDF3/GRIB2/Zarr
@@ -166,17 +174,44 @@ let scale = null;     // one ColorScale for every frame, so the animation is com
 let seq = 0;          // monotonic guard: a slow frame must never overwrite a newer one
 let playing = null;
 
+// The extent override, when the box is filled. `grid` is a PARTIAL override — supplying bbox alone
+// keeps the file's own pixel dimensions.
+function gridOverride() {
+  const raw = $("#bbox").value.trim();
+  if (!raw) return undefined;
+  const bbox = raw.split(/[,\s]+/).map(Number);
+  if (bbox.length !== 4 || !bbox.every(Number.isFinite)) {
+    log("extent override ignored — need four numbers: minLon, minLat, maxLon, maxLat", "warn");
+    return undefined;
+  }
+  return { bbox };
+}
+
+let lastSource = null;   // kept so "retry with an extent" doesn't need the file picked again
+
 async function open(source, name) {
+  lastSource = { source, name };
   pill("#pill-src", "scanning…", "warn");
   try {
     // scan() only — no pixels are decoded here, however many timesteps the file holds.
-    ds = await parseSciwrid(source, { name });
+    ds = await parseSciwrid(source, { name, grid: gridOverride() });
   } catch (e) {
     pill("#pill-src", "failed", "bad");
     $("#scan").textContent = `${e.name}: ${e.message}`;
-    log(`parseSciwrid failed — ${e.message}`, "bad");
+    // The common real-world failure: scan() derives an extent from 1-D coordinate variables only, so
+    // a curvilinear file (2-D lat(j,i)/lon(j,i) — ocean `tos`, rotated poles) reports none. The pixels
+    // are perfectly readable; only the extent is unknown, so supplying one makes the file work.
+    if (/no geographic bbox/.test(e.message)) {
+      $("#bbox").focus();
+      $("#bbox").style.borderColor = "var(--warn)";
+      log("this file carries no 1-D lat/lon coordinates, so its extent is unknown — type one in " +
+          "“extent override” (or click <b>world</b> for a global file) and load it again", "warn");
+    } else {
+      log(`parseSciwrid failed — ${e.message}`, "bad");
+    }
     return;
   }
+  $("#bbox").style.borderColor = "";
 
   const entries = ds.axis?.entries ?? [];
   $("#scan").textContent = JSON.stringify({
@@ -204,7 +239,7 @@ async function open(source, name) {
   const first = ds.select(entries[0].coord);
   const g0 = await first.grid();
   const s0 = statsOf(g0);
-  scale = new ColorScale({ palette: "viridis", min: 0, max: Math.max(s0.max, 1e-6), continuous: true,
+  scale = new ColorScale({ palette: "blues", min: 0, max: Math.max(s0.max, 1e-6), continuous: true,
                            unit: ds.meta.unit ?? "" });
   paintLegend();
 
@@ -241,11 +276,21 @@ function showFrame(i, grid) {
 const round = (n) => (typeof n === "number" ? Number(n.toFixed(5)) : n);
 
 function paintLegend() {
+  // Read the domain back through getValues() — the PUBLIC reader. `_min`/`_max` are internal and
+  // there are no `min`/`max` getters, so reaching for `scale.min` yields undefined, every sample
+  // becomes NaN, and the gradient silently collapses to `linear-gradient(to right, ,,,)`.
+  const vals = scale.getValues();
+  const lo = vals[0], hi = vals[vals.length - 1];
   const stops = [];
-  for (let i = 0; i <= 10; i++) stops.push(scale.getColor(scale.min + (i / 10) * (scale.max - scale.min)));
-  $("#ramp").style.background = `linear-gradient(to right, ${stops.join(",")})`;
-  $("#legend-min").textContent = round(scale.min);
-  $("#legend-max").textContent = round(scale.max);
+  for (let i = 0; i <= 10; i++) {
+    const c = scale.getColor(lo + (i / 10) * (hi - lo));
+    if (c) stops.push(c);
+  }
+  $("#ramp").style.background = stops.length > 1
+    ? `linear-gradient(to right, ${stops.join(",")})`
+    : "";
+  $("#legend-min").textContent = round(lo);
+  $("#legend-max").textContent = round(hi);
   $("#legend-unit").textContent = ds?.meta.unit ?? "";
 }
 
@@ -318,6 +363,13 @@ $("#btn-play").addEventListener("click", () => {
 $("#file").addEventListener("change", (e) => {
   const f = e.target.files[0];
   if (f) { stop(); open(f, f.name); }
+});
+$("#btn-global").addEventListener("click", () => {
+  $("#bbox").value = "-180, -90, 180, 90";
+  if (lastSource) { stop(); open(lastSource.source, lastSource.name); }
+});
+$("#bbox").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && lastSource) { stop(); open(lastSource.source, lastSource.name); }
 });
 $("#btn-sample").addEventListener("click", async () => {
   stop();
