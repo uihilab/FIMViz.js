@@ -42,9 +42,11 @@ afterEach(() => {
   dom.window.close();
 });
 
-// Boot needs a real map SDK; we only care about what landed in the DOM first.
+// Boot needs a real map SDK; we only care about what landed in the DOM first. `provider` is
+// mandatory (mount() throws config-invalid before touching the container without one), so it is
+// part of the minimum viable config here, not incidental.
 const mountQuiet = (target, opts = {}) => {
-  const p = mount(target, { apiKey: "k", ...opts });
+  const p = mount(target, { provider: "google", apiKey: "k", ...opts });
   p.then(undefined, () => {});
   return p;
 };

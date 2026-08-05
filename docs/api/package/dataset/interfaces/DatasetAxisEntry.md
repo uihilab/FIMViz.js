@@ -6,7 +6,7 @@
 
 # Interface: DatasetAxisEntry
 
-Defined in: package/dataset.js:73
+Defined in: [package/dataset.js:75](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L75)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: package/dataset.js:73
 
 > **coord**: `string` \| `number`
 
-Defined in: package/dataset.js:74
+Defined in: [package/dataset.js:76](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L76)
 
 ***
 
@@ -22,7 +22,7 @@ Defined in: package/dataset.js:74
 
 > `optional` **meta?**: `any`
 
-Defined in: package/dataset.js:76
+Defined in: [package/dataset.js:78](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L78)
 
 ***
 
@@ -30,4 +30,4 @@ Defined in: package/dataset.js:76
 
 > **ref**: `string` \| \{ \}
 
-Defined in: package/dataset.js:75
+Defined in: [package/dataset.js:77](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L77)

@@ -19,8 +19,15 @@
 // proj4 branch is unreachable in practice because every caller warps with GDAL first.)
 
 import { fromArrayBuffer } from "geotiff";
-import { warpTo, crsEquivalent } from "./gdal.js";
+import { crsEquivalent } from "./crs.js";
 import { Dataset } from "../package/dataset.js";
+
+// gdal.js (→ gdal3.js, ~190 KB of glue) is loaded ON THE FIRST REAL WARP, not at import time. This
+// function is barrel-exported, so a static import here put that glue in every consumer's initial
+// bundle — including the same-CRS early return below, which never touches GDAL at all. It matches
+// what ds.reproject() already does through the reprojector seam: the wasm was always lazy, and now
+// the JS wrapper around it is too.
+const loadWarpTo = () => import("./gdal.js").then((m) => m.warpTo);
 
 /**
  * Reproject `ds` to `toCrs` (e.g. 'EPSG:4326'). Returns a NEW Dataset — value semantics — with a
@@ -45,6 +52,7 @@ export async function warp(ds, toCrs) {
       `geojson/kml/kmz/shp sources are EPSG:4326 by spec.`);
   }
 
+  const warpTo = await loadWarpTo();
   const { buffer } = await warpTo(ds.data, ds.name, toCrs);
   const image = await (await fromArrayBuffer(buffer)).getImage();
   const [west, south, east, north] = image.getBoundingBox();

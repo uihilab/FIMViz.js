@@ -14,57 +14,34 @@ custom file-format decoder or reprojector, and the parts of `FimMap`'s own API b
 
 ## Map provider seam
 
-```js
-registerMapProvider(name, impl)   // impl: MapProviderImpl (below)
-createMap(el, options)             // what mount() calls internally — options.provider picks the impl
-mapProviderNames()                  // → string[] — every registered name
-providerAcceptsCRS(name, crs)        // → boolean — can this provider render content in this CRS?
-providerRequiresApiKey(name)         // → boolean
-```
-
-### The `MapProviderImpl` contract
-
-Every method except `create` has an **identical** shape across providers — that's the point: `Layer`
-and the event dispatch call these without knowing which provider is underneath. Only `create()`'s
-`options` shape is provider-specific.
-
-| Method | Signature | Notes |
-|---|---|---|
-| `create` | `(el, options) => Promise<map>` | Builds the map; returns the provider's native map object (`fim.map`). |
-| `requiresApiKey` | `boolean` | Property, not a method. `google`: `true`; `leaflet`: `false`. |
-| `acceptsCRS` | `(crs: string\|null) => boolean` | Asked by `Layer`'s render precondition. Omitted = permissive (accepts anything). |
-| `addVector` | `(map, geojson, {style?}) => handle` | `style`: a neutral style object/string, **or** a `({feature, index}) => style\|string\|null` function for per-feature styling. |
-| `removeVector` | `(map, handle) => void` | |
-| `fitBounds` | `(map, {north,south,east,west}) => void` | |
-| `addRasterImage` | `(map, dataUrl, bounds, {opacity?, interactive?}) => handle` | Non-interactive (`clickable:false`) by default — map events pass through to the engine's own hit-testing. |
-| `removeRasterImage` | `(map, handle) => void` | |
-| `setRasterImageOpacity` | `(handle, opacity) => void` | |
-| `setRasterImageUrl` | `(map, handle, dataUrl, bounds, {opacity?, interactive?}) => handle` | Swap the image (a repaint). **Use the RETURNED handle going forward** — some providers (google) can't swap in place and recreate the overlay. |
-| `onMapMouseMove` | `(map, cb: ({lat,lng}) => void) => unsubscribe` | |
-| `onMapEvent` | `(map, type, cb: ({type,lat,lng,originalEvent}) => void) => unsubscribe` | `type ∈ click\|hover\|dblclick\|mousedown\|mouseup\|rightclick`. `hover` maps to the provider's mousemove. |
+Two built-in backends cover the documented use — `'leaflet'` (no credentials) and `'google'`. Pick
+one with the required `provider` option and read
+[Built-in provider options](#built-in-provider-options) below; that is all most hosts ever need from
+this seam. The registry hangs off `FimViz`, which is what boots a map:
 
 ```js
-registerMapProvider('mine', {
-  requiresApiKey: false,
-  acceptsCRS: (crs) => crs == null || crs === 'EPSG:4326',
-  async create(el, options) { /* return your map object */ },
-  addVector(map, geojson, { style }) { /* ... */ },
-  removeVector(map, handle) { /* ... */ },
-  fitBounds(map, bounds) { /* ... */ },
-  addRasterImage(map, dataUrl, bounds, opts) { /* ... */ },
-  removeRasterImage(map, handle) { /* ... */ },
-  setRasterImageOpacity(handle, opacity) { /* ... */ },
-  setRasterImageUrl(map, handle, dataUrl, bounds, opts) { /* ... */ },
-  onMapMouseMove(map, cb) { /* return an unsubscribe fn */ },
-  onMapEvent(map, type, cb) { /* return an unsubscribe fn */ },
-});
-
-await mount('#el', { provider: 'mine' });
+FimViz.mapProviders()                  // → string[] — the backends available
+FimViz.providerAcceptsCRS(name, crs)   // → boolean — can it render content in this CRS?
+createMap(el, options)                 // what mount() calls internally; you rarely call it directly
 ```
 
-**Still provider-specific by design, not covered by this seam** (each needs its own per-provider
-work): velocity's continuously-animated canvas, the comparison draw-mask tool, HAZUS
-`AdvancedMarkerElement` damage markers, `FloodDepthLayer`'s ArcGIS MapServer tiles.
+**Adding a third backend is possible but deliberately under-documented.**
+`FimViz.registerMapProvider(name, impl)` takes an implementation of ~12 methods (`create`, `addVector`/
+`removeVector`, `fitBounds`, the `addRasterImage` family, `onMapMouseMove`/`onMapEvent`, plus the
+`requiresApiKey` and `acceptsCRS` properties) — `src/package/mapProvider.js` carries the full JSDoc
+contract and two complete implementations to copy from, which is a better spec than a table here
+could be. Four tiers stay provider-specific and outside the seam regardless: velocity's animated
+canvas, the comparison draw-mask tool, HAZUS `AdvancedMarkerElement` markers, and `FloodDepthLayer`'s
+ArcGIS MapServer tiles — so a third provider gets a map, vectors and static rasters, not those.
+
+One contract detail that bites even when using the built-ins: **`setRasterImageUrl` returns the
+handle to use next.** Google can't swap a `GroundOverlay`'s image in place, so it removes and
+recreates; always reassign from the return value rather than reusing the handle you passed in.
+
+`onMapEvent`'s `type` is one of `click`/`hover`/`dblclick`/`mousedown`/`mouseup`/`rightclick`
+(`hover` maps to the provider's mousemove; `rightclick` and `contextmenu` are synonyms that both work
+on either built-in). The callback gets `{ type, lat, lng, originalEvent }`, where `originalEvent` is
+the DOM `MouseEvent` — for a UI that positions itself at the pointer.
 
 ## Built-in provider options
 
@@ -83,7 +60,15 @@ await mount('#el', { provider: 'leaflet', center?, zoom?, tileUrl?, tileOptions?
 ```
 
 Both accept the WGS84 family only (`EPSG:4326`/`EPSG:4269`) for `acceptsCRS` — a non-WGS84 raster
-must be reprojected first (see [DATASET_OPERATIONS.md](./DATASET_OPERATIONS.md)).
+must be reprojected first (see [DATASET_OPERATIONS.md](./DATASET_OPERATIONS.md)). Neither is loaded
+until it is used: `create()` dynamic-imports the SDK, so a Leaflet-only page downloads no Maps loader
+and vice versa. An unregistered `provider` name throws `config-invalid`, listing the registered ones.
+
+**Leaflet needs `leaflet.css`.** The provider imports it itself (`leaflet/dist/leaflet.css`, alongside
+the SDK), which the shipped `dist/fimviz.js` resolves — style-loader injects it on first `create()`,
+no CDN request. Bundling from `fimviz/src` instead makes that import *your* bundler's problem: give it
+a CSS rule, or drop the import and add a `<link>` of your own. Without the stylesheet, tiles and
+markers lay out wrongly rather than failing loudly.
 
 ## Neutral vector style vocabulary
 
@@ -102,41 +87,48 @@ use provider-native options directly.
 GeoJSON feature (same original feature + 0-based index on every provider) — a bare color string
 shorthand expands to `{fillColor, strokeColor}`; `null` = that feature's provider-default styling.
 
-```js
-styleToGoogle(neutralStyle)     // → a google.maps.Data style object
-styleToLeaflet(neutralStyle)    // → Leaflet path options
-featuresOf(geojson)              // → Feature[] in document order (FeatureCollection/Feature/[])
-resolveFeatureStyle(style, feature, index)   // resolves one feature's style per the rules above
-```
+The translation itself (`styleToGoogle`/`styleToLeaflet`) and the per-feature resolution
+(`featuresOf`/`resolveFeatureStyle`) are **internal** to `mapProvider.js` — a `VectorLayer` applies
+them for you. Read them there if you are implementing a provider.
 
 ## Materialize / decode extension seam
 
-The registries behind `Dataset`'s lazy force (`package/materialize.js`) — plug in a custom file
-format decoder, or swap the reprojection implementation:
+The registries behind `Dataset`'s lazy force — plug in a custom file format decoder, or swap the
+reprojection implementation. They are **statics on `Dataset`**, the type they serve:
 
 ```js
-registerMaterializer(format, fn)   // fn: async (root, ds) => RasterGrid | VectorFeatures
-                                    // root: {kind:'inline', data} | {kind:'url', url}
-getMaterializer(format)              // → the registered decoder, or null
-materializerFormats()                 // → string[] — every registered format name
-registerBuiltinMaterializers()        // wires geotiff + geojson/kml/kmz/shp/hazus/csv/xyz at once
-                                       // (auto-runs on import of io/materializers.js — usually no
-                                       // manual call needed)
+Dataset.registerMaterializer(format, fn)  // fn: async (root, ds) => RasterGrid | VectorFeatures
+                                          //   root: {kind:'inline', data} | {kind:'url', url}
+Dataset.formats()                          // → string[] — every format decodable right now
+                                          //   (built-ins + your own). Outside a custom decoder this
+                                          //   is the one to reach for: build a file picker's
+                                          //   `accept` list, or check an upload BEFORE parsing it.
 
-registerReprojector(fn)              // fn: async (grid, targetCrs) => RasterGrid — the ONE warp slot
-getReprojector()                      // → the registered warp, or null
-registerDefaultReprojectorLoader(fn)  // fn: async () => void — a JIT fallback, invoked at most once,
-                                       // the first force that finds nothing registered; expected to
-                                       // call registerReprojector() itself before resolving. This is
-                                       // how the GDAL warp auto-loads with no setup call — see
-                                       // DATASET_OPERATIONS.md's reproject note.
-resolveReprojector()                   // → Promise<Reprojector|null> — what Dataset's force actually
-                                       // calls (tries the default loader before giving up)
+Dataset.registerReprojector(fn)           // fn: async (grid, toCrs) => RasterGrid — the ONE warp slot
+Dataset.registerDefaultReprojectorLoader(fn)
+                                          // fn: async () => void — a JIT fallback invoked at most
+                                          //   once, on the first force that finds nothing
+                                          //   registered; it is expected to call
+                                          //   Dataset.registerReprojector() before resolving. This
+                                          //   is how the GDAL warp auto-loads with no setup call.
+Dataset.registerResampler(fn)             // methods beyond nearest/bilinear/average (cubic/lanczos/…)
+
+registerBuiltinMaterializers()            // a plain barrel function, not a Dataset static: it lives
+                                          //   in io/materializers.js, which imports geotiff, and
+                                          //   Dataset must never reach that. Idempotent, and it
+                                          //   auto-runs at module scope there — which the barrel
+                                          //   re-exports from, so importing anything from 'fimviz'
+                                          //   has already registered the built-ins. Call it by hand
+                                          //   only from a raw-browser page driving dist directly.
 ```
+
+The registries' other readers (`getMaterializer`, `getReprojector`, `resolveReprojector`) are
+**internal**: they hand back the implementation, and the seam already dispatches to it — a caller
+who wants a decode calls `ds.load()`, and one who wants a warp calls `ds.reproject(crs)`.
 
 ```js
 // Register a custom format decoder:
-registerMaterializer('my-format', async (root, ds) => {
+Dataset.registerMaterializer('my-format', async (root, ds) => {
   const bytes = root.kind === 'url' ? await (await fetch(root.url)).arrayBuffer() : root.data;
   // ... decode bytes ...
   return new RasterGrid({ pixels, width, height, bounds, crs, noData, meta });

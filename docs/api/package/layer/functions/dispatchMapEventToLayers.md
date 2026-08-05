@@ -8,7 +8,7 @@
 
 > **dispatchMapEventToLayers**(`layers`, `type`, `base`, `opts?`): `any`
 
-Defined in: package/layer.js:834
+Defined in: [package/layer.js:1044](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/layer.js#L1044)
 
 Dispatch a normalized map event to the layers TOP-DOWN in z-order (last = top), hit-testing each.
 Default (precedence): stop when a handler absorbs it (`evt.stopPropagation()`). With

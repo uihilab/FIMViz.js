@@ -69,7 +69,7 @@ classDiagram
         +id : string
         +name : string
         +kind : raster/vector
-        +format : geotiff/geojson/kml/kmz/shp/hazus
+        +format : geotiff/geojson/kml/kmz/shp/hazus/csv/xyz
         +crs : string (native, never assumed)
         +bounds : Bounds (in crs)
         +meta : object
@@ -78,11 +78,18 @@ classDiagram
         +isMaterialized : boolean
         +fromURL(url, opts)$ Dataset
         +fromRecord(rec)$ Dataset
+        +fromGrid(value, opts)$ Dataset (wraps an already-decoded grid)
+        +registerMaterializer(fmt, fn)$ +formats()$ : decode registry (statics)
+        +registerReprojector(fn)$ +registerResampler(fn)$ : warp/resample seams (statics)
         +reproject(crs) Dataset (lazy op)
         +select(coord, opts) Dataset (lazy op)
+        +reduce(op, opts) Dataset (lazy op)
         +mask(polygon, opts) Dataset (lazy op)
         +clip(bbox) Dataset (lazy op)
         +reclassify(rules, opts) Dataset (lazy op)
+        +resampleTo(target, opts) Dataset (lazy op)
+        +slope/aspect/hillshade(opts) Dataset (lazy op)
+        +rasterize(opts) Dataset (lazy op, vector→raster)
         +combine(others, opts) Dataset (lazy op)
         +load() RasterGrid/VectorFeatures$ (terminal, forces+memoizes)
         +grid() RasterGrid$ (terminal)
@@ -163,7 +170,9 @@ classDiagram
         +colorScale : ColorScale
         +visible : boolean
         +exclusive : boolean
+        +dirty : boolean (an op is applied but not yet drawn)
         +map : FimMap
+        +registerType(type, factory)$ +types()$ : layer-type registry (statics)
         +show() void
         +hide() void
         +remove() void
@@ -173,6 +182,9 @@ classDiagram
         +async render(opts) Layer
         +setSources(sources, opts) Layer
         +deriveSources(fn, opts) Layer
+        +clip/mask/reclassify/resampleTo(…) Layer  %% the Dataset ops, chainable
+        +slope/aspect/hillshade/reproject/select/reduce(…) Layer
+        +async reset(opts) Layer (back to the pre-op sources)
         +getLegend() Legend
         +async getStats() Stats
     }
@@ -187,8 +199,11 @@ classDiagram
         <<✅ registered "vector">>
         type: geojson/kml/kmz/shp/csv/xyz
         render() is SYNCHRONOUS
+        +colorScale : ColorScale  %% the SAME class a raster uses
+        +colorBy : string (the feature property it reads)
         +featureAt(lat, lng) Feature
-        +async getStats(opts) Stats  %% from GeoJSON — headless, provider-neutral
+        +getLegend() Legend
+        +async getStats(opts) Stats  %% from GeoJSON — headless, provider-neutral; byClass via colorScale
     }
     class ComparisonLayer {
         <<✅ registered "comparison">>
@@ -239,6 +254,9 @@ classDiagram
         <<✅>>
         +color : string
         +useFileColors : boolean
+        +colorScale : ColorScale (references the layer's, not a copy)
+        +colorBy : string (feature property → value)
+        +palette/continuous/missingColor : route to that scale
     }
 
     class ColorScale {
@@ -247,6 +265,7 @@ classDiagram
         +isExplicit : boolean
         +palette : string/Array
         +unit : string
+        +missingColor : string (colour for an absent value; outside the 3 modes)
         +colorFor : function (override, checked first)
         +getStops() Array
         +getValues() number[]
@@ -263,7 +282,7 @@ classDiagram
         +continuous : boolean (getter)
         +onChange(fn) / offChange(fn) ColorScale
         +fromGdalLegend(legend, unit)$ ColorScale
-        +registerPalette(name, colors)$ : open registry, throws on unknown
+        +registerPalette(name, colors)$ +palettes()$ : open registry (statics)
     }
 
     class Legend {
@@ -372,6 +391,7 @@ classDiagram
     Layer ..> Legend : getLegend()
     Layer ..> Stats : getStats()
     RasterSettings ..> ColorScale : routes to
+    VectorSettings ..> ColorScale : routes to (colorBy grading)
     Filter <|-- SpatialFilter
     Filter <|-- PredicateFilter
     Stats ..> Filter : scoped by (compute-time)
@@ -408,7 +428,8 @@ classDiagram
     class ColorScale {
         <<engine ✅>>
         value → (color, label)
-        two modes: palette-scale + explicit-stops
+        three modes: palette / classed-stops / continuous-stops
+        a value is a PIXEL or a feature property (raster + vector)
     }
     class Legend {
         <<read-model ✅>>
@@ -433,15 +454,24 @@ classDiagram
     note for Filter "SpatialFilter = polygon(s), universal.\nPredicateFilter = (v,x,y,at) raster /\n(feature) vector. RegionFilter was renamed\nSpatialFilter; region = a drawn SpatialFilter."
 ```
 
-### ColorScale's two modes
+### ColorScale's modes
 
-The one non-obvious point: `ColorScale` unifies the **two** coloring paths that exist in the
-code today.
+The one non-obvious point: `ColorScale` unifies the coloring paths that existed separately in the
+original code.
 
 | Mode | State | Color source | Backing code |
 |---|---|---|---|
-| **palette-scale** | `{ palette, min, max, continuous }` | computed per-value via `getRgbForValue` | `rasterTools.js` PALETTES |
+| **palette-scale** | `{ palette, min, max, continuous }` | computed per-value via `getRgbForValue` | `rasterTools.js` palette table |
 | **explicit-stops** | `_stops: [{ value \| range, color, label }]` | looked up in the stops array | `depthMap.js` GDAL legend / `buildDefaultDepthLegend` |
+| **continuous color stops** | `setColorStops(values, colors)` | interpolated between the bracketing control points | added with the composable core |
+
+Orthogonal to all three: **`missingColor`** — what an absent value (`null`/`NaN`/`''`) is painted,
+`null` meaning "the consumer decides" (a vector layer leaves the feature at its base style; a raster
+leaves the pixel transparent). A mode switch leaves it untouched.
+
+**Not raster-only.** The same instance serves a `VectorLayer` via `colorBy`, which names the feature
+property whose value the scale reads — so `getLegend()` and `getStats().byClass` work identically on
+either kind.
 
 `getStops()` returns the same shape either way (palette bands are *derived*, GDAL stops are
 *stored*), which is what lets `Legend` and the render loop treat both uniformly.

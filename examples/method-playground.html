@@ -56,37 +56,42 @@
 </main>
 
 <script type="importmap">
-{ "imports": { "fimviz": "../dist/fimviz.js" } }
+{ "imports": { "fimviz": "../dist/fimviz.js", "fimviz/ui": "../dist/ui.js" } }
 </script>
 
 <script type="module">
 import {
   // boot / lifecycle
-  FimViz, mount, registerRuntime,
+  FimViz, mount,
   // map provider seam
-  createMap, registerMapProvider, mapProviderNames, providerAcceptsCRS,
+  createMap,
   // dataset + warp + storage
   Dataset, warp, Storage,
   // materialize seam
-  RasterGrid, VectorFeatures, registerMaterializer, registerReprojector,
+  RasterGrid, VectorFeatures,
   registerBuiltinMaterializers, registerGdalReprojector,
   // read-models
-  ColorScale, PALETTES, registerPalette, hasPalette, paletteNames,
+  ColorScale,
   Legend, Stats, Filter, SpatialFilter, PredicateFilter,
   // layer model
-  Layer, RasterLayer, VectorLayer, registerLayerType,
+  Layer, RasterLayer, VectorLayer,
   ComparisonLayer, EnsembleAggregationLayer,
   // raster pipeline + ops
   colorizeGrid, gridToDataURL,
   maskGrid, clipGrid, reclassifyGrid, combineGrids, zonalStats,
-  // headless UI module
+  // registry queries
+  // vendored primitives
+  fromArrayBuffer, kml, shp, Loader,
+} from "fimviz";
+
+// The headless UI module lives at its OWN subpath and is not re-exported by the barrel — one home,
+// so an app can never end up with two copies of it. It pulls only small pure deps (~17 KB).
+import {
   createToast, connectToast, createTooltip, bindHoverValue,
   createInfoWindow, propsTable, bindFeatureInfo,
   createToolsPanel, rasterControls, vectorControls, renderLegend, renderStats,
   createRegionDraw, createOperationsPanel,
-  // vendored primitives
-  fromArrayBuffer, kml, shp, Loader,
-} from "fimviz";
+} from "fimviz/ui";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // tiny runner — runs a call, prints its label + returned value (or ERR). No
@@ -150,8 +155,8 @@ const GEOJSON = {
 };
 
 // register decoders for our synthetic formats so a Dataset can force()
-registerMaterializer("demo", async () => newGrid(1, 0));    // registerMaterializer(format, async (root, ds) => RasterGrid|VectorFeatures)
-registerMaterializer("demo2", async () => newGrid(1, 5));
+Dataset.registerMaterializer("demo", async () => newGrid(1, 0));    // Dataset.registerMaterializer(format, async (root, ds) => RasterGrid|VectorFeatures)
+Dataset.registerMaterializer("demo2", async () => newGrid(1, 5));
 
 // live handles exposed for the console
 const FIM = window.FIM = { data: { newGrid, makePixels, META, BOUNDS, leftHalf, GEOJSON, extentA, extentB, extentC } };
@@ -161,13 +166,14 @@ const FIM = window.FIM = { data: { newGrid, makePixels, META, BOUNDS, leftHalf, 
 // ═════════════════════════════════════════════════════════════════════════════
 
 // ── colorScale.js: palettes ──────────────────────────────────────────────────
-section("palettes — PALETTES, registerPalette, hasPalette, paletteNames");
-run("PALETTES", () => Object.keys(PALETTES));
-run("paletteNames()", () => paletteNames());
-run("hasPalette('viridis')", () => hasPalette("viridis"));                     // hasPalette(name)
-run("hasPalette('nope')", () => hasPalette("nope"));
-run("registerPalette('demo-pal', ['#000','#f00','#fff'])", () => registerPalette("demo-pal", ["#000000", "#ff0000", "#ffffff"]));  // registerPalette(name, colors[])
-run("hasPalette('demo-pal')", () => hasPalette("demo-pal"));                     // hasPalette(name)
+// The palette registry is ColorScale's, so it lives on the class: palettes() lists every available
+// name, which also answers "do I have X" via .includes() — no separate hasPalette needed.
+section("palettes — ColorScale.palettes / ColorScale.registerPalette");
+run("ColorScale.palettes()", () => ColorScale.palettes());
+run("palettes().includes('viridis')", () => ColorScale.palettes().includes("viridis"));
+run("palettes().includes('nope')", () => ColorScale.palettes().includes("nope"));
+run("ColorScale.registerPalette('demo-pal', ['#000','#f00','#fff'])", () => ColorScale.registerPalette("demo-pal", ["#000000", "#ff0000", "#ffffff"]));  // ColorScale.registerPalette(name, colors[])
+run("palettes().includes('demo-pal')", () => ColorScale.palettes().includes("demo-pal"));
 
 // ── colorScale.js: ColorScale ────────────────────────────────────────────────
 section("ColorScale — constructor params, statics, read, write, notify");
@@ -257,9 +263,9 @@ run("new RasterGrid({pixels,width,height,bounds,crs,noData,bands,meta})",
   () => new RasterGrid({ pixels: makePixels(1), width: W, height: H, bounds: BOUNDS, crs: "EPSG:4326", noData: ND, bands: 1, meta: { unit: "m" } }));
 // new VectorFeatures({ features, bounds, crs, meta })
 run("new VectorFeatures({features,bounds,crs,meta})", () => new VectorFeatures({ features: GEOJSON, bounds: BOUNDS, crs: "EPSG:4326", meta: {} }));
-run("registerMaterializer('demo3', fn)", () => registerMaterializer("demo3", async () => newGrid(3)));       // registerMaterializer(format, async(root,ds)=>value)
+run("Dataset.registerMaterializer('demo3', fn)", () => Dataset.registerMaterializer("demo3", async () => newGrid(3)));       // Dataset.registerMaterializer(format, async(root,ds)=>value)
 run("registerBuiltinMaterializers()", () => registerBuiltinMaterializers());                                 // geotiff + geojson/kml/kmz/shp/hazus decoders
-run("registerReprojector(fn) — stub warp (no GDAL)", () => registerReprojector(async (grid, crs) => new RasterGrid({ ...grid, crs })));  // registerReprojector(async(grid,targetCrs)=>RasterGrid)
+run("Dataset.registerReprojector(fn) — stub warp (no GDAL)", () => Dataset.registerReprojector(async (grid, crs) => new RasterGrid({ ...grid, crs })));  // Dataset.registerReprojector(async(grid,targetCrs)=>RasterGrid)
 // The GDAL reprojector already auto-registered when "fimviz" was imported above; this stub call
 // (which runs later, at click-time) overwrites it for this demo — registerGdalReprojector() would
 // swap the real GDAL warp back in.
@@ -357,21 +363,21 @@ await runA("store.close()", () => store.close());
 await runA("store.destroy() — delete the whole database", () => store.destroy());
 
 // ── mapProvider.js (pure parts) ──────────────────────────────────────────────
-section("mapProvider — mapProviderNames, providerAcceptsCRS, registerMapProvider, createMap");
-run("mapProviderNames()", () => mapProviderNames());
-run("providerAcceptsCRS('google','EPSG:4326')", () => providerAcceptsCRS("google", "EPSG:4326"));   // providerAcceptsCRS(name, crs)
-run("providerAcceptsCRS('google','EPSG:3857')", () => providerAcceptsCRS("google", "EPSG:3857"));
-run("registerMapProvider('null-provider', {create,…})", () => {
-  // registerMapProvider(name, { requiresApiKey?, acceptsCRS?, create, addVector?, removeVector?, fitBounds?, addRasterImage?, … })
-  registerMapProvider("null-provider", { requiresApiKey: false, acceptsCRS: () => true, create: () => ({ dummy: true }) });
-  return mapProviderNames();
+section("map providers — FimViz.mapProviders / providerAcceptsCRS / registerMapProvider, createMap");
+run("FimViz.mapProviders()", () => FimViz.mapProviders());
+run("FimViz.providerAcceptsCRS('google','EPSG:4326')", () => FimViz.providerAcceptsCRS("google", "EPSG:4326"));   // FimViz.providerAcceptsCRS(name, crs)
+run("FimViz.providerAcceptsCRS('google','EPSG:3857')", () => FimViz.providerAcceptsCRS("google", "EPSG:3857"));
+run("FimViz.registerMapProvider('null-provider', {create,…})", () => {
+  // FimViz.registerMapProvider(name, { requiresApiKey?, acceptsCRS?, create, addVector?, removeVector?, fitBounds?, addRasterImage?, … })
+  FimViz.registerMapProvider("null-provider", { requiresApiKey: false, acceptsCRS: () => true, create: () => ({ dummy: true }) });
+  return FimViz.mapProviders();
 });
 await runA("createMap(el, {provider:'null-provider'})", () => createMap(document.createElement("div"), { provider: "null-provider" }));  // createMap(el, {provider,apiKey,center,zoom,mapId,mapOptions,…})
 
 // ── layer.js: type registry + registerRuntime ────────────────────────────────
 section("layer registry + registerRuntime");
-run("registerLayerType('noop-layer', factory)", () => registerLayerType("noop-layer", (fim, opts) => new Layer({ map: fim, type: "noop-layer" })));  // registerLayerType(type, (fim,opts)=>Layer)
-run("registerRuntime({}) — merges into the runtime seam", () => registerRuntime({}));   // registerRuntime({ bootstrap, getMountedMap, teardownMap, createPanel, markup })
+run("Layer.registerType('noop-layer', factory)", () => Layer.registerType("noop-layer", (fim, opts) => new Layer({ map: fim, type: "noop-layer" })));  // Layer.registerType(type, (fim,opts)=>Layer)
+run("FimViz.registerRuntime({}) — merges into the runtime seam", () => FimViz.registerRuntime({}));   // FimViz.registerRuntime({ bootstrap, getMountedMap, teardownMap, createPanel, markup })
 
 // ── ui: pure renderers ───────────────────────────────────────────────────────
 section("ui read-model renderers — renderLegend, renderStats, propsTable");

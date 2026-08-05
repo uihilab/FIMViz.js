@@ -8,7 +8,7 @@
 
 > **providerAcceptsCRS**(`name?`, `crs?`): `boolean`
 
-Defined in: package/mapProvider.js:582
+Defined in: [package/mapProvider.js:596](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/mapProvider.js#L596)
 
 Can the named provider render content in `crs`? The Layer render precondition asks this before
 drawing so a non-WGS84 raster surfaces a clear "reproject first" error instead of a blank overlay.
@@ -18,7 +18,7 @@ A provider that declares no `acceptsCRS` is treated as accepting anything (permi
 
 ### name?
 
-`string` = `"google"`
+`string` = `DEFAULT_PROVIDER`
 
 ### crs?
 

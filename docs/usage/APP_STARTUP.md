@@ -15,10 +15,13 @@ materialize/decode extension seam, and `FimMap`'s fuller instance API.
 ## Mounting
 
 ```js
-import { FimViz, mount, registerRuntime } from 'fimviz';   // or: FimViz.mount / FimViz.create
+import { FimViz, mount } from 'fimviz';   // or: FimViz.mount / FimViz.create
 
 const fim = await mount(target, options);        // === FimViz.mount === FimViz.create (all aliases)
 ```
+
+Everything on this page comes off the `fimviz` barrel; for the other published specifiers
+(`fimviz/ui`, `fimviz/src`, `fimviz/src/*`) see [USAGE.md → Subpaths](./USAGE.md#subpaths).
 
 `target`: an `Element`, its id string, or a CSS selector. Returns a `Promise<FimMap>` that ALSO has
 `.on(evt, fn)`/`.off(evt, fn)` glued on *before* it resolves — so `mount(el, opts).on('ready', fn)`
@@ -41,8 +44,8 @@ Only `.on()`/`.off()` are available before it resolves.
 
 | Key | Default | Notes |
 |---|---|---|
+| `provider` | — (**required**) | `'leaflet'` \| `'google'` \| a registered name. **No default** — the backends differ in credentials *and* capability (`'leaflet'`: no key, map + vectors + static rasters; `'google'`: needs `apiKey`, adds velocity, damage markers and ArcGIS depth), so the engine never picks for you. Omitting it throws `config-invalid` naming both. |
 | `apiKey` | `''` (build-time `GOOGLE_MAPS_API_KEY`) | Required when `provider` needs one (`google` does; `leaflet` doesn't) — throws `config-invalid` otherwise. |
-| `provider` | `'google'` | `'google'` \| `'leaflet'` \| a name registered via `registerMapProvider`. |
 | `center` | `null` (provider default) | `{lat, lng}`. |
 | `zoom` | `null` (provider default) | number. |
 | `mapId` | `null` | Google-only; required for `AdvancedMarkerElement`. |
@@ -54,8 +57,13 @@ Only `.on()`/`.off()` are available before it resolves.
 | `theme` | — | `{bgColor, olColor, hlColor, bColor}` → the widget's CSS custom properties. |
 | `isolated` | `false` | `true` gives this map its **own** `FimViz` instance instead of the shared default — see "Multiple maps" below. |
 
-Config is **set-once**: `app.configure()` locks after the first successful boot; a later `mount()`
-call on the same app silently no-ops (with a console warning) rather than reconfiguring.
+Config is **set-once**: `create()` locks it the moment a boot starts. A later `app.configure(...)` is
+then ignored with a console warning rather than reconfiguring — and a second `mount()` on the same
+app never gets that far, since the single-map guard throws `already-mounted` first (see
+[Multiple maps](#multiple-maps-on-one-page)).
+
+Three things `mount()` rejects before booting anything, all as `config-invalid`: a missing `provider`,
+a provider that `requiresApiKey` with no `apiKey` given, and a `target` that resolves to no element.
 
 ### Two boot paths
 
@@ -65,7 +73,7 @@ call on the same app silently no-ops (with a console warning) rather than reconf
 - **A runtime is registered** (a host supplies one): the FULL widget boots instead.
 
 ```js
-registerRuntime({ bootstrap, getMountedMap, teardownMap, createPanel, markup });   // call BEFORE mount()
+FimViz.registerRuntime({ bootstrap, getMountedMap, teardownMap, createPanel, markup });   // call BEFORE mount()
 await mount('#el', { apiKey });
 ```
 
@@ -76,10 +84,16 @@ resolves — so hold the reference, but read `fim.map` only afterwards.
 
 ### Markup injection
 
-`mount()` injects the widget markup into your container, unless **that container** already holds a
-`#map`. A container you have already populated is left untouched, so you can supply the widget DOM
-inline. The check is scoped to the container: a `#map` elsewhere on the page is unrelated and does not
-suppress injection, which is what lets two widgets mount on one page.
+`mount()` injects markup into your container, unless **that container** already holds a `#map`. A
+container you have already populated is left untouched, so you can supply the widget DOM inline. The
+check is scoped to the container: a `#map` elsewhere on the page is unrelated and does not suppress
+injection, which is what lets two widgets mount on one page.
+
+What gets injected depends on the boot path: with no runtime it's a bare
+`<div id="map" style="width:100%;height:100%">` for the engine to boot into; with a runtime it's that
+runtime's `markup`. A runtime that registers **no** `markup` while the container has no `#map` is an
+error, not a silent empty map — `mount()` throws `config-invalid` naming both fixes (pass `markup`,
+or put `#map` in the page yourself).
 
 ### Multiple maps on one page
 
@@ -129,6 +143,13 @@ dropzone.addEventListener('drop', async (e) => {
 `fim.addDataset(source, options?)` accepts `File | Blob | ArrayBuffer | string (URL)`. It parses (format
 auto-detected from filename/extension unless `options.format` is given) into a `Dataset` and pushes
 it onto `fim.datasets` — it does **not** render anything yet.
+
+Recognised formats: `geotiff` (.tif/.tiff), `geojson` (.geojson/.json, incl. HAZUS damage), `kml`,
+`kmz`, `shp` (a .zip carrying .shp/.dbf/.shx), `csv`, and `xyz`. The last two take their own
+`options` — a `latField`/`lngField` column pair or a `geometryField` of WKT/GeoJSON for CSV,
+`swapXY` for northing-first XYZ — and `csvHeaders(text)` reads a CSV's column names *before* parsing
+so you can build a mapping picker; see
+[LAYER_SUBTYPES.md → Building from CSV/XYZ](./LAYER_SUBTYPES.md#building-from-csvxyz-both-produce-a-vector-dataset--vectorlayer).
 
 ### Getting it on the map
 

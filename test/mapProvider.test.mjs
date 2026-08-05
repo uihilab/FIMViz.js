@@ -11,6 +11,7 @@ import assert from "node:assert/strict";
 import {
   createMap, registerMapProvider, getMapProvider, mapProviderNames, providerRequiresApiKey,
   styleToGoogle, styleToLeaflet, featuresOf, resolveFeatureStyle, providerAcceptsCRS,
+  DEFAULT_PROVIDER,
 } from "../src/package/mapProvider.js";
 
 describe("map provider registry", () => {
@@ -72,10 +73,27 @@ describe("createMap", () => {
     assert.equal(map.options.zoom, 7);
   });
 
-  test("provider defaults to 'google'", async () => {
-    // Google's create() would try to load the real SDK, so just assert the dispatch target — an
-    // unknown apiKey means we never get past validation into the loader.
-    await assert.rejects(() => createMap(el, {}), /requires an apiKey/);
+  test("a provider is REQUIRED — there is no default to fall back on", async () => {
+    // The two built-ins differ in credentials AND in which overlay tiers they implement, so a
+    // default would silently decide that for the host. The error names both options rather than
+    // guessing (and lists the registry, so a custom provider is discoverable from it).
+    await assert.rejects(() => createMap(el, {}), (e) => {
+      assert.equal(e.code, "config-invalid");
+      assert.match(e.message, /provider is required/);
+      assert.match(e.message, /'leaflet'/);
+      assert.match(e.message, /'google'/);
+      return true;
+    });
+    // Naming google still enforces the key (its create() is never reached).
+    await assert.rejects(() => createMap(el, { provider: "google" }), /requires an apiKey/);
+  });
+
+  test("DEFAULT_PROVIDER is the detached-layer fallback, not a config default", () => {
+    // A Layer built with no mounted app has no config.provider to read; it resolves against this.
+    // Nothing about mount()'s required-provider rule changes because of it.
+    assert.equal(DEFAULT_PROVIDER, "leaflet");
+    assert.equal(providerRequiresApiKey(DEFAULT_PROVIDER), false,
+      "a detached layer must never need credentials to resolve a provider");
   });
 
   test("a provider that needs no key boots with none", async () => {

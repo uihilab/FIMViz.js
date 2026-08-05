@@ -94,7 +94,7 @@ export class Stats {
       kind: "raster", unit: meta.unit || "", min: vMin, max: vMax, mean, median, stddev,
       sum, count, area, histogram: { bins: edges, counts }, byClass: null,
     });
-    if (classify) stats.byClass = rasterByClass(vals, area / count, classify);
+    if (classify) stats.byClass = byClassBuckets(vals, area / count, classify);
     return stats;
   }
 
@@ -108,10 +108,16 @@ export class Stats {
    * @param {*} source - GeoJSON FeatureCollection|Feature|Feature[]|VectorFeatures, or a `google.maps.Data` layer
    * @param {Object} [opts]
    * @param {import('./filter.js').Filter|Function|Array|null} [opts.filter]
+   * @param {import('./colorScale.js').ColorScale|null} [opts.classify] - bucket features into `byClass`
+   *   by the SAME scale that colours them. Needs `classifyBy` to know which property carries the
+   *   value; `VectorLayer.getStats()` passes both from the layer, so the buckets line up with the
+   *   legend exactly as they do for a raster.
+   * @param {string|null} [opts.classifyBy] - the feature property `classify` reads
    * @returns {Stats}
    */
-  static vector(source, { filter = null } = {}) {
+  static vector(source, { filter = null, classify = null, classifyBy = null } = {}) {
     const f = normalizeFilter(filter);
+    const graded = classify && classifyBy ? [] : null;   // the values that will fall into buckets
     let total = 0, nPoly = 0, nLine = 0, nPoint = 0, areaM2 = 0, lengthM = 0;
     let n = 0, s = 90, w = 180, e = -180, north = -90;   // bbox accumulate
 
@@ -135,15 +141,27 @@ export class Stats {
       } else if (t === "Point" || t === "MultiPoint") {
         nPoint++;
       }
+      if (graded) {
+        const raw = feature?.properties?.[classifyBy];
+        const v = raw == null || raw === "" ? NaN : Number(raw);
+        // A feature with no usable value is counted in featureCount but lands in no bucket —
+        // "missing" must not be silently graded as a real number (matching the render path, which
+        // leaves such a feature at its base style rather than colouring it).
+        if (Number.isFinite(v)) graded.push(v);
+      }
     }
 
-    return new Stats({
+    const stats = new Stats({
       kind: "vector", featureCount: total,
       byType: { polygon: nPoly, line: nLine, point: nPoint },
       area: areaM2, length: lengthM,
       bbox: n ? { north, south: s, east: e, west: w } : null,
       propertySummary: null,
     });
+    // Same bucketing the raster path uses, so one `byClass` shape serves both kinds. `area` is
+    // meaningless per feature-class here, so only counts are filled.
+    if (graded) stats.byClass = byClassBuckets(graded.sort((a, b) => a - b), 0, classify);
+    return stats;
   }
 
   // ---- pure derived views ----
@@ -233,7 +251,7 @@ export class Stats {
 // ---- helpers ----
 
 // area/count per ColorScale band. `perCellArea` = mean pixel area (m²) for a quick area estimate.
-function rasterByClass(sortedVals, perCellArea, colorScale) {
+function byClassBuckets(sortedVals, perCellArea, colorScale) {
   const stops = colorScale.getStops();
   const discrete = stops.length && "value" in stops[0];
   const last = stops.length - 1;

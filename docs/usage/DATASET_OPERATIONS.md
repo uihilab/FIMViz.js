@@ -31,6 +31,13 @@ Dataset.fromURL(url, { format?, name?, kind?, crs?, bounds?, meta? })
 // when omitted; crs defaults to EPSG:4326 for vector formats, null (unknown) for raster.
 
 Dataset.fromRecord(record)   // rehydrate a toRecord() snapshot (recipe or materialized)
+
+Dataset.fromGrid(value, { name?, format?, meta? })
+// A Dataset around an ALREADY-DECODED RasterGrid/VectorFeatures — one you got from ds.grid(),
+// computed with the standalone grid functions, or built by hand. Pre-materialized: no fetch, no
+// decode, no materializer needed, and load()/grid() return the value you passed in. `kind`/`crs`/
+// `bounds` come from the value; `format` stays null, since there are no encoded bytes to claim one.
+// This is the way BACK into the op chain, so `ds.grid()` isn't a one-way door.
 ```
 
 Normally you don't construct directly — `fim.addDataset(file)` / `FimViz.parseFile(source)` parse a
@@ -58,13 +65,28 @@ raw File/Blob/ArrayBuffer/URL into a Dataset for you.
 | --------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `await ds.load()`     | `RasterGrid | VectorFeatures` | Decodes the root (or forces the parent + applies this node's op), **memoized** — repeat calls are free. |
 | `await ds.grid()`     | `RasterGrid`                  | `load()` + assert raster; throws if this Dataset is vector.                                             |
-| `await ds.features()` | `VectorFeatures`              | `load()` + assert vector; throws if this Dataset is raster.                                             |
+| `await ds.features()` | `VectorFeatures`              | `load()` + assert vector; throws if this Dataset is raster. **Iterable** — see below.                   |
 | `ds.release()`        | `void`                        | Evicts the memoized result (not async).                                                                 |
 | `ds.isMaterialized`   | `boolean` (getter)            | Has this exact node been forced yet.                                                                    |
 | `ds.warnings`         | `string[]` (getter)           | Collected at force time (e.g. "reprojected X→Y", "resampled onto...") — empty until forced.             |
 
 
 
+
+### Reading the features out of `VectorFeatures`
+
+A decoder may hand back a FeatureCollection, a lone Feature, or a bare array, so `.features` is
+whatever the format produced. Iterate the wrapper instead and the shape stops mattering:
+
+```js
+const vf = await ds.features();
+
+for (const feature of vf) console.log(feature.properties);   // iterable
+vf.toArray();      // Feature[] in document order — normalized from all three payload shapes
+vf.count;          // how many features
+vf.features;       // the raw payload, if you specifically want the GeoJSON object as decoded
+vf.bounds; vf.crs; // the frame it was decoded in
+```
 
 ## Raster — unary
 
@@ -77,7 +99,7 @@ All throw `"<op>: raster-only op"` if called on a vector Dataset.
 | `clip(bbox)`                                     | `bbox: {north,south,east,west}` (required)                                                                                                                                           | Crop to overlap, snapped to pixel edges.                                                                                                                                                                                    |
 | `mask(polygon, opts?)`                           | `polygon`: `SpatialFilter` or a ring/multi-ring of `{lat,lng}`|`[lat,lng]`; `opts.invert=false`                                                                                      | Pixels outside the polygon → transparent (or inside, with `invert:true`). Footprint unchanged.                                                                                                                              |
 | `reclassify(rules, opts?)`                       | `rules: [{min?,max?,value?}]` (non-empty) **or** `(value, index) => number\|null\|undefined` (required either way); `opts.unmatched='nodata'|'keep'`                                                                                                | Remap pixel values. The **rules-array** form is first-match-wins (unbounded `{min:-Infinity,max:Infinity,value:v}` maps every valid pixel to one constant, e.g. a single-color silhouette; a range with no `value` = "keep in range" band). The **callback** form is called once per valid pixel with its raw value and its flat row-major index (`row*width+col`), returning the new value directly — not limited to a contiguous range (any per-pixel or index-dependent logic), and cheaper than the rules form once you need more than a couple of ranges (one call per pixel instead of a per-rule scan). Either form: `null`/`undefined` (or no rule match) → unmatched. Existing noData/NaN pixels are never passed to a rule or the callback — shape/footprint is always preserved. On force, a pixel that matched no rule/returned nullish becomes noData under the default `unmatched:'nodata'` — if that actually happened (a real hole, not pre-existing noData), it's reported on `ds.warnings` naming how many pixels, so incomplete coverage doesn't silently punch holes. A callback does NOT survive `toRecord()` (functions can't structured-clone) — use range rules for a chain you need to persist. |
-| `resampleTo(target, opts?)`                      | `target`: `{width,height,bw,bs,be,bn}` **or** grid-shaped `{width,height,bounds:{north,south,east,west}}` (e.g. another Dataset's `.grid()`); `opts.method='nearest'`, `opts.noData` | Resample onto an explicit target grid. `crs` unchanged (resamples, doesn't reproject). GDAL-only methods (`cubic`/`lanczos`/...) need `registerResampler` or force throws.                                                  |
+| `resampleTo(target, opts?)`                      | `target`: `{width,height,bw,bs,be,bn}` **or** grid-shaped `{width,height,bounds:{north,south,east,west}}` (e.g. another Dataset's `.grid()`); `opts.method='nearest'`, `opts.noData` | Resample onto an explicit target grid. `crs` unchanged (resamples, doesn't reproject). GDAL-only methods (`cubic`/`lanczos`/...) need `Dataset.registerResampler` or force throws.                                                  |
 | `slope(opts?)`                                   | `opts.zFactor`, `opts.cellsizeX`, `opts.cellsizeY`, `opts.unit='degrees'|'percent'`                                                                                                  | Horn's method, pure JS, no GDAL.                                                                                                                                                                                            |
 | `aspect()`                                       | —                                                                                                                                                                                    | Downslope compass bearing, Horn's method.                                                                                                                                                                                   |
 | `hillshade(opts?)`                               | `opts.altitude`, `opts.azimuth`, `opts.zFactor`, `opts.cellsizeX`, `opts.cellsizeY`                                                                                                  | Shaded-relief illumination.                                                                                                                                                                                                 |
@@ -129,6 +151,8 @@ an already-decoded `RasterGrid` — barrel-exported, so if you already have a gr
 `await ds.grid()`, or built by hand), you can call these without a `Dataset` at all. Same signatures
 as the `Dataset` methods, minus the laziness — each takes a `RasterGrid` first and returns a new one:
 
+Finished with a grid and want the op chain back? `Dataset.fromGrid(grid)` wraps it (above).
+
 ```js
 maskGrid(grid, polygon, opts?)          // opts: { invert? }
 clipGrid(grid, bbox)
@@ -149,7 +173,7 @@ RESAMPLE_METHODS             // ['nearest','bilinear','average', 'cubic','cubics
 resolveTargetGrid(metas, policy)          // metas: [{width,height,bw,bs,be,bn}, ...] → the common target grid
 resampleGrid(pixels, srcMeta, dstMeta, opts?)   // opts: { method?, noData? }
 alignRasters(rasters, opts?)              // rasters: [{pixels,meta}, ...] → { grid, rasters: [{pixels,meta}, ...] }
-registerResampler(fn)        // the escape hatch for cubic/lanczos/etc. — nothing registered by default
+Dataset.registerResampler(fn)   // the escape hatch for cubic/lanczos/etc. — nothing registered by default
 ```
 
 Colorize (`package/rasterImage.js`, also barrel-exported — see [COLOR_SCALE.md](./COLOR_SCALE.md) for

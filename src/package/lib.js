@@ -11,11 +11,13 @@
 // composes a full widget by importing the runtime it wants and calling registerRuntime() before
 // mount(); `registerRuntime` is re-exported here so it is part of the public engine surface. Absent
 // a runtime, mount() still boots a bare working map via the map-provider seam (see mount.js).
-export { mount, FimViz, registerRuntime } from "./mount.js";
+// `registerRuntime`, `registerMapProvider`, `mapProviders()` and `providerAcceptsCRS()` are STATICS
+// on FimViz — it is what boots a map, so it owns both the backend registry and the runtime seam.
+export { mount, FimViz } from "./mount.js";
 
-// Map creation. `mount()` uses this by default, so a plain map needs no runtime at all. The
-// registry is the seam for a second backend — see mapProvider.js for what that does NOT cover.
-export { createMap, registerMapProvider, mapProviderNames, providerAcceptsCRS } from "./mapProvider.js";
+// The low-level map constructor `mount()` calls. Rarely needed directly; it is the one map-provider
+// verb that isn't a registry operation, so it stays a plain function.
+export { createMap } from "./mapProvider.js";
 
 // Composable-core primitives. FimViz.parseFile / fim.addDataset produce Datasets from
 // files; parsing never reprojects — a Dataset comes back in its native `crs` and the caller warps
@@ -32,10 +34,13 @@ export { csvHeaders, wktToGeometry } from "../io/parse.js";
 // Dataset produces, plus the registries a host uses to supply decoders/warp. The engine ships no heavy
 // decoder on the barrel — import "fimviz/src/io/materializers.js" for the built-in geotiff/vector ones,
 // or register your own. reproject as a lazy op (ds.reproject) forces through the registered reprojector.
-import {
-  RasterGrid, VectorFeatures, registerMaterializer, registerReprojector, registerDefaultReprojectorLoader,
-} from "./materialize.js";
-export { RasterGrid, VectorFeatures, registerMaterializer, registerReprojector, registerDefaultReprojectorLoader };
+// The two decoded VALUE TYPES a materializer returns (and `Dataset.fromGrid` accepts). The seams
+// themselves — registerMaterializer / formats() / registerReprojector /
+// registerDefaultReprojectorLoader — are STATICS ON `Dataset`, the type they serve. The registries'
+// other readers (getMaterializer/getReprojector/resolveReprojector) stay internal: they hand back
+// the implementation, which a caller has no use for once the seam dispatches on its own.
+import { RasterGrid, VectorFeatures, registerDefaultReprojectorLoader } from "./materialize.js";
+export { RasterGrid, VectorFeatures };
 // The built-in decoders (geotiff + vector) register on import of this barrel; the function is exposed
 // so a raw-browser page can re-run it explicitly.
 export { registerBuiltinMaterializers } from "../io/materializers.js";
@@ -88,14 +93,16 @@ export async function callGdal(method, ...params) {
 
 // Read-models (pure, headless): the value→color engine, its derived legend, computed statistics,
 // and the spatial/predicate filters that scope them.
-export { ColorScale, PALETTES, registerPalette, hasPalette, paletteNames } from "./colorScale.js";
+// Palettes are ColorScale's registry: ColorScale.registerPalette(name, colors) / ColorScale.palettes().
+export { ColorScale } from "./colorScale.js";
 export { Legend } from "./legend.js";
 export { Stats } from "./stats.js";
 export { Filter, SpatialFilter, PredicateFilter } from "./filter.js";
 
 // The Layer object model: the base + the type registry. Each subsystem (velocity, ensemble, depth,
 // comparison, …) registers its own factory on import, so this barrel names none of them.
-export { Layer, RasterLayer, VectorLayer, registerLayerType } from "./layer.js";
+// The type registry is Layer's: Layer.registerType(type, factory) / Layer.types().
+export { Layer, RasterLayer, VectorLayer } from "./layer.js";
 // The provider-neutral raster colorize pipeline RasterLayer._draw uses — surfaced so the app can
 // reuse it (retiring its ~6 hand-rolled copies) and a consumer can colorize a grid independently.
 export { colorizeGrid, gridToDataURL } from "./rasterImage.js";
@@ -112,25 +119,20 @@ export {
 // SYNCHRONOUS, pixel-level hook for a host with its own already-initialized kernel — GDAL's own richer
 // methods (cubic/lanczos/...) go through geo/gdal.js's async, buffer-level warpToGrid instead, not this
 // (see geo/resample.js's header for why the two don't unify).
-export { GRID_POLICY, RESAMPLE_METHODS, resolveTargetGrid, resampleGrid, alignRasters, registerResampler } from "../geo/resample.js";
+// registerResampler moved to `Dataset.registerResampler` with the other seams it sits beside.
+export { GRID_POLICY, RESAMPLE_METHODS, resolveTargetGrid, resampleGrid, alignRasters } from "../geo/resample.js";
 // ComparisonLayer both exports the class and (on import) registers the "comparison" layer type.
 export { ComparisonLayer } from "./comparisonLayer.js";
 // EnsembleAggregationLayer likewise registers the "ensembleAgreement" type on import.
 export { EnsembleAggregationLayer } from "./ensembleAggregationLayer.js";
 
-// Headless UI module (docs/PACKAGE_ROADMAP.md §5) — OPT-IN, user-mounted widgets the engine never
-// calls: a toast, a pointer tooltip (+ raster hover-value binding), a click info window (+ vector
-// feature-info binding), a tools panel bound to layer.settings (+ raster/vector control presets),
-// and thin legend/stats renderers. These touch the DOM only inside functions, so the engine stays
-// headless (test/hostEvents.test.mjs) and this barrel stays Node-importable.
-export {
-  createToast, connectToast,
-  createTooltip, bindHoverValue,
-  createInfoWindow, propsTable, bindFeatureInfo,
-  createToolsPanel, rasterControls, vectorControls,
-  renderLegend, renderStats,
-  createRegionDraw, createOperationsPanel,
-} from "../ui/index.js";
+// The headless UI module (docs/PACKAGE_ROADMAP.md §5) is NOT re-exported here. It has exactly one
+// home — the `fimviz/ui` subpath (dist/ui.js) — for two reasons. Payload: that entry pulls only the
+// small pure deps it names, so a consumer who wants a toast or a tools panel downloads ~17 KB
+// instead of the engine. Identity: re-exporting the same modules from both entries meant an app
+// importing from both shipped TWO copies, with two separate registries and two sets of DOM nodes
+// that each believed they were the only one. One import path, one instance:
+//     import { createToast, createToolsPanel } from "fimviz/ui";
 
 // Vendored runtime primitives. Surfaced here so any consumer imports them from the engine — never
 // by naming the third-party package directly — making the engine the single owner of these
@@ -139,5 +141,18 @@ export {
 // comparison/extent overlays, XML→GeoJSON, shapefile→GeoJSON, and the Google Maps script loader.
 export { fromArrayBuffer } from "geotiff";
 export { kml } from "@tmcw/togeojson";
-export { default as shp } from "shpjs";
 export { Loader } from "@googlemaps/js-api-loader";
+
+/**
+ * shpjs: a zipped shapefile (.shp/.dbf/.shx) → GeoJSON. Same call shape as shpjs's own default
+ * export (it is async there too), but the module is loaded ON FIRST CALL rather than re-exported
+ * statically. shpjs depends on proj4 (+ wkt-parser, mgrs) to honour a .prj, so a static re-export
+ * put ~300 KB into every consumer's initial bundle to serve the one format that needs it. The
+ * `shp` branch of `parseFile` defers it the same way.
+ * @param {ArrayBuffer} buffer
+ * @returns {Promise<Object|Object[]>} a GeoJSON FeatureCollection (or one per layer)
+ */
+export async function shp(buffer) {
+  const mod = await import("shpjs");
+  return (mod.default ?? mod)(buffer);
+}

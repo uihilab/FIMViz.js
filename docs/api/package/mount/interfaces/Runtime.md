@@ -6,7 +6,7 @@
 
 # Interface: Runtime
 
-Defined in: package/mount.js:33
+Defined in: [package/mount.js:35](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/mount.js#L35)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: package/mount.js:33
 
 > **bootstrap**: (`fim`) => `Promise`\<`void`\>
 
-Defined in: package/mount.js:34
+Defined in: [package/mount.js:36](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/mount.js#L36)
 
 boot the map; called by create() instead of its default createMap() path, with the FimMap being mounted
 
@@ -34,7 +34,7 @@ boot the map; called by create() instead of its default createMap() path, with t
 
 > **createPanel**: (`root`) => `any`
 
-Defined in: package/mount.js:37
+Defined in: [package/mount.js:39](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/mount.js#L39)
 
 per-instance Layer Panel factory
 
@@ -54,7 +54,7 @@ per-instance Layer Panel factory
 
 > **getMountedMap**: () => `any`
 
-Defined in: package/mount.js:35
+Defined in: [package/mount.js:37](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/mount.js#L37)
 
 reported once bootstrap() resolves
 
@@ -68,7 +68,7 @@ reported once bootstrap() resolves
 
 > **markup**: `string`
 
-Defined in: package/mount.js:38
+Defined in: [package/mount.js:40](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/mount.js#L40)
 
 widget HTML injected into the container
 
@@ -78,7 +78,7 @@ widget HTML injected into the container
 
 > **teardownMap**: () => `void`
 
-Defined in: package/mount.js:36
+Defined in: [package/mount.js:38](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/mount.js#L38)
 
 detach listeners on destroy()
 

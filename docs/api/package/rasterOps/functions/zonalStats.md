@@ -8,7 +8,7 @@
 
 > **zonalStats**(`grid`, `zones`, `opts?`): `object`[]
 
-Defined in: package/rasterOps.js:176
+Defined in: [package/rasterOps.js:176](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/rasterOps.js#L176)
 
 Zonal statistics: per-zone min/max/mean/sum/count/area over a raster. `zones` = [{ id?, polygon | filter }]
 (a ring/multi-ring of {lat,lng}|[lat,lng], or a SpatialFilter). noData/NaN pixels are excluded; `area`

@@ -9,7 +9,7 @@
 // docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1.
 
 import { fromArrayBuffer } from "geotiff";
-import { readCrs } from "../geo/gdal.js";
+import { readCrs } from "../geo/crs.js";
 import { boundsOf } from "./parse.js";
 import {
   RasterGrid, VectorFeatures, registerMaterializer,

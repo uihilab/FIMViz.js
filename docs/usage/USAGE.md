@@ -40,24 +40,75 @@ parameters.
 
 ## Install & import
 
-**ESM-only, single-entry.** Everything is one `import { … } from 'fimviz'` — there is no
-subpath-per-concern split (`fimviz/data`, `fimviz/storage`, etc. do **not** exist). `fimviz` resolves
-to `dist/fimviz.js`:
+**ESM-only.** The main entry is the barrel — `import { … } from 'fimviz'`, resolving to
+`dist/fimviz.js` — which carries the whole engine:
 
 ```js
 import {
-  mount, FimViz, registerRuntime,             // boot
-  createMap, registerMapProvider, mapProviderNames,  // map-provider seam (google/leaflet)
-  Dataset, warp, Storage,                      // composable core
-  ColorScale, PALETTES, registerPalette, hasPalette, paletteNames, Legend, Stats,
-  Filter, SpatialFilter, PredicateFilter,      // read-models
-  Layer, RasterLayer, VectorLayer, registerLayerType, ComparisonLayer, EnsembleAggregationLayer,
-  fromArrayBuffer, kml, shp, Loader,           // vendored primitives (below)
+  mount, FimViz,                                // boot
+  Dataset, warp, Storage,                       // composable core
+  csvHeaders, wktToGeometry,                    // the CSV column-mapping seam
+  RasterGrid, VectorFeatures,                   // the two decoded value types
+  ColorScale, Legend, Stats,                    // read-models
+  Filter, SpatialFilter, PredicateFilter,
+  Layer, RasterLayer, VectorLayer, ComparisonLayer, EnsembleAggregationLayer,
+  colorizeGrid, gridToDataURL,                  // the colorize pipeline RasterLayer draws through
+  maskGrid, clipGrid, reclassifyGrid, combineGrids, zonalStats,
+  slopeGrid, aspectGrid, hillshadeGrid, rasterizeFeatures,                // pure grid ops
+  GRID_POLICY, RESAMPLE_METHODS, resolveTargetGrid, resampleGrid, alignRasters,
+  createMap, registerBuiltinMaterializers, registerGdalReprojector, callGdal,   // low-level
+  fromArrayBuffer, kml, shp, Loader,            // vendored primitives (below)
 } from 'fimviz';
 ```
 
-You get the whole engine or nothing — a page that only parses files still pulls in the Layer model and
-the vendored Maps loader. There are no tree-shakeable subpaths.
+### The barrel exports types; functions live on the type they act on
+
+Every registry hangs off the thing it serves, so there is one import (the class you already have)
+instead of a loose top-level verb whose owner was never in doubt:
+
+| Registry | Register | Query |
+|---|---|---|
+| Layer types (`fim.addLayer`) | `Layer.registerType(type, factory)` | `Layer.types()` |
+| Palettes | `ColorScale.registerPalette(name, colors)` | `ColorScale.palettes()` |
+| Format decoders | `Dataset.registerMaterializer(format, fn)` | `Dataset.formats()` |
+| The warp | `Dataset.registerReprojector(fn)`, `Dataset.registerDefaultReprojectorLoader(fn)` | — |
+| Resample methods | `Dataset.registerResampler(fn)` | `RESAMPLE_METHODS` |
+| Map backends | `FimViz.registerMapProvider(name, impl)` | `FimViz.mapProviders()`, `FimViz.providerAcceptsCRS(name, crs)` |
+| The UI runtime | `FimViz.registerRuntime({ … })` | — |
+
+`ColorScale.palettes()` replaces the old `paletteNames()` + `hasPalette()` pair — a list answers
+both, via `.includes(name)`.
+
+The [headless UI module](./UI.md) is **not** on this barrel — it has one home, `fimviz/ui`:
+
+```js
+import { createToast, createToolsPanel, bindHoverValue } from 'fimviz/ui';
+```
+
+### Subpaths
+
+`package.json`'s `exports` map publishes the barrel plus three narrower entries:
+
+| Specifier | Resolves to | For |
+|---|---|---|
+| `fimviz` | `dist/fimviz.js` | the whole engine — everything above |
+| `fimviz/ui` | `dist/ui.js` | the [headless UI module](./UI.md) — its **only** home, deliberately not re-exported by the barrel. Its own build entry pulls just the small pure deps (no geotiff, no Maps loader, no GDAL), so a consumer who wants a toast or a tools panel downloads ~17 KB; and with one entry an app can't end up running two copies with two registries |
+| `fimviz/src` | `src/package/lib.js` | the same barrel as raw, unbundled source — bring your own bundler |
+| `fimviz/src/*` | any source module | the escape hatch for an internal the barrel doesn't re-export, e.g. `fimviz/src/io/parsePrimitives.js` for the parse primitives without the Maps loader |
+
+There is **no** per-concern split (`fimviz/data`, `fimviz/storage`, … do not exist), and the barrel
+is not meaningfully tree-shakeable — `io/materializers.js` self-registers its decoders as an import
+**side effect**, which named-export analysis can't drop. Payload is managed by **deferring the heavy
+dependencies instead**, so the initial download carries only what every consumer uses:
+
+| Loaded lazily | Size | Pulled in by |
+|---|---|---|
+| gdal3.js glue (+ the ~38 MB wasm, from a CDN) | ~190 KB | the first real `warp()` / `ds.reproject()` / `callGdal()` |
+| `shpjs` → `proj4`, `wkt-parser`, `mgrs` | ~300 KB | opening a zipped **shapefile** (also `shp()`) |
+| `jszip` | ~95 KB | opening a **`.kmz`** |
+| `leaflet` / the Google Maps loader | ~450 KB / ~15 KB | `create()` on that provider only |
+
+A consumer who parses GeoTIFF/GeoJSON and renders it downloads none of the above.
 
 This works unchanged in a bundler (Vite/webpack/Rollup/esbuild). In Node, the **same** bare `fimviz`
 resolves to the **built** `dist/fimviz.js` (the `exports` map has no `browser`/`node` split), so
@@ -70,9 +121,11 @@ import map supplies resolution:
 <script type="module">import { FimViz } from "fimviz";</script>
 ```
 
-**Vendored primitives are an escape hatch.** `fromArrayBuffer`/`kml`/`shp`/`Loader` re-export geotiff /
+**Vendored primitives are an escape hatch.** `fromArrayBuffer`/`kml`/`shp`/`Loader` surface geotiff /
 @tmcw/togeojson / shpjs / the Maps loader so you reach raw primitives without adding those packages yourself
-(risking a version split with ours). Prefer `parseFile()` for anything it covers.
+(risking a version split with ours). Prefer `parseFile()` for anything it covers. `shp(buffer)` is a
+thin async wrapper rather than a direct re-export — it loads shpjs (and its ~300 KB proj4 chain) on
+first call; the other three are plain re-exports.
 
 **No UMD** — a second build meant a second artifact to sync, and its global was a wart (`window.FimViz` held
 the module *namespace*, which exported something called `FimViz` → `window.FimViz.FimViz`). ESM has no such
@@ -89,20 +142,23 @@ ambiguity. Async chunks (GDAL glue, arcgislink) are emitted next to `fimviz.js` 
 
 ```js
 import { mount } from 'fimviz';
-const fim  = await mount('#fim',  { apiKey: 'YOUR_GOOGLE_MAPS_KEY' });   // real google.maps.Map
-const fim2 = await mount('#fim2', { provider: 'leaflet' });              // real Leaflet map, no key
+const fim  = await mount('#fim',  { provider: 'leaflet' });                      // no key needed
+const fim2 = await mount('#fim2', { provider: 'google', apiKey: 'YOUR_KEY' });   // real google.maps.Map
 ```
 
-Only the **provider** requires an `apiKey` (`google` does, `leaflet` does not). You get a working empty map
-+ every composable primitive; you do **not** get the FIMViz widget chrome (Layer Panel, flood layers,
-comparison tools).
+**`provider` is required and has no default.** The two backends differ in credentials *and* in which
+tiers they implement, so a default would silently decide that for you: `'leaflet'` needs nothing and
+gives map + vectors + static rasters; `'google'` needs an `apiKey` and is the only one with the full
+overlay tier (velocity, damage markers, ArcGIS depth). Omitting it throws `config-invalid` naming
+both. Either way you get a working empty map + every composable primitive; you do **not** get the
+FIMViz widget chrome (Layer Panel, flood layers, comparison tools).
 
 **Runtime → the full widget.** The UI tier (map boot, panels, widget markup) is a host concern. A host
-supplies it via `registerRuntime()` **before** `mount()`; the registered `bootstrap()` then takes over boot:
+supplies it via `FimViz.registerRuntime()` **before** `mount()`; the registered `bootstrap()` then takes over boot:
 
 ```js
-import { mount, registerRuntime } from 'fimviz';
-registerRuntime({
+import { mount, FimViz } from 'fimviz';
+FimViz.registerRuntime({
   bootstrap,     // async (fim) => void — boot the map; called instead of createMap()
   getMountedMap, // () => the provider's map object — reported once bootstrap resolves
   teardownMap,   // () => void — detach listeners on destroy()
@@ -203,7 +259,7 @@ Passed to `mount()`/`create()`. **Set-once — locked after the first boot.**
 
 | Option | Default | Notes |
 |---|---|---|
-| `provider` | `'google'` | Map backend for `createMap()`. Built in: `'google'`, `'leaflet'`. `registerMapProvider(name, {...})` adds another. |
+| `provider` | — (**required**) | Map backend for `createMap()`. Built in: `'leaflet'` (no key), `'google'` (needs `apiKey`, and is the only one with the full overlay tier — velocity, damage markers, ArcGIS depth). No default: omitting it throws `config-invalid`. |
 | `apiKey` | `''` (build env) | Google Maps JS API key. **Required only if `provider` requires one** (`providerRequiresApiKey(name)`). |
 | `dataSource` | `''` | Base URL for your data. The engine ships **no** deployment topology; only meaningful to a registered runtime (the bare-map path ignores it). |
 | `corsProxy` | `''` | CORS proxy base. |
@@ -284,7 +340,7 @@ const ds = new Dataset({ id, name, kind, format, crs, bounds, meta, data });
 |---|---|
 | `id` / `name` | stable string id (auto) / filename or label |
 | `kind` | `'raster'` \| `'vector'` |
-| `format` | `'geotiff'` \| `'geojson'` \| `'kml'` \| `'kmz'` \| `'shp'` \| `'hazus'` |
+| `format` | `'geotiff'` \| `'geojson'` \| `'kml'` \| `'kmz'` \| `'shp'` \| `'hazus'` \| `'csv'` \| `'xyz'` |
 | `crs` | e.g. `'EPSG:26915'` — **native**, `null` when unknown |
 | `bounds` | `{ north, south, east, west }` in `crs` |
 | `meta` | pixel dims, no-data, bands, GDAL legend/unit, feature counts… |
@@ -294,6 +350,7 @@ const ds = new Dataset({ id, name, kind, format, crs, bounds, meta, data });
 ds.download();                  // save the original bytes/content to disk
 ds.toRecord();                  // structured-cloneable record (source + op recipe; { storeMaterialized } embeds the decode)
 Dataset.fromRecord(record);     // rehydrate — required: structured clone drops prototypes
+Dataset.fromGrid(grid);         // wrap an already-decoded grid so the ops chain off it again
 ds.toJSON();                    // metadata view, without the heavy `data` payload
 ```
 
@@ -374,6 +431,7 @@ const gdal = ColorScale.fromGdalLegend(stops, 'm');
 | `getColor(v)` | css string \| `null` | `set({ continuous })` / `set({ min, max })` | |
 | `getRgb(v)` | `[r,g,b]` (hot path) \| `null` | `setRange(i,{min,max})` / `setColor(i,c)` / `setLabel(i,s)` | per-band; materializes to explicit stops |
 | `kind`/`isExplicit`/`discrete`/`source` | `'continuous'`\|`'classed'`; provenance | `colorFor = v => hex\|css\|null` | escape hatch; overrides when non-null |
+| `missingColor` | colour for an absent value, or `null` | `set({ missingColor })` | outside the three modes — a mode switch keeps it |
 | | | `onChange(fn)` / `offChange(fn)` | repaint hook |
 
 An unknown palette **throws**, listing the available names.
@@ -381,9 +439,11 @@ An unknown palette **throws**, listing the available names.
 ### Palettes
 
 ```js
-PALETTES              // built-ins: blues, grayscale, rainbow, heat, viridis, terrain, reds, plasma
-registerPalette(name, colors)   // colors: >= 2 hex strings
-hasPalette(name) → boolean      paletteNames() → string[]   // built-in + registered
+ColorScale.palettes()                       // → string[] — built-ins + registered. The built-ins are
+                                            //   blues, grayscale, rainbow, heat, viridis, terrain,
+                                            //   reds, plasma
+ColorScale.palettes().includes(name)        // → boolean — "is this one available?"
+ColorScale.registerPalette(name, colors)    // colors: >= 2 hex strings
 ```
 
 ---
@@ -407,8 +467,12 @@ Pure computation, extracted out of the DOM path.
 
 ```js
 Stats.raster(pixelData, meta, { filter?, classify?, skipZero?, bins? })   // meta: { bw,bs,be,bn, width,height, noData?, unit? }
-Stats.vector(source, { filter? })     // source: GeoJSON (FeatureCollection|Feature|Feature[]|VectorFeatures)
-                                      //         OR a google.maps.Data layer. classify: a ColorScale to bucket byClass
+Stats.vector(source, { filter?, classify?, classifyBy? })
+                                      // source: GeoJSON (FeatureCollection|Feature|Feature[]|VectorFeatures)
+                                      //         OR a google.maps.Data layer.
+                                      // classify: a ColorScale to bucket byClass — needs classifyBy,
+                                      // the feature property carrying the value (VectorLayer.getStats()
+                                      // passes both from the layer automatically)
 ```
 
 | Method | | Fields |
@@ -453,7 +517,7 @@ renderers get their own subclass. Full reference: [LAYERS.md](./LAYERS.md) and
 
 ```js
 const layer = await fim.addLayer('vector', { source: ds });   // 'vector' is the engine's own built-in type
-registerLayerType('my-type', (fim, opts) => new RasterLayer({ ...opts, type: 'my-type' }));
+Layer.registerType('my-type', (fim, opts) => new RasterLayer({ ...opts, type: 'my-type' }));
 ```
 
 `'vector'` is the only type the **library** registers itself (raster overlays extend
@@ -466,6 +530,7 @@ type throws with the current list.
 |---|---|
 | `id` / `type` / `sources` / `visible` / `map` / `dataset` | `dataset` = `sources[0]` |
 | `render(opts)` / `compute(opts)` | `render` = compute → CRS precondition → draw; `render: 'auto'\|'in-place'\|'recreate'` |
+| `clip` / `mask` / `reclassify` / `resampleTo` / `slope` / `aspect` / `hillshade` / `reproject` / `select` / `reduce` | the Dataset ops, chainable off the layer — applied to the sources immediately, drawn at the next `render()`; `reset()` undoes them ([LAYERS.md](./LAYERS.md#chainable-ops)) |
 | `setSources(ds[], opts)` / `deriveSources(fn, opts)` | swap sources (cold) / hot-modify (reuse memoized ancestors) |
 | `settings` / `set(partial)` / `get()` | the `LayerSettings` change-model (palette/opacity/hover/noData…) |
 | `on/off/once/emit(evt, payload)` | Evented (`L.Evented` style) |
@@ -507,7 +572,7 @@ The built-in map providers only render the WGS84 family (`EPSG:4326`/`4269`); `g
 `shp`/`csv`/`xyz` are already WGS84 by spec, so this is a **raster-only** concern:
 
 ```js
-if (ds.kind === 'raster' && ds.crs && !providerAcceptsCRS(fim.config.provider, ds.crs)) {
+if (ds.kind === 'raster' && ds.crs && !FimViz.providerAcceptsCRS(fim.config.provider, ds.crs)) {
   ds = await warp(ds, 'EPSG:4326');   // → a NEW Dataset (GDAL WASM; browser-only, first call is slow)
 }
 ```
@@ -584,8 +649,9 @@ Loader                 // @googlemaps/js-api-loader — the Maps script loader
 
 ## GDAL
 
-`gdal3.js` is bundled but its ~38 MB `.wasm`/`.data` are **not** — they load from a version-pinned CDN, and
-**only on the first reprojection that needs them** (a widget that never reprojects downloads nothing).
+**Nothing GDAL loads until a reprojection actually runs** — neither the ~38 MB `.wasm`/`.data` (fetched
+from a version-pinned CDN) nor the ~190 KB of gdal3.js glue (an async chunk next to `fimviz.js`). A
+widget that never reprojects downloads neither.
 Self-host with `mount('#fim', { apiKey, gdalPath: '/my/static/gdal' })`. GDAL is **process-global** (one
 Emscripten module per page, so the first `gdalPath` wins; a later different path warns). Runs with
 `useWorker: false`, so basic reprojection does **not** require `SharedArrayBuffer`/COOP-COEP.

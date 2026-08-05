@@ -34,40 +34,11 @@ export function getGdal(gdalPath = getGdalPath()) {
   return _gdalPromise;
 }
 
-/**
- * The raster's declared CRS, read from its GeoTIFF geokeys. → 'EPSG:26915' | null (unknown).
- * Pure: no GDAL, no network. This is the detector `Dataset.crs` is populated from.
- */
-export function readCrs(image) {
-  const geoKeys = image.getGeoKeys();
-  if (!geoKeys || Object.keys(geoKeys).length === 0) return null;
-  const modelType = geoKeys.GTModelTypeGeoKey;
-  const code = modelType === 2
-    ? (geoKeys.GeographicTypeGeoKey || null)     // geographic
-    : modelType === 1
-      ? (geoKeys.ProjectedCSTypeGeoKey || null)  // projected
-      : null;
-  return code ? `EPSG:${code}` : null;
-}
-
-// CRS pairs treated as interchangeable, so a reprojection between them is a no-op.
-// NAD83 (4269) ≈ WGS84 (4326): they differ by ~1-2 m — below the resolution these rasters are
-// rendered at. This is an APPROXIMATION, not an identity; it preserves the long-standing
-// isAlreadyWgs84() behaviour this function replaces.
-const EQUIVALENT = [["EPSG:4326", "EPSG:4269"]];
-
-/** True if a warp between `a` and `b` would be a no-op. Unknown CRS (null) is never equivalent. */
-export function crsEquivalent(a, b) {
-  if (!a || !b) return false;
-  if (a === b) return true;
-  return EQUIVALENT.some((set) => set.includes(a) && set.includes(b));
-}
-
-/** 'EPSG:26915' → 26915. Anything unparseable (incl. null/'') → null, never 0. */
-export function epsgNumber(crs) {
-  const m = /^EPSG:(\d+)$/i.exec(String(crs ?? "").trim());
-  return m ? Number(m[1]) : null;
-}
+// readCrs/crsEquivalent/epsgNumber moved to geo/crs.js — they are pure (no GDAL), and keeping them
+// here made every consumer of io/parse.js pull gdal3.js's glue into the initial bundle. Re-exported
+// so this module's own contract is unchanged for anything already importing them from here.
+import { readCrs, crsEquivalent, epsgNumber } from "./crs.js";
+export { readCrs, crsEquivalent, epsgNumber };
 
 // GDAL is initialised lazily — on the first reprojection that actually needs it — so a widget
 // that never loads an unusual-projection raster does not pay the ~38 MB wasm/data download.

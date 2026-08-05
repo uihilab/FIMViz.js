@@ -156,9 +156,17 @@ export class ColorScale {
    * @param {Array<{value?: number, range?: [number,number], min?: number, max?: number, color: string, label?: string}>|null} [opts.stops] - explicit stops; presence switches to explicit mode
    * @param {string} [opts.unit]
    * @param {'palette'|'custom'|'gdal'|null} [opts.source]
+   * @param {string|null} [opts.missingColor] - the colour for a value that ISN'T one: `null`/`undefined`/
+   *   `NaN`/`''`. `null` (the default) means "no colour" — the consumer decides what absent looks
+   *   like (a vector layer leaves the feature at its base style; a raster leaves the pixel
+   *   transparent). Set it to render missing data explicitly, e.g. a grey "no data" swatch.
    */
   constructor({ palette = "blues", min = 0, max = 1, continuous = false,
-                stops = null, unit = "", source = null } = {}) {
+                stops = null, unit = "", source = null, missingColor = null } = {}) {
+    // Deliberately NOT part of the three mutually-exclusive colouring modes: it answers a question
+    // none of them can ("what colour is a value that doesn't exist?"), so switching palette/stops/
+    // colorStops leaves it alone.
+    this.missingColor = missingColor;
     this.palette = assertPalette(palette);   // PALETTES key or a custom color array (validated)
     this._min = min;
     this._max = max;
@@ -185,6 +193,26 @@ export class ColorScale {
   static fromGdalLegend(legend, unit = "") {
     return new ColorScale({ stops: legend, unit, source: "gdal" });
   }
+
+  // ---- the palette registry, as statics on the type it serves -------------------------------
+  //
+  // A palette is a ColorScale's ramp and has no meaning without one, so this is where a consumer
+  // meets the registry rather than as loose barrel functions. `palettes()` subsumes the old
+  // paletteNames() + hasPalette() pair: a list answers both ("is x available" is `.includes(x)`).
+
+  /**
+   * Add a palette by name. `colors`: >= 2 hex strings.
+   * @param {string} name
+   * @param {string[]} colors
+   * @returns {void}
+   */
+  static registerPalette(name, colors) { return registerPalette(name, colors); }
+
+  /**
+   * Every palette name available to `{ palette }` — the built-ins plus anything registered.
+   * @returns {string[]}
+   */
+  static palettes() { return paletteNames(); }
 
   // ---- GDAL legend XML parser (host-registered) ----
   //
@@ -389,7 +417,7 @@ export class ColorScale {
    * @returns {ColorScale}
    */
   set(patch = {}) {
-    const KNOWN = ["palette", "min", "max", "continuous", "unit", "stops", "colorStops"];
+    const KNOWN = ["palette", "min", "max", "continuous", "unit", "stops", "colorStops", "missingColor"];
     const unknown = Object.keys(patch).filter((k) => !KNOWN.includes(k));
     if (unknown.length) {
       throw new Error(
@@ -408,6 +436,7 @@ export class ColorScale {
         this._setDomain("min" in patch ? patch.min : this._min, "max" in patch ? patch.max : this._max);
       }
       if ("unit" in patch) this.unit = patch.unit;
+      if ("missingColor" in patch) this.missingColor = patch.missingColor || null;
     } finally {
       this._listeners = listeners;
     }

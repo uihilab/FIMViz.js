@@ -7,7 +7,7 @@
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { Layer, RasterLayer, VectorLayer } from "../src/package/layer.js";
+import { Layer, RasterLayer, VectorLayer, registerLayerType, getLayerTypes } from "../src/package/layer.js";
 import { ColorScale } from "../src/package/colorScale.js";
 import { Dataset } from "../src/package/dataset.js";
 import { Stats } from "../src/package/stats.js";
@@ -721,5 +721,281 @@ describe("layer.toSpec() → map2.addLayer(spec) — transfer without cloning", 
     assert.notEqual(copy, cs, "a new instance, not the same object");
     copy.set({ palette: "heat" });
     assert.equal(cs.palette, "viridis", "the original is untouched");
+  });
+});
+
+describe("getLayerTypes() — the public read of the layer-type registry", () => {
+  test("lists the built-ins, and anything a host registers", () => {
+    const before = getLayerTypes();
+    assert.ok(Array.isArray(before));
+    // layer.js registers these two itself; the rest self-register from their own modules on import.
+    assert.ok(before.includes("vector"), "the one generic type the engine always registers");
+    assert.ok(before.includes("raster"));
+
+    registerLayerType("test-only-type", () => new Layer({ type: "test-only-type" }));
+    assert.ok(getLayerTypes().includes("test-only-type"), "a host's own type shows up");
+    assert.equal(getLayerTypes().length, before.length + 1);
+  });
+
+  test("returns a copy — mutating the result cannot corrupt the registry", () => {
+    const list = getLayerTypes();
+    list.push("not-real");
+    assert.ok(!getLayerTypes().includes("not-real"));
+  });
+});
+
+describe("VectorLayer: colours features by a property through a ColorScale", () => {
+  // The same ColorScale a raster uses. Nothing in it is pixel-specific — it maps a value to a
+  // colour — so a feature property is as good a source of that value as a pixel is.
+  const styleCalls = [];
+  registerMapProvider("vector-style-spy", {
+    create: () => ({}),
+    addVector: (map, geojson, opts) => { styleCalls.push(opts.style); return { h: styleCalls.length }; },
+    removeVector: () => {},
+    fitBounds: () => {},
+  });
+  const map = { map: {}, app: { config: { provider: "vector-style-spy" } }, _unregisterLayer() {} };
+
+  const feat = (depth) => ({
+    type: "Feature", properties: depth === undefined ? {} : { depth },
+    geometry: { type: "Polygon", coordinates: [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]] },
+  });
+  const fc = { type: "FeatureCollection", features: [feat(0), feat(5), feat(10), feat(undefined)] };
+  const vecDs = () => new Dataset({ name: "v", kind: "vector", format: "geojson", crs: "EPSG:4326", data: fc });
+  const scale = () => new ColorScale({ palette: "blues", min: 0, max: 10, continuous: true });
+
+  const mk = (extra = {}) => {
+    styleCalls.length = 0;
+    return new VectorLayer({ map, type: "geojson", sources: [vecDs()], ...extra });
+  };
+
+  test("with no scale the style stays a plain object — unchanged behaviour", () => {
+    const layer = mk();
+    layer.render({ style: { fillColor: "#abc" } });
+    assert.deepEqual(styleCalls[0], { fillColor: "#abc" }, "no function, no grading");
+  });
+
+  test("scale + colorBy makes the provider style a per-feature function", () => {
+    const layer = mk({ colorScale: scale(), colorBy: "depth" });
+    layer.render();
+    const style = styleCalls[0];
+    assert.equal(typeof style, "function", "the provider seam's per-feature style form");
+
+    const lo = style({ feature: fc.features[0], index: 0 });
+    const hi = style({ feature: fc.features[2], index: 2 });
+    assert.ok(lo.fillColor && hi.fillColor);
+    assert.notEqual(lo.fillColor, hi.fillColor, "different values get different colours");
+    assert.equal(lo.fillColor, lo.strokeColor, "fill and stroke both follow the value");
+  });
+
+  test("a feature missing the property keeps the base style rather than a made-up colour", () => {
+    const layer = mk({ colorScale: scale(), colorBy: "depth" });
+    layer.render({ style: { fillColor: "#base", strokeWidth: 3 } });
+    const style = styleCalls[0];
+    const missing = style({ feature: fc.features[3], index: 3 });
+    assert.equal(missing.fillColor, "#base", "not graded");
+    const graded = style({ feature: fc.features[1], index: 1 });
+    assert.equal(graded.strokeWidth, 3, "the flat style still merges under the graded colour");
+    assert.notEqual(graded.fillColor, "#base", "…but the colour is the scale's");
+  });
+
+  test("missingColor paints the no-value features when the scale declares one", () => {
+    const cs = new ColorScale({ palette: "blues", min: 0, max: 10, continuous: true, missingColor: "#cccccc" });
+    const layer = mk({ colorScale: cs, colorBy: "depth" });
+    layer.render({ style: { fillColor: "#base" } });
+    const style = styleCalls[0];
+    assert.equal(style({ feature: fc.features[3], index: 3 }).fillColor, "#cccccc",
+      "explicitly rendered as 'no data', not left looking like the base style");
+    assert.notEqual(style({ feature: fc.features[1], index: 1 }).fillColor, "#cccccc",
+      "a real value is still coloured by the ramp");
+
+    // Settable after the fact, through the same one-knob path, and it survives a mode switch:
+    // it answers a question none of the three colouring modes can.
+    layer.set({ missingColor: "#ff0000" });
+    layer.set({ palette: "viridis" });
+    assert.equal(layer.colorScale.missingColor, "#ff0000");
+    layer.set({ missingColor: null });
+    assert.equal(layer.colorScale.missingColor, null, "back to 'let the consumer decide'");
+  });
+
+  test("colorBy alone (or a scale alone) does not grade — both are needed", () => {
+    const onlyBy = mk({ colorBy: "depth" });
+    onlyBy.render();
+    assert.notEqual(typeof styleCalls[0], "function");
+
+    const onlyScale = mk({ colorScale: scale() });
+    onlyScale.render();
+    assert.notEqual(typeof styleCalls[0], "function");
+  });
+
+  test("getLegend() works on a vector layer, like it does on a raster", () => {
+    const layer = mk({ colorScale: scale(), colorBy: "depth" });
+    const legend = layer.getLegend();
+    assert.ok(legend, "a Legend, derived from the same scale");
+    assert.ok(legend.stops.length > 0);
+    assert.equal(mk().getLegend(), null, "null until a scale is attached");
+  });
+
+  test("editing the scale restyles a live layer and emits 'restyle'", () => {
+    const layer = mk({ colorScale: scale(), colorBy: "depth" });
+    layer.render();
+    let restyled = 0;
+    layer.on("restyle", () => { restyled++; });
+
+    styleCalls.length = 0;
+    layer.colorScale.set({ palette: "viridis" });
+    assert.equal(restyled, 1, "one event for the whole patch");
+    assert.equal(styleCalls.length, 1, "the overlay was re-added through the new resolution");
+  });
+
+  test("set({ colorScale, colorBy }) routes through settings, and rejects a non-ColorScale", () => {
+    const layer = mk();
+    layer.set({ colorScale: scale(), colorBy: "depth" });   // settings.set is synchronous
+    assert.equal(layer.colorBy, "depth");
+    assert.ok(layer.colorScale);
+    // The same guard the raster path has: a palette NAME here is the classic mistake, and it must
+    // fail loudly instead of half-attaching.
+    assert.throws(() => layer.set({ colorScale: "viridis" }), /expected a ColorScale instance/);
+    assert.ok(layer.colorScale, "the previous scale is intact after the rejected write");
+  });
+
+  test("getStats() buckets byClass with the scale that is colouring the features", async () => {
+    const layer = mk({ colorScale: new ColorScale({ palette: "blues", min: 0, max: 10 }), colorBy: "depth" });
+    const s = await layer.getStats();
+    assert.equal(s.featureCount, 4, "every feature counts, graded or not");
+    assert.ok(Array.isArray(s.byClass) && s.byClass.length > 0);
+    const bucketed = s.byClass.reduce((n, c) => n + c.count, 0);
+    assert.equal(bucketed, 3, "the property-less feature lands in no bucket");
+    assert.equal((await mk().getStats()).byClass, undefined, "no scale, no byClass");
+  });
+});
+
+describe("Layer: chainable ops (immediate application, one render)", () => {
+  // The ops live on Dataset; these are the same ops reachable from the layer you already have.
+  // What is "immediate" is the SOURCE rewrite — the redraw still waits for render(), and the data
+  // still computes lazily at the terminal inside compute().
+  const grid = () => new RasterGrid({
+    pixels: Float32Array.from([1, 2, 3, 4]), width: 2, height: 2,
+    bounds: { north: 2, south: 0, east: 2, west: 0 }, crs: "EPSG:4326",
+  });
+  const rasterDs = () => Dataset.fromGrid(grid(), { name: "r" });
+  const bbox = { north: 1, south: 0, east: 1, west: 0 };
+
+  test("each op returns the layer, so they chain", () => {
+    const layer = new RasterLayer({ sources: [rasterDs()] });
+    const out = layer.clip(bbox).reclassify([{ min: 0, max: 10, value: 1 }]);
+    assert.equal(out, layer, "chainable");
+  });
+
+  test("sources are rewritten NOW — not queued until render", () => {
+    const layer = new RasterLayer({ sources: [rasterDs()] });
+    const before = layer.dataset;
+    layer.clip(bbox);
+    assert.notEqual(layer.dataset, before, "layer.dataset already reflects the op");
+    assert.equal(layer.dataset.kind, "raster");
+  });
+
+  test("an op invalidates the memoized compute and marks the layer dirty", async () => {
+    // A headless drawable: the real raster _draw() needs a canvas, and this is about the op
+    // bookkeeping, not pixels.
+    registerMapProvider("op-spy", { create: () => ({}), acceptsCRS: () => true });
+    class Drawable extends Layer { async _draw() {} }
+    const map = { map: {}, app: { config: { provider: "op-spy" } }, _unregisterLayer() {} };
+    const layer = new Drawable({ map, sources: [rasterDs()] });
+
+    await layer.compute();
+    assert.ok(layer.result, "computed once");
+    assert.equal(layer.dirty, false);
+
+    layer.clip(bbox);
+    assert.equal(layer.result, null, "the stale grid is dropped, so render() recomputes");
+    assert.equal(layer.dirty, true, "what is drawn no longer matches the sources");
+
+    await layer.render();
+    assert.equal(layer.dirty, false, "render() reconciles them");
+    assert.ok(layer.result, "and it recomputed on the way through");
+  });
+
+  test("data stays lazy — chaining computes nothing until a terminal", () => {
+    const ds = rasterDs();
+    const layer = new RasterLayer({ sources: [ds] });
+    layer.clip(bbox).mask([{ lat: 0, lng: 0 }, { lat: 0, lng: 1 }, { lat: 1, lng: 1 }]);
+    assert.equal(layer.dataset.isMaterialized, false, "the derived tail is unforced");
+    assert.equal(layer.result, null);
+  });
+
+  test("ops apply across ALL sources, so a multi-source layer stays aligned", () => {
+    const layer = new RasterLayer({ sources: [rasterDs(), rasterDs()] });
+    const before = [...layer.sources];
+    layer.clip(bbox);
+    assert.equal(layer.sources.length, 2);
+    for (let i = 0; i < 2; i++) assert.notEqual(layer.sources[i], before[i], `source ${i} was derived`);
+  });
+
+  test("a bad op throws AT THE CALL, leaving the layer untouched", () => {
+    const vecDs = new Dataset({ name: "v", kind: "vector", format: "geojson", crs: "EPSG:4326",
+      data: { type: "FeatureCollection", features: [] } });
+    const layer = new VectorLayer({ sources: [vecDs] });
+    const before = layer.dataset;
+    assert.throws(() => layer.clip(bbox), /raster-only op/, "the Dataset's own kind gate fires");
+    assert.equal(layer.dataset, before, "no partial application");
+    assert.equal(layer.dirty, false);
+  });
+
+  test("reset() returns to the sources the layer was built from", async () => {
+    const original = rasterDs();
+    const layer = new RasterLayer({ sources: [original] });
+    layer.clip(bbox).slope();
+    assert.notEqual(layer.dataset, original);
+
+    await layer.reset();
+    assert.equal(layer.dataset, original, "back to the pristine source, not the derived tail");
+    assert.equal(layer.dirty, false);
+    await layer.reset();   // idempotent
+    assert.equal(layer.dataset, original);
+  });
+
+  test("rasterize refuses to chain, and says what to do instead", () => {
+    const layer = new RasterLayer({ sources: [rasterDs()] });
+    assert.throws(() => layer.rasterize(), /changes a Dataset's kind/);
+    assert.throws(() => layer.rasterize(), /fim\.addLayer/, "names the alternative");
+  });
+
+  test("an op on a layer with no sources throws rather than silently doing nothing", () => {
+    assert.throws(() => new RasterLayer({}).clip(bbox), /has no source Dataset/);
+  });
+});
+
+describe("registries hang off the type they serve", () => {
+  // The barrel exports TYPES; the functions that act on a type are statics on it. One import (the
+  // class you already have) instead of loose top-level verbs whose owner was never in doubt.
+  test("Layer.registerType / Layer.types()", () => {
+    const before = Layer.types();
+    assert.ok(before.includes("vector") && before.includes("raster"));
+    Layer.registerType("static-registry-probe", () => new Layer({ type: "static-registry-probe" }));
+    assert.ok(Layer.types().includes("static-registry-probe"));
+    assert.equal(Layer.types().length, before.length + 1);
+  });
+
+  test("ColorScale.registerPalette / ColorScale.palettes()", () => {
+    assert.ok(ColorScale.palettes().includes("viridis"), "built-ins are listed");
+    assert.ok(!ColorScale.palettes().includes("probe-ramp"));
+    ColorScale.registerPalette("probe-ramp", ["#000000", "#ffffff"]);
+    assert.ok(ColorScale.palettes().includes("probe-ramp"));
+    // palettes() subsumes the old hasPalette(): a list answers "is it available" on its own.
+    const cs = new ColorScale({ palette: "probe-ramp", min: 0, max: 1 });
+    assert.ok(cs.getColor(0.5), "the registered ramp really colours");
+  });
+
+  test("Dataset.formats() / Dataset.registerMaterializer", async () => {
+    // (The built-in decoders come from importing io/materializers.js, which this file does not —
+    // materialize.test.mjs covers that. Here it is the registry contract itself.)
+    assert.ok(!Dataset.formats().includes("probe-fmt"));
+    Dataset.registerMaterializer("probe-fmt", async () => new RasterGrid({
+      pixels: Float32Array.from([1]), width: 1, height: 1,
+    }));
+    assert.ok(Dataset.formats().includes("probe-fmt"));
+    const ds = new Dataset({ name: "p", kind: "raster", format: "probe-fmt", data: new ArrayBuffer(0) });
+    assert.equal((await ds.grid()).width, 1, "the registered decoder is what forcing dispatches to");
   });
 });

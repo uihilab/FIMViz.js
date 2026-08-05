@@ -170,8 +170,8 @@ is the *why*, those are the *what*.
   table or hardcoded app value ends up in engine code, defended as "a marked domain adapter" or "the
   generic mechanism" — plausible-sounding categories that don't hold up. The fix pattern each time was the
   same: **the library owns the mechanism + an open registry; the app registers the specifics** (mirrors
-  `registerLayerType`/`registerMapProvider`/`registerMaterializer`). Applied to: `PALETTES` (closed table →
-  `registerPalette`/`hasPalette`/`paletteNames`, unknown-palette now throws with the available list instead
+  the layer-type, map-provider and materializer registries). Applied to: `PALETTES` (closed table → an
+  open registry, unknown-palette now throws with the available list instead
   of silently falling back to `blues`); `proxiedUrl` (deployment-specific host branching lives in a host's
   own config, reached via `config.resolveUrl`; the engine's `defaultResolveUrl` is
   **identity** — guessing a URL scheme produced a real `[::1]` loopback bug); domain data
@@ -199,7 +199,7 @@ is the *why*, those are the *what*.
   Per-instance UI modules (a `LayerPanel`/`RasterToolsPanel`) hold a real root and resolve through
   `scoped(root).byId(...)`.
 - **The engine names no host element, and reads no ambient DOM scope.** This was aspirational for a
-  long while — CLAUDE.md described `layers/` as "UI-clean … they import no UI" while `depthMap`,
+  long while — `layers/` was described as "UI-clean … they import no UI" while `depthMap`,
   `ensemble` and `floodDepth` were writing `#loading-indicator`, `#tif-depth-hover-value`,
   `#ExtentLegend`, `#droughtLegend`, `#depth-legend` and `#maptypes` by id. Two things were wrong with
   that: those ids are one deployment's chrome, so in any other host the engine silently did nothing
@@ -496,11 +496,21 @@ per-instance; the config/map work above does not incidentally solve it.
 ## 4. Known gaps
 
 - **Four extension idioms coexist with no stated rule for which applies when**: registry
-  (`registerLayerType`/`registerMapProvider`/`registerMaterializer`), injected factory (`createLayerPanel`
-  passed into `FimMap`), config hook (`config.resolveUrl`), and emitter (`package/events.js`). Each was
-  chosen for good reasons in its own spot (see §1's per-decision rationale), but no doc states *when a new
-  extension point should reach for which one* — worth writing down before a fifth idiom gets invented for
-  something one of the four already covers.
+  (`Layer.registerType`/`FimViz.registerMapProvider`/`Dataset.registerMaterializer`), injected factory
+  (`createLayerPanel` passed into `FimMap`), config hook (`config.resolveUrl`), and emitter
+  (`package/events.js`). Each was chosen for good reasons in its own spot (see §1's per-decision
+  rationale), but no doc states *when a new extension point should reach for which one* — worth writing
+  down before a fifth idiom gets invented for something one of the four already covers.
+
+  **Where a registry LIVES is settled, even though which idiom to pick isn't:** on the type it serves,
+  as a static. `Layer.registerType`/`Layer.types()`, `ColorScale.registerPalette`/`palettes()`,
+  `Dataset.registerMaterializer`/`formats()`/`registerReprojector`/`registerResampler`,
+  `FimViz.registerMapProvider`/`mapProviders()`/`registerRuntime`. The owner was never ambiguous in
+  any of these cases — a factory registered on the layer registry builds a `Layer`, a palette is a
+  `ColorScale`'s ramp — so the barrel exports the **types** and the verbs hang off them, rather than
+  ~15 loose top-level functions a reader has to associate by prefix. `registerBuiltinMaterializers`
+  is the one exception, and for a structural reason: it lives in `io/materializers.js`, which imports
+  geotiff, and `Dataset` must never reach that.
 
 ## 5. Incomplete / deferred work
 
@@ -559,33 +569,37 @@ here.
 - **The object model's shape (UML, ownership, per-class status):** [CLASS_DIAGRAM.md](./CLASS_DIAGRAM.md).
 - **Forward-looking roadmap (not yet started, larger additions):**
   [PACKAGE_ROADMAP.md](./PACKAGE_ROADMAP.md).
-- **Source layout / module ownership map:** [CLAUDE.md](../CLAUDE.md).
 
-## Doc/reality gaps: documented names that are not barrel exports
+## What is public, and the one test for it (resolved)
 
-*(Moved out of `docs/usage/test.md`, which is user-facing.)*
+The usage docs used to name thirteen functions the barrel didn't export — readable as promises the
+package wasn't making. Resolved by asking one question per name, **not** by exporting them all: *does
+a consumer have a use for this that the public API doesn't already serve?*
 
-Two places where a usage doc's table names something that isn't actually reachable off the public
-barrel — worth knowing when a snippet above reaches for an indirect proxy instead of calling the
-named thing directly:
+Only one passed. **`Dataset.formats()`** is now barrel-exported: "which formats can I decode
+right now" has no other answer, and a host needs it to build a file picker's `accept` list or to
+validate an upload before parsing. **`Layer.types()`** was added — a *new* name, not one of the
+thirteen — replacing the proposed `hasLayerType` export, because `type` is overloaded in this
+codebase (a registry key for `addLayer`, and separately `layer.type`'s subtype discriminator, with
+`'depth'`/`'ensemble'` meaning different things in each); a list named after the registry can't be
+misread the way a `hasLayerType(type)` predicate could.
 
-- **`providerRequiresApiKey(name)`** — documented in [APP_STARTUP_ADVANCED.md](./APP_STARTUP_ADVANCED.md)'s
-  map-provider seam table, but `package/lib.js` only re-exports `createMap`/`registerMapProvider`/
-  `mapProviderNames`/`providerAcceptsCRS` from `mapProvider.js` — `providerRequiresApiKey` itself is
-  used internally by `mount.js` and never reaches the barrel. §3 above exercises the same behavior
-  through `mount()`'s own `config-invalid` error instead.
-- **`styleToGoogle`/`styleToLeaflet`/`featuresOf`/`resolveFeatureStyle`** — documented in
-  [APP_STARTUP_ADVANCED.md](./APP_STARTUP_ADVANCED.md)'s neutral vector style vocabulary section as
-  standalone functions, but none of the four are barrel-exported either — `mapProvider.js` uses them
-  internally. §3 above exercises the same translation indirectly through a real `VectorLayer.render({style})`.
-- **`hasLayerType`/`createLayer`/`dispatchMapEventToLayers`/`geomContains`** — [LAYERS.md](./LAYERS.md)
-  documents these as part of "the type registry" / "map-event dispatch", but `lib.js` only
-  re-exports `Layer`/`RasterLayer`/`VectorLayer`/`registerLayerType` from `layer.js` — the other four
-  are internal, called by `fimMap.js`/`fim.addLayer` rather than reachable standalone. §4 above
-  exercises them through `fim.addLayer(...)`/`fim.enableMapEvents()` instead.
+Everything else stayed internal and the docs now say so:
 
-None of these are bugs — each one is exactly the kind of "internal mechanism vs. public barrel
-surface" split the codebase is built around (see `CLAUDE.md`'s "Public export surface" section); the
-docs describe the *mechanism* accurately, they just don't all promise a *standalone* export. Worth a
-follow-up pass to either barrel-export the missing few (if a consumer actually needs them directly)
-or soften the docs' tables to say "internal, exercised only through `fim.*`" where that's the reality.
+- **`getMaterializer`/`getReprojector`/`resolveReprojector`** — they hand back the *implementation*,
+  which is what the seam already dispatches to. A caller who wants a decode calls `ds.load()`; one
+  who wants a warp calls `ds.reproject(crs)`. Nothing is left for the handle to do.
+- **`providerRequiresApiKey`** — its only use was a provider-picker deciding whether to show a key
+  field, and `mount()` already throws `config-invalid` naming the missing key. Retired along with
+  the google default (`provider` now defaults to `'leaflet'`, which needs no key at all).
+- **`styleToGoogle`/`styleToLeaflet`/`featuresOf`/`resolveFeatureStyle`** — provider-implementation
+  detail. `VectorLayer` applies them; a third-party provider author reads `mapProvider.js`, which
+  carries the full contract and two worked implementations.
+- **`hasLayerType`/`createLayer`/`dispatchMapEventToLayers`/`geomContains`** — reached through
+  `fim.addLayer(...)` / `fim.enableMapEvents()`. For a point-in-polygon test of one's own, the public
+  equivalent is `SpatialFilter.contains(lat, lng)`.
+
+**The standing rule:** a name reaches the barrel when it answers a question the public API can't, not
+because it happens to be exported from its module. Everything remains reachable through
+`fimviz/src/*` for anyone who really needs it — with no types and no stability promise, which is the
+honest signal that they are off the supported path.

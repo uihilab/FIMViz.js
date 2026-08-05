@@ -1,9 +1,16 @@
 # Headless UI module — usage reference
 
-The headless UI module (barrel-exported alongside the engine) is
-a **separate, opt-in** module the engine core never imports. Every piece touches the DOM only inside
+A **separate, opt-in** module the engine core never imports. Every piece touches the DOM only inside
 functions (never at import time), and calls no `window.foo()` — the engine emits, these subscribe.
 Mount whichever pieces you want; none of them are required for the engine to work.
+
+Everything below imports from **`fimviz/ui`**, its only home — the engine barrel does not re-export
+it. That entry carries just the small pure deps these need (~17 KB, no geotiff/Maps loader/GDAL), and
+having exactly one entry means an app can never load two copies with two sets of state:
+
+```js
+import { createToast, connectToast, createToolsPanel } from 'fimviz/ui';
+```
 
 ## Contents
 
@@ -74,7 +81,9 @@ A view over `layer.settings` — each control's change calls `layer.settings.set
 ```js
 rasterControls(layer)   // PURE, node-testable — the control spec for a RasterLayer:
                           // palette + continuous (only if layer.colorScale is attached), opacity, hover
-vectorControls(layer)    // PURE — for a VectorLayer: color, opacity
+vectorControls(layer)    // PURE — for a VectorLayer: opacity, plus EITHER a flat colour, OR (when the
+                          // layer grades features via colorScale + colorBy) the same palette +
+                          // continuous controls rasterControls emits — they write the same ColorScale
 
 createToolsPanel(root, { layer, controls?, pretty? })
 // controls: overrides the preset — an array, or (layer) => Control[]

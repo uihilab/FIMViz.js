@@ -21,5 +21,6 @@
 - [createLayer](functions/createLayer.md)
 - [dispatchMapEventToLayers](functions/dispatchMapEventToLayers.md)
 - [geomContains](functions/geomContains.md)
+- [getLayerTypes](functions/getLayerTypes.md)
 - [hasLayerType](functions/hasLayerType.md)
 - [registerLayerType](functions/registerLayerType.md)

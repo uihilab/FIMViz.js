@@ -5,7 +5,7 @@ primitives, the `ColorScale`/`Legend`/`Stats`/`Filter` read-models, a `Layer` mo
 map-provider seam (Google Maps or Leaflet) for creating a map and rendering vector layers. It
 ships **no UI** — no widget markup, no CSS, no panels. A full widget (Layer Panel, flood-extent
 slider, comparison tools, HAZUS damage UI) is a separate host runtime built *on top of* this
-engine via `registerRuntime()`; it is not part of this package.
+engine via `FimViz.registerRuntime()`; it is not part of this package.
 
 > **Not yet published to the public npm registry.** To use it today, clone this repository and
 > either import from `src/package/lib.js` directly, or run `npm run build` and point your bundler
@@ -26,8 +26,7 @@ No runtime, no widget markup needed — `mount()` builds a real map itself via t
 ```js
 import { FimViz } from 'fimviz';
 
-const fim = await FimViz.mount('#fim', { apiKey: 'YOUR_GOOGLE_MAPS_KEY' });
-// fim.getMap() is a real google.maps.Map.
+const fim = await FimViz.mount('#fim', { provider: 'leaflet' });   // a real map — no API key needed
 
 const ds = await fim.addDataset(geojsonFileOrUrl);   // File | Blob | ArrayBuffer | URL → Dataset
 await fim.addLayer('vector', { source: ds });      // renders it via the map provider
@@ -37,10 +36,13 @@ await fim.addLayer('vector', { source: ds });      // renders it via the map pro
 <div id="fim" style="width: 100%; height: 600px;"></div>
 ```
 
-Pass `{ provider: 'leaflet' }` instead of `apiKey` for a Leaflet map — no key required:
+`provider` is **required** — the backends differ in credentials *and* capability, so the engine never
+picks one for you. `'leaflet'` needs nothing; `'google'` needs a key and is the only one with the
+full overlay tier (velocity, damage markers, ArcGIS depth tiles):
 
 ```js
-const fim = await FimViz.mount('#fim', { provider: 'leaflet' });
+const fim = await FimViz.mount('#fim', { provider: 'google', apiKey: 'YOUR_GOOGLE_MAPS_KEY' });
+// fim.getMap() is a real google.maps.Map.
 ```
 
 Vector layers render on either provider (a neutral style vocabulary —

@@ -31,9 +31,12 @@ const DEFAULTS = {
   // docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1 "the app policy leaking into library code" pattern.
   resolveUrl: null,
   // ---- map boot (read by package/mapProvider.js when no runtime is registered) ----
-  // Which backend creates the map. A registry, so a host can add one; "google" is built in and is the
-  // only one whose overlay tier is implemented. `apiKey` is required BY PROVIDER, not always.
-  provider: "google",
+  // Which backend creates the map. REQUIRED — there is deliberately no default. The providers differ
+  // in ways a guess cannot paper over: google needs an apiKey and carries the full overlay tier
+  // (velocity, damage markers, ArcGIS depth); leaflet needs no credentials and carries the map +
+  // vector + static-raster tiers only. Defaulting either way silently decides that for a host, so
+  // mount() throws `config-invalid` naming both options instead.
+  provider: null,
   center: null,        // { lat, lng } — provider default when null
   zoom: null,          // number      — provider default when null
   mapId: null,         // google: required for AdvancedMarkerElement

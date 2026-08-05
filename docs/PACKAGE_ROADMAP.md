@@ -93,6 +93,15 @@ exactly like `combine()` — no new grid math, reusing the already-tested N-ary 
 2-entry axis stub series (mean/sum/min/max, the lazy-not-forced guarantee, the empty-axis and
 unsupported-op error paths).
 
+✅ **Landed: the ops reach a Layer directly** — `layer.clip(bbox).mask(poly).reclassify(rules)` applies each
+op across every source **immediately** (synchronously, via the same `deriveSources` path), returns the
+layer so they chain, and draws once at the next `render()`; `layer.dirty` reports an applied-but-undrawn
+op and `layer.reset()` restores the pre-op sources. `Dataset.fromGrid(grid)` closes the loop the other way,
+wrapping an already-decoded grid as a pre-materialized Dataset so the chain is reachable from a bare grid.
+N-ary ops (`combine`/`difference`) are deliberately absent from the layer — "which source is the left
+operand" has no answer there — and `layer.rasterize()` throws, since a kind change cannot return the same
+layer.
+
 **Still open:** **polygonize** (raster→vector — the other half of "vectorize/rasterize"; unlike rasterize,
 this needs contour tracing (marching squares / connected-component boundary tracing), a materially
 different and larger algorithm than the point-in-polygon tests the rest of §2 reuses — deliberately not
@@ -106,7 +115,7 @@ GDAL-backed performance tier over the pure-JS path above, for rasters too large 
 **Problem.** `parseSource` handles geotiff/geojson/kml/kmz/shp; real hydrology/hydraulics work lives in
 domain and geospatial formats we can't yet ingest.
 
-**Design.** The materializer/parser registry already generalizes this: `registerMaterializer(format, fn)`
+**Design.** The materializer/parser registry already generalizes this: `Dataset.registerMaterializer(format, fn)`
 (generic geo formats, engine) + **domain adapters** (`parseFimScenario`-style, app-tier, per lab schema).
 Format detection extends `detectFormat`; browser parsing uses WASM (GDAL covers many) or a JS parser.
 
@@ -253,9 +262,9 @@ browser-only), not an engine preset.
 
 ## 6. Tree-shakeable subpaths (`fimviz/core`)
 
-**Problem.** The barrel forces every consumer to download the whole engine (CLAUDE.md's "public export
-surface" note). Tracing the actual import graph: `mount.js` (→ `FimViz`/`mount`/`parseFile`, which nearly
-every consumer imports) reaches `io/parse.js`, which statically imports `@tmcw/togeojson`, `shpjs`, `jszip`,
+**Problem, as originally traced.** The barrel forces every consumer to download the whole engine: `mount.js`
+(→ `FimViz`/`mount`/`parseFile`, which nearly
+every consumer imports) reaches `io/parse.js`, which statically imported `@tmcw/togeojson`, `shpjs`, `jszip`,
 `geotiff`, and `@turf/turf` — unconditionally, whether or not the consumer ever parses a file. Separately,
 `io/materializers.js` (reached because the barrel re-exports `registerBuiltinMaterializers` from it) **runs
 `registerBuiltinMaterializers()` at module scope** — a real side effect, which named-export tree-shaking
@@ -278,10 +287,24 @@ is the thing a `fimviz/core` entry would need to opt out of. `fimviz` (unchanged
 default for the common boot-a-map-and-parse-files case; `fimviz/core` is for a consumer building/rendering
 Datasets without the parse layer.
 
-**Not started.** No ✅ — this is a proposal, not a landed slice. Two subpaths, not per-class subpaths: a
-subpath per export multiplies webpack entries/`exports` map entries/docs roughly 15-20x for a payoff that
-only benefits a consumer wanting a sliver of the library — disproportionate for the coarse dependency
-boundary actually found above.
+**Not started, and the case for it is now much weaker** — because the payload problem was attacked at the
+*dependency* level instead, which needed no new entry point and no API change:
+
+- `readCrs`/`crsEquivalent`/`epsgNumber` moved out of `geo/gdal.js` into a pure `geo/crs.js`. They touch no
+  GDAL, but living in the module whose first line is `import initGdalJs from "gdal3.js"` put ~190 KB of glue
+  in every consumer's initial bundle. `geo/warp.js` now dynamic-`import()`s the warp for the same reason.
+- `shpjs` (→ `proj4` + `wkt-parser` + `mgrs`, ~300 KB) and `jszip` (~95 KB) load **on demand**, inside the
+  shapefile and `.kmz` branches of `parseSource`. The barrel's vendored `shp` became a thin async wrapper
+  rather than a static re-export, since one re-export would have undone the whole thing.
+- `@turf/turf` was already shaking down to `@turf/bbox`'s ~22 KB; only `geotiff` (~108 KB) and
+  `@tmcw/togeojson` (~34 KB) remain eager.
+
+**`dist/fimviz.js` went 678 KB → 201 KB (−71%)**, and what is left is roughly half our own source. A
+`fimviz/core` entry would now be carving up that half — a much smaller prize than the original tracing
+suggested, for a permanent second entry point, a second `exports` mapping, a docs split, and the
+"which subpath is this class in?" question every consumer then has to answer. Two subpaths (`fimviz` +
+`fimviz/ui`) remain the shipped shape; the barrel's *name* count was addressed separately by moving each
+registry onto the type it serves (`Layer.registerType`, `ColorScale.registerPalette`, …).
 
 ---
 
@@ -336,4 +359,4 @@ GDAL utilities beyond `gdalwarp` callers actually reach for.
 - **Keep the engine headless.** New heavy deps (HDF5, full-GDAL, netcdf) live behind registered seams in
   `io/`, never in `package/` — the rule that kept `Dataset` constructible without GDAL.
 - **Plugin boundary.** As the format/op/source lists grow, split them into optional entry points so the base
-  bundle stays small (tree-shakeable subpaths — tracked as future work in CLAUDE.md).
+  bundle stays small (tree-shakeable subpaths — §6 above).

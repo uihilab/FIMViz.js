@@ -13,6 +13,10 @@
 - [MapProviderImpl](interfaces/MapProviderImpl.md)
 - [NeutralStyle](interfaces/NeutralStyle.md)
 
+## Variables
+
+- [DEFAULT\_PROVIDER](variables/DEFAULT_PROVIDER.md)
+
 ## Functions
 
 - [createMap](functions/createMap.md)

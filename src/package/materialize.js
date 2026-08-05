@@ -62,6 +62,27 @@ export class VectorFeatures {
     this.crs = crs;
     this.meta = meta;
   }
+
+  /**
+   * The features as a plain array, whatever shape the payload arrived in — a FeatureCollection, a
+   * lone Feature, or an array. Without this, reading them means knowing which of those you got and
+   * writing `(await ds.features()).features.features` for the common case.
+   * @returns {Object[]} GeoJSON Features, in document order
+   */
+  toArray() {
+    const f = this.features;
+    if (!f) return [];
+    if (Array.isArray(f)) return f;
+    if (Array.isArray(f.features)) return f.features;
+    if (f.type === "Feature") return [f];
+    return [];
+  }
+
+  /** How many features this holds. @returns {number} */
+  get count() { return this.toArray().length; }
+
+  /** `for (const feature of await ds.features())`. @returns {Iterator<Object>} */
+  [Symbol.iterator]() { return this.toArray()[Symbol.iterator](); }
 }
 
 // ---- materializer registry: format -> async (root, ds) => RasterGrid | VectorFeatures ----

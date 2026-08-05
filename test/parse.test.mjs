@@ -53,7 +53,8 @@ describe("geo/gdal: CRS detection", () => {
 });
 
 describe("geo/gdal: encodeGridAsGeoTiff (the pure half of warpGrid — no wasm, Node-testable)", () => {
-  // warpGrid() itself needs GDAL wasm (browser-only — see CLAUDE.md), so it can't run here. This is
+  // warpGrid() itself needs GDAL wasm (browser-only — see docs/usage/USAGE.md "GDAL"), so it can't
+  // run here. This is
   // the part that's actually new/risky: turning a decoded grid BACK into real GeoTIFF bytes. Round-
   // tripping through geotiff.js's own READER (the same library, its own decode path) is the strongest
   // check available without a browser — it confirms the file is well-formed and the geo-referencing

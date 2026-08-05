@@ -41,15 +41,28 @@ export function rasterControls(layer) {
 }
 
 /**
- * PURE: the control spec for a vector layer — fill/stroke colour + fill opacity.
+ * PURE: the control spec for a vector layer — fill/stroke colour + fill opacity, plus the palette
+ * controls when the layer is grading features by a property (`colorScale` + `colorBy`). Those two
+ * keys are the SAME ones `rasterControls` emits, because they write the same `ColorScale` — so a
+ * host's palette picker is one control that fits either kind of layer.
  * @param {import('../package/layer.js').VectorLayer} layer
  * @returns {Control[]}
  */
 export function vectorControls(layer) {
-  return [
-    { type: "color", key: "color", label: "Colour", value: "#3388ff" },
-    { type: "range", key: "opacity", label: "Fill opacity", min: 0, max: 1, step: 0.05, value: layer.settings.get("opacity") ?? 1 },
-  ];
+  const controls = [];
+  if (layer.colorScale && layer.colorBy) {
+    controls.push({
+      type: "select", key: "palette", label: "Palette",
+      options: paletteNames().map((n) => ({ value: n, label: n })),
+      value: typeof layer.colorScale.palette === "string" ? layer.colorScale.palette : "",
+    });
+    controls.push({ type: "checkbox", key: "continuous", label: "Continuous", value: layer.colorScale.kind === "continuous" });
+  } else {
+    // No grading: one flat colour is the only thing that can apply.
+    controls.push({ type: "color", key: "color", label: "Colour", value: "#3388ff" });
+  }
+  controls.push({ type: "range", key: "opacity", label: "Fill opacity", min: 0, max: 1, step: 0.05, value: layer.settings.get("opacity") ?? 1 });
+  return controls;
 }
 
 /** PURE: pick the preset spec by layer shape (raster exposes valueAt; vector exposes featureAt). */

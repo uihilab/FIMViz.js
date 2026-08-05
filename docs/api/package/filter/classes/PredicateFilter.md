@@ -6,7 +6,7 @@
 
 # Class: PredicateFilter
 
-Defined in: package/filter.js:73
+Defined in: [package/filter.js:73](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/filter.js#L73)
 
 ## Extends
 
@@ -18,7 +18,7 @@ Defined in: package/filter.js:73
 
 > **new PredicateFilter**(`fn`): `PredicateFilter`
 
-Defined in: package/filter.js:75
+Defined in: [package/filter.js:75](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/filter.js#L75)
 
 #### Parameters
 
@@ -40,7 +40,7 @@ Defined in: package/filter.js:75
 
 > **fn**: (...`args`) => `boolean`
 
-Defined in: package/filter.js:75
+Defined in: [package/filter.js:75](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/filter.js#L75)
 
 #### Parameters
 
@@ -58,7 +58,7 @@ Defined in: package/filter.js:75
 
 > **isEmpty**(): `boolean`
 
-Defined in: package/filter.js:34
+Defined in: [package/filter.js:34](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/filter.js#L34)
 
 #### Returns
 
@@ -74,7 +74,7 @@ Defined in: package/filter.js:34
 
 > **test**(`unit`): `boolean`
 
-Defined in: package/filter.js:77
+Defined in: [package/filter.js:77](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/filter.js#L77)
 
 #### Parameters
 
@@ -96,7 +96,7 @@ Defined in: package/filter.js:77
 
 > `static` **all**(`filters`): [`Filter`](Filter.md)
 
-Defined in: package/filter.js:59
+Defined in: [package/filter.js:59](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/filter.js#L59)
 
 Combine filters as a conjunction (AND) — the semantics of chaining applyFilter().
 
@@ -120,7 +120,7 @@ Combine filters as a conjunction (AND) — the semantics of chaining applyFilter
 
 > `static` **from**(`input`): [`Filter`](Filter.md)
 
-Defined in: package/filter.js:45
+Defined in: [package/filter.js:45](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/filter.js#L45)
 
 Coerce any friendly input into a Filter.
   Filter        → returned as-is

@@ -128,8 +128,9 @@ $("boot").onclick = async () => {
   if (!apiKey) return log("✘ paste a Google Maps API key first", "bad");
   $("boot").disabled = true;
   try {
-    // No registerRuntime() — this is the bare-mount path. A real, empty map, none of the widget.
-    fim = await mount("#map", { apiKey, center: { lat: 33.1, lng: -96.8 }, zoom: 6 });
+    // No FimViz.registerRuntime() — this is the bare-mount path. A real, empty map, none of the widget.
+    // provider is mandatory; the depth tier is Google-only, hence 'google' + a key here.
+    fim = await mount("#map", { provider: "google", apiKey, center: { lat: 33.1, lng: -96.8 }, zoom: 6 });
     log(`✔ mounted — provider "${fim.app.config.provider || "google"}"`, "ok");
 
     // `busy` rides the HOST SINK (engine → app bus) — general engine plumbing, not depth-specific,

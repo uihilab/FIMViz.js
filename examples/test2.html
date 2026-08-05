@@ -15,11 +15,11 @@
     <script type="module">
     // Everything comes from the ONE public barrel — a consumer's exact import surface.
     import {
-      mount, mapProviderNames,
+      mount, FimViz,
       Dataset, warp, Storage,
       ColorScale, Legend, Stats,
       Filter, SpatialFilter, PredicateFilter,
-      paletteNames, RasterLayer,
+      RasterLayer,
     } from "../dist/fimviz.js";
 
     // ── console logger ────────────────────────────────────────────────────────
@@ -52,12 +52,12 @@
     });
     const fim2 = await mount("l", { isolated: true, provider: "leaflet", center, zoom });
     console.log("✓ google + leaflet mounted");
-    // await check("mapProviderNames()", () => mapProviderNames().join(", "));
+    // await check("FimViz.mapProviders()", () => FimViz.mapProviders().join(", "));
 
     // ══ 2. STYLE — ColorScale / Legend ═══════════════════════════════════════
     H("2 · style");
     const cs = new ColorScale({ palette: "viridis", min: 0, max: 10 });
-    await check("paletteNames()", () => paletteNames().join(", "));
+    await check("ColorScale.palettes()", () => ColorScale.palettes().join(", "));
     await check("ColorScale.getColor(5)", () => cs.getColor(5));
     await check("ColorScale.getRgb(5)", () => JSON.stringify(cs.getRgb(5)));
     await check("Legend.fromColorScale().stops", () => Legend.fromColorScale(cs).toJSON().stops.length + " stops");

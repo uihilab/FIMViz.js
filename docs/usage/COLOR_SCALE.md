@@ -19,6 +19,7 @@ A `RasterLayer` owns at most one `ColorScale`, attached via `layer.set({ colorSc
 [The three coloring modes](#the-three-coloring-modes) · [1. Palette mode](#1-palette-mode) ·
 [2. Classed / discrete stops](#2-classed--discrete-stops-setstops-and-per-band-edits) ·
 [3. Continuous color stops](#3-continuous-color-stops-setcolorstops) ·
+[Values that aren't values](#values-that-arent-values-missingcolor) ·
 [The override callback](#the-override-callback-colorfor) ·
 [Reacting to changes](#reacting-to-changes-onchangeoffchange) ·
 [Attaching to a layer](#attaching-to-a-layer) ·
@@ -49,7 +50,7 @@ continuous: true }) })`):
 
 ```js
 // palette — swap which colors the ramp uses; keeps the same domain/mode
-l1.set({ palette: 'viridis' });                          // a PALETTES name or registerPalette()'d custom name
+l1.set({ palette: 'viridis' });                          // any ColorScale.palettes() name, built-in or registered
 l1.set({ palette: ['#000033', '#3366ff', '#ffffff'] });  // or a custom hex color array (>= 2 colors)
 
 // continuous — same palette/domain, toggle smooth interpolation vs. discrete bands
@@ -129,6 +130,25 @@ error, as does a `values`/`colors` length mismatch.
 range) but the actual color mapping is driven entirely by the control points, not by min/max — the
 two are complementary: set both if you want a labeled axis range that differs from where the color
 control points themselves sit.
+
+## Values that aren't values (`missingColor`)
+
+The three modes above all answer "what colour is this number?". `missingColor` answers the one they
+can't: **what colour is a value that isn't there** — `null`, `undefined`, `NaN`, `''`, or a
+non-numeric property.
+
+```js
+new ColorScale({ palette: 'viridis', min: 0, max: 10, missingColor: '#cccccc' });
+cs.set({ missingColor: '#cccccc' });   // or after the fact — fires onChange like any other write
+cs.set({ missingColor: null });         // the default: no colour at all
+```
+
+`null` means **"the consumer decides what absent looks like"**, and each does something sensible: a
+`VectorLayer` leaves the feature at its base style, and a raster leaves the pixel transparent (a
+grid's `noData` is a separate, earlier decision — see [LAYER_SUBTYPES.md](./LAYER_SUBTYPES.md)).
+Set it when "no data here" is information the reader should see rather than a gap.
+
+Because it is orthogonal to the modes, switching palette/stops/colorStops leaves it in place.
 
 ## The override callback (`colorFor`)
 

@@ -22,22 +22,26 @@
 library source, then reload this page, to pick up the change.</p>
 
 <script type="importmap">
-{ "imports": { "fimviz": "../dist/fimviz.js" } }
+{ "imports": { "fimviz": "../dist/fimviz.js", "fimviz/ui": "../dist/ui.js" } }
 </script>
 
 <script type="module">
 // The core barrel only. depth/ensemble/velocity (src/layers/) are deliberately
 // absent from this bundle — see src/layers/index.js if you need those from a
 // console session; import it directly from source alongside this bundle.
-import * as FIM from "fimviz";
+import * as ENGINE from "fimviz";
+// The headless UI module is its own entry (the barrel does not re-export it), so the bench pulls
+// both to keep every documented name reachable from the console.
+import * as UI from "fimviz/ui";
 
+const FIM = { ...ENGINE, ...UI };
 window.FIM = FIM;
 window.FimViz = FIM.FimViz;
 // Every export is ALSO a bare global, so console snippets can call `mount(...)` etc. without the
 // FIM. prefix. A scratch bench, not a pattern to copy into an app.
-Object.assign(window, window.FIM);
+Object.assign(window, FIM);
 console.log("[fimviz] scratch bench ready — FIM.* (and bare globals) are live.",
-            Object.keys(window.FIM).length + " exports");
+            `${Object.keys(ENGINE).length} engine + ${Object.keys(UI).length} ui exports`);
 </script>
 
 </body>

@@ -136,9 +136,10 @@ describe("rendering on one map must not tear down another's layer", () => {
     const { depthLayerFor: dlf, removeUserDepthLayer } = await import("../src/layers/depthMap.js");
     const a = mounted("keep"), bb = mounted("render");
     const la = dlf(a);
-    // A stand-in for a drawn overlay. Needs setMap(): the google provider's
-    // removeRasterImage() calls it to detach the GroundOverlay.
-    la.overlay = { name: "A", setMap() {} };
+    // A stand-in for a drawn overlay. It answers BOTH providers' teardown calls — google's
+    // removeRasterImage() calls setMap(null) on the GroundOverlay, leaflet's calls remove() — so the
+    // test stays about instancing and does not silently depend on which provider is the default.
+    la.overlay = { name: "A", setMap() {}, remove() {} };
     let aRemoved = 0;
     la.on("removed", () => { aRemoved++; });
 

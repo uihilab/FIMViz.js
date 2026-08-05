@@ -16,7 +16,9 @@ import { fimError } from "./events.js";
 import { FimMap } from "./fimMap.js";
 import { getDefaultApp, createApp, FimViz as FimVizLifecycle } from "./fimViz.js";
 import { parseSource } from "../io/parse.js";
-import { createMap, providerRequiresApiKey } from "./mapProvider.js";
+import {
+  createMap, providerRequiresApiKey, registerMapProvider, mapProviderNames, providerAcceptsCRS,
+} from "./mapProvider.js";
 
 // Runtime seam (the boot inversion). The map-boot (bootstrap/getMountedMap/teardownMap), the
 // Layer-panel factory, and the widget markup are a host concern, NOT the headless core's. They are
@@ -94,6 +96,15 @@ export function create(target, options = {}) {
         "FimViz: an instance is already mounted (v0 supports one widget per page).");
     }
     app.configure(options);
+    // The provider is REQUIRED, with no default. google and leaflet differ in credentials AND in
+    // which overlay tiers they implement, so picking one for a host silently decides something it
+    // should state. Checked here, before the container/markup work, so the message arrives even
+    // when a runtime is registered and would otherwise boot the map itself.
+    if (!app.config.provider) {
+      throw fimError("config-invalid",
+        "FimViz: mount() requires a map provider — pass provider: 'leaflet' (no API key needed) " +
+        "or provider: 'google' with an apiKey.");
+    }
     // apiKey is required BY PROVIDER, not always: Google needs one, another backend may not.
     if (providerRequiresApiKey(app.config.provider) && !app.config.apiKey) {
       throw fimError("config-invalid",
@@ -232,7 +243,19 @@ export function parseFile(source, options = {}) {
 }
 
 // Namespaced surface matching the documented API (FimViz.mount / .create / .parseFile / …).
+//
+// The map-backend registry and the runtime seam hang off FimViz because FimViz is what BOOTS a map:
+// a provider is the thing `mount()` creates the map with, and a runtime is what it boots instead.
+// Both were loose barrel functions whose owner was never ambiguous.
 /**
  * @type {typeof FimVizLifecycle & {create: typeof create, mount: typeof mount, parseFile: typeof parseFile}}
  */
-export const FimViz = { ...FimVizLifecycle, create, mount, parseFile };
+export const FimViz = {
+  ...FimVizLifecycle, create, mount, parseFile,
+  registerRuntime,
+  registerMapProvider,
+  /** Every registered map backend. @returns {string[]} */
+  mapProviders: () => mapProviderNames(),
+  /** Can the named provider render content in `crs`? @param {string} name @param {string|null} crs @returns {boolean} */
+  providerAcceptsCRS: (name, crs) => providerAcceptsCRS(name, crs),
+};

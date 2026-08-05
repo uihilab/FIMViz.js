@@ -19,7 +19,7 @@
 //                it does not depend on the map SDK's asynchronous removal timing.
 
 import { createEmitter, emitHost } from "./events.js";
-import { getMapProvider, providerAcceptsCRS } from "./mapProvider.js";
+import { getMapProvider, providerAcceptsCRS, DEFAULT_PROVIDER } from "./mapProvider.js";
 import { Legend } from "./legend.js";
 import { Stats } from "./stats.js";
 import { gridToDataURL, rangeOf } from "./rasterImage.js";
@@ -28,6 +28,22 @@ import { LayerSettings, RasterSettings, VectorSettings } from "./layerSettings.j
 
 let _seq = 0;
 const nextId = () => `layer_${Date.now().toString(36)}_${(++_seq).toString(36)}`;
+
+/**
+ * Guard for every `set({ colorScale })` path (raster and vector alike). Validated BEFORE anything is
+ * mutated, so a bad argument — classically a palette-name string meant for `set({ palette })` —
+ * throws cleanly instead of leaving `layer.colorScale` half-set.
+ * @param {*} cs
+ * @returns {void}
+ */
+function assertColorScale(cs) {
+  if (cs != null && typeof cs.onChange !== "function") {
+    throw new Error(
+      `layer.set({ colorScale }): expected a ColorScale instance (or null), got ${typeof cs === "string" ? `the string "${cs}"` : typeof cs}. ` +
+      "Construct one first — new ColorScale({ palette: '...', min, max }) — or, to just change the " +
+      "palette on the already-attached scale, call layer.set({ palette: '...' }) instead.");
+  }
+}
 
 export class Layer {
   /**
@@ -55,6 +71,27 @@ export class Layer {
     // Dataset source (comparison's {pixels,meta}) is a harmless no-op.
     for (const ds of this.sources) this._map?._acquireDataset?.(ds);
   }
+
+  // ---- the layer-type registry, as statics on the type it serves ---------------------------
+  //
+  // `fim.addLayer(type, opts)` dispatches through this. It hangs off Layer because the owner was
+  // never in question — a factory registered here builds a Layer — and one import (the class you
+  // already have) beats two loose barrel functions.
+
+  /**
+   * Register the factory `fim.addLayer('<type>')` dispatches to.
+   * @param {string} type
+   * @param {(fim: import('./fimMap.js').FimMap, opts: Object) => Layer|Promise<Layer>} factory
+   * @returns {void}
+   */
+  static registerType(type, factory) { return registerLayerType(type, factory); }
+
+  /**
+   * Every type `addLayer` can currently construct — built-ins plus anything a host registered.
+   * REGISTRY KEYS, not `layer.type` values (see `getLayerTypes`).
+   * @returns {string[]}
+   */
+  static types() { return getLayerTypes(); }
 
   /** The owning FimMap. @returns {import('./fimMap.js').FimMap|null} */
   get map() { return this._map; }
@@ -162,6 +199,7 @@ export class Layer {
     }
     await this._draw({ ...opts, mode });
     this.visible = true;
+    this._dirty = false;   // what is drawn now matches the sources (see the chainable ops)
     if (this.exclusive) this._map?._claimExclusive?.(this);
     return this;
   }
@@ -216,6 +254,104 @@ export class Layer {
     return this.setSources(fn(this.sources), opts);
   }
 
+  // ---- chainable ops -----------------------------------------------------------------------
+  //
+  // The same Dataset ops, reachable from the layer you already have:
+  //
+  //     await layer.clip(bbox).mask(poly).reclassify(rules).render();
+  //
+  // THREE timings are at play here and only the first is what "immediate" refers to:
+  //   1. sources are rewritten  → NOW, synchronously, at each call (this is the choice);
+  //   2. the map redraws        → at the explicit render(), so a 4-op chain repaints once, not 4x;
+  //   3. data is computed       → unchanged: at a terminal, inside compute(). Dataset stays lazy.
+  //
+  // Immediate application is what keeps `layer.dataset`/`getStats()`/`fit()` truthful mid-chain and
+  // puts a bad argument's throw at the call that made it. Its cost is that a chain failing partway
+  // leaves the earlier ops applied — nothing is corrupted (every op is a pure new node), and
+  // `reset()` returns to the sources the layer was built from.
+  //
+  // Ops apply across ALL sources, so a comparison/ensemble layer clips every member. N-ary ops
+  // (combine/difference) are deliberately absent: "which source is the left operand" has no
+  // sensible answer on a layer — call them on the Datasets.
+
+  /**
+   * Apply one Dataset op across every source, immediately. Invalidates the memoized compute and
+   * marks the layer dirty; draws nothing until `render()`.
+   * @param {string} name - the op, for error messages
+   * @param {(ds: import('./dataset.js').Dataset) => import('./dataset.js').Dataset} fn
+   * @returns {Layer}
+   */
+  _op(name, fn) {
+    if (!this.sources.length) throw new Error(`layer.${name}(): the layer has no source Dataset`);
+    const prev = this.sources;
+    // Build ALL the derived nodes before touching anything: a kind mismatch (e.g. clip on a vector)
+    // throws here, at the call site, leaving the layer exactly as it was.
+    const next = prev.map((ds) => {
+      if (typeof ds?.[name] !== "function") {
+        throw new Error(`layer.${name}(): source "${ds?.name ?? "?"}" is not a Dataset with a ${name}() op`);
+      }
+      return ds[name] ? fn(ds) : ds;
+    });
+    if (this._origin == null) this._origin = prev;   // first op — remember what to reset() to
+    for (const ds of next) this._map?._acquireDataset?.(ds);
+    this.sources = next;
+    this.result = null;
+    this._dirty = true;
+    for (const ds of prev) this._map?._releaseDataset?.(ds);
+    return this;
+  }
+
+  /** Has an op been applied that the last render() has not drawn yet? @returns {boolean} */
+  get dirty() { return !!this._dirty; }
+
+  /**
+   * Point the layer back at the sources it held before its first op. Async and atomic, like any
+   * source swap — a live layer re-renders. A no-op if nothing has been applied.
+   * @param {Object} [opts] - { render?: 'auto'|'in-place'|'recreate' }
+   * @returns {Promise<Layer>}
+   */
+  async reset(opts = {}) {
+    if (this._origin == null) return this;
+    const origin = this._origin;
+    this._origin = null;
+    this._dirty = false;
+    return this.setSources(origin, opts);
+  }
+
+  /** Crop to a bbox. @param {{north:number,south:number,east:number,west:number}} bbox @returns {Layer} */
+  clip(bbox) { return this._op("clip", (ds) => ds.clip(bbox)); }
+  /** Pixels outside `polygon` (or inside, with `{invert:true}`) become noData. @param {*} polygon @param {Object} [opts] @returns {Layer} */
+  mask(polygon, opts) { return this._op("mask", (ds) => ds.mask(polygon, opts)); }
+  /** Remap pixel values by rules or a callback. @param {Array|Function} rules @param {Object} [opts] @returns {Layer} */
+  reclassify(rules, opts) { return this._op("reclassify", (ds) => ds.reclassify(rules, opts)); }
+  /** Resample onto an explicit target grid (does not reproject). @param {Object} target @param {Object} [opts] @returns {Layer} */
+  resampleTo(target, opts) { return this._op("resampleTo", (ds) => ds.resampleTo(target, opts)); }
+  /** Warp to `toCrs` — forced at render, GDAL loaded then. @param {string} toCrs @returns {Layer} */
+  reproject(toCrs) { return this._op("reproject", (ds) => ds.reproject(toCrs)); }
+  /** Slope (Horn's method). @param {Object} [opts] @returns {Layer} */
+  slope(opts) { return this._op("slope", (ds) => ds.slope(opts)); }
+  /** Downslope compass bearing. @returns {Layer} */
+  aspect() { return this._op("aspect", (ds) => ds.aspect()); }
+  /** Shaded relief. @param {Object} [opts] @returns {Layer} */
+  hillshade(opts) { return this._op("hillshade", (ds) => ds.hillshade(opts)); }
+  /** Resolve one selection-axis entry (the scenario-slider op). @param {number|string} coord @param {Object} [opts] @returns {Layer} */
+  select(coord, opts) { return this._op("select", (ds) => ds.select(coord, opts)); }
+  /** Collapse a selection axis to one grid. @param {string} [op] @param {Object} [opts] @returns {Layer} */
+  reduce(op, opts) { return this._op("reduce", (ds) => ds.reduce(op, opts)); }
+
+  /**
+   * NOT chainable, on purpose. `rasterize` changes a Dataset's kind (vector → raster), and this
+   * layer draws the kind it was built for — returning `this` would leave a VectorLayer pointing at a
+   * raster it cannot draw. Do it on the Dataset and add the result as its own layer.
+   * @returns {never}
+   */
+  rasterize() {
+    throw new Error(
+      "layer.rasterize() does not exist: rasterize changes a Dataset's kind (vector → raster), so it " +
+      "cannot return this layer. Build the raster as its own layer instead:\n" +
+      "    await fim.addLayer(layer.dataset.rasterize({ width, height }));");
+  }
+
   /**
    * Resolve the render update mode. An explicit 'in-place'/'recreate' wins; 'auto' asks provider
    * CAPABILITY (does it expose setRasterImageUrl?) + layer TYPE (does this layer render a swappable
@@ -225,7 +361,7 @@ export class Layer {
    */
   _resolveRenderMode(requested) {
     if (requested === "in-place" || requested === "recreate") return requested;
-    const providerName = this._map?.app?.config?.provider || "google";
+    const providerName = this._map?.app?.config?.provider || DEFAULT_PROVIDER;
     const provider = getMapProvider(providerName);
     const canSwap = typeof provider?.setRasterImageUrl === "function" && this._usesRasterImage();
     return canSwap ? "in-place" : "recreate";
@@ -245,7 +381,7 @@ export class Layer {
    * @returns {void}
    */
   _checkProviderCRS() {
-    const providerName = this._map?.app?.config?.provider || "google";
+    const providerName = this._map?.app?.config?.provider || DEFAULT_PROVIDER;
     for (const ds of this.sources) {
       const crs = ds?.crs;
       if (crs && !providerAcceptsCRS(providerName, crs)) {
@@ -398,7 +534,7 @@ export class RasterLayer extends Layer {
   /** Set overlay opacity (0..1), applied live via the provider (no redraw). Chainable. @param {number} v @returns {RasterLayer} */
   setOpacity(v) {
     this.opacity = v;
-    const provider = getMapProvider(this._map?.app?.config?.provider || "google");
+    const provider = getMapProvider(this._map?.app?.config?.provider || DEFAULT_PROVIDER);
     provider?.setRasterImageOpacity?.(this.overlay, v);
     return this;
   }
@@ -411,7 +547,7 @@ export class RasterLayer extends Layer {
    */
   hide() {
     if (this.overlay) {
-      const provider = getMapProvider(this._map?.app?.config?.provider || "google");
+      const provider = getMapProvider(this._map?.app?.config?.provider || DEFAULT_PROVIDER);
       provider?.setRasterImageOpacity?.(this.overlay, 0);
     }
     this.visible = false;
@@ -421,7 +557,7 @@ export class RasterLayer extends Layer {
   /** Re-show the overlay at its configured opacity. Chainable. @returns {RasterLayer} */
   show() {
     if (this.overlay) {
-      const provider = getMapProvider(this._map?.app?.config?.provider || "google");
+      const provider = getMapProvider(this._map?.app?.config?.provider || DEFAULT_PROVIDER);
       provider?.setRasterImageOpacity?.(this.overlay, this.opacity);
     }
     this.visible = true;
@@ -496,7 +632,7 @@ export class RasterLayer extends Layer {
     this.disableHover();
     const map = this._map?.map;
     if (!map) return this;
-    const provider = getMapProvider(this._map?.app?.config?.provider || "google");
+    const provider = getMapProvider(this._map?.app?.config?.provider || DEFAULT_PROVIDER);
     this.moveListener = provider.onMapMouseMove(map, ({ lat, lng }) => {
       let value = this.valueAt(lat, lng, { noDataTolerance });
       if (value != null && isEmpty?.(value)) value = null;
@@ -558,7 +694,7 @@ export class RasterLayer extends Layer {
     if (!grid || grid.kind !== "raster") return;   // compute() sets result = the decoded RasterGrid
     const originalLegend = this._resolveColorScale(grid);
     const fim = this._map;
-    const providerName = fim?.app?.config?.provider || "google";
+    const providerName = fim?.app?.config?.provider || DEFAULT_PROVIDER;
     const provider = getMapProvider(providerName);
     if (typeof provider?.addRasterImage !== "function") {
       throw new Error(`RasterLayer: the "${providerName}" provider has no addRasterImage`);
@@ -598,7 +734,7 @@ export class RasterLayer extends Layer {
   /** Fit the map to this raster's bounds (after render). @returns {RasterLayer} */
   fit() {
     const fim = this._map;
-    const provider = getMapProvider(fim?.app?.config?.provider || "google");
+    const provider = getMapProvider(fim?.app?.config?.provider || DEFAULT_PROVIDER);
     provider?.fitBounds?.(fim?.map, this.result?.bounds);
     return this;
   }
@@ -619,12 +755,7 @@ export class RasterLayer extends Layer {
    * @returns {RasterLayer}
    */
   _setColorScale(cs) {
-    if (cs != null && typeof cs.onChange !== "function") {
-      throw new Error(
-        `layer.set({ colorScale }): expected a ColorScale instance (or null), got ${typeof cs === "string" ? `the string "${cs}"` : typeof cs}. ` +
-        "Construct one first — new ColorScale({ palette: '...', min, max }) — or, to just change the " +
-        "palette on the already-attached scale, call layer.set({ palette: '...' }) instead.");
-    }
+    assertColorScale(cs);
     if (this.colorScale && this._onScaleChange) this.colorScale.offChange?.(this._onScaleChange);
     this.colorScale = cs || null;
     this._onScaleChange = null;
@@ -668,6 +799,78 @@ export class RasterLayer extends Layer {
 // (setting .dataLayer + a _teardown), so render() here is additive and does not disturb that path.
 export class VectorLayer extends Layer {
   /**
+   * @param {Object} [opts] - the base Layer options, plus:
+   * @param {import('./colorScale.js').ColorScale|null} [opts.colorScale] - value → colour for `colorBy`
+   * @param {string|null} [opts.colorBy] - the feature property whose value the scale reads
+   */
+  constructor(opts = {}) {
+    super(opts);
+    // The SAME ColorScale a RasterLayer uses. Nothing about the class is pixel-specific: it maps a
+    // value to a colour, and a feature property is as good a value as a pixel. What differs is only
+    // where the value comes from — hence `colorBy`, the property name to read per feature.
+    this.colorScale = null;
+    this.colorBy = opts.colorBy ?? null;
+    if (opts.colorScale) this._setColorScale(opts.colorScale);
+  }
+
+  /**
+   * Attach the ColorScale that colours features by `colorBy`. Its `onChange` drives a live restyle,
+   * the same seam RasterLayer uses for palette edits — the layer still names no UI.
+   * @internal Use `layer.set({ colorScale })`.
+   * @param {import('./colorScale.js').ColorScale|null} cs
+   * @returns {VectorLayer}
+   */
+  _setColorScale(cs) {
+    assertColorScale(cs);
+    if (this.colorScale && this._onScaleChange) this.colorScale.offChange?.(this._onScaleChange);
+    this.colorScale = cs || null;
+    this._onScaleChange = null;
+    if (cs) {
+      this._onScaleChange = () => {
+        this.emit("restyle", { colorScale: cs });
+        // A vector overlay has no in-place restyle in the provider contract, so a live layer is
+        // re-added with the new resolution — the same remove-then-add setStyle() already does.
+        if (this.visible && this._map?.map) this.setStyle({});
+      };
+      cs.onChange(this._onScaleChange);
+    }
+    return this;
+  }
+
+  /**
+   * The style handed to the provider. With a ColorScale + `colorBy` attached this is a per-feature
+   * FUNCTION — each feature's `properties[colorBy]` goes through the scale — merged over whatever
+   * flat style `setStyle()`/`render({style})` set, so an explicit `strokeWidth` still applies. With
+   * no scale (or no `colorBy`) it is just that flat style, exactly as before.
+   *
+   * A feature whose property is missing or non-numeric is coloured by the scale's `missingColor`
+   * when one is set, and otherwise keeps the base style — never a value from the ramp, since
+   * "no data for this feature" must not be able to look like a real reading.
+   * @returns {Object|Function|null}
+   */
+  _resolveStyle() {
+    const cs = this.colorScale;
+    const key = this.colorBy;
+    const base = (this._style && typeof this._style === "object") ? this._style : null;
+    if (!cs || !key) return this._style ?? null;
+    return ({ feature }) => {
+      const raw = feature?.properties?.[key];
+      const v = (raw == null || raw === "") ? NaN : Number(raw);
+      const color = Number.isFinite(v) ? cs.getColor(v) : (cs.missingColor || null);
+      return color ? { ...base, fillColor: color, strokeColor: color } : (base || {});
+    };
+  }
+
+  /**
+   * The display read-model, derived from the ColorScale (null until one is attached) — so a vector
+   * layer coloured by a property gets the same legend a raster does.
+   * @returns {import('./legend.js').Legend|null}
+   */
+  getLegend() {
+    return this.colorScale ? Legend.fromColorScale(this.colorScale) : null;
+  }
+
+  /**
    * Draw this layer's Dataset on the map via the owning FimMap's provider.
    * @param {{ style?: object }} [opts]  provider-native style (e.g. google.maps.Data style)
    * @returns {VectorLayer}
@@ -676,7 +879,7 @@ export class VectorLayer extends Layer {
     const fim = this._map;
     if (!fim?.map) throw new Error("VectorLayer.render: the layer has no mounted map");
 
-    const providerName = fim.app?.config?.provider || "google";
+    const providerName = fim.app?.config?.provider || DEFAULT_PROVIDER;
     const provider = getMapProvider(providerName);
     if (typeof provider?.addVector !== "function") {
       throw new Error(
@@ -689,8 +892,9 @@ export class VectorLayer extends Layer {
     if (!geojson) throw new Error("VectorLayer.render: the source Dataset has no GeoJSON data");
 
     this._style = opts.style ?? this._style ?? null;
-    this.dataLayer = provider.addVector(fim.map, geojson, { ...opts, style: this._style });
+    this.dataLayer = provider.addVector(fim.map, geojson, { ...opts, style: this._resolveStyle() });
     this.visible = true;
+    this._dirty = false;   // VectorLayer.render() is synchronous — it does not go through the base
     // Base remove() runs this before emitting 'removed'.
     this._teardown = () => provider.removeVector(fim.map, this.dataLayer);
     this.emit("rendered", { dataset: this.dataset });
@@ -700,7 +904,7 @@ export class VectorLayer extends Layer {
   /** Fit the map to this layer's Dataset bounds, via the provider. @returns {VectorLayer} */
   fit() {
     const fim = this._map;
-    const provider = getMapProvider(fim?.app?.config?.provider || "google");
+    const provider = getMapProvider(fim?.app?.config?.provider || DEFAULT_PROVIDER);
     provider?.fitBounds?.(fim.map, this.dataset?.bounds);
     return this;
   }
@@ -715,7 +919,7 @@ export class VectorLayer extends Layer {
   hide() {
     const fim = this._map;
     if (this.dataLayer && fim?.map) {
-      const provider = getMapProvider(fim.app?.config?.provider || "google");
+      const provider = getMapProvider(fim.app?.config?.provider || DEFAULT_PROVIDER);
       provider?.removeVector?.(fim.map, this.dataLayer);
       this.dataLayer = null;
     }
@@ -727,9 +931,9 @@ export class VectorLayer extends Layer {
   show() {
     const fim = this._map;
     if (!this.dataLayer && fim?.map) {
-      const provider = getMapProvider(fim.app?.config?.provider || "google");
+      const provider = getMapProvider(fim.app?.config?.provider || DEFAULT_PROVIDER);
       const geojson = this.dataset?.data;
-      if (geojson) this.dataLayer = provider.addVector(fim.map, geojson, { style: this._style });
+      if (geojson) this.dataLayer = provider.addVector(fim.map, geojson, { style: this._resolveStyle() });
     }
     this.visible = true;
     return this;
@@ -755,7 +959,13 @@ export class VectorLayer extends Layer {
     // already-parsed inline GeoJSON that render() draws from.
     let features = ds.data ?? null;
     if (!features && typeof ds.features === "function") features = await ds.features();
-    return features ? Stats.vector(features, opts) : null;
+    if (!features) return null;
+    // Default the classification to whatever is actually colouring the features, so `byClass` and
+    // the legend agree — the same guarantee RasterLayer.getStats() gives for pixels. Explicit opts
+    // still win.
+    return Stats.vector(features, {
+      classify: this.colorScale, classifyBy: this.colorBy, ...opts,
+    });
   }
 
   /**
@@ -766,9 +976,9 @@ export class VectorLayer extends Layer {
     const base = (this._style && typeof this._style === "object") ? this._style : {};
     this._style = { ...base, ...patch };
     if (this.visible && this._map?.map) {
-      const provider = getMapProvider(this._map.app?.config?.provider || "google");
+      const provider = getMapProvider(this._map.app?.config?.provider || DEFAULT_PROVIDER);
       if (this.dataLayer) provider.removeVector(this._map.map, this.dataLayer);
-      this.dataLayer = provider.addVector(this._map.map, this.dataset?.data, { style: this._style });
+      this.dataLayer = provider.addVector(this._map.map, this.dataset?.data, { style: this._resolveStyle() });
     }
     return this;
   }
@@ -864,6 +1074,18 @@ export function registerLayerType(type, factory) { _factories.set(type, factory)
  * @returns {boolean}
  */
 export function hasLayerType(type) { return _factories.has(type); }
+
+/**
+ * Every layer type `fim.addLayer(type, …)` can currently construct — the built-ins plus anything a
+ * host registered. The public query, mirroring `mapProviderNames()`/`materializerFormats()`.
+ *
+ * NOTE these are REGISTRY KEYS, not `layer.type` values. The two overlap confusingly: 'depth' and
+ * 'ensemble' appear here as constructible types AND as `RasterLayer.type` discriminators among
+ * sibling rasters ('extent'|'userRaster'|'depth'|'ensemble'), where they mean "which kind of raster
+ * is this", not "which factory built it". This function only ever answers the first question.
+ * @returns {string[]}
+ */
+export function getLayerTypes() { return [..._factories.keys()]; }
 
 /**
  * Construct a Layer of `type` for `fim`. `type` is normally a registry string ('vector', 'raster',

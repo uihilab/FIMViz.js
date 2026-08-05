@@ -22,19 +22,19 @@
   <script type="module">
     import { FimViz } from "fimviz";
 
+    // `provider` is MANDATORY — there is no default, since the two backends differ in both
+    // credentials and capability. Leaflet needs none, so this page boots without a key; add
+    // ?apiKey=… to boot Google instead.
     const apiKey = new URLSearchParams(location.search).get("apiKey");
-    if (!apiKey) {
-      document.getElementById("fim").innerHTML =
-        '<p id="hint">Open with <code>?apiKey=YOUR_GOOGLE_MAPS_KEY</code> to mount via ESM import.</p>';
-    } else {
-      // NOTE: the engine is headless and no runtime is registered here, so this takes the
-      // bare-map boot path — a real google.maps.Map with no FIMViz widget chrome (no Layer
-      // Panel, no flood layers). See docs/usage/USAGE.md "Booting the widget".
-      const w = FimViz.mount("#fim", { apiKey });
-      w.on("ready", () => console.log("[esm] ready"));
-      w.then((widget) => console.log("[esm] mounted", widget))
-        .catch((e) => console.error("[esm] failed", e.code, e.message));
-    }
+    const config = apiKey ? { provider: "google", apiKey } : { provider: "leaflet" };
+
+    // NOTE: the engine is headless and no runtime is registered here, so this takes the
+    // bare-map boot path — a real map with no FIMViz widget chrome (no Layer Panel, no flood
+    // layers). See docs/usage/USAGE.md "Booting the widget".
+    const w = FimViz.mount("#fim", config);
+    w.on("ready", () => console.log(`[esm] ready on ${config.provider}`));
+    w.then((widget) => console.log("[esm] mounted", widget))
+      .catch((e) => console.error("[esm] failed", e.code, e.message));
   </script>
 </body>
 </html>

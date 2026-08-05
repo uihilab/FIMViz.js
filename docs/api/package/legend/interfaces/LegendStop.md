@@ -6,7 +6,7 @@
 
 # Interface: LegendStop
 
-Defined in: package/legend.js:8
+Defined in: [package/legend.js:8](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/legend.js#L8)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: package/legend.js:8
 
 > **color**: `string`
 
-Defined in: package/legend.js:12
+Defined in: [package/legend.js:12](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/legend.js#L12)
 
 ***
 
@@ -22,7 +22,7 @@ Defined in: package/legend.js:12
 
 > `optional` **label?**: `string`
 
-Defined in: package/legend.js:13
+Defined in: [package/legend.js:13](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/legend.js#L13)
 
 ***
 
@@ -30,7 +30,7 @@ Defined in: package/legend.js:13
 
 > `optional` **max?**: `number`
 
-Defined in: package/legend.js:11
+Defined in: [package/legend.js:11](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/legend.js#L11)
 
 ***
 
@@ -38,7 +38,7 @@ Defined in: package/legend.js:11
 
 > `optional` **min?**: `number`
 
-Defined in: package/legend.js:10
+Defined in: [package/legend.js:10](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/legend.js#L10)
 
 ***
 
@@ -46,4 +46,4 @@ Defined in: package/legend.js:10
 
 > `optional` **value?**: `number`
 
-Defined in: package/legend.js:9
+Defined in: [package/legend.js:9](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/legend.js#L9)

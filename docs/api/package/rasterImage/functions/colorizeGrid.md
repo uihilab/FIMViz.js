@@ -8,7 +8,7 @@
 
 > **colorizeGrid**(`grid`, `opts?`): `Uint8ClampedArray`\<`ArrayBufferLike`\>
 
-Defined in: package/rasterImage.js:41
+Defined in: [package/rasterImage.js:41](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/rasterImage.js#L41)
 
 Colorize a RasterGrid to an RGBA buffer (PURE — no DOM). A pixel becomes transparent when it is
 NaN, equal to the grid's `noData`, optionally zero (`skipZero`), or unmapped by the scale. With no

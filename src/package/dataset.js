@@ -26,6 +26,8 @@
 import {
   RasterGrid, VectorFeatures,
   getMaterializer, resolveReprojector,
+  registerMaterializer, materializerFormats,
+  registerReprojector, registerDefaultReprojectorLoader,
 } from "./materialize.js";
 import {
   maskGrid, clipGrid, reclassifyGrid, combineGrids, zonalStats,
@@ -35,7 +37,7 @@ import {
 // rasterOps.js, which already imports it for combine()'s LHS-conform resampling. registerResampler
 // (the escape hatch for GDAL-only methods) and resampleGrid itself are also barrel-exported directly
 // (lib.js), so a caller can use either the Dataset op below or the raw function on pixel arrays.
-import { resampleGrid } from "../geo/resample.js";
+import { resampleGrid, registerResampler } from "../geo/resample.js";
 
 // A resample target is either resample.js's native meta shape already, or anything grid-shaped
 // (a RasterGrid, or another Dataset's already-forced .grid() result) — normalized the same way
@@ -157,6 +159,83 @@ export class Dataset {
       meta: opts.meta ?? {},
       resolveUrl: opts.resolveUrl ?? null,
     });
+  }
+
+  /**
+   * A Dataset around an ALREADY-DECODED grid (or VectorFeatures) — the way back into the op chain
+   * for something you decoded yourself, computed with the standalone grid functions, or built by
+   * hand. The result is pre-materialized: no decode, no fetch, no materializer needed, and
+   * `load()`/`grid()` return the value handed in.
+   *
+   * This is what makes "ops live on Dataset" a complete story rather than a one-way door: `ds.grid()`
+   * hands you a grid, and this hands it back so `clip`/`mask`/`slope`/… stay reachable.
+   *
+   * @param {import('./materialize.js').RasterGrid|import('./materialize.js').VectorFeatures} value
+   * @param {Object} [opts] - { name?, format?, meta? }; `kind`/`crs`/`bounds` come from the value
+   * @returns {Dataset}
+   */
+  // ---- the decode/warp seams, as statics on the type they serve ----------------------------
+  //
+  // These are Dataset's registries: what `load()`/`grid()` dispatch through. They live here rather
+  // than as loose barrel functions because the owner was never ambiguous — a materializer decodes
+  // FOR a Dataset, a reprojector warps ONE. Same functions as `package/materialize.js` exports;
+  // this is where a consumer meets them.
+
+  /**
+   * Register the decoder for a `format` (e.g. 'geotiff', 'nc').
+   * @param {string} format
+   * @param {(root: Object, ds: Dataset) => Promise<RasterGrid|VectorFeatures>} fn
+   * @returns {void}
+   */
+  static registerMaterializer(format, fn) { return registerMaterializer(format, fn); }
+
+  /**
+   * Every format that can be decoded right now — built-ins plus anything registered. Build a file
+   * picker's `accept` list from it, or check an upload before parsing.
+   * @returns {string[]}
+   */
+  static formats() { return materializerFormats(); }
+
+  /**
+   * Supply the ONE warp implementation `reproject()` forces through.
+   * @param {(grid: RasterGrid, toCrs: string) => Promise<RasterGrid>} fn
+   * @returns {void}
+   */
+  static registerReprojector(fn) { return registerReprojector(fn); }
+
+  /**
+   * A JIT fallback invoked at most once, on the first force that finds no reprojector registered —
+   * how the GDAL warp auto-loads with no setup call.
+   * @param {() => Promise<void>} fn
+   * @returns {void}
+   */
+  static registerDefaultReprojectorLoader(fn) { return registerDefaultReprojectorLoader(fn); }
+
+  /**
+   * Supply a resampler for the methods the pure-JS path doesn't implement (cubic/lanczos/…), which
+   * `resampleTo({ method })` otherwise throws on. Synchronous and pixel-level — GDAL's own richer
+   * methods go through the warp seam instead (see geo/resample.js).
+   * @param {Function} fn
+   * @returns {void}
+   */
+  static registerResampler(fn) { return registerResampler(fn); }
+
+  static fromGrid(value, opts = {}) {
+    if (!value || (value.kind !== "raster" && value.kind !== "vector")) {
+      throw new Error("Dataset.fromGrid: expected a RasterGrid or VectorFeatures (a decoded value with a .kind)");
+    }
+    const ds = new Dataset({
+      name: opts.name || "grid",
+      kind: value.kind,
+      // No source FORMAT: there are no encoded bytes here to decode, which is the whole point. A
+      // format would be a claim about bytes that do not exist.
+      format: opts.format ?? null,
+      crs: value.crs ?? null,
+      bounds: value.bounds ?? null,
+      meta: opts.meta ?? value.meta ?? {},
+    });
+    ds.#materialized = value;   // already forced: terminals return this without touching a seam
+    return ds;
   }
 
   /**

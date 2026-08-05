@@ -15,11 +15,16 @@
 
 import { bbox } from "@turf/turf";
 import { kml } from "@tmcw/togeojson";
-import JSZip from "jszip";
-import shp from "shpjs";
 import { fromArrayBuffer } from "geotiff";
-import { readCrs } from "../geo/gdal.js";
+import { readCrs } from "../geo/crs.js";
 import { Dataset } from "../package/dataset.js";
+
+// jszip (~95 KB) and shpjs (~16 KB, but it drags proj4 + wkt-parser + mgrs ≈ 300 KB) are loaded
+// ON DEMAND, not at module scope: only a caller who actually opens a .kmz or a zipped shapefile
+// pays for them. Both branches below are already async, so the dynamic import costs nothing else.
+// Every other format — geojson, geotiff, kml, csv, xyz — stays free of them entirely.
+const loadJSZip = () => import("jszip").then((m) => m.default ?? m);
+const loadShp = () => import("shpjs").then((m) => m.default ?? m);
 
 // geojson/kml/kmz/shp are WGS84 by specification (RFC 7946 / OGC KML); shpjs reprojects to it.
 const VECTOR_CRS = "EPSG:4326";
@@ -127,6 +132,7 @@ async function parseKML(blob, name) {
 }
 
 async function parseKMZ(blob, name) {
+  const JSZip = await loadJSZip();
   const zip = await JSZip.loadAsync(blob);
   let kmlText = null;
   for (const path of Object.keys(zip.files)) {
@@ -148,6 +154,7 @@ async function parseShapefile(blob, name) {
   // merge into one. A non-shapefile zip (e.g. a mixed bundle) rejects here with shpjs's error.
   let result;
   try {
+    const shp = await loadShp();
     result = await shp(await blob.arrayBuffer());
   } catch (e) {
     throw new Error(`parseFile: '${name}' is not a valid shapefile (.zip must contain ` +

@@ -205,7 +205,13 @@ export class RasterSettings extends LayerSettings {
  */
 export class VectorSettings extends LayerSettings {
   constructor(layer) {
-    super(layer, { opacity: 1, hover: false, color: null, useFileColors: false });
+    super(layer, {
+      opacity: 1, hover: false, color: null, useFileColors: false,
+      // Colour-by-property: the same ColorScale a raster uses, reading a feature property instead of
+      // a pixel. `colorBy` alone (or a scale alone) does nothing — both are needed to grade features,
+      // and until then `color` keeps applying flatly.
+      colorScale: null, colorBy: null, missingColor: null,
+    });
   }
   _apply(key, v) {
     const L = this._layer;
@@ -216,6 +222,20 @@ export class VectorSettings extends LayerSettings {
         L.setStyle?.({ fillOpacity: v }); return { redraw: false, emit: "restyle" };
       case "useFileColors":
         return { redraw: false, emit: "restyle" };
+      case "colorScale":
+        // Validates before mutating, then re-adds the overlay through the new resolution.
+        L._setColorScale?.(v); L.setStyle?.({}); return { redraw: false, emit: "restyle" };
+      case "colorBy":
+        L.colorBy = v || null; L.setStyle?.({}); return { redraw: false, emit: "restyle" };
+      // palette/continuous/missingColor route to the attached scale, exactly as they do on a raster
+      // — so one UI control writes the same knob whichever kind of layer it is bound to.
+      // missingColor is what a feature with no usable `colorBy` value is painted; leave it null to
+      // keep such features at their base style instead.
+      case "palette":
+      case "continuous":
+      case "missingColor":
+        if (!L.colorScale) return { redraw: false, emit: null };
+        L.colorScale.set({ [key]: v }); return { redraw: false, emit: "restyle" };
       case "hover":
         return { redraw: false, emit: null };
       default:

@@ -9,7 +9,7 @@ specific methods (RasterLayer/VectorLayer/ComparisonLayer/EnsembleAggregationLay
 ## Contents
 
 [Construction](#construction) · [Properties](#properties) · [Events](#events) ·
-[Lifecycle](#lifecycle) · [Render pipeline](#render-pipeline) ·
+[Lifecycle](#lifecycle) · [Render pipeline](#render-pipeline) · [Chainable ops](#chainable-ops) ·
 [Swapping sources](#swapping-sources) · [Settings](#settings-declarative-knobs) ·
 [Read-models](#read-models) · [Hit-testing](#hit-testing) ·
 [The type registry](#the-type-registry-how-fimaddlayer-dispatches) ·
@@ -134,6 +134,42 @@ await layer.render(opts?)    // compute (if needed) → CRS precondition → dra
 expose `setRasterImageUrl`?) and the layer type (`_usesRasterImage()`) — vector layers and providers
 without in-place swap always fall back to `'recreate'`.
 
+## Chainable ops
+
+The same [Dataset ops](./DATASET_OPERATIONS.md), reachable from the layer you already have. Each
+returns the layer, so they chain; one `render()` draws the result:
+
+```js
+await layer.clip(bbox).mask(polygon).reclassify(rules).render();
+await layer.reset();     // back to the sources the layer was built from
+```
+
+| Op | Notes |
+|---|---|
+| `clip(bbox)` `mask(polygon, opts?)` `reclassify(rules, opts?)` `resampleTo(target, opts?)` | raster ops, per [DATASET_OPERATIONS.md](./DATASET_OPERATIONS.md) |
+| `slope(opts?)` `aspect()` `hillshade(opts?)` | terrain |
+| `reproject(toCrs)` | the warp runs at `render()`, GDAL loads then |
+| `select(coord, opts?)` `reduce(op?, opts?)` | selection-axis ops — `select` is what a scenario slider drives |
+| `reset(opts?)` | **async** — restores the pre-op sources and re-renders a live layer |
+| `dirty` | getter: an op has been applied that the last `render()` hasn't drawn |
+
+**Three timings, and only the first is "immediate":**
+
+1. **Sources are rewritten now**, synchronously, at each call — so `layer.dataset`, `getStats()` and
+   `fit()` tell the truth mid-chain, and a bad argument throws at the call that made it rather than
+   several awaits later.
+2. **The map redraws at `render()`** — a four-op chain repaints once, not four times.
+3. **Data still computes lazily**, at a terminal inside `compute()`. Chaining forces nothing.
+
+Ops apply across **all** sources, so a comparison/ensemble layer clips every member. The cost of
+immediate application: a chain that throws partway leaves the earlier ops applied. Nothing is
+corrupted — every op is a pure new node — and `reset()` returns to the original sources.
+
+**Not available:** `combine`/`difference` (N-ary — "which source is the left operand" has no answer
+on a layer; call them on the Datasets), and `rasterize`, which changes a Dataset's *kind* and so
+can't return this layer. `layer.rasterize()` throws naming the alternative:
+`fim.addLayer(layer.dataset.rasterize({ width, height }))`.
+
 ## Swapping sources
 
 ```js
@@ -166,10 +202,11 @@ succeeded despite it. Which keys exist depends on the subtype — see
 ## Read-models
 
 ```js
-layer.getLegend()        // base: null. RasterLayer derives from its ColorScale.
+layer.getLegend()        // base: null. RasterLayer AND VectorLayer derive one from their ColorScale.
 await layer.getStats()   // base: null. RasterLayer classifies pixels by the attached ColorScale;
                          // VectorLayer counts features by geometry type (area/length/bbox) from its
-                         // GeoJSON source — works headless, before/without a render, any provider.
+                         // GeoJSON source — works headless, before/without a render, any provider —
+                         // and buckets byClass by its own colorScale/colorBy when both are set.
 ```
 
 ## Hit-testing
@@ -185,14 +222,23 @@ receive an event.
 ## The type registry (how `fim.addLayer` dispatches)
 
 ```js
-registerLayerType(type, factory)   // factory: (fim, opts) => Layer | Promise<Layer>
-hasLayerType(type)                  // boolean
-createLayer(fim, type?, opts?)      // the free function fim.addLayer(...) calls
+Layer.registerType(type, factory)   // factory: (fim, opts) => Layer | Promise<Layer>
+Layer.types()                     // string[] — every type addLayer can currently construct
 ```
 
 Built-in registered types: `'vector'`, `'raster'` (both in `layer.js`); `'comparison'`,
 `'ensembleAgreement'`, `'velocity'`, `'ensemble'`, `'depth'` self-register from their own modules on
-import.
+import. `Layer.types()` returns exactly those plus anything a host registered — a copy, so
+mutating it can't corrupt the registry.
+
+> **These are registry keys, not `layer.type` values.** `'depth'` and `'ensemble'` appear in both
+> vocabularies: here they name a *factory* `addLayer` can dispatch to, while `layer.type` uses them
+> as discriminators among sibling rasters (`'extent'`/`'userRaster'`/`'depth'`/`'ensemble'`) to say
+> *what kind of raster this is*. `Layer.types()` only ever answers the first question.
+
+`hasLayerType(type)` and `createLayer(fim, type?, opts?)` exist in `layer.js` but are **internal** —
+`fim.addLayer(...)` is the way in, and it already throws naming every registered type when one can't
+be resolved.
 
 `fim.addLayer(type?, opts?)` — `type` can be:
 - an explicit registry string (`'raster'`, `'vector'`, ...),
@@ -217,11 +263,16 @@ fim.namedLayers                     // Layer[] — every registered named layer
 fim.removeLayer(idOrLayer)          // → layer.remove()
 ```
 
-## Map-event dispatch (pure function, used by `FimMap`)
+## Map-event dispatch (internal — driven by `fim.enableMapEvents()`)
 
-```js
-dispatchMapEventToLayers(layers, type, base, { simultaneous? })
-// layers: Layer[] · type: e.g. 'click'/'hover' · base: {lat, lng}
-// Top-down z-order (last = top); each hit-tested layer gets it; default stops on the first absorber
-// (evt.stopPropagation()); simultaneous:true bypasses absorption — every hit layer gets it regardless.
-```
+`dispatchMapEventToLayers(layers, type, base, { simultaneous? })` in `layer.js` is the pure function
+behind hover/click routing, called by `FimMap`; `geomContains(geom, x, y)` is its point-in-geometry
+test. Neither is barrel-exported — turn dispatch on with `fim.enableMapEvents()` (see
+[APP_STARTUP_ADVANCED.md](./APP_STARTUP_ADVANCED.md)) and subscribe on the layer. The behaviour it
+implements is worth knowing either way:
+
+> Top-down z-order (last = top); every hit-tested layer is offered the event; by default propagation
+> stops at the first layer that absorbs it (`evt.stopPropagation()`), and
+> `fim.simultaneousLayerEvents = true` bypasses absorption so every hit layer receives it.
+
+For a point-in-polygon test of your own, use `SpatialFilter.contains(lat, lng)` — that one is public.

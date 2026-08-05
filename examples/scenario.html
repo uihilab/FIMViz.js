@@ -63,7 +63,7 @@
 <script type="module">
 // Everything below comes from the ONE public barrel — a consumer's exact import surface.
 import {
-  FimViz, mapProviderNames,
+  FimViz,
   Dataset, warp, Storage,
   ColorScale, Legend, Stats,
   Filter, SpatialFilter, PredicateFilter,
@@ -225,7 +225,7 @@ const neighborhoodStyle = ({ feature }) => {
     return `mounted; fim.map is a ${fimL.map?.constructor?.name ?? "?"}`;
   });
 
-  await step("mapProviderNames()", () => mapProviderNames().join(", "));
+  await step("FimViz.mapProviders()", () => FimViz.mapProviders().join(", "));
 
   // ── B. Ingest scenario data ───────────────────────────────────────────────────────────────
   section("B · Ingest");

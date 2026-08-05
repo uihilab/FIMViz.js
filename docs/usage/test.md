@@ -21,10 +21,16 @@ printed value yourself, same spirit as `examples/method-playground.html`.
 
 ## Setup
 
-These snippets assume a page that has booted a `FimMap` and exposed the package barrel on `window` —
-a real, booted `FimMap` as `window.fim` plus every export these snippets use callable directly. Any
-host page that does `import * as FIM from 'fimviz'; Object.assign(window, FIM)` and mounts a map will
-do; `examples/method-playground.html` is one such page you can open in a browser.
+These snippets assume a page that has booted a `FimMap` and exposed the package on `window` — a real,
+booted `FimMap` as `window.fim` plus every export these snippets use callable directly. Any host page
+that does `import * as FIM from 'fimviz'; import * as UI from 'fimviz/ui';
+Object.assign(window, FIM, UI)` and mounts a map will do — the UI module is a separate entry, so both
+imports are needed. `examples/console-test.html` and `examples/method-playground.html` are two such
+pages you can open in a browser.
+
+Registries are reached through the type that owns them (`Layer.registerType`,
+`ColorScale.registerPalette`, `Dataset.registerMaterializer`, `FimViz.registerMapProvider`, …), so
+those calls appear qualified below rather than as bare globals.
 
 Wait for `window.fim` to exist (`mount()` resolves asynchronously — the app's own `.then` sets it):
 
@@ -151,6 +157,17 @@ ds.id; ds.name; ds.kind; ds.format; ds.crs; ds.bounds; ds.meta;
 const rec = ds.toRecord();               // small — source + recipe, no decoded payload
 const rehydrated = Dataset.fromRecord(rec);
 rehydrated.toJSON();                      // {id,name,kind,format,crs,bounds,meta,axes}
+
+Dataset.formats();                        // every format decodable right now
+
+// fromGrid: the way back INTO the op chain from an already-decoded grid
+const wrapped = Dataset.fromGrid(grid, { name: 'from-grid' });
+wrapped.isMaterialized;                   // true — nothing to decode
+(await wrapped.clip(ds.bounds).grid()).width;
+
+// features() is iterable — no .features.features
+const vf = await dsVector.features();
+vf.count; vf.toArray().length; [...vf][0]?.type;
 ```
 
 `ds.download()` triggers a real file save — run it manually if you want to see the browser's save
@@ -180,12 +197,15 @@ await db.destroy();   // clean up — don't leave a stray IndexedDB database beh
 ```js
 const cs = new ColorScale({ palette: 'viridis', min: 0, max: 10, continuous: false, unit: 'm' });
 cs.getStops();
-PALETTES;                        // built-in names
-paletteNames();                  // built-in + registered
-hasPalette('viridis');           // true
-hasPalette('not-a-palette');     // false
-registerPalette('test-md-ramp', ['#000000', '#ffffff']);
-hasPalette('test-md-ramp');      // true
+ColorScale.palettes();                              // built-in + registered
+ColorScale.palettes().includes('viridis');          // true
+ColorScale.palettes().includes('not-a-palette');    // false
+ColorScale.registerPalette('test-md-ramp', ['#000000', '#ffffff']);
+ColorScale.palettes().includes('test-md-ramp');     // true
+
+cs.set({ missingColor: '#cccccc' });   // what an absent value (null/NaN/'') is painted
+cs.missingColor;                        // survives a mode switch — it is orthogonal to the 3 modes
+cs.set({ missingColor: null });         // back to "the consumer decides"
 ```
 
 ### `Legend` / `Stats` / Filters (full guides at [§8](#8-legendmd) and here)
@@ -214,7 +234,15 @@ const vlayer = await fim.addLayer('vector', { source: dsVector,
 vlayer.id; vlayer.type; vlayer.visible;
 vlayer.fit();
 vlayer.remove();
-```
+
+// Chainable ops — the Dataset ops applied to the layer's sources IMMEDIATELY, drawn once at render()
+const rlayer = await fim.addLayer('raster', { source: ds });
+rlayer.clip({ north: 90, south: -90, east: 180, west: -180 });
+rlayer.dirty;                    // true — applied but not yet drawn
+await rlayer.render();
+rlayer.dirty;                    // false
+await rlayer.reset();            // back to the pristine source
+rlayer.remove();
 
 ### From file to rendered layer
 
@@ -342,7 +370,7 @@ l1.remove();
 
 ```js
 f1.crs;                                        // whatever Brazos_RP100_depth.tif declares
-if (f1.crs && !providerAcceptsCRS(fim.config.provider, f1.crs)) {
+if (f1.crs && !FimViz.providerAcceptsCRS(fim.config.provider, f1.crs)) {
   const l2 = await fim.addLayer(f1.reproject('EPSG:4326'));   // lazy op; warp forced inside render()
   l2.remove();
 } else {
@@ -357,10 +385,10 @@ if (f1.crs && !providerAcceptsCRS(fim.config.provider, f1.crs)) {
 ### Map provider seam
 
 ```js
-mapProviderNames();                       // → ['google', 'leaflet'] on a stock build
-providerAcceptsCRS('google', 'EPSG:4326'); // true
-providerAcceptsCRS('google', 'EPSG:26915');// false — needs reprojecting first
-providerAcceptsCRS('leaflet', null);       // true — unknown CRS treated permissively
+FimViz.mapProviders();                       // → ['google', 'leaflet'] on a stock build
+FimViz.providerAcceptsCRS('google', 'EPSG:4326'); // true
+FimViz.providerAcceptsCRS('google', 'EPSG:26915');// false — needs reprojecting first
+FimViz.providerAcceptsCRS('leaflet', null);       // true — unknown CRS treated permissively
 ```
 
 `providerRequiresApiKey(name)` is documented in this doc's seam table but is **not** re-exported from
@@ -377,7 +405,7 @@ await mount(document.createElement('div'), { provider: 'leaflet', isolated: true
 Register a trivial third provider to exercise the whole `MapProviderImpl` contract yourself:
 
 ```js
-registerMapProvider('test-md-noop', {
+FimViz.registerMapProvider('test-md-noop', {
   requiresApiKey: false,
   acceptsCRS: (crs) => crs == null || crs === 'EPSG:4326',
   async create(el) { const d = document.createElement('div'); d.textContent = 'fake map'; el.appendChild(d); return d; },
@@ -391,7 +419,7 @@ registerMapProvider('test-md-noop', {
   onMapMouseMove() { return () => {}; },
   onMapEvent() { return () => {}; },
 });
-mapProviderNames().includes('test-md-noop');   // true
+FimViz.mapProviders().includes('test-md-noop');   // true
 const fim3 = await mount(document.createElement('div'), { provider: 'test-md-noop', isolated: true });
 fim3.map;   // the fake <div>"fake map"</div>
 fim3.destroy();
@@ -409,10 +437,18 @@ fimLeaf.destroy();
 ### Neutral vector style vocabulary
 
 ```js
-styleToGoogle;   // ⚠️ not on the barrel — see gaps section; exercise it indirectly via VectorLayer.setStyle
+// styleToGoogle/styleToLeaflet/featuresOf/resolveFeatureStyle are internal to mapProvider.js — a
+// VectorLayer applies them for you. Exercise the vocabulary through the layer instead:
 const vl = await fim.addLayer('vector', { source: dsVector, style: '#ff8800' });   // bare color string shorthand
 vl._style;
 vl.setStyle({ strokeWidth: 4 });
+
+// Colour features BY A PROPERTY through the same ColorScale a raster uses:
+vl.set({ colorScale: new ColorScale({ palette: 'viridis', min: 0, max: 10, continuous: true }),
+         colorBy: 'SOME_NUMERIC_PROPERTY' });
+vl.getLegend();                       // a Legend, exactly as on a raster
+(await vl.getStats()).byClass;        // bucketed by that same scale
+vl.set({ missingColor: '#cccccc' });  // features with no usable value, painted explicitly
 vl.remove();
 
 const vlFn = await fim.addLayer('vector', { source: dsVector,
@@ -423,7 +459,7 @@ vlFn.remove();
 ### Materialize / decode extension seam
 
 ```js
-registerMaterializer('test-md-format', async (root, dsForRoot) => {
+Dataset.registerMaterializer('test-md-format', async (root, dsForRoot) => {
   // root: {kind:'inline', data} | {kind:'url', url} — return a RasterGrid or VectorFeatures
   return new RasterGrid({ pixels: new Float32Array([1, 2, 3, 4]), width: 2, height: 2,
     bounds: { north: 1, south: 0, east: 1, west: 0 }, crs: 'EPSG:4326' });
@@ -432,7 +468,7 @@ const dsCustom = new Dataset({ kind: 'raster', format: 'test-md-format', data: {
 const customGrid = await dsCustom.grid();
 customGrid.width, customGrid.pixels;
 
-registerReprojector(async (grid, targetCrs) => { console.log('custom reprojector called for', targetCrs); return grid; });
+Dataset.registerReprojector(async (grid, targetCrs) => { console.log('custom reprojector called for', targetCrs); return grid; });
 // Careful: this REPLACES the GDAL reprojector for the whole page — only run this in a throwaway tab.
 ```
 
@@ -529,13 +565,15 @@ rl.hitTest(grid.bounds.north - 0.001, grid.bounds.west + 0.001);   // near a cor
 ### The type registry
 
 ```js
-registerLayerType('test-md-type', (fimArg, opts) => new RasterLayer({ ...opts, map: fimArg, type: 'test-md-type' }));
+Layer.registerType('test-md-type', (fimArg, opts) => new RasterLayer({ ...opts, map: fimArg, type: 'test-md-type' }));
 const tLayer = await fim.addLayer('test-md-type', { source: ds });
 tLayer.type;   // 'test-md-type'
 tLayer.remove();
 
-// hasLayerType/createLayer/dispatchMapEventToLayers aren't on the public barrel — see the gaps
-// section. An unresolvable type still demonstrates the registry indirectly (lists what IS registered):
+Layer.types();   // every type addLayer can construct, incl. the one just registered
+
+// hasLayerType/createLayer/dispatchMapEventToLayers are internal — Layer.types() is the public read.
+// An unresolvable type demonstrates the registry indirectly too (it lists what IS registered):
 try { await fim.addLayer('not-a-real-type', {}); } catch (e) { console.log(e.message); }
 ```
 
@@ -1071,9 +1109,9 @@ resampleGrid(grid.pixels, gridMeta(grid), gridMeta(gridB), { method: 'nearest' }
 alignRasters([{ pixels: grid.pixels, meta: gridMeta(grid) }, { pixels: gridB.pixels, meta: gridMeta(gridB) }],
   { policy: 'high', method: 'nearest' });
 
-registerResampler((pixels, srcMeta, dstMeta, opts) => { console.log('custom resampler called', opts); return pixels; });
+Dataset.registerResampler((pixels, srcMeta, dstMeta, opts) => { console.log('custom resampler called', opts); return pixels; });
 resampleGrid(grid.pixels, gridMeta(grid), { ...gridMeta(gridB), width: gridB.width + 1 }, { method: 'cubic' });
-registerResampler(null);   // un-register when done poking at it
+Dataset.registerResampler(null);   // un-register when done poking at it
 ```
 
 Colorize:

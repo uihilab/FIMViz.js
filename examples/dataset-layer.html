@@ -106,7 +106,7 @@
 
 <script type="module">
 import {
-  FimViz, registerMapProvider,
+  FimViz,
   RasterLayer, VectorLayer, ComparisonLayer, ColorScale,
 } from "fimviz";
 // ds.reproject().grid() already works — the GDAL warp auto-registers on import of "fimviz".
@@ -114,7 +114,7 @@ import {
 // ── a keyless "demo" map provider: it draws overlays as <img>s into a div ───────────────────────
 // It implements just the raster-image + vector contract RasterLayer/VectorLayer call. This is the
 // whole point of the provider seam — the Layers don't know they're not on Google/Leaflet.
-registerMapProvider("demo", {
+FimViz.registerMapProvider("demo", {
   create: (el) => { const m = document.createElement("div"); m.className = "demo-map"; el.appendChild(m); return m; },
   addRasterImage: (map, url) => { const img = document.createElement("img"); img.className = "demo-overlay"; img.src = url; map.appendChild(img); return img; },
   removeRasterImage: (_map, h) => h?.remove(),

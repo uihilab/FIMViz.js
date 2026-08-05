@@ -23,29 +23,25 @@
 <pre id="out">running…</pre>
 
 <!--
-  Maps each public subpath to its bundle — the same job node_modules + package.json "exports" does.
-  The engine's file layout is NOT here, and that is the point: consumers see six entry points.
+  Maps each public specifier to its bundle — the same job node_modules + package.json "exports"
+  does. Two entries: the engine barrel and the headless UI module.
 -->
 <script type="importmap">
 {
   "imports": {
-    "fimviz":          "../dist/fimviz.js",
-    "fimviz/data":     "../dist/fimviz.js",
-    "fimviz/storage":  "../dist/fimviz.js",
-    "fimviz/style":    "../dist/fimviz.js",
-    "fimviz/analysis": "../dist/fimviz.js",
-    "fimviz/layers":   "../dist/fimviz.js",
-    "fimviz/vendor":   "../dist/fimviz.js"
+    "fimviz":    "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js"
   }
 }
 </script>
 
 <script type="module">
-import { parseFile, Dataset }                          from "fimviz/data";
-import { Storage }                                     from "fimviz/storage";
-import { ColorScale, Legend, paletteNames }            from "fimviz/style";
-import { Stats, SpatialFilter, PredicateFilter, Filter } from "fimviz/analysis";
-import { RasterLayer }                                 from "fimviz/layers";
+// One entry, not six. (The per-concern specifiers this page used to import — fimviz/data, /storage,
+// /style, /analysis, /layers — never existed in package.json; the import map was faking them.)
+import {
+  FimViz, Dataset, Storage, ColorScale, Legend,
+  Stats, SpatialFilter, PredicateFilter, Filter, RasterLayer,
+} from "fimviz";
 
 const log = [];
 const p = (s) => log.push(s);
@@ -58,7 +54,7 @@ try {
   const cs = new ColorScale({ palette: "viridis", min: 0, max: 10 });
   p("ColorScale.getColor(5)   " + cs.getColor(5));
   p("ColorScale.getRgb(5)     " + JSON.stringify(cs.getRgb(5)));
-  p("paletteNames()           " + paletteNames().join(", "));
+  p("ColorScale.palettes()           " + ColorScale.palettes().join(", "));
 
   // Legend
   p("Legend.stops             " + Legend.fromColorScale(cs).toJSON().stops.length + " stops");
@@ -97,7 +93,7 @@ try {
   p("Storage keys             " + JSON.stringify(await db.list("t", { keys:true })));
   await db.destroy();
 
-  p("\n✓ all checks passed — now drop a file above to test parseFile()");
+  p("\n✓ all checks passed — now drop a file above to test FimViz.parseFile()");
 } catch (err) {
   p("\n✗ FAILED: " + (err && err.stack ? err.stack : err));
 }
@@ -108,7 +104,7 @@ document.getElementById("f").addEventListener("change", async (e) => {
   for (const file of e.target.files) {
     log.push("\n── " + file.name);
     try {
-      const ds = await parseFile(file);
+      const ds = await FimViz.parseFile(file);
       log.push(`   kind=${ds.kind} format=${ds.format} crs=${ds.crs}`);
       log.push("   bounds=" + JSON.stringify(ds.bounds));
       log.push("   meta=" + JSON.stringify(ds.meta));
@@ -119,7 +115,7 @@ document.getElementById("f").addEventListener("change", async (e) => {
   }
 });
 
-window.FIM = { parseFile, Dataset, Storage, ColorScale, Legend, Stats, SpatialFilter, Filter, RasterLayer };
+window.FIM = { FimViz, Dataset, Storage, ColorScale, Legend, Stats, SpatialFilter, Filter, RasterLayer };
 </script>
 </body>
 </html>

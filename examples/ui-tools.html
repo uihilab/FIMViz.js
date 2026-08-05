@@ -112,16 +112,17 @@
 </main>
 
 <script type="importmap">
-{ "imports": { "fimviz": "../dist/fimviz.js" } }
+{ "imports": { "fimviz": "../dist/fimviz.js", "fimviz/ui": "../dist/ui.js" } }
 </script>
 
 <script type="module">
+import { FimViz, RasterLayer, VectorLayer, ColorScale } from "fimviz";
+// The headless UI module has one home — its own subpath, not the engine barrel.
 import {
-  FimViz, RasterLayer, VectorLayer, ColorScale,
   createToast, connectToast, createTooltip, bindHoverValue,
   createInfoWindow, bindFeatureInfo, createToolsPanel, renderLegend, renderStats, createRegionDraw,
   createOperationsPanel,
-} from "fimviz";
+} from "fimviz/ui";
 
 const $ = (s) => document.querySelector(s);
 const pill = (id, t, c = "") => { const e = $("#" + id); if (e) { e.textContent = t; e.className = "pill " + c; } };

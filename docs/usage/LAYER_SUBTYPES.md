@@ -1,6 +1,6 @@
 # Layer subtypes — usage reference
 
-Shared base mechanics (`render`/`compute`/`setSources`/`settings`/events/...): see
+Shared base mechanics (`render`/`compute`/`setSources`/the chainable ops/`settings`/events/...): see
 [LAYERS.md](./LAYERS.md). This doc covers every subtype's **own** methods/properties — not just its
 "ops" in the Dataset sense, but everything you can call on it.
 
@@ -95,7 +95,7 @@ unlike the base/RasterLayer async pipeline, since parsing nothing is needed to d
 GeoJSON.
 
 ```js
-new VectorLayer({ map?, type?, sources=[], id?, exclusive? })
+new VectorLayer({ map?, type?, sources=[], id?, exclusive?, colorScale?, colorBy? })
 ```
 
 ### Properties
@@ -104,6 +104,8 @@ new VectorLayer({ map?, type?, sources=[], id?, exclusive? })
 |---|---|
 | `.dataLayer` | The provider's vector handle. |
 | `._style` | The current neutral style patch (`fillColor`/`strokeColor`/`fillOpacity`/...). |
+| `.colorScale` | `ColorScale\|null` — grades features by `colorBy` (below). |
+| `.colorBy` | `string\|null` — the feature property whose value the scale reads. |
 
 ### Methods
 
@@ -148,12 +150,52 @@ wktToGeometry('POINT(-90.07 29.95)');   // → GeoJSON geometry; POINT/MULTIPOIN
 await fim.addDataset(xyzFile, { swapXY? })   // swapXY:true if a file orders northing/easting first
 ```
 
+### Colouring features by a property
+
+A `VectorLayer` owns a `ColorScale` exactly as a `RasterLayer` does — it's the same class, because
+nothing in it is pixel-specific: it maps a **value** to a colour, and a feature property is as good a
+source of that value as a pixel. `colorBy` names the property to read:
+
+```js
+layer.set({
+  colorScale: new ColorScale({ palette: 'viridis', min: 0, max: 12, continuous: true }),
+  colorBy: 'depth_ft',
+});
+
+layer.getLegend();          // → a Legend, same as a raster's
+await layer.getStats();     // → byClass buckets, keyed by the same scale
+layer.set({ palette: 'plasma' });   // routes to the attached scale, restyles live
+```
+
+Both knobs are needed — a scale with no `colorBy` (or the reverse) leaves the flat `color`/`style`
+in charge.
+
+**Features with no usable value** (property absent, `null`, `''`, or non-numeric) are never given a
+colour from the ramp — "no value" must not be able to look like a real one. What they *do* get is
+yours to choose, via the scale's `missingColor`:
+
+```js
+layer.set({ missingColor: '#cccccc' });   // paint them explicitly as "no data"
+layer.set({ missingColor: null });         // (default) leave them at the base style
+```
+
+Either way they still count in `featureCount` and land in no `byClass` bucket. `missingColor` sits
+outside the three colouring modes — it answers a question none of them can — so switching
+palette/stops/colorStops leaves it untouched.
+
+Under the hood this hands the provider a per-feature style *function* (the seam already supports one)
+merged over whatever flat style `render({style})`/`setStyle()` set — so an explicit `strokeWidth`
+still applies while the colour comes from the scale.
+
 ### Settings knobs
 
 | Key | Effect |
 |---|---|
 | `color` | `setStyle({fillColor: v, strokeColor: v})` → `'restyle'`. |
 | `opacity` | `setStyle({fillOpacity: v})` → `'restyle'`. |
+| `colorScale` | Attach/detach the scale (validated — a palette-name string throws) → `'restyle'`. |
+| `colorBy` | The feature property the scale reads → `'restyle'`. |
+| `palette` / `continuous` / `missingColor` | Route to the attached `colorScale`; no-op if none is attached — the same keys a raster takes, so one UI control fits either kind. |
 | `useFileColors` | → `'restyle'` (the UI reads this back; no direct style call here). |
 | `hover` | Interaction-only. |
 

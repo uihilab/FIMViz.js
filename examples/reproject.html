@@ -88,7 +88,9 @@
 <script type="module">
 // The barrel auto-registers the geotiff/vector DECODERS and the GDAL REPROJECTOR on import — no
 // explicit wiring needed.
-import { FimViz, providerAcceptsCRS } from "fimviz";
+import {
+ FimViz,
+} from "fimviz";
 
 const $ = (s) => document.querySelector(s);
 const j = (v) => JSON.stringify(v, null, 2);
@@ -150,8 +152,8 @@ $("#go").addEventListener("click", async () => {
       "",
       "warnings: " + j(rp.warnings),
       "",
-      "provider.acceptsCRS('google', '" + g.crs + "') = " + providerAcceptsCRS("google", g.crs) +
-        (providerAcceptsCRS("google", g.crs) ? "   (a Layer could render this)" : "   (a Layer render would BLOCK — warp to EPSG:4326)"),
+      "provider.acceptsCRS('google', '" + g.crs + "') = " + FimViz.providerAcceptsCRS("google", g.crs) +
+        (FimViz.providerAcceptsCRS("google", g.crs) ? "   (a Layer could render this)" : "   (a Layer render would BLOCK — warp to EPSG:4326)"),
       "isMaterialized (memoized): " + rp.isMaterialized,
     ].join("\n");
   } catch (err) {

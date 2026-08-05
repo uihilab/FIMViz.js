@@ -75,6 +75,28 @@ describe("materialize: vector terminal (features)", () => {
     assert.ok(f.features?.type, "carries the GeoJSON object");
   });
 
+  test("VectorFeatures iterates its features directly — no .features.features", async () => {
+    const ds = await parseSource(ab("iowa_lakes_meta.geojson"), { name: "iowa_lakes_meta.geojson" });
+    const f = await ds.features();
+    const iterated = [...f];
+    assert.ok(iterated.length > 0);
+    assert.deepEqual(iterated, f.toArray());
+    assert.equal(f.count, iterated.length);
+    assert.equal(iterated[0].type, "Feature");
+    // for...of is the point of the iterator — assert the loop form, not just the spread.
+    let n = 0;
+    for (const feature of f) { assert.ok(feature.geometry); n++; }
+    assert.equal(n, f.count);
+  });
+
+  test("toArray normalizes all three payload shapes a decoder may return", () => {
+    const feat = { type: "Feature", geometry: { type: "Point", coordinates: [0, 0] }, properties: {} };
+    assert.equal(new VectorFeatures({ features: { type: "FeatureCollection", features: [feat, feat] } }).count, 2);
+    assert.equal(new VectorFeatures({ features: feat }).count, 1, "a lone Feature");
+    assert.equal(new VectorFeatures({ features: [feat] }).count, 1, "a bare array");
+    assert.deepEqual(new VectorFeatures({ features: null }).toArray(), [], "no payload is empty, not a throw");
+  });
+
   test("a vector Dataset with no known bounds (e.g. a lazily-rooted one) computes them from the decoded features", async () => {
     // parseSource's inline path already gets bounds for free (parse.js computes them from the same
     // features at parse time — see boundsOf() there). A URL-rooted Dataset.fromURL()/select() has no
@@ -253,5 +275,49 @@ describe("materialize: Dataset.fromURL resolveUrl applied at force (the material
       await Dataset.fromURL("https://data.example/w.geojson").features();
       assert.equal(fetched.at(-1), "https://data.example/w.geojson");
     } finally { globalThis.fetch = orig; }
+  });
+});
+
+describe("Dataset.fromGrid — the way back into the op chain", () => {
+  const grid = () => new RasterGrid({
+    pixels: Float32Array.from([1, 2, 3, 4]), width: 2, height: 2,
+    bounds: { north: 2, south: 0, east: 2, west: 0 }, crs: "EPSG:4326", meta: { unit: "m" },
+  });
+
+  test("wraps an already-decoded grid: pre-materialized, no seam involved", async () => {
+    const ds = Dataset.fromGrid(grid(), { name: "computed" });
+    assert.equal(ds.kind, "raster");
+    assert.equal(ds.name, "computed");
+    assert.equal(ds.isMaterialized, true, "no decode is pending — the value IS the payload");
+    assert.equal(ds.format, null, "no encoded bytes exist, so claiming a format would be a lie");
+    assert.equal(ds.crs, "EPSG:4326", "frame comes from the value");
+    assert.deepEqual(ds.bounds, { north: 2, south: 0, east: 2, west: 0 });
+    assert.equal(ds.meta.unit, "m");
+
+    const forced = await ds.grid();
+    assert.equal(forced.width, 2, "the terminal returns what was handed in");
+  });
+
+  test("ops chain off it, exactly as off a parsed Dataset", async () => {
+    const ds = Dataset.fromGrid(grid());
+    const clipped = ds.clip({ north: 1, south: 0, east: 1, west: 0 });
+    assert.notEqual(clipped, ds, "still immutable/lazy");
+    assert.equal(clipped.isMaterialized, false, "the derived node is unforced");
+    const g = await clipped.grid();
+    assert.ok(g.width >= 1 && g.width <= 2, "the clip really ran against the wrapped grid");
+  });
+
+  test("round-trips a VectorFeatures too", async () => {
+    const vf = new VectorFeatures({
+      features: { type: "FeatureCollection", features: [] }, crs: "EPSG:4326",
+    });
+    const ds = Dataset.fromGrid(vf);
+    assert.equal(ds.kind, "vector");
+    assert.equal((await ds.features()).kind, "vector");
+  });
+
+  test("rejects anything that is not a decoded value", () => {
+    assert.throws(() => Dataset.fromGrid(null), /RasterGrid or VectorFeatures/);
+    assert.throws(() => Dataset.fromGrid({ pixels: [] }), /RasterGrid or VectorFeatures/);
   });
 });

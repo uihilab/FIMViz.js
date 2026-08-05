@@ -77,6 +77,15 @@ const _providers = new Map();
  */
 
 /**
+ * The provider a DETACHED layer resolves against — one built without a mounted app, so there is no
+ * `config.provider` to read (a unit test's stub, or a Layer constructed directly). NOT a config
+ * default: `mount()` requires an explicit `provider` and throws `config-invalid` without one, so
+ * this is never what a real mounted map uses. `leaflet` because it is the credential-free one.
+ * @type {string}
+ */
+export const DEFAULT_PROVIDER = "leaflet";
+
+/**
  * Register a map backend.
  * @param {string} name
  * @param {MapProviderImpl} provider
@@ -551,7 +560,12 @@ registerMapProvider("leaflet", {
  * @returns {Promise<any>} the provider's map object
  */
 export async function createMap(el, options = {}) {
-  const name = options.provider || "google";
+  const name = options.provider;
+  if (!name) {
+    throw fimError("config-invalid",
+      "FimViz: a map provider is required — pass provider: 'leaflet' (no API key) or " +
+      `provider: 'google' (with an apiKey). Registered: ${mapProviderNames().join(", ") || "(none)"}.`);
+  }
   const provider = getMapProvider(name);
   if (!provider) {
     throw fimError("config-invalid",
@@ -569,7 +583,7 @@ export async function createMap(el, options = {}) {
 }
 
 /** Does the named provider need an apiKey? Used by mount() to validate config before booting. */
-export function providerRequiresApiKey(name = "google") {
+export function providerRequiresApiKey(name = DEFAULT_PROVIDER) {
   return !!getMapProvider(name)?.requiresApiKey;
 }
 
@@ -579,7 +593,7 @@ export function providerRequiresApiKey(name = "google") {
  * A provider that declares no `acceptsCRS` is treated as accepting anything (permissive default).
  * @param {string} name @param {string|null} crs @returns {boolean}
  */
-export function providerAcceptsCRS(name = "google", crs = null) {
+export function providerAcceptsCRS(name = DEFAULT_PROVIDER, crs = null) {
   const provider = getMapProvider(name);
   return typeof provider?.acceptsCRS === "function" ? provider.acceptsCRS(crs) : true;
 }
