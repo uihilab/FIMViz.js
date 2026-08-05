@@ -14,7 +14,7 @@ is the *why*, those are the *what*.
 [1. Architecture decisions](#1-architecture-decisions-resolved) ·
 [2. Tradeoffs, rejections, and open questions](#2-tradeoffs-rejections-and-open-questions) ·
 [3. Implementation status](#3-implementation-status) ·
-[4. Known open bugs](#4-known-open-bugs) ·
+[4. Known gaps](#4-known-gaps) ·
 [5. Incomplete / deferred work](#5-incomplete--deferred-work) ·
 [6. Cross-references](#6-cross-references)
 
@@ -83,6 +83,16 @@ is the *why*, those are the *what*.
 - **The CRS precondition is strict in the engine, convenience is app-tier policy.** `render()` asks
   `provider.acceptsCRS(ds.crs)`; a mismatch **emits a host event and throws** — no silent reproject.
   Auto-reproject-then-render is a config flag the host can add; the engine never guesses.
+- **`provider` is required and has no default — the same "never guess" rule, applied at boot.** The
+  two built-in backends differ in *credentials* **and** in *capability*: `'leaflet'` needs nothing and
+  gives map + vectors + static rasters, `'google'` needs an `apiKey` and is the only one carrying the
+  full overlay tier (velocity, damage markers, ArcGIS depth). A default would silently decide both for
+  a host — either demanding a key it never asked to need, or quietly withholding tiers it thought it
+  had — so `mount()` throws `config-invalid` naming both options instead (`mount.js`, checked before
+  any container/markup work so the message survives a registered runtime booting its own map).
+  `mapProvider.js`'s `DEFAULT_PROVIDER = 'leaflet'` is deliberately **not** this default: it is the
+  fallback a *detached* layer resolves against — one constructed with no mounted app, so with no
+  `config.provider` to read at all.
 - **The Settings/Operations change-model: a change to a Layer is either an *operation* (replaces or
   re-acquires the source data — `setSources`/`deriveSources`, `reproject`, `select(coord)`, `reload`,
   `show`/`hide`/`fit`/`remove` — imperative Layer/Dataset **methods**) or a *setting* (a parameter applied
@@ -590,8 +600,11 @@ Everything else stayed internal and the docs now say so:
   which is what the seam already dispatches to. A caller who wants a decode calls `ds.load()`; one
   who wants a warp calls `ds.reproject(crs)`. Nothing is left for the handle to do.
 - **`providerRequiresApiKey`** — its only use was a provider-picker deciding whether to show a key
-  field, and `mount()` already throws `config-invalid` naming the missing key. Retired along with
-  the google default (`provider` now defaults to `'leaflet'`, which needs no key at all).
+  field, and `mount()` already throws `config-invalid` naming the missing key. Retired from the
+  barrel along with the google default — `provider` now has **no** default at all and is required
+  (§1.1), so there is no implied backend whose key requirement a caller would need to ask about.
+  (`mapProvider.js`'s `DEFAULT_PROVIDER = 'leaflet'` is *not* that default: it is what a **detached**
+  layer — one built with no mounted app, so no `config.provider` to read — resolves against.)
 - **`styleToGoogle`/`styleToLeaflet`/`featuresOf`/`resolveFeatureStyle`** — provider-implementation
   detail. `VectorLayer` applies them; a third-party provider author reads `mapProvider.js`, which
   carries the full contract and two worked implementations.
