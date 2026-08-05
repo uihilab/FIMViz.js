@@ -39,6 +39,42 @@ const boundsOf = (bbox) =>
     : null);
 
 /**
+ * Why this bbox cannot be WGS84 degrees, or `null` if it is plausible.
+ *
+ * The guard exists because a wrong extent is worse than a missing one: a missing one throws, a wrong
+ * one places every pixel confidently somewhere it isn't. `scan()` derives its bbox from the min/max of
+ * whatever 1-D variables are *named* like coordinates — including `x`/`y` and `rlat`/`rlon` — so a
+ * PROJECTED file (HRRR/RAP/NAM/WRF, x/y in metres) yields something like
+ * `[-2699020, -1588806, 2697980, 1588806]`: four finite numbers, max > min, and utterly not degrees.
+ * Range-checking is what turns that from a silently wrong map into the same actionable "supply an
+ * extent" error a curvilinear file already gets.
+ *
+ * Longitudes allow ±360 because both the −180..180 and 0..360 conventions are in wide use.
+ *
+ * KNOWN GAP: a **rotated-pole** grid (CORDEX/COSMO — `rlat`/`rlon` in rotated degrees) passes this
+ * check, because its numbers genuinely are small degree-like values; they simply are not geographic
+ * ones. Detecting that needs the variable's `grid_mapping` attribute, which `scan()` does not surface.
+ * @param {*} bbox
+ * @returns {string|null}
+ */
+function geographicBboxProblem(bbox) {
+  if (!Array.isArray(bbox) || bbox.length !== 4 || !bbox.every(Number.isFinite)) {
+    return "it is not four finite numbers";
+  }
+  const [w, s, e, n] = bbox;
+  if (!(e > w) || !(n > s)) return "max is not greater than min";
+  if (Math.abs(s) > 90 || Math.abs(n) > 90) {
+    return `its latitudes are out of range (${s}, ${n} — |lat| must be <= 90), which usually means a ` +
+      "projected grid whose y axis is in metres, not degrees";
+  }
+  if (Math.abs(w) > 360 || Math.abs(e) > 360) {
+    return `its longitudes are out of range (${w}, ${e} — |lon| must be <= 360), which usually means a ` +
+      "projected grid whose x axis is in metres, not degrees";
+  }
+  return null;
+}
+
+/**
  * The variable's NATIVE grid, from `scan()` — the piece that makes SciWrid usable as a materializer
  * at all. `extractGrid` is a *resample*: it makes the caller pre-commit to a bbox and an output
  * width/height, while every Dataset op (clip/mask/combine's LHS-conform) assumes a Dataset has a grid
@@ -67,12 +103,12 @@ function nativeGridOf(scanResult, variable, override) {
   const height = override?.height ?? usable.at(-2);
   const width = override?.width ?? usable.at(-1);
   const bbox = override?.bbox ?? scanResult.bbox;
-  if (override?.bbox && !(Array.isArray(bbox) && bbox.length === 4 && bbox.every(Number.isFinite)
-      && bbox[2] > bbox[0] && bbox[3] > bbox[1])) {
-    throw new Error("sciwrid: opts.grid.bbox must be [minLon, minLat, maxLon, maxLat] with max > min " +
-      `(got ${JSON.stringify(override.bbox)}).`);
+  const problem = bbox == null ? "none was found" : geographicBboxProblem(bbox);
+  if (override?.bbox && problem) {
+    throw new Error("sciwrid: opts.grid.bbox must be [minLon, minLat, maxLon, maxLat] in WGS84 " +
+      `degrees — ${problem} (got ${JSON.stringify(override.bbox)}).`);
   }
-  const bounds = boundsOf(bbox);
+  const bounds = problem ? null : boundsOf(bbox);
   if (!bounds) {
     // We will NOT invent an extent. A guessed bbox (global, say) silently places every pixel in the
     // wrong location, which is the failure mode the CRS precondition exists to prevent — a wrong map
@@ -82,13 +118,16 @@ function nativeGridOf(scanResult, variable, override) {
     // variables, and ocean/rotated-pole products (`tos`, NEMO, CORDEX, tripolar grids) carry 2-D
     // lat(j,i)/lon(j,i) instead, which the scan skips. The pixels are still readable — only the
     // extent is unknown — so passing `grid` makes the file work.
+    const cause = bbox == null
+      ? "scan() derived no bbox at all — the usual cause is a CURVILINEAR grid (2-D lat(j,i)/lon(j,i) " +
+        "coordinates: ocean `tos` products, NEMO, tripolar and polar-stereographic grids like NCEP " +
+        "Stage IV), or a Zarr store with no CF coordinates. scan() reads 1-D coordinate variables only"
+      : `scan() reported ${JSON.stringify(bbox)}, which was REJECTED because ${problem}`;
     throw new Error(
-      `sciwrid: "${variable.name}" has no geographic bbox in scan(), so its extent is unknown and it ` +
-      "cannot be placed on a map. Pass one explicitly:\n" +
+      `sciwrid: "${variable.name}" has no usable geographic extent, so it cannot be placed on a map. ` +
+      `${cause}. The pixels are readable — only the extent is unknown — so pass one explicitly:\n` +
       `  parseSciwrid(file, { variable: ${JSON.stringify(variable.name)}, ` +
-      `grid: { width: ${width}, height: ${height}, bbox: [minLon, minLat, maxLon, maxLat] } })\n` +
-      "Common causes: a curvilinear/rotated grid (2-D lat(j,i)/lon(j,i) coordinates, e.g. ocean `tos` " +
-      "files) or a Zarr store with no CF coordinates — scan() reads 1-D coordinate variables only. " +
+      `grid: { bbox: [minLon, minLat, maxLon, maxLat] } })   // ${width}x${height} dims stay native\n` +
       `Scan reported: format=${scanResult.format}, shape=${JSON.stringify(variable.shape)}, ` +
       `variables=[${(scanResult.variable_names || []).join(", ")}].`);
   }

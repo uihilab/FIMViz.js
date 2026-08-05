@@ -136,14 +136,23 @@ and render directly. Missing values arrive as `NaN`, which colorize and `Stats` 
 absent. Rehydrating a stored selector Dataset skips the parser, so call `registerSciwridFormats()`
 once at boot before `Dataset.fromRecord`.
 
-#### "has no geographic bbox in scan()"
+#### "has no usable geographic extent"
 
-A common failure on real-world files, and a recoverable one. `scan()` derives a file's extent from
-**1-D** coordinate variables only. Plenty of products don't have those:
+A common failure on real-world files, and a recoverable one. It happens for two different reasons,
+and the message says which:
 
-- **Curvilinear / rotated grids** — ocean output (`tos` and friends on tripolar grids), NEMO, CORDEX:
-  the coordinates are 2-D `lat(j,i)` / `lon(j,i)`, so nothing 1-D matches.
-- **Zarr with no CF coordinates** — the store reports synthetic index axes.
+- **No bbox was derived.** `scan()` reads **1-D** coordinate variables only, so a **curvilinear** grid
+  (2-D `lat(j,i)`/`lon(j,i)` — ocean `tos` products, NEMO, tripolar and polar-stereographic grids like
+  NCEP Stage IV) or a **Zarr store with no CF coordinates** yields nothing to place the data with.
+- **A bbox was derived and rejected.** `scan()`'s matcher accepts variables *named* `x`/`y`, so a
+  **projected** file (HRRR, RAP, NAM, WRF) reports its extent in **metres** — e.g.
+  `[-2699020, -1588806, 2697980, 1588806]`. That is checked as degrees (`|lat| ≤ 90`, `|lon| ≤ 360`)
+  and refused, because placing it would be silently wrong rather than loudly broken.
+
+> **Not caught:** a **rotated-pole** grid (CORDEX/COSMO, `rlat`/`rlon`) reports plausible small
+> degree-like numbers that are not geographic. Detecting it needs the `grid_mapping` attribute, which
+> `scan()` does not expose — so such a file will render in the wrong place without complaint. See
+> [PACKAGE_ROADMAP.md §8.1](../PACKAGE_ROADMAP.md#81-which-grids-we-actually-support-scope-and-the-silent-failure-guard).
 
 The pixels are perfectly readable; only the *extent* is unknown, so nothing can place them on a map.
 FIMViz will not guess one — a wrong extent silently puts every pixel in the wrong place, which is the

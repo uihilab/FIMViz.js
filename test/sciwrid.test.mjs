@@ -142,7 +142,33 @@ describe("sciwrid adapter: real NetCDF4", () => {
   test("a malformed bbox override is rejected rather than silently misplacing the data", async () => {
     await assert.rejects(
       () => parseSciwrid(readFileSync(FIXTURE), { grid: { bbox: [10, 10, 5, 5] } }),
-      /bbox must be \[minLon, minLat, maxLon, maxLat\] with max > min/);
+      /max is not greater than min/);
+  });
+
+  // A wrong extent is worse than a missing one: the missing one throws, the wrong one puts every
+  // pixel confidently somewhere it isn't. scan() takes min/max of anything NAMED like a coordinate,
+  // including projected `x`/`y` in metres, so the numbers must be range-checked as degrees.
+  test("a PROJECTED extent (x/y in metres) is rejected, not silently believed", async () => {
+    await assert.rejects(
+      // A real HRRR-shaped Lambert Conformal extent, in metres.
+      () => parseSciwrid(readFileSync(FIXTURE), { grid: { bbox: [-2699020, -1588806, 2697980, 1588806] } }),
+      (e) => {
+        assert.match(e.message, /latitudes are out of range/);
+        assert.match(e.message, /metres, not degrees/, "must name the likely cause");
+        return true;
+      });
+  });
+
+  test("a latitude just past the pole is caught — the boundary, not just absurd values", async () => {
+    await assert.rejects(
+      () => parseSciwrid(readFileSync(FIXTURE), { grid: { bbox: [-100, -91, -80, 45] } }),
+      /\|lat\| must be <= 90/);
+  });
+
+  test("the 0..360 longitude convention is still accepted", async () => {
+    // Both -180..180 and 0..360 are in wide use; rejecting the latter would break real files.
+    const ds = await parseSciwrid(readFileSync(FIXTURE), { grid: { bbox: [270, 24, 285, 37] } });
+    assert.deepEqual(ds.bounds, { west: 270, south: 24, east: 285, north: 37 });
   });
 
   test("a selected timestep round-trips through toRecord/fromRecord", async () => {
@@ -176,8 +202,8 @@ describe("sciwrid adapter: GRIB2", () => {
     // Stage IV is curvilinear (grid template 20), so scan() reports no bbox — the real-world case.
     // The pixels are readable; only the extent is unknown, so the error must point at the fix.
     await assert.rejects(() => parseSciwrid(readFileSync(FIX)), (e) => {
-      assert.match(e.message, /no geographic bbox/);
-      assert.match(e.message, /curvilinear/, "must name the likely cause");
+      assert.match(e.message, /no usable geographic extent/);
+      assert.match(e.message, /curvilinear/i, "must name the likely cause");
       assert.match(e.message, /parseSciwrid\(file, \{/, "and show the call that fixes it");
       return true;
     });

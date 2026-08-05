@@ -208,7 +208,7 @@ async function open(source, name) {
     // The common real-world failure: scan() derives an extent from 1-D coordinate variables only, so
     // a curvilinear file (2-D lat(j,i)/lon(j,i) — ocean `tos`, rotated poles) reports none. The pixels
     // are perfectly readable; only the extent is unknown, so supplying one makes the file work.
-    if (/no geographic bbox/.test(e.message)) {
+    if (/no usable geographic extent/.test(e.message)) {
       $("#bbox").focus();
       $("#bbox").style.borderColor = "var(--warn)";
       log("this file carries no 1-D lat/lon coordinates, so its extent is unknown — type one in " +

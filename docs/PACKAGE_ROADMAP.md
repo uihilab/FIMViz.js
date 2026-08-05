@@ -500,6 +500,55 @@ with one format difference worth recording. Both are node-tested against vendore
   misplaces every pixel), but the thrown error now names the variable, its shape, the variables
   present, the likely cause, and the exact call that fixes it.
 
+### 8.1 Which grids we actually support (scope, and the silent-failure guard)
+
+Recorded because "it reads NetCDF" is far too coarse a claim: the *format* is rarely the hard part —
+the **coordinate geometry** is. What we support is **rectilinear geographic grids**, with a manual
+extent override for anything else. Everything below is a horizontal-grid type real files use:
+
+| Geometry | How coordinates are stored | Typical sources | Status |
+|---|---|---|---|
+| Regular lat/lon | 1-D `lat[]`/`lon[]`, even spacing | NLDAS, AORC, most reanalysis | ✅ works |
+| Gaussian | 1-D lat at quadrature points, **uneven** | ECMWF/IFS, GRIB template 40 | ⚠️ decoded as evenly spaced (below) |
+| Projected rectilinear | 1-D `x[]`/`y[]` in **metres** + `grid_mapping` | HRRR, RAP, NAM, WRF, MODIS sinusoidal | ✅ now rejected loudly |
+| Rotated pole | 1-D `rlat`/`rlon` in *rotated* degrees | CORDEX, COSMO, HIRLAM | 🔴 still silently wrong |
+| Curvilinear | 2-D `lat(j,i)`/`lon(j,i)` | NEMO/MOM/POP, ocean `tos`, NCEP Stage IV | ✅ throws; override works |
+| Unstructured / mesh | `lat(ncells)`+connectivity | ICON, MPAS, FESOM, ADCIRC, SCHISM | ❌ different data model |
+| Reduced Gaussian | rows of differing length | ECMWF GRIB | ❌ |
+| Cubed-sphere / icosahedral | tiles/faces | GFDL FV3, MPAS | ❌ |
+| Swath | 2-D geolocation, irregular, bowtie gaps | MODIS L2, VIIRS, TROPOMI | ❌ |
+| DGGS | cell IDs, no coordinates | H3, S2, geohash | ❌ |
+
+**The guard, and why it earns its place.** `scan()` derives a bbox from the min/max of whatever 1-D
+variables are *named* like coordinates — and its matcher accepts `x`/`y` and `rlat`/`rlon`
+(`sciwrid-lib.js`'s coordinate detection). A projected file therefore yields something like
+`[-2699020, -1588806, 2697980, 1588806]`: four finite numbers, `max > min`, and metres rather than
+degrees. That passed every check we had, so the data would have been placed confidently and wrongly.
+**A wrong extent is worse than a missing one** — a missing one throws, a wrong one produces a map
+nobody questions — so `geographicBboxProblem()` now range-checks any bbox as degrees
+(`|lat| <= 90`, `|lon| <= 360`, both conventions allowed) and rejects it into the *same* actionable
+"pass an extent" error a curvilinear file already gets.
+
+**Two known gaps, stated rather than papered over:**
+
+- **Rotated pole still slips through.** Its coordinates *are* small degree-like numbers — they simply
+  are not geographic ones. Catching it needs the variable's `grid_mapping`/`grid_north_pole_*`
+  attributes, which `scan()` does not surface at all. Until it does, a CORDEX file will land in the
+  wrong place with no complaint.
+- **Gaussian latitudes are treated as evenly spaced.** SciWrid decodes GRIB templates 0 and 40
+  identically (`lat[j] = lat1 ± j·dj`), but template 40 *is* Gaussian — its latitudes are quadrature
+  points. The resulting placement error is small, largest in mid-latitudes, and silent.
+
+Both are upstream fixes, not ours; the useful thing we can do is not pretend they're handled.
+
+**Beyond the horizontal grid**, three axis families matter for this domain and none is modelled yet:
+**vertical coordinates** (pressure/height/depth are directly usable; sigma, hybrid sigma-pressure and
+ocean s-coordinates are *dimensionless* and need `formula_terms` plus a surface field to become real
+altitudes), **forecast reference time × lead time** (a genuinely 2-D temporal structure, native to
+GRIB2 — expressible with our N-axis model, but a different mental model from one time line), and
+**ensemble member / threshold / percentile** axes, which map onto `EnsembleAggregationLayer` and
+probabilistic flood products. Folding those in is later work; §8's slice is one time axis.
+
 **Surfaced by the example, fixed in the engine:** `ColorScale.getColor(null)`/`('')` coerced to `0`
 and returned the domain **minimum's** colour — "no data" rendering as "the lowest reading", the one
 confusion `missingColor` exists to prevent — while `NaN` escaped as the malformed string
