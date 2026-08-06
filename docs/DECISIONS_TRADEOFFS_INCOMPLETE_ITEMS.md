@@ -675,6 +675,43 @@ read. Not yet diagnosed to engine vs. example vs. Leaflet animation timing (`#rg
 `rasterLayer.fit()` immediately before `start()`, so an in-flight zoom animation is a live suspect for
 both symptoms).
 
+**Open — raster overlays are plate carrée content drawn into a Mercator viewport.**
+`RasterLayer._draw` colorizes a grid to a data URL and hands it to `addRasterImage`, which is
+`L.imageOverlay(url, [[s,w],[n,e]])` on Leaflet and a `GroundOverlay` on Google. Both stretch that
+image **linearly in Web Mercator screen space**, while our grid rows are evenly spaced in **latitude**.
+The two agree only near the equator, and the error grows with the extent's height:
+
+| dataset | extent | worst latitude error |
+|---|---|---|
+| `idalia-nldas2.nc` (regional) | 25.06 – 36.94 °N | 0.19° ≈ 21 km |
+| CMIP `tos` (global ocean) | −80 – +90 ° | 25.67° ≈ 2850 km |
+
+This went unnoticed because every raster the library had rendered was a regional flood map ~12° tall,
+where the error is a couple of screen pixels — it took a global NetCDF3 to make it obvious. A second
+problem rides along: **latitude 90 is infinite in Mercator** (y = 37.3, against 3.14 at the
+conventional ±85.05° cutoff), so the top of such a file has nowhere to be drawn and the provider
+simply clamps.
+
+**The existing reprojection machinery does not address it, and it is worth recording why**, because
+both plausible-looking routes are dead ends. `resampleGrid` maps destination pixels *linearly in
+lat/lng* (`lat = bn - (dy+0.5)/h * (bn-bs)`), so it is a plate-carrée→plate-carrée resampler and can
+never produce Mercator-spaced rows. And warping to `EPSG:3857` is refused before it draws: both
+providers declare `acceptsCRS` as the WGS84 family only, so `Layer._checkProviderCRS` throws — with a
+message advising `ds.reproject('EPSG:4326')`, which walks the caller straight back into the bug. Even
+with that guard lifted, `addRasterImage` takes lat/lng bounds while a 3857 grid's are metres.
+
+**Two routes, and the smaller one is preferred.** (A) Resample rows to Mercator before colorizing —
+for each output row take its Mercator-even *y*, convert to latitude, read the nearest source row. Pure
+arithmetic, ~25 lines beside `resampleGrid`, no GDAL, node-testable, and the bounds stay lat/lng so
+nothing else in the render path changes; clamp to ±85.05°. Mechanically it is the same shape as
+`io/sciwrid.js`'s longitude roll. (B) Teach the stack about projected content properly — extend
+`acceptsCRS`, derive lat/lng corners from projected bounds in `addRasterImage`, warp through GDAL. (B)
+is the architecturally general answer and the one to reach for if genuinely projected grids (polar
+stereographic, rotated pole) ever need to reach the map, but it makes every global raster depend on a
+~38 MB wasm download to do four lines of trigonometry. Not yet implemented either way: the fix changes
+how every raster renders on every provider, including shifting the existing regional maps by ~21 km,
+which is a correction but a visible one.
+
 **Still owed:** everything Google-side — vector rendering and neutral-style translation on
 `google.maps.Data` (including the new point symbol), and raster overlay colorize/opacity/hit-test. Also
 the GDAL WASM reproject forced at a real terminal, and the `http://[::1]:PORT` loopback fix (confirm
