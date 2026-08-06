@@ -10,8 +10,8 @@ import assert from "node:assert/strict";
 
 import {
   createMap, registerMapProvider, getMapProvider, mapProviderNames, providerRequiresApiKey,
-  styleToGoogle, styleToLeaflet, featuresOf, resolveFeatureStyle, providerAcceptsCRS,
-  DEFAULT_PROVIDER,
+  styleToGoogle, styleToLeaflet, styleToGooglePoint, featuresOf, resolveFeatureStyle,
+  providerAcceptsCRS, DEFAULT_PROVIDER, DEFAULT_POINT_RADIUS,
 } from "../src/package/mapProvider.js";
 
 describe("map provider registry", () => {
@@ -300,6 +300,38 @@ describe("neutral vector style vocabulary", () => {
   test("omitted neutral keys are not emitted (no undefined overwrite of provider defaults)", () => {
     assert.deepEqual(styleToGoogle({ fillColor: "#f00" }), { fillColor: "#f00" });
     assert.deepEqual(styleToLeaflet({ strokeColor: "#00f" }), { color: "#00f" });
+  });
+
+  // Point geometry draws an icon (google) / a marker (leaflet), neither of which reads the PATH
+  // style — so `fillColor` on a point silently did nothing on both providers until the point
+  // translation below existed.
+  test("pointRadius is point-only: it never leaks into either path vocabulary", () => {
+    assert.deepEqual(styleToGoogle({ fillColor: "#f00", pointRadius: 9 }), { fillColor: "#f00" });
+    assert.equal(styleToLeaflet({ pointRadius: 9 }).radius, 9);   // L.circleMarker's own option
+  });
+
+  test("styleToGooglePoint: neutral style → a scaled circle symbol", () => {
+    const sym = styleToGooglePoint(neutral);
+    assert.equal(sym.scale, DEFAULT_POINT_RADIUS);
+    assert.equal(sym.fillColor, "#f00");
+    assert.equal(sym.fillOpacity, 0.3);
+    assert.equal(sym.strokeColor, "#00f");
+    assert.equal(sym.strokeWeight, 2);
+    assert.match(sym.path, /^M 0,-1 A 1,1/);          // a literal path, not google.maps.SymbolPath
+  });
+
+  test("styleToGooglePoint: pointRadius sizes it; a fill implies opacity 1", () => {
+    assert.equal(styleToGooglePoint({ pointRadius: 12 }).scale, 12);
+    // A google Symbol defaults to fillOpacity 0 — invisible — unlike a path, so a bare fillColor
+    // must carry an explicit opacity or the point does not render at all.
+    assert.equal(styleToGooglePoint({ fillColor: "#0f0" }).fillOpacity, 1);
+    assert.equal(styleToGooglePoint({ fillColor: "#0f0", fillOpacity: 0.5 }).fillOpacity, 0.5);
+  });
+
+  test("styleToGooglePoint: an unstyled point still gets a visible default-sized circle", () => {
+    const sym = styleToGooglePoint();
+    assert.equal(sym.scale, DEFAULT_POINT_RADIUS);
+    assert.ok(sym.path);
   });
 });
 

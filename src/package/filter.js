@@ -35,19 +35,28 @@ export class Filter {
 
   /**
    * Coerce any friendly input into a Filter.
-   *   Filter        → returned as-is
+   *   Filter-like   → returned as-is (anything with a `test(unit)` method)
    *   function      → PredicateFilter
    *   Region-like   → input.toFilter()
    *   polygon       → SpatialFilter   ([[lat,lng],…] | [{lat,lng},…] | [[ring],[ring]…])
+   *
+   * DUCK-TYPED, not `instanceof Filter`, for the same reason nothing in the engine does
+   * `instanceof Dataset`: class identity is per-module-instance, and `fimviz` and `fimviz/ui` are
+   * two separate bundles that each carry their own copy of this file. A `SpatialFilter` built by
+   * `fimviz/ui`'s createRegionDraw is therefore NOT `instanceof` the engine bundle's `Filter`, so
+   * `layer.getStats({ filter })` rejected the tool's own output. Testing for the method — the only
+   * thing every call site actually uses — makes the seam work across bundles and lets a host pass
+   * its own filter object.
    * @param {Filter|Function|{toFilter: () => Filter}|Array|null} input
    * @returns {Filter|null}
    */
   static from(input) {
     if (input == null) return null;
-    if (input instanceof Filter) return input;
-    if (typeof input === "function") return new PredicateFilter(input);
-    if (typeof input.toFilter === "function") return input.toFilter();
+    // Arrays first: a polygon is an object too, and must not be mistaken for a filter-like.
     if (Array.isArray(input)) return new SpatialFilter(input);
+    if (typeof input === "function") return new PredicateFilter(input);
+    if (typeof input.test === "function") return input;
+    if (typeof input.toFilter === "function") return input.toFilter();
     throw new Error("Filter.from: unrecognized filter input");
   }
 

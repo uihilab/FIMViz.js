@@ -127,7 +127,14 @@ export function create(target, options = {}) {
     // never reached, because it runs before the FimMap that would scope it exists.
     const hasRuntime = typeof _runtime.bootstrap === "function";
     let injected = false;
-    if (!container.querySelector('[id="map"]')) {
+    // A container that IS the map div already provides it. Injecting another `<div id="map">` inside
+    // it put TWO nodes with the same id in the document, so `document.getElementById("map")` and
+    // `container.querySelector('#map')` disagreed about which one the map lived in — a real
+    // collision, since `mount("map", …)` is the obvious thing to write (examples/ui-tools.html does).
+    // Only for the bare-engine path: with a runtime there is a real widget to inject, and the host
+    // owns its own container naming.
+    const containerIsMapDiv = !hasRuntime && container.id === "map";
+    if (!containerIsMapDiv && !container.querySelector('[id="map"]')) {
       if (hasRuntime && !_runtime.markup) {
         throw fimError("config-invalid",
           "FimViz: a runtime is registered but supplied no `markup`, and the page has no #map. " +

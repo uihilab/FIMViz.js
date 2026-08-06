@@ -130,6 +130,12 @@ export function mapProviderNames() {
 // bare colour STRING — the "graded colour" shorthand, expanded to `{ fillColor, strokeColor }`. The
 // callback sees the ORIGINAL GeoJSON feature and the same 0-based index on EVERY provider; each
 // adapter maps its own SDK feature back to that (see addVector below). See resolveFeatureStyle.
+// POINT GEOMETRY is the one case the path vocabulary above cannot express on either provider: a
+// google.maps.Data point draws an `icon`, not a filled path, and Leaflet's default point is an
+// L.marker whose Icon.Default ignores path options too. So `fillColor`/`strokeColor` silently did
+// nothing for points on BOTH providers. Each adapter now translates the SAME neutral style into its
+// own circle primitive — a google symbol icon, an L.circleMarker — so a styled point looks the same
+// on either. `pointRadius` (px) sizes it.
 /**
  * @typedef {Object} NeutralStyle
  * @property {string} [fillColor]
@@ -137,13 +143,43 @@ export function mapProviderNames() {
  * @property {string} [strokeColor]
  * @property {number} [strokeWidth]
  * @property {number} [strokeOpacity]
+ * @property {number} [pointRadius] - radius in px for Point/MultiPoint features (default 6)
  */
+
+/** Default point radius in px — shared, so a point is the same size on every provider. */
+export const DEFAULT_POINT_RADIUS = 6;
+
+// A unit-radius circle as an SVG path, scaled by `pointRadius`. Spelled out rather than using
+// google.maps.SymbolPath.CIRCLE so the translation stays a PURE function: it is unit-tested under
+// Node, where the google namespace does not exist.
+const UNIT_CIRCLE_PATH = "M 0,-1 A 1,1 0 1,0 0,1 A 1,1 0 1,0 0,-1 Z";
+
+/**
+ * The neutral style of a POINT feature → a `google.maps.Symbol` for `Data.StyleOptions.icon`.
+ * @param {NeutralStyle} [s]
+ * @returns {Object} a google.maps.Symbol
+ */
+export function styleToGooglePoint(s = {}) {
+  const { fillColor, fillOpacity, strokeColor, strokeWidth, strokeOpacity, pointRadius } = s;
+  return {
+    path: UNIT_CIRCLE_PATH,
+    scale: pointRadius ?? DEFAULT_POINT_RADIUS,
+    // A symbol defaults to fillOpacity 0 (invisible), unlike a path — so a supplied fillColor
+    // implies a fully opaque fill unless the caller said otherwise.
+    ...(fillColor != null ? { fillColor, fillOpacity: fillOpacity ?? 1 } : {}),
+    ...(strokeColor != null ? { strokeColor } : {}),
+    ...(strokeWidth != null ? { strokeWeight: strokeWidth } : {}),
+    ...(strokeOpacity != null ? { strokeOpacity } : {}),
+  };
+}
+
 /**
  * @param {NeutralStyle} [s]
  * @returns {Object} a `google.maps.Data` style object
  */
 export function styleToGoogle(s = {}) {
-  const { strokeColor, strokeWidth, strokeOpacity, fillColor, fillOpacity, ...rest } = s;
+  const { strokeColor, strokeWidth, strokeOpacity, fillColor, fillOpacity, pointRadius, ...rest } = s;
+  void pointRadius;                                                // point-only; see styleToGooglePoint
   return {
     ...rest,                                                       // provider-native extras (icon, …)
     ...(fillColor != null ? { fillColor } : {}),
@@ -158,7 +194,7 @@ export function styleToGoogle(s = {}) {
  * @returns {Object} Leaflet path options
  */
 export function styleToLeaflet(s = {}) {
-  const { strokeColor, strokeWidth, strokeOpacity, fillColor, fillOpacity, ...rest } = s;
+  const { strokeColor, strokeWidth, strokeOpacity, fillColor, fillOpacity, pointRadius, ...rest } = s;
   return {
     ...rest,                                                       // provider-native extras (dashArray, …)
     ...(fillColor != null ? { fillColor, fill: true } : {}),
@@ -166,6 +202,7 @@ export function styleToLeaflet(s = {}) {
     ...(strokeColor != null ? { color: strokeColor } : {}),       // stroke color → Leaflet's `color`
     ...(strokeWidth != null ? { weight: strokeWidth } : {}),      // px width → Leaflet's `weight`
     ...(strokeOpacity != null ? { opacity: strokeOpacity } : {}),
+    ...(pointRadius != null ? { radius: pointRadius } : {}),      // L.circleMarker's `radius`
   };
 }
 
@@ -278,17 +315,24 @@ registerMapProvider("google", {
     // eslint-disable-next-line no-undef
     const data = new google.maps.Data();
     const added = data.addGeoJson(geojson);   // Data.Feature[] in document order
-    if (typeof style === "function") {
+    if (style) {
       // google.maps.Data.setStyle accepts a per-feature function, but hands it a Data.Feature — not
       // the GeoJSON feature. Map it back by add order so the callback sees feature.properties/geometry.
+      // Always a FUNCTION, even for a static style object: the geometry TYPE decides whether the
+      // style becomes path options or a point symbol, and only the callback sees it.
       const feats = featuresOf(geojson);
       const indexOf = new Map(added.map((df, i) => [df, i]));
       data.setStyle((df) => {
         const i = indexOf.get(df) ?? 0;
-        return styleToGoogle(resolveFeatureStyle(style, feats[i], i));
+        const neutral = typeof style === "function" ? resolveFeatureStyle(style, feats[i], i) : style;
+        const out = styleToGoogle(neutral);
+        // Points draw an icon, not a path — translate the same neutral style into a circle symbol,
+        // unless the caller passed a provider-native `icon` of their own (which `rest` preserved).
+        if (out.icon == null && /Point$/.test(df.getGeometry?.()?.getType?.() || "")) {
+          out.icon = styleToGooglePoint(neutral);
+        }
+        return out;
       });
-    } else if (style) {
-      data.setStyle(styleToGoogle(style));   // neutral vocab → google.maps.Data style
     }
     data.setMap(map);
     return data;
@@ -466,15 +510,27 @@ registerMapProvider("leaflet", {
   addVector(map, geojson, { style } = {}) {
     const L = _leaflet;
     if (!L) throw new Error("leaflet provider: addVector called before a leaflet map was created");
-    let opts = {};
-    if (typeof style === "function") {
-      // L.geoJSON's style callback gets the GeoJSON feature but no index; recover it from a
-      // reference map (L.geoJSON keeps the original feature object as layer.feature).
-      const indexOf = new Map(featuresOf(geojson).map((f, i) => [f, i]));
-      opts = { style: (feature) => styleToLeaflet(resolveFeatureStyle(style, feature, indexOf.get(feature) ?? 0)) };
-    } else if (style) {
-      opts = { style: () => styleToLeaflet(style) };   // neutral vocab → L path opts
-    }
+    // L.geoJSON's style callback gets the GeoJSON feature but no index; recover it from a
+    // reference map (L.geoJSON keeps the original feature object as layer.feature).
+    const indexOf = typeof style === "function"
+      ? new Map(featuresOf(geojson).map((f, i) => [f, i]))
+      : null;
+    const neutralFor = (feature) => (typeof style === "function"
+      ? resolveFeatureStyle(style, feature, indexOf.get(feature) ?? 0)
+      : (style || {}));
+
+    const opts = {
+      // Leaflet's default for a Point is L.marker with Icon.Default, which resolves its PNGs from
+      // the URL of a `<script src=".../leaflet.js">` tag. This package BUNDLES Leaflet, so that tag
+      // never exists, Icon.Default falls back to a page-relative `images/marker-icon.png`, and every
+      // point renders as a broken image. A circleMarker needs no asset at all AND honours the
+      // neutral style vocabulary that an icon marker ignores — the same circle google draws above.
+      pointToLayer: (feature, latlng) => {
+        const s = neutralFor(feature);
+        return L.circleMarker(latlng, { radius: DEFAULT_POINT_RADIUS, ...styleToLeaflet(s) });
+      },
+    };
+    if (style) opts.style = (feature) => styleToLeaflet(neutralFor(feature));   // neutral vocab → L path opts
     const layer = L.geoJSON(geojson, opts);
     layer.addTo(map);
     return layer;
