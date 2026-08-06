@@ -424,6 +424,8 @@ let fim = null, toast = null, tooltip = null, infoWindow = null;
 let rasterLayer = null, rasterTools = null, hoverBinding = null, opsPanel = null;
 let vectorLayer = null, vectorTools = null, infoBinding = null, pointLayer = null;
 let colorScale = null, lastRegionFilter = null;
+// Step 7's state. Declared up here because boot() registers the map:click handler that reads it.
+let mlLayers = [], mlLog = [];
 
 async function refreshReadModels() {
   if (!rasterLayer) return;
@@ -440,6 +442,15 @@ async function boot() {
 
   document.querySelectorAll("[data-toast]").forEach((b) => b.addEventListener("click", () =>
     fim.emit("notify", { message: `A ${b.dataset.toast} message on ${provider}`, level: b.dataset.toast })));
+
+  // Step 7's log. This has to be registered here, not at module scope, because it needs `fim`. It
+  // fires BEFORE the per-layer dispatch, so it resets the buffer that each layer's own click handler
+  // appends to; the setTimeout(0) then renders once dispatch has finished walking the stack.
+  fim.on("map:click", () => {
+    if (!mlLayers.length) return;
+    mlLog = ["click:"];
+    setTimeout(() => { $("#ml-log").textContent = mlLog.join("\n"); }, 0);
+  });
 
   $("#bootinfo").textContent =
     `provider : ${provider}\ncentre   : ${center.lat}, ${center.lng}  zoom ${zoom}\n` +
@@ -544,7 +555,6 @@ $("#clear-points").addEventListener("click", () => { pointLayer?.remove(); point
 
 // ── 7 · multi-layer dispatch ───────────────────────────────────────────────────────────────────
 const ML_COLORS = ["#f85149", "#3fb950", "#58a6ff"];    // z=0 bottom … z=2 top
-let mlLayers = [], mlLog = [];
 function mapCenter() {
   const c = fim.map.getCenter();
   return provider === "leaflet" ? { lat: c.lat, lng: c.lng } : { lat: c.lat(), lng: c.lng() };
