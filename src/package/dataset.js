@@ -589,6 +589,56 @@ export class Dataset {
   get selector() { return this.#selector; }
 
   /**
+   * Narrow one axis to the window `[from, to]` — a **series in, series out** operation, which is what
+   * separates it from `select()`. `select(coord)` resolves to ONE payload and hands back something
+   * forceable; `selectRange` hands back another selection-axis Dataset, still lazy, still unforceable
+   * on its own. That is the point: everything that works on the full series works on the window,
+   * `reduce()` most of all — "the mean of these six hours" is `selectRange(a, b).reduce('mean')`,
+   * with no new machinery on either side.
+   *
+   * Both bounds are **inclusive**, and the comparison is a plain `>=`/`<=` on the entry coords, so it
+   * is type-agnostic: numeric coords (epoch milliseconds, a stage in feet) compare numerically, and
+   * ISO-8601 strings compare lexicographically, which for ISO-8601 is the same as chronologically.
+   * Reversed bounds are swapped rather than rejected. Unlike `select()` there is no nearest-match: a
+   * window is already tolerant of falling between samples, so a range narrower than the sampling
+   * interval matches nothing and returns `null` — which is honest, where snapping would silently hand
+   * back a wider span than asked for.
+   *
+   * Coords are compared as given — `Date.parse(iso)` for the epoch-millisecond axes `parseSciwrid`
+   * builds. The engine stays domain-neutral about what a coordinate means.
+   *
+   * ```js
+   * const storm = ds.selectRange(Date.parse('2023-08-29T00:00Z'), Date.parse('2023-08-30T00:00Z'));
+   * storm.axis.entries.length;          // just that day's steps
+   * await storm.reduce('max').grid();    // peak rainfall WITHIN the window
+   * storm.select(coord);                  // and one step out of it, as usual
+   * ```
+   *
+   * @param {number|string} from - inclusive lower bound
+   * @param {number|string} to - inclusive upper bound
+   * @param {Object} [opts]
+   * @param {number|string} [opts.axis=0] - which axis (index or name) to narrow
+   * @returns {Dataset|null} a Dataset whose chosen axis holds only the matching entries; `null` when
+   *   the axis is missing/empty or nothing falls inside the window
+   */
+  selectRange(from, to, { axis = 0 } = {}) {
+    const idx = typeof axis === "number" ? axis : this.axes?.findIndex((a) => a.name === axis);
+    const ax = idx >= 0 ? this.axes?.[idx] : null;
+    if (!ax?.entries?.length) return null;
+    const [lo, hi] = from <= to ? [from, to] : [to, from];
+    const entries = ax.entries.filter((e) => e.coord >= lo && e.coord <= hi);
+    if (!entries.length) return null;
+    // Every OTHER axis is carried through untouched — narrowing time must not disturb a variable or
+    // ensemble axis sitting beside it.
+    return new Dataset({
+      name: this.name, kind: this.kind, format: this.format, crs: this.crs,
+      bounds: this.#bounds, meta: this.#meta,
+      data: this.data, url: this.#url, resolveUrl: this.#resolveUrl,
+      axes: this.axes.map((a, i) => (i === idx ? { ...a, entries } : a)),
+    });
+  }
+
+  /**
    * Look up an entry on one axis by coordinate. Exact match first; with { nearest: true } (default) and
    * a NUMERIC axis, falls back to the closest coord. `axis` selects which axis (index or name).
    * @param {number|string} coord
@@ -646,8 +696,17 @@ export class Dataset {
   // ---- private force helpers ----
 
   async #materializeRoot() {
+    // A selection-axis series is not forceable, whether or not it holds bytes. That distinction used
+    // to be free — a series was URL-backed and had no `data`, so the no-source branch below caught it.
+    // In-file selectors changed that: a NetCDF/GRIB2/Zarr series carries the whole file, so the
+    // series check has to come first and stand on `axes` alone. A node with its own `selector` is the
+    // exception — it is one resolved slice, and forcing it is exactly right.
+    if (this.axes?.length && !this.#selector) {
+      throw new Error(`load(): "${this.name}" is a selection-axis series (${this.axes.length} ` +
+        `axis/axes, ${this.axes[0]?.entries?.length ?? 0} entries on the first) — select(coord) an ` +
+        "entry first, or reduce(op) to collapse the axis.");
+    }
     if (!this.#url && this.data == null) {
-      if (this.axes) throw new Error(`load(): "${this.name}" is a selection-axis series — select(coord) an entry first`);
       throw new Error(`load(): "${this.name}" has no source (no data, no url)`);
     }
     const mat = getMaterializer(this.format);

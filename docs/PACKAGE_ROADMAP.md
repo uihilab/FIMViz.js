@@ -582,9 +582,24 @@ path was never affected because `colorizeGrid` pre-filters `NaN` itself.
   are the only two value types, and `reduce()` exists precisely to collapse an axis *to a grid*. A
   third value type would touch materialize, the ops, `Stats`, and `toRecord` round-tripping. Worth
   doing eventually; folding it in here is how the NetCDF slice slips.
-- **Temporal range selection** — `select()` resolves a single entry. A `selectRange(from, to)`
-  narrowing the axis is genuinely new surface, though SciWrid backs it natively (`t1`/`t2`/
-  `dateRange`). A follow-on once single-entry `select()` is proven.
+- ~~**Temporal range selection**~~ — ✅ **landed** as `ds.selectRange(from, to, { axis })`. The shape
+  that made it cheap: **series in, series out.** `select()` resolves one entry and hands back a
+  forceable payload; `selectRange` hands back another selection-axis Dataset, so everything already
+  built on a full axis works on a window unchanged — "the peak of these six hours" is
+  `selectRange(a, b).reduce('max')`, needing nothing new on either side. Bounds are inclusive and
+  compared with plain `>=`/`<=`, which is type-agnostic: numeric coords compare numerically and
+  ISO-8601 strings lexicographically, i.e. chronologically. Reversed bounds swap. **No nearest-match**,
+  deliberately — a window already tolerates falling between samples, so one narrower than the sampling
+  interval returns `null` rather than silently widening to a bigger span than was asked for. Other
+  axes pass through untouched, which is what keeps it usable once a variable or ensemble axis sits
+  beside time. Needed no SciWrid support at all, despite `t1`/`t2`/`dateRange` existing: filtering
+  entries is a pure axis operation, and pushing the window down to the reader would have made it a
+  format-specific feature instead of a Dataset one.
+  - **Fixed on the way:** a selection-axis series was still forceable. The guard read "no source *and*
+    has axes", which was free while a series was URL-backed with no `data` — in-file selectors gave
+    a series the whole file, so it sailed past and failed later with a confusing decoder error. It now
+    stands on `axes` alone (a node with its own `selector` being the exception, since that *is* one
+    resolved slice), and names `select()`/`reduce()` as the way forward.
 - **Parquet/Kerchunk** — SciWrid reads both, and they are vector/reference-shaped rather than gridded.
   Out of scope until the raster path lands.
 

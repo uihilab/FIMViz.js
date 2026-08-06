@@ -49,6 +49,7 @@ raw File/Blob/ArrayBuffer/URL into a Dataset for you.
 | Method                          | Params                                                                                                    | Returns                                      | Notes                                                                                                                                                                                                                                                       |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `select(coord, opts?)`          | `coord: number|string`; `opts.axis=0` (index/name), `opts.nearest=true`, `opts.variant`, `opts.base`      | `Dataset|null`                               | Resolves one axis entry to a child Dataset — URL-rooted, or rooted on this Dataset's own source for an in-file selector ([below](#axis-entries-one-file-per-entry-or-one-file-many-entries)). Only meaningful on a Dataset with `.axes` (a selection-axis series) — a plain parsed file has none. `null` on no match. `opts.variant` required when the entry's `ref` is `{raster, vector}`-shaped. |
+| `selectRange(from, to, opts?)`  | `from`/`to`: inclusive bounds (same type as the coords); `opts.axis=0`                                    | `Dataset|null`                               | **Series in, series out** — narrows one axis to a window instead of resolving one entry, so `select()`/`reduce()` still work on the result ("the mean of these six hours" is `selectRange(a,b).reduce('mean')`). Reversed bounds swap. No nearest-match: a window narrower than the sampling returns `null` rather than silently widening. Other axes are untouched. |
 | `selectAxisEntry(coord, opts?)` | same `opts` (no `variant`/`base`)                                                                         | `DatasetAxisEntry|null`                      | What `select` looks up before resolving the URL — exact match first, nearest **numeric** coord on a miss (`nearest:true`, default).                                                                                                                         |
 | `reduce(op?, opts?)`            | `op: 'sum'|'mean'|'min'|'max'` (default `'mean'`); `opts.axis=0`, `opts.method='nearest'`, `opts.variant` | `Dataset`                                    | Collapse a temporal/vertical axis to one grid — sugar over `select()` every entry + `combine()`. Throws if no axis / empty axis / an entry fails to resolve.                                                                                                |
 | `toRecord(opts?)`               | `opts.storeMaterialized=false`                                                                            | `Object`                                     | Structured-cloneable snapshot for `Storage.put()`. Default = source + op recipe (small); `storeMaterialized:true` also embeds the decoded grid/features (call `await ds.load()` first, or it throws).                                                       |
@@ -84,6 +85,15 @@ child.selector;                   // → { variable: 'TMP', t: 1 }
 child.axes;                       // → null — a child is ONE payload, so it forces like any Dataset
 await child.grid();               // materializer receives { kind:'inline', data, select: {…} }
 await ds.reduce('mean').grid();   // every entry resolved + reduced — no extra machinery
+```
+
+A **series is not forceable** — `load()`/`grid()` on one throws, naming `select()`/`reduce()` as the
+way forward. That holds whether or not it carries the file's bytes, which an in-file series does:
+
+```js
+const storm = ds.selectRange(t0, t1);   // → a NARROWER series, still lazy, still not forceable
+await storm.reduce('max').grid();        // the peak within that window
+storm.select(coord);                      // …or one step out of it
 ```
 
 `select`'s `base` applies to URL refs only. A selector ref may also carry `name`/`crs`/`bounds` to

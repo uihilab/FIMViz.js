@@ -325,3 +325,68 @@ describe("Dataset: selection axis — in-file selector refs", () => {
       "the discriminator is an object-valued `select`, not merely the key's presence");
   });
 });
+
+// selectRange narrows an axis to a window. The distinction that matters: select() resolves to ONE
+// payload, selectRange returns another SERIES — so everything that worked on the whole axis works on
+// the window, reduce() included. See docs/PACKAGE_ROADMAP.md §8.
+describe("Dataset: selectRange — series in, series out", () => {
+  const axis = {
+    name: "time", unit: "ms",
+    entries: [0, 10, 20, 30, 40].map((c) => ({ coord: c, ref: { select: { variable: "V", time: c / 10 } } })),
+  };
+  const series = () => new Dataset({ name: "s", kind: "raster", format: "test-nd",
+    data: new ArrayBuffer(4), axis });
+
+  test("narrows to the inclusive window, keeping the Dataset a series", () => {
+    const win = series().selectRange(10, 30);
+    assert.deepEqual(win.axis.entries.map((e) => e.coord), [10, 20, 30], "both bounds included");
+    assert.equal(win.axes.length, 1, "still a selection-axis Dataset, not a payload");
+    assert.equal(win.selector, null, "…so it carries no selection of its own");
+    assert.equal(win.data, series().data === null ? null : win.data, "sanity");
+  });
+
+  test("the window is itself selectable and reducible — nothing special-cased", () => {
+    const win = series().selectRange(10, 30);
+    assert.deepEqual(win.select(20).selector, { variable: "V", time: 2 }, "select() works on a window");
+    assert.doesNotThrow(() => win.reduce("mean"), "and so does reduce(), over just those entries");
+  });
+
+  test("reversed bounds are swapped, not rejected", () => {
+    assert.deepEqual(series().selectRange(30, 10).axis.entries.map((e) => e.coord), [10, 20, 30]);
+  });
+
+  test("a window narrower than the sampling matches nothing and says so with null", () => {
+    // Deliberately NOT snapped to the nearest entry: a window is already tolerant of falling between
+    // samples, so widening silently would hand back a bigger span than was asked for.
+    assert.equal(series().selectRange(11, 19), null);
+    assert.equal(series().selectRange(100, 200), null, "outside the axis entirely");
+    assert.equal(new Dataset({ name: "no-axes" }).selectRange(0, 1), null, "no axis at all");
+  });
+
+  test("ISO-8601 string coords compare chronologically, being lexicographic", () => {
+    const iso = new Dataset({ name: "t", axis: { name: "time", entries: [
+      { coord: "2023-08-28T00:00:00Z", ref: "a" }, { coord: "2023-08-29T00:00:00Z", ref: "b" },
+      { coord: "2023-08-30T00:00:00Z", ref: "c" },
+    ] } });
+    const win = iso.selectRange("2023-08-28T12:00:00Z", "2023-08-29T12:00:00Z");
+    assert.deepEqual(win.axis.entries.map((e) => e.coord), ["2023-08-29T00:00:00Z"]);
+  });
+
+  test("a second axis is carried through untouched", () => {
+    const two = new Dataset({ name: "2d", data: new ArrayBuffer(4), axes: [
+      axis, { name: "member", entries: [{ coord: 0, ref: "m0" }, { coord: 1, ref: "m1" }] },
+    ] });
+    const win = two.selectRange(0, 10);
+    assert.equal(win.axes[0].entries.length, 2, "time narrowed");
+    assert.equal(win.axes[1].entries.length, 2, "member untouched");
+    assert.deepEqual(two.selectRange(1, 1, { axis: "member" }).axes[1].entries.map((e) => e.coord), [1],
+      "and the axis can be chosen by name");
+  });
+
+  test("a series is not forceable even though it now carries the file's bytes", async () => {
+    // In-file selectors changed this: a series used to be URL-backed with no `data`, so the
+    // no-source check caught it by accident. It has to stand on `axes` alone now.
+    await assert.rejects(() => series().load(), /selection-axis series.*select\(coord\)/s);
+    await assert.rejects(() => series().selectRange(10, 30).load(), /selection-axis series/);
+  });
+});
