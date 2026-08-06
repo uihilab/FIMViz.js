@@ -18,6 +18,17 @@ import { RasterGrid } from "../package/materialize.js";
 /** Formats this adapter can decode. Registered by `registerSciwridFormats()`. @type {string[]} */
 export const SCIWRID_FORMATS = ["netcdf4", "netcdf3", "grib2", "zarr"];
 
+/**
+ * Formats for which `scan()` NEVER reports a bbox, so an extent must always be supplied.
+ *
+ * Not a property of any particular file: SciWrid assigns its internal `_geoBbox` only on the
+ * netcdf4, zarr and parquet paths, and never on the WASM-backed ones — so a perfectly rectilinear
+ * GRIB2 is as extent-less as a polar-stereographic one. Worth naming explicitly, because the
+ * alternative reading ("this file must be curvilinear") sends you looking at the wrong thing.
+ * @type {Set<string>}
+ */
+const NO_BBOX_FORMATS = new Set(["grib2", "netcdf3"]);
+
 let _mod = null;
 /** Load SciWrid once, lazily. The whole point of the dynamic import — see the header. */
 async function sciwrid() {
@@ -119,9 +130,13 @@ function nativeGridOf(scanResult, variable, override) {
     // lat(j,i)/lon(j,i) instead, which the scan skips. The pixels are still readable — only the
     // extent is unknown — so passing `grid` makes the file work.
     const cause = bbox == null
-      ? "scan() derived no bbox at all — the usual cause is a CURVILINEAR grid (2-D lat(j,i)/lon(j,i) " +
-        "coordinates: ocean `tos` products, NEMO, tripolar and polar-stereographic grids like NCEP " +
-        "Stage IV), or a Zarr store with no CF coordinates. scan() reads 1-D coordinate variables only"
+      ? (NO_BBOX_FORMATS.has(scanResult.format)
+        ? `scan() never derives an extent for ${scanResult.format} at all — SciWrid populates a bbox ` +
+          "only on its netcdf4/zarr/parquet paths, so EVERY file of this format needs one supplied, " +
+          "whatever its grid geometry"
+        : "scan() derived no bbox — it reads 1-D coordinate variables only, so a CURVILINEAR grid " +
+          "(2-D lat(j,i)/lon(j,i): ocean `tos` products, NEMO, tripolar and rotated grids) or a Zarr " +
+          "store with no CF coordinates leaves nothing to place the data with")
       : `scan() reported ${JSON.stringify(bbox)}, which was REJECTED because ${problem}`;
     throw new Error(
       `sciwrid: "${variable.name}" has no usable geographic extent, so it cannot be placed on a map. ` +

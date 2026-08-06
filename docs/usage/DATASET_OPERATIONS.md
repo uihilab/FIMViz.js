@@ -101,9 +101,16 @@ The concrete producer of selector axes — multi-dimensional scientific formats,
 [SciWrid Toolkit](https://github.com/uihilab/SciWrid-Toolkit). **Opt-in and not on the barrel**: the
 engine never imports it, so the ~193 KB wasm stays out of every other consumer's bundle.
 
-Tested end-to-end on **NetCDF4**, **GRIB2** and **Zarr v2** (`netcdf3` is registered but not yet
-exercised). One call covers all of them — the differences between formats live inside the adapter:
-GRIB2 reports `nx`/`ny` instead of a `shape`, Zarr reports `shape` as an array rather than a string.
+One call covers every format — the differences live inside the adapter (GRIB2 reports `nx`/`ny`
+instead of a `shape`; Zarr reports `shape` as an array rather than a string). What differs for a
+*caller* is what `scan()` can tell us about a file, which is not uniform:
+
+| Format | Extent from `scan()` | Time axis | So you get |
+|---|---|---|---|
+| **NetCDF4** | ✅ from 1-D coords | ✅ | the full temporal path |
+| **Zarr v2** | ✅ when the store has CF coords | ✅ | the full temporal path |
+| **GRIB2** | ❌ never — supply `grid.bbox` | ✅ | scrub + `reduce()`, with an extent |
+| **NetCDF3** | ❌ never — supply `grid.bbox` | ❌ | a **single grid**; no `select()`/`reduce()` |
 
 ```js
 import { parseSciwrid } from 'fimviz/src/io/sciwrid.js';
@@ -138,12 +145,16 @@ once at boot before `Dataset.fromRecord`.
 
 #### "has no usable geographic extent"
 
-A common failure on real-world files, and a recoverable one. It happens for two different reasons,
+A common failure on real-world files, and a recoverable one. It happens for three different reasons,
 and the message says which:
 
-- **No bbox was derived.** `scan()` reads **1-D** coordinate variables only, so a **curvilinear** grid
-  (2-D `lat(j,i)`/`lon(j,i)` — ocean `tos` products, NEMO, tripolar and polar-stereographic grids like
-  NCEP Stage IV) or a **Zarr store with no CF coordinates** yields nothing to place the data with.
+- **The format never reports one.** `scan()` derives a bbox only on its netcdf4/zarr/parquet paths —
+  so for **GRIB2 and NetCDF3 it is *always* absent**, whatever the file's grid looks like. Every file
+  of those two formats needs an extent supplied. (This is a property of the reader, not of your file:
+  don't go looking for curvilinear coordinates.)
+- **No bbox was derived** (netcdf4/zarr). There `scan()` reads **1-D** coordinate variables, so a
+  **curvilinear** grid (2-D `lat(j,i)`/`lon(j,i)` — ocean `tos` products, NEMO, tripolar and rotated
+  grids) or a **Zarr store with no CF coordinates** leaves nothing to place the data with.
 - **A bbox was derived and rejected.** `scan()`'s matcher accepts variables *named* `x`/`y`, so a
   **projected** file (HRRR, RAP, NAM, WRF) reports its extent in **metres** — e.g.
   `[-2699020, -1588806, 2697980, 1588806]`. That is checked as degrees (`|lat| ≤ 90`, `|lon| ≤ 360`)

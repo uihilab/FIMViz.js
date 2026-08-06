@@ -198,12 +198,15 @@ describe("sciwrid adapter: GRIB2", () => {
     assert.equal(ds.axis.entries.length, 4, "one axis entry per message");
   });
 
-  test("a polar-stereographic file has no derivable extent, and says so actionably", async () => {
-    // Stage IV is curvilinear (grid template 20), so scan() reports no bbox — the real-world case.
-    // The pixels are readable; only the extent is unknown, so the error must point at the fix.
+  test("GRIB2 never reports an extent — the FORMAT, not this file's grid", async () => {
+    // Easy to misdiagnose: Stage IV is polar-stereographic, so "curvilinear" looks like the cause.
+    // It isn't. SciWrid assigns a bbox only on its netcdf4/zarr/parquet paths, so a rectilinear GRIB2
+    // is equally extent-less. The message must say that, or it sends the reader to inspect the file.
     await assert.rejects(() => parseSciwrid(readFileSync(FIX)), (e) => {
       assert.match(e.message, /no usable geographic extent/);
-      assert.match(e.message, /curvilinear/i, "must name the likely cause");
+      assert.match(e.message, /never derives an extent for grib2/, "must blame the format");
+      assert.ok(!/curvilinear/i.test(e.message),
+        "and must NOT suggest curvilinear coords, which is a different cause entirely");
       assert.match(e.message, /parseSciwrid\(file, \{/, "and show the call that fixes it");
       return true;
     });
@@ -242,5 +245,38 @@ describe("sciwrid adapter: Zarr v2", () => {
     assert.equal(g.height, 390);
     assert.equal(g.crs, "EPSG:4326");
     assert.ok(range(g.pixels).n > 0);
+  });
+});
+
+// NetCDF3 is the weakest of the four formats, so it is pinned rather than assumed. It decodes, but
+// scan() surfaces neither an extent nor a time axis for it — the first because SciWrid only
+// populates a bbox on its netcdf4/zarr/parquet paths, the second because the C accessor for NetCDF3
+// times is still outstanding upstream. Registered and usable; the temporal half of §8 does not apply.
+describe("sciwrid adapter: NetCDF3 (degraded, deliberately pinned)", () => {
+  const FIX = fileURLToPath(new URL("../assets/SampleFiles/sample.nc3", import.meta.url));
+
+  test("needs an extent — the format never reports one, whatever the grid looks like", async () => {
+    await assert.rejects(() => parseSciwrid(readFileSync(FIX)), (e) => {
+      assert.match(e.message, /never derives an extent for netcdf3/,
+        "must blame the format, not send the reader hunting for curvilinear coordinates");
+      return true;
+    });
+  });
+
+  test("decodes to a SINGLE grid once an extent is given — no time axis to scrub", async () => {
+    const ds = await parseSciwrid(readFileSync(FIX), { grid: { bbox: [-10, -5, 10, 5] } });
+    assert.equal(ds.format, "netcdf3");
+    assert.equal(ds.axes, null, "scan() surfaces no times for netcdf3");
+    assert.deepEqual(ds.selector, { variable: "temperature", time: 0 },
+      "so the Dataset carries its own selector and forces directly");
+    const g = await ds.grid();
+    assert.equal(g.width, 5);
+    assert.equal(g.height, 4);
+    assert.equal(range(g.pixels).n, 20, "every cell decoded");
+  });
+
+  test("reduce() therefore throws — there is no axis, and it says so", async () => {
+    const ds = await parseSciwrid(readFileSync(FIX), { grid: { bbox: [-10, -5, 10, 5] } });
+    assert.throws(() => ds.reduce("mean"), /no selection-axis entries to reduce/);
   });
 });

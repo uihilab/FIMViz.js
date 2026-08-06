@@ -493,12 +493,24 @@ with one format difference worth recording. Both are node-tested against vendore
   untouched.
 - **Zarr needed nothing** — its `shape` is an array rather than a string (already handled), and the
   AORC store carries CF coordinates, so it gets a real extent with no override.
-- **Curvilinear files are the recurring real-world snag, not a format issue.** Stage IV is
-  polar-stereographic, so `scan()` derives no bbox — the identical situation as ocean `tos` products.
-  `opts.grid` is therefore a **partial** override: pass `bbox` alone and the pixel dims still come
-  from the variable's own shape. The engine still refuses to guess an extent (a wrong one silently
-  misplaces every pixel), but the thrown error now names the variable, its shape, the variables
-  present, the likely cause, and the exact call that fixes it.
+- **Two entirely different reasons a file has no extent — worth not conflating.** SciWrid assigns its
+  internal `_geoBbox` **only** on the netcdf4/zarr/parquet paths and never on the WASM-backed ones, so
+  `scan().bbox` is *always* undefined for **GRIB2 and NetCDF3** regardless of grid geometry — a
+  rectilinear GRIB2 is as extent-less as polar-stereographic Stage IV. (An earlier note here blamed
+  Stage IV's curvilinear grid; that was wrong, and it sends you inspecting the file instead of the
+  format.) For **netcdf4/zarr** the bbox *is* derived, from 1-D coordinate variables, so its absence
+  there really does mean curvilinear coords or a store with no CF coordinates. The error message
+  distinguishes the two cases. Either way `opts.grid` is a **partial** override: pass `bbox` alone and
+  the pixel dims still come from the variable's own shape. The engine still refuses to guess an extent
+  — a wrong one silently misplaces every pixel.
+
+✅ **Landed: NetCDF3, exercised rather than assumed** — and it is the weakest of the four, which is
+the point of testing it. It decodes (`shape` parses, pixels come back correct), but `scan()` surfaces
+**neither an extent nor a time axis** for it: the extent because of the WASM-path gap above, the times
+because SciWrid's own docs record that a `wp_nc3_get_time_units_json` accessor is still needed. So a
+NetCDF3 file arrives as a **single grid with a mandatory extent override** — `select()` and `reduce()`
+have no axis to work on. Registered and usable, but the temporal half of §8 does not apply to it, and
+a test pins exactly that so the limitation cannot quietly change.
 
 ### 8.1 Which grids we actually support (scope, and the silent-failure guard)
 
@@ -518,6 +530,14 @@ extent override for anything else. Everything below is a horizontal-grid type re
 | Cubed-sphere / icosahedral | tiles/faces | GFDL FV3, MPAS | ❌ |
 | Swath | 2-D geolocation, irregular, bowtie gaps | MODIS L2, VIIRS, TROPOMI | ❌ |
 | DGGS | cell IDs, no coordinates | H3, S2, geohash | ❌ |
+
+**Read that table as being about *geometry*, not about which files work.** Two independent things
+decide whether a file lands on the map: its grid geometry (above) and whether its **format path**
+reports an extent at all. `scan()` populates a bbox only on the netcdf4/zarr/parquet paths, so **every
+GRIB2 and NetCDF3 file needs an extent supplied regardless of geometry** — NCEP Stage IV appears in the
+curvilinear row because it genuinely is curvilinear, but it would need an override even if it were a
+plain lat/lon grid. Conversely a curvilinear *NetCDF4* file fails for the geometry reason. The thrown
+error distinguishes them, because the two send you looking in completely different places.
 
 **The guard, and why it earns its place.** `scan()` derives a bbox from the min/max of whatever 1-D
 variables are *named* like coordinates — and its matcher accepts `x`/`y` and `rlat`/`rlon`

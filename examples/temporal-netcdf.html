@@ -84,10 +84,11 @@
         Three bundled samples, all Hurricane Idalia so the reductions are comparable:
         <strong>NetCDF4</strong> (NLDAS-2, 120 hourly steps, 104×96), <strong>Zarr</strong> (AORC, 120
         steps, 390×390) and <strong>GRIB2</strong> (NCEP Stage IV, trimmed to 4 steps, 1121×881).
-        The GRIB2 one pre-fills the extent box, because Stage IV is polar-stereographic and
-        <code>scan()</code> derives no bbox from a curvilinear grid — the same override any such file
-        needs. Any NetCDF4/NetCDF3/GRIB2/Zarr file with a time axis works; the first NetCDF4 decode
-        pulls <code>h5wasm</code> from a CDN.
+        The GRIB2 one pre-fills the extent box because <code>scan()</code> reports no extent for
+        <em>any</em> GRIB2 or NetCDF3 file — a property of the reader, not of this file's grid — so
+        those two formats always need one supplied. NetCDF4 and Zarr derive theirs from 1-D coordinate
+        variables, and only fail when a file has none (curvilinear ocean grids, CF-less Zarr stores).
+        The first NetCDF4 decode pulls <code>h5wasm</code> from a CDN.
       </p>
       <pre id="scan">— nothing loaded —</pre>
     </div>
