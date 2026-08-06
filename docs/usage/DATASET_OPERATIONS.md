@@ -120,7 +120,21 @@ instead of a `shape`; Zarr reports `shape` as an array rather than a string). Wh
 | **NetCDF4** | ✅ from 1-D coords | ✅ | the full temporal path |
 | **Zarr v2** | ✅ when the store has CF coords | ✅ | the full temporal path |
 | **GRIB2** | ❌ never — supply `grid.bbox` | ✅ | scrub + `reduce()`, with an extent |
-| **NetCDF3** | ❌ never — supply `grid.bbox` | ❌ | a **single grid**; no `select()`/`reduce()` |
+| **NetCDF3** | ❌ never — supply `grid.bbox` | ❌ invisible | a **single grid** + `allowExtraDims` |
+
+#### Dimensions beyond (lat, lon) + time
+
+`T(time, level, lat, lon)` is ordinary — ERA5, GFS, CMIP. The decoder exposes no way to pick a level,
+member or band, so a 4-D variable **throws** rather than silently handing you whichever slice the
+reader chose:
+
+```js
+await parseSciwrid(file, { allowExtraDims: true });   // accept it; recorded on meta.extraDims
+```
+
+This is arithmetic on the declared `shape`, not on what the reader admits to — which is why a
+**NetCDF3** file trips it even though `scan()` reports no time axis: its time dimension is *invisible*
+but still there, and was being collapsed unannounced.
 
 ```js
 import { parseSciwrid } from 'fimviz/src/io/sciwrid.js';

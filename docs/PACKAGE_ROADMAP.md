@@ -561,6 +561,20 @@ nobody questions — so `geographicBboxProblem()` now range-checks any bbox as d
 
 Both are upstream fixes, not ours; the useful thing we can do is not pretend they're handled.
 
+✅ **Landed: a guard for unmodelled dimensions.** `T(time, level, lat, lon)` is ordinary output
+(ERA5/GFS/CMIP), and the adapter models only (lat, lon) + one time axis. Left alone that fails in the
+worst available way — a normal-looking time scrubber over a vertical level nobody chose, correctly
+placed and quietly wrong. `extractGrid` exposes no level/member/band selector, so we cannot resolve it
+either; `parseSciwrid` therefore **throws** when a variable declares more dimensions than are
+modelled, and `allowExtraDims: true` is the caller's acknowledgement, recording `meta.extraDims` and
+the raw `shape` rather than losing them.
+
+The check is arithmetic on the declared shape, **not** on what the reader admits to — which is what
+makes it useful. It immediately caught our own NetCDF3 fixture: `sample.nc3` is `(time=3, lat=4,
+lon=5)`, but since `scan()` surfaces no times for netcdf3, dimension 0 was *invisible and unmodelled*,
+and had been collapsed unannounced since the format landed. Trusting the reader's silence would have
+hidden exactly the bug the guard exists to find.
+
 **Beyond the horizontal grid**, three axis families matter for this domain and none is modelled yet:
 **vertical coordinates** (pressure/height/depth are directly usable; sigma, hybrid sigma-pressure and
 ocean s-coordinates are *dimensionless* and need `formula_terms` plus a surface field to become real

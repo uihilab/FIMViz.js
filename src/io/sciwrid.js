@@ -95,17 +95,28 @@ function geographicBboxProblem(bbox) {
  * `shape` is `'120x96x104'` (NetCDF/GRIB) or `[120, 96, 104]` (Zarr), in CF order — the two trailing
  * dimensions are (lat, lon), so height/width are the LAST two regardless of how many lead them.
  */
-function nativeGridOf(scanResult, variable, override) {
+/**
+ * A variable's dimension lengths, in CF order — `'120x96x104'` (NetCDF/GRIB string) or
+ * `[120, 96, 104]` (Zarr array), falling back to GRIB2's `nx`/`ny`, which is all it reports.
+ * @param {Object} variable
+ * @returns {number[]}
+ */
+function usableDims(variable) {
   const dims = Array.isArray(variable.shape)
     ? variable.shape.map(Number)
     : String(variable.shape || "").split(/[x×,]/).map((n) => Number(n.trim()));
-  let usable = dims.filter((n) => Number.isFinite(n) && n > 0);
+  const usable = dims.filter((n) => Number.isFinite(n) && n > 0);
   // GRIB2 reports no `shape` — a message IS one 2-D field, so scan() gives `nx`/`ny` (+ `messages`
   // for the count) instead. Same (height, width) order as the trailing pair of a CF shape.
   if (usable.length < 2 && Number.isFinite(variable.nx) && Number.isFinite(variable.ny)
       && variable.nx > 0 && variable.ny > 0) {
-    usable = [variable.ny, variable.nx];
+    return [variable.ny, variable.nx];
   }
+  return usable;
+}
+
+function nativeGridOf(scanResult, variable, override) {
+  const usable = usableDims(variable);
   if (usable.length < 2) {
     throw new Error(`sciwrid: variable "${variable.name}" has no usable 2-D shape ` +
       `(shape=${JSON.stringify(variable.shape)}, nx=${variable.nx}, ny=${variable.ny}) — a griddable ` +
@@ -252,6 +263,10 @@ export function registerSciwridFormats(formats = SCIWRID_FORMATS) {
  *   decode coarser than native
  * @param {number} [opts.workers] - extractGrid's worker count; defaults to SciWrid's own in a browser
  *   and to `0` (inline) under Node, where the worker pool never resolves
+ * @param {boolean} [opts.allowExtraDims=false] - proceed with a variable carrying dimensions beyond
+ *   (lat, lon) + time — a vertical level, ensemble member or band. Off by default: the reader collapses
+ *   them with no say from the caller, so this is an acknowledgement, not a fix. Recorded on
+ *   `meta.extraDims`
  * @param {(url: string) => string} [opts.resolveUrl] - host CORS-proxy/mirror, applied at force time
  * @returns {Promise<Dataset>}
  */
@@ -293,6 +308,30 @@ export async function parseSciwrid(source, opts = {}) {
     `${variable.name}.${scanned.format}`;
   const times = timesOf(scanned, variable);
 
+  // A variable with MORE dimensions than (lat, lon) + an optional time is carrying something we do
+  // not model — a vertical level, an ensemble member, a spectral band. `T(time, level, lat, lon)` is
+  // ordinary in ERA5/GFS/CMIP output, and left alone it fails the worst way available: a normal-looking
+  // time scrubber over a level nobody chose. Not a placement error (the lat/lon are right), but still
+  // "confidently answering a question that wasn't asked".
+  //
+  // We cannot resolve it either — extractGrid's options are variable/time/date/bbox/width/height, with
+  // no way to pick a level — so this throws rather than pretending. `allowExtraDims` is the
+  // acknowledgement: proceed, and let the reader collapse the dimension however it does, with the fact
+  // recorded on meta rather than lost.
+  const dims = usableDims(variable);
+  const modelled = 2 + (times.length ? 1 : 0);
+  const extraDims = dims.length - modelled;
+  if (extraDims > 0 && !opts.allowExtraDims) {
+    throw new Error(
+      `sciwrid: "${variable.name}" has ${dims.length} dimensions (${JSON.stringify(variable.shape)}) ` +
+      `but only ${modelled} are modelled — (lat, lon)${times.length ? " + time" : ""}. The extra ` +
+      `${extraDims} (a vertical level, ensemble member or spectral band) would be collapsed by the ` +
+      "reader with no say from you, and no indication of which slice you got.\n" +
+      "  parseSciwrid(file, { allowExtraDims: true })   // accept the reader's choice, recorded on meta\n" +
+      "A real second axis needs a level/member selector the decoder does not currently expose — see " +
+      "docs/PACKAGE_ROADMAP.md §8.");
+  }
+
   // The meta a child inherits: the target grid (what the materializer resamples onto) plus the
   // file-level facts a UI wants without forcing anything.
   const meta = {
@@ -301,6 +340,9 @@ export async function parseSciwrid(source, opts = {}) {
     timeRange: scanned.timeRange ?? null,
     sourceFormat: scanned.format,
     ...(opts.workers === undefined ? {} : { workers: opts.workers }),
+    // Recorded, not silent: which slice of these the reader picked is its business, but a consumer
+    // can at least see that a dimension was collapsed.
+    ...(extraDims > 0 ? { extraDims, shape: variable.shape } : {}),
   };
 
   const base = {

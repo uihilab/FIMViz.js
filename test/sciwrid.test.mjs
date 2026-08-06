@@ -263,8 +263,18 @@ describe("sciwrid adapter: NetCDF3 (degraded, deliberately pinned)", () => {
     });
   });
 
-  test("decodes to a SINGLE grid once an extent is given — no time axis to scrub", async () => {
-    const ds = await parseSciwrid(readFileSync(FIX), { grid: { bbox: [-10, -5, 10, 5] } });
+  test("its time dimension is INVISIBLE to scan(), so it must be acknowledged too", async () => {
+    // shape is (time=3, lat=4, lon=5) but scan() surfaces no times for netcdf3, so dimension 0 would
+    // be collapsed by the reader with nobody choosing which of the three steps you got.
+    await assert.rejects(
+      () => parseSciwrid(readFileSync(FIX), { grid: { bbox: [-10, -5, 10, 5] } }),
+      /has 3 dimensions.*only 2 are modelled/s);
+  });
+
+  test("decodes to a SINGLE grid once both are given — no time axis to scrub", async () => {
+    const ds = await parseSciwrid(readFileSync(FIX),
+      { grid: { bbox: [-10, -5, 10, 5] }, allowExtraDims: true });
+    assert.equal(ds.meta.extraDims, 1, "the collapsed dimension is recorded, not lost");
     assert.equal(ds.format, "netcdf3");
     assert.equal(ds.axes, null, "scan() surfaces no times for netcdf3");
     assert.deepEqual(ds.selector, { variable: "temperature", time: 0 },
@@ -276,7 +286,34 @@ describe("sciwrid adapter: NetCDF3 (degraded, deliberately pinned)", () => {
   });
 
   test("reduce() therefore throws — there is no axis, and it says so", async () => {
-    const ds = await parseSciwrid(readFileSync(FIX), { grid: { bbox: [-10, -5, 10, 5] } });
+    const ds = await parseSciwrid(readFileSync(FIX),
+      { grid: { bbox: [-10, -5, 10, 5] }, allowExtraDims: true });
     assert.throws(() => ds.reduce("mean"), /no selection-axis entries to reduce/);
+  });
+});
+
+// A variable with dimensions beyond (lat, lon) + time — T(time, level, lat, lon) is ordinary in
+// ERA5/GFS/CMIP — must not quietly become a normal-looking scrubber over a level nobody chose.
+describe("sciwrid adapter: unmodelled dimensions", () => {
+  // No 4-D fixture is vendored, so the arithmetic is pinned directly: the guard is
+  // dims.length > 2 + (hasTime ? 1 : 0), and these assert the boundary either side of it.
+  const FIX = fileURLToPath(new URL("../assets/SampleFiles/idalia-nldas2.nc", import.meta.url));
+
+  test("a 3-D (time, lat, lon) variable is fully modelled and passes untouched", async () => {
+    const ds = await parseSciwrid(readFileSync(FIX));
+    assert.equal(ds.meta.extraDims, undefined, "nothing was collapsed, so nothing is recorded");
+    assert.equal(ds.axis.entries.length, 120);
+  });
+
+  test("a dimension scan() cannot see still counts as unmodelled", async () => {
+    // The guard is arithmetic on the SHAPE, not on what the reader admits to. sample.nc3 is
+    // (time, lat, lon) but netcdf3 surfaces no times, so dimension 0 is invisible AND unmodelled —
+    // exactly the case where trusting the reader's silence would have hidden the collapse.
+    const nc3 = readFileSync(fileURLToPath(new URL("../assets/SampleFiles/sample.nc3", import.meta.url)));
+    await assert.rejects(() => parseSciwrid(nc3, { grid: { bbox: [-10, -5, 10, 5] } }),
+      /has 3 dimensions.*only 2 are modelled/s);
+    const ok = await parseSciwrid(nc3, { grid: { bbox: [-10, -5, 10, 5] }, allowExtraDims: true });
+    assert.equal(ok.meta.extraDims, 1);
+    assert.equal(ok.meta.shape, "3x4x5", "the shape is kept so a consumer can see what was dropped");
   });
 });
