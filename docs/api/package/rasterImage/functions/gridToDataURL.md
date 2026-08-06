@@ -8,7 +8,7 @@
 
 > **gridToDataURL**(`grid`, `opts?`): `string`
 
-Defined in: [package/rasterImage.js:74](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/rasterImage.js#L74)
+Defined in: [package/rasterImage.js:74](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/rasterImage.js#L74)
 
 Colorize + encode: a RasterGrid → a PNG data URL ready for `provider.addRasterImage`.
 

@@ -8,7 +8,7 @@
 
 > **registerSciwridFormats**(`formats?`): `void`
 
-Defined in: [io/sciwrid.js:227](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/io/sciwrid.js#L227)
+Defined in: [io/sciwrid.js:227](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/io/sciwrid.js#L227)
 
 Register the SciWrid-backed decoders. Idempotent; call once at boot before forcing any Dataset of
 these formats. `parseSciwrid()` calls it for you, so an app that always goes through the parser

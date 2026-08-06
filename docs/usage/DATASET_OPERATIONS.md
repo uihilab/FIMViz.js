@@ -68,12 +68,18 @@ An axis entry's `ref` says how to GET that entry's payload, and takes three form
 // 1. A URL — one file per entry (the FIM Scenario shape: each stage/timestep its own raster).
 { coord: 19.5, ref: 'stage_19p5.tif' }                       // → a URL-rooted child
 
-// 2. Named URL variants — pick one with select(coord, { variant }).
+// 2. Named URL variants — pick one with select(coord, { variant }); ds.variantsAt(coord) lists them.
 { coord: 19.5, ref: { raster: 'a.tif', vector: 'a.kmz' } }    // → select(19.5, { variant: 'raster' })
 
 // 3. An IN-FILE selector — the entry is a slice of the SAME source, not a separate download.
 { coord: 6, ref: { select: { variable: 'TMP', t: 1 } } }      // → a child sharing this file's bytes
 ```
+
+**Form 2 is not an axis, on purpose.** A variant switches the Dataset's `kind` — `.tif` gives a raster
+in an unknown CRS, `.kmz` a vector in EPSG:4326 — whereas every axis preserves kind, CRS and bounds.
+It is a choice of *encoding of the same datum*, not a coordinate in the data. Use `ds.variantsAt(coord)`
+to enumerate what an entry offers (`['raster', 'vector']`, or `null`) rather than catching the error
+`select()` throws when you omit a required one.
 
 Form 3 is what lets **one multi-dimensional file** (NetCDF/GRIB2/Zarr, every timestep inside it) back a
 whole temporal axis. The child shares the parent's bytes or URL — no second fetch — carries the same

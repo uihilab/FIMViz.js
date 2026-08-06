@@ -435,3 +435,33 @@ describe("Dataset: axis algebra (ordered / commensurable)", () => {
     assert.doesNotThrow(() => member.reduce("mean"));
   });
 });
+
+// Variants are NOT an axis and deliberately never became one — a variant switches the Dataset's
+// KIND, while every genuine axis preserves kind/CRS/bounds. They therefore need their own discovery
+// route, since "call select() without one and read the error" is no way to build a picker.
+describe("Dataset: named variants are not an axis", () => {
+  const ds = () => new Dataset({ name: "s", axis: { name: "stage", entries: [
+    { coord: 19.5, ref: { raster: "a.tif", vector: "a.kmz" } },
+    { coord: 34, ref: "plain.kmz" },
+    { coord: 40, ref: { select: { t: 0 } } },
+  ] } });
+
+  test("selecting a variant changes KIND — which is why it fails the fold-in test", () => {
+    const r = ds().select(19.5, { variant: "raster" });
+    const v = ds().select(19.5, { variant: "vector" });
+    assert.equal(r.kind, "raster");
+    assert.equal(v.kind, "vector");
+    assert.notEqual(r.crs, v.crs, "…and the CRS too: the Dataset invariant an axis must preserve");
+  });
+
+  test("variantsAt enumerates them, so a picker needs no thrown error to find them", () => {
+    assert.deepEqual(ds().variantsAt(19.5), ["raster", "vector"]);
+    assert.equal(ds().variantsAt(34), null, "a plain URL ref has no variants");
+    assert.equal(ds().variantsAt(40), null, "a selector ref is a slice, not a set of encodings");
+    assert.equal(ds().variantsAt(999, { nearest: false }), null, "no entry, no variants");
+  });
+
+  test("omitting a required variant still throws, naming the ones available", () => {
+    assert.throws(() => ds().select(19.5), /named variants \(raster, vector\)/);
+  });
+});

@@ -173,6 +173,25 @@ is the *why*, those are the *what*.
     incompatible axis shapes and a `reduce()` that works on only one. Because `reduce()` is already
     sugar over `select()` + `combine()`, folding the in-file case into `select()` bought temporal
     aggregation for free. Landed with the NetCDF4/GRIB2/Zarr adapter — [PACKAGE_ROADMAP.md §8](./PACKAGE_ROADMAP.md#8-multi-dimensional-formats--real-temporal-datasets-sciwrid-toolkit-as-a-materializer).
+  - **Named variants stay a `ref` shape, NOT an axis — the fold-in test decides it.** `ref: { raster:
+    'a.tif', vector: 'a.kmz' }` is a categorical dimension expressed as a ref shape rather than as
+    `axes[1]`, which reads like an inconsistency once axes gain an algebra (`{ ordered: false,
+    commensurable: false }` describes a variant exactly). Investigated and **rejected**, for two
+    independent reasons:
+    1. **A variant switches the Dataset's `kind`** — `.tif` yields a raster in an unknown CRS, `.kmz` a
+       vector in EPSG:4326 — while every genuine axis preserves kind, CRS and bounds. That is precisely
+       the fold-in test above ("does it share Dataset's invariant?"), which variants fail: a variant is
+       a choice of *encoding of the same datum*, not a coordinate in the data. Time, level, band and
+       ensemble member are all kind-preserving; variant is the one that isn't.
+    2. **A URL-ref axis cannot be peeled.** `select()` on a selector ref merges coordinates and defers
+       resolution to the materializer, but a URL ref must yield a complete URL *at select time* — so a
+       URL-backed axis can only ever be the **last** axis resolved. This is a general constraint of the
+       model, not a fact about variants, and it is visible in FIM Scenario already: it ships one
+       stage-series *per model* rather than a model × stage product.
+    What the review did produce is the real gap it was masking: variants were **undiscoverable** except
+    by calling `select()` without one and reading the thrown error. `ds.variantsAt(coord)` now
+    enumerates them, which is what a picker actually needs — without pretending they are an axis.
+
   - **RESOLVED: the model is 2-D grids + selection axes, NOT an N-D array algebra.** Once one file can
     back a whole axis, the pull toward xarray is constant — broadcasting, partial reduction, a cube
     value type — and each step looks small on its own. The decision is to stop at: a `Dataset` forces

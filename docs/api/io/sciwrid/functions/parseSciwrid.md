@@ -8,7 +8,7 @@
 
 > **parseSciwrid**(`source`, `opts?`): `Promise`\<[`Dataset`](../../../package/dataset/classes/Dataset.md)\>
 
-Defined in: [io/sciwrid.js:273](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/io/sciwrid.js#L273)
+Defined in: [io/sciwrid.js:273](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/io/sciwrid.js#L273)
 
 Read a multi-dimensional scientific file into a `Dataset` with a real temporal axis.
 

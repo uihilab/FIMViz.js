@@ -655,6 +655,32 @@ export class Dataset {
       resolveUrl: this.#resolveUrl });
   }
 
+  /**
+   * The named variants available at one axis coordinate, or `null` when that entry has none.
+   *
+   * Variants are **not** an axis and deliberately never became one, so they need their own way to be
+   * discovered — previously the only way to learn an entry had them was to call `select()` without one
+   * and read the thrown error, which is no way to build a picker.
+   *
+   * Why not an axis (see DECISIONS §1.1): a variant switches the Dataset's **kind** — `.tif` gives a
+   * raster in an unknown CRS, `.kmz` a vector in EPSG:4326 — while every genuine axis preserves kind,
+   * CRS and bounds. It is a choice of *encoding of the same datum*, not a coordinate in the data.
+   *
+   * ```js
+   * ds.variantsAt(19.5);                       // → ['raster', 'vector']  (or null)
+   * ds.select(19.5, { variant: 'raster' });
+   * ```
+   * @param {number|string} coord
+   * @param {{ axis?: number|string, nearest?: boolean }} [opts]
+   * @returns {string[]|null}
+   */
+  variantsAt(coord, opts = {}) {
+    const ref = this.selectAxisEntry(coord, opts)?.ref;
+    if (!ref || typeof ref !== "object" || isSelectorRef(ref)) return null;
+    const names = Object.keys(ref).filter((k) => typeof ref[k] === "string");
+    return names.length ? names : null;
+  }
+
   /** The in-file selection this Dataset forces with, or null. @returns {Object|null} */
   get selector() { return this.#selector; }
 
