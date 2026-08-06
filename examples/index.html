@@ -38,6 +38,14 @@
 
   <h2>Start here</h2>
   <div class="grid">
+    <a class="card" href="verify.html">
+      <h3>verify.html</h3>
+      <p><strong>Guided manual verification</strong> — ten numbered steps, each with what to do and what you should
+        see, plus Pass/Fail capture and a copyable Markdown report. Covers the things a headless test cannot judge:
+        how the toast, tooltips, legend ramp, point styling, dispatch order and modal region-draw actually
+        <em>look and feel</em>. Run it on <strong>both providers</strong> before a release.</p>
+      <div class="tags"><span class="tag star">start here</span><span class="tag keyless">Leaflet</span><span class="tag key">Google</span></div>
+    </a>
     <a class="card" href="ui-tools.html">
       <h3>ui-tools.html</h3>
       <p>The headless <code>ui/</code> module: toast, hover tooltip, feature info window, a tools panel bound to <code>layer.settings</code>, legend/stats read-models, multi-layer event dispatch, and modal region-draw. Runs on <strong>Leaflet or Google</strong> (switcher in the header).</p>
@@ -66,6 +74,18 @@
       <h3>test2.html</h3>
       <p>Console API smoke test: two isolated instances (<code>{ isolated: true }</code>), one Google + one Leaflet, exercising <code>addLayer('vector')</code> with one neutral style on both providers.</p>
       <div class="tags"><span class="tag keyless">Leaflet</span><span class="tag key">Google</span></div>
+    </a>
+  </div>
+
+  <h2>Multi-dimensional &amp; temporal</h2>
+  <div class="grid">
+    <a class="card" href="temporal-netcdf.html">
+      <h3>temporal-netcdf.html</h3>
+      <p>NetCDF4 / Zarr / GRIB2 through the SciWrid Toolkit adapter: <code>scan()</code> a file into a
+        <code>Dataset</code> with a <strong>time axis</strong>, scrub it with a slider, and collapse the whole axis with
+        <code>reduce('mean'|'max')</code>. Three bundled Hurricane Idalia samples, one per format. Also shows the
+        extent override a GRIB2/NetCDF3 file needs, since <code>scan()</code> derives no bbox for those.</p>
+      <div class="tags"><span class="tag star">SciWrid</span><span class="tag keyless">Leaflet</span></div>
     </a>
   </div>
 
@@ -100,6 +120,7 @@
 
   <div class="note" style="margin-top:26px">
     New here? Open <a href="ui-tools.html" style="color:var(--accent)"><strong>ui-tools.html</strong></a> — it's the fullest tour of the package on a real map, keyless on Leaflet.
+    Checking a change before you ship it? Use <a href="verify.html" style="color:var(--accent)"><strong>verify.html</strong></a> instead — it tells you what to look for.
   </div>
 </div>
 </body>

@@ -64,7 +64,9 @@ const RASTER_URL  = '/assets/SampleFiles/4326.tif';                  // WGS84 al
 const DEPTH_URL   = '/assets/SampleFiles/Brazos_RP100_depth.tif';    // a second, differently-shaped raster
 const CMP_A_URL   = '/assets/SampleFiles/Compare_0-0-DEP-12840.tif'; // two aligned extent rasters —
 const CMP_B_URL   = '/assets/SampleFiles/Compare_0-0-DEP-17780.tif'; //   good for Comparison/Ensemble tests
-const GEOJSON_URL = '/assets/SampleFiles/Iowa_city.json';
+// A real FeatureCollection (99 county polygons). NOT Iowa_city.json — that one is a site-config
+// blob with no `type`/`features`, so parseFile rejects it as vector.
+const GEOJSON_URL = '/assets/SampleFiles/Iowa_County_Boundaries.json';
 const KMZ_URL     = '/assets/SampleFiles/ames.kmz';
 ```
 
@@ -75,7 +77,7 @@ const rasterFile = await urlToFile(RASTER_URL, '4326.tif', 'image/tiff');
 let ds = await fim.addDataset(rasterFile);           // → Dataset, kind:'raster'
 console.log(ds.kind, ds.format, ds.crs, ds.bounds);
 
-const vectorFile = await urlToFile(GEOJSON_URL, 'Iowa_city.json', 'application/geo+json');
+const vectorFile = await urlToFile(GEOJSON_URL, 'Iowa_County_Boundaries.json', 'application/geo+json');
 const dsVector = await fim.addDataset(vectorFile);   // → Dataset, kind:'vector'
 console.log(dsVector.kind, dsVector.format, dsVector.crs, dsVector.bounds);
 

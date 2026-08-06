@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — guided verification</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root { --bg:#0f1216; --panel:#161b22; --line:#2b3440; --fg:#e6edf3; --dim:#8b949e;
+          --ok:#3fb950; --bad:#f85149; --warn:#d29922; --accent:#58a6ff; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#fff; --panel:#f6f8fa; --line:#d0d7de; --fg:#1f2328; --dim:#656d76; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:14px/1.55 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  code, .mono { font-family:ui-monospace,Menlo,Consolas,monospace; }
+  code { background:var(--panel); padding:1px 5px; border-radius:4px; font-size:.9em; }
+
+  header { padding:14px 22px; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:20;
+           background:var(--bg); display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  h1 { margin:0; font-size:16px; }
+  .switch a { font-size:12px; padding:3px 9px; border-radius:999px; border:1px solid var(--line); color:var(--dim); text-decoration:none; }
+  .switch a.on { background:var(--accent); color:#08111f; border-color:var(--accent); font-weight:600; }
+  .score { margin-left:auto; display:flex; gap:10px; align-items:center; font-size:13px; }
+  .score b.ok { color:var(--ok); } .score b.bad { color:var(--bad); } .score b.left { color:var(--dim); }
+
+  main { display:grid; grid-template-columns:minmax(420px,1fr) 1.15fr; height:calc(100vh - 57px); }
+  @media (max-width:900px) { main { grid-template-columns:1fr; height:auto; } #mapwrap { height:70vh; } }
+  .steps { overflow:auto; padding:16px 20px 60px; border-right:1px solid var(--line); }
+  #mapwrap { position:relative; background:#1b2230; }
+  #map { position:absolute; inset:0; }
+
+  .intro { border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:8px;
+           background:var(--panel); padding:12px 14px; margin:0 0 18px; font-size:13px; color:var(--dim); }
+  .intro strong { color:var(--fg); }
+  .intro ol { margin:8px 0 0; padding-left:20px; } .intro li { margin:3px 0; }
+
+  .step { border:1px solid var(--line); border-radius:9px; background:var(--panel); margin:0 0 12px; overflow:hidden; }
+  .step.pass { border-color:var(--ok); } .step.fail { border-color:var(--bad); }
+  .step > h2 { margin:0; padding:9px 12px; font-size:13px; border-bottom:1px solid var(--line);
+               display:flex; gap:8px; align-items:center; }
+  .step > h2 .n { font:600 11px/1 ui-monospace,monospace; background:var(--bg); border:1px solid var(--line);
+                  border-radius:5px; padding:3px 6px; color:var(--dim); }
+  .step .body { padding:11px 13px; }
+  .do, .expect { margin:0 0 8px; }
+  .do b, .expect b { display:block; font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--dim); margin-bottom:2px; }
+  .expect { color:var(--fg); }
+  .expect ul { margin:3px 0 0; padding-left:18px; } .expect li { margin:2px 0; }
+
+  button { background:var(--accent); color:#08111f; border:0; border-radius:6px; padding:5px 11px;
+           font-weight:600; cursor:pointer; font-size:12px; font-family:inherit; }
+  button.sec { background:transparent; color:var(--accent); border:1px solid var(--line); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .verdict { display:flex; gap:6px; margin-top:10px; padding-top:9px; border-top:1px dashed var(--line); align-items:center; }
+  .verdict button.p { background:transparent; border:1px solid var(--ok); color:var(--ok); }
+  .verdict button.f { background:transparent; border:1px solid var(--bad); color:var(--bad); }
+  .verdict button.s { background:transparent; border:1px solid var(--line); color:var(--dim); }
+  .verdict button[aria-pressed="true"].p { background:var(--ok); color:#08111f; }
+  .verdict button[aria-pressed="true"].f { background:var(--bad); color:#fff; }
+  .verdict button[aria-pressed="true"].s { background:var(--line); color:var(--fg); }
+  .verdict input { flex:1; min-width:80px; background:var(--bg); color:var(--fg); border:1px solid var(--line);
+                   border-radius:5px; padding:4px 7px; font-size:12px; font-family:inherit; }
+
+  .row { display:flex; gap:7px; flex-wrap:wrap; align-items:center; }
+  .host { margin-top:8px; } .dim { color:var(--dim); font-size:12px; }
+  .pill { font-size:11px; padding:1px 8px; border-radius:999px; border:1px solid var(--line); color:var(--dim); margin-left:auto; }
+  .pill.ok { color:var(--ok); border-color:var(--ok); } .pill.bad { color:var(--bad); border-color:var(--bad); }
+  pre { margin:8px 0 0; padding:8px; background:var(--bg); border:1px solid var(--line); border-radius:6px;
+        font:12px/1.45 ui-monospace,Menlo,monospace; white-space:pre-wrap; max-height:190px; overflow:auto; }
+  #keygate { position:absolute; inset:0; display:flex; flex-direction:column; gap:10px; align-items:center;
+             justify-content:center; text-align:center; padding:24px; background:var(--bg); z-index:5; }
+  input[type=text] { background:var(--bg); color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:5px 8px; font-size:12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FIMViz — guided verification</h1>
+  <span class="switch" id="switch"></span>
+  <span class="dim" id="provnote"></span>
+  <span class="score">
+    <span><b class="ok" id="s-pass">0</b> pass</span>
+    <span><b class="bad" id="s-fail">0</b> fail</span>
+    <span><b class="left" id="s-left">0</b> left</span>
+    <button class="sec" id="report">Copy report</button>
+    <button class="sec" id="reset">Reset</button>
+  </span>
+</header>
+
+<main>
+<div class="steps">
+
+  <div class="intro">
+    <strong>What this page is.</strong> A manual pass over the things an automated test cannot judge —
+    how it <em>looks</em> and how it <em>feels</em>. Each step says what to do and what you should see;
+    mark it Pass or Fail. Nothing is sent anywhere — “Copy report” puts a Markdown summary on your clipboard.
+    <ol>
+      <li>Build first: <code>npm run build</code>.</li>
+      <li>Serve the <em>repo root</em>: <code>npx serve .</code> (not the <code>examples/</code> folder — pages read <code>../dist</code> and <code>../assets</code>).</li>
+      <li>Open <code>/examples/verify.html</code>. Leaflet needs no key; add <code>?provider=google</code> for the Google pass.</li>
+      <li>Work top to bottom — later steps reuse the layers earlier ones load.</li>
+    </ol>
+  </div>
+
+  <!-- 1 ───────────────────────────────────────────────────────────────────── -->
+  <div class="step" data-step="1" data-title="Boot &amp; basemap">
+    <h2><span class="n">1</span> Boot &amp; basemap <span class="pill" id="p1">…</span></h2>
+    <div class="body">
+      <p class="do"><b>Do</b> Nothing — the map boots on load.</p>
+      <div class="expect"><b>Expect</b>
+        <ul>
+          <li>A real, pannable basemap fills the right-hand pane.</li>
+          <li>Dragging and scroll-zoom both work.</li>
+          <li>The browser console has <em>no</em> red errors.</li>
+        </ul>
+      </div>
+      <pre id="bootinfo">…</pre>
+    </div>
+  </div>
+
+  <!-- 2 ───────────────────────────────────────────────────────────────────── -->
+  <div class="step" data-step="2" data-title="Toast — connectToast(fim)">
+    <h2><span class="n">2</span> Toast <code>connectToast</code></h2>
+    <div class="body">
+      <p class="do"><b>Do</b> Click each level. The buttons only <code>fim.emit('notify', …)</code> — the engine never calls the toast itself.</p>
+      <div class="row">
+        <button data-toast="info">info</button><button data-toast="success">success</button>
+        <button data-toast="warn">warn</button><button data-toast="error">error</button>
+      </div>
+      <div class="expect" style="margin-top:9px"><b>Expect</b>
+        <ul>
+          <li>A toast appears for each, then dismisses itself.</li>
+          <li>The four levels are visually distinguishable (colour/icon).</li>
+          <li>Rapid clicks stack or replace cleanly — never overlap illegibly.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3 ───────────────────────────────────────────────────────────────────── -->
+  <div class="step" data-step="3" data-title="Raster: render, tools panel, legend, stats">
+    <h2><span class="n">3</span> Raster + tools panel <span class="pill" id="p3">idle</span></h2>
+    <div class="body">
+      <p class="do"><b>Do</b> Load the bundled sample (or pick your own GeoTIFF), then drag the
+        <em>opacity</em> slider and change the <em>palette</em> in the tools panel.</p>
+      <div class="row">
+        <button id="load-raster">Load 4326.tif</button>
+        <input type="file" id="ras-file" accept=".tif,.tiff" style="font-size:12px" />
+      </div>
+      <div class="host" id="ras-tools"></div>
+      <div class="host" id="ras-legend"></div>
+      <div class="host" id="ras-stats"></div>
+      <div class="expect" style="margin-top:9px"><b>Expect</b>
+        <ul>
+          <li>A coloured raster lands on the map and the view fits to it.</li>
+          <li>Opacity changes the overlay <em>live</em>, with no flicker or reload.</li>
+          <li>Changing palette recolours both the raster and the legend ramp.</li>
+          <li>The legend ramp is a real gradient, labelled with min/max.</li>
+          <li>Stats show plausible numbers (min ≤ mean ≤ max, count &gt; 0).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4 ───────────────────────────────────────────────────────────────────── -->
+  <div class="step" data-step="4" data-title="Hover tooltip — bindHoverValue">
+    <h2><span class="n">4</span> Hover tooltip <code>bindHoverValue</code></h2>
+    <div class="body">
+      <p class="do"><b>Do</b> Move the pointer slowly across the raster, then off its edge onto bare basemap.</p>
+      <div class="expect"><b>Expect</b>
+        <ul>
+          <li>A tooltip tracks the cursor showing the pixel value + unit.</li>
+          <li>Values change as you move; they are not frozen on the first reading.</li>
+          <li>Leaving the raster hides the tooltip — it does not linger or stick.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5 ───────────────────────────────────────────────────────────────────── -->
+  <div class="step" data-step="5" data-title="Vector polygons + feature info window">
+    <h2><span class="n">5</span> Vector polygons <span class="pill" id="p5">idle</span></h2>
+    <div class="body">
+      <p class="do"><b>Do</b> Load the county boundaries, then click any polygon.</p>
+      <div class="row">
+        <button id="load-vector">Load Iowa counties</button>
+        <input type="file" id="vec-file" accept=".geojson,.json,.kml,.kmz,.zip" style="font-size:12px" />
+      </div>
+      <div class="host" id="vec-tools"></div>
+      <div class="expect" style="margin-top:9px"><b>Expect</b>
+        <ul>
+          <li>99 county polygons draw with a visible fill <em>and</em> a distinct outline.</li>
+          <li>Clicking one opens an info window listing that feature's properties.</li>
+          <li>The properties belong to the polygon you actually clicked.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6 ───────────────────────────────────────────────────────────────────── -->
+  <div class="step" data-step="6" data-title="Point styling — the neutral vocabulary on points">
+    <h2><span class="n">6</span> Point styling <span class="pill" id="p6">idle</span></h2>
+    <div class="body">
+      <p class="do"><b>Do</b> Add six inline points, each styled from the same neutral
+        <code>{ fillColor, strokeColor, pointRadius }</code> vocabulary the polygons above use.</p>
+      <div class="row">
+        <button id="load-points">Add 6 styled points</button>
+        <button class="sec" id="clear-points">Clear</button>
+      </div>
+      <div class="expect" style="margin-top:9px"><b>Expect</b>
+        <ul>
+          <li>Six filled <strong>circles</strong> — <em>not</em> broken-image icons, and not default pins.</li>
+          <li>Colours run left→right through the palette; each has a dark outline.</li>
+          <li>Radii grow left→right (4px → 14px), proving <code>pointRadius</code> is honoured.</li>
+          <li>They look the same on Leaflet and Google — switch providers and re-check.</li>
+        </ul>
+      </div>
+      <p class="dim" style="margin:8px 0 0">Leaflet's default point is an <code>L.marker</code> whose icon PNGs
+        are resolved from a <code>leaflet.js</code> script tag. This package bundles Leaflet, so that tag never
+        exists and the default rendered as a broken image that ignored every style key.</p>
+    </div>
+  </div>
+
+  <!-- 7 ───────────────────────────────────────────────────────────────────── -->
+  <div class="step" data-step="7" data-title="Multi-layer dispatch + absorption">
+    <h2><span class="n">7</span> Multi-layer dispatch <span class="pill" id="p7">idle</span></h2>
+    <div class="body">
+      <p class="do"><b>Do</b> Stack three translucent overlays, then click where they overlap —
+        first with “top absorbs” off, then on.</p>
+      <div class="row">
+        <button id="ml-stack">Stack 3 overlays</button>
+        <button class="sec" id="ml-clear">Clear</button>
+        <label class="dim"><input type="checkbox" id="ml-absorb" /> top absorbs</label>
+        <label class="dim"><input type="checkbox" id="ml-simul" /> simultaneous</label>
+      </div>
+      <pre id="ml-log">Stack, then click the overlays.</pre>
+      <div class="expect" style="margin-top:9px"><b>Expect</b>
+        <ul>
+          <li>Absorb <em>off</em>: the log lists z=2, z=1, z=0 — top-down, all three.</li>
+          <li>Absorb <em>on</em>: only z=2, followed by “ABSORBED — dispatch stops”.</li>
+          <li>“Simultaneous” delivers to all layers regardless of absorption.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8 ───────────────────────────────────────────────────────────────────── -->
+  <div class="step" data-step="8" data-title="Region draw → scoped stats (modal capture)">
+    <h2><span class="n">8</span> Region draw → scoped stats <span class="pill" id="p8">idle</span></h2>
+    <div class="body">
+      <p class="do"><b>Do</b> Click <em>Draw region</em>, click ≥3 points <strong>on the raster</strong>,
+        then <em>Finish</em>. While drawing, try hovering the raster.</p>
+      <div class="row">
+        <button id="rg-draw">Draw region</button>
+        <button class="sec" id="rg-finish">Finish</button>
+        <button class="sec" id="rg-clear">Clear</button>
+      </div>
+      <div class="host" id="rg-out">—</div>
+      <div class="expect" style="margin-top:9px"><b>Expect</b>
+        <ul>
+          <li>The outline draws as you click, and closes into a polygon on Finish.</li>
+          <li>While drawing, the hover tooltip is <em>suppressed</em> — that is the modal capture.</li>
+          <li>Finish prints stats scoped to the region: a <em>smaller count</em> than step 3's.</li>
+          <li>Hover works again afterwards.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9 ───────────────────────────────────────────────────────────────────── -->
+  <div class="step" data-step="9" data-title="Operations panel — reclassify / mask">
+    <h2><span class="n">9</span> Operations panel <span class="pill" id="p9">idle</span></h2>
+    <div class="body">
+      <p class="do"><b>Do</b> Apply <em>Threshold</em>, then <em>Mask</em> to the step-8 region, then <em>Reset</em>.</p>
+      <div class="host" id="ras-ops"></div>
+      <div class="expect" style="margin-top:9px"><b>Expect</b>
+        <ul>
+          <li>Threshold visibly changes the raster and the legend/stats refresh to match.</li>
+          <li>Mask clips it to the drawn region; everything outside disappears.</li>
+          <li>Reset restores the original raster exactly.</li>
+          <li>Each op is a <em>lazy Dataset op</em> — the source file is never re-read.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10 ──────────────────────────────────────────────────────────────────── -->
+  <div class="step" data-step="10" data-title="Temporal / multi-dimensional formats">
+    <h2><span class="n">10</span> Temporal formats <span class="pill">separate page</span></h2>
+    <div class="body">
+      <p class="do"><b>Do</b> Open <a href="temporal-netcdf.html" style="color:var(--accent)"><strong>temporal-netcdf.html</strong></a>
+        and run all three bundled samples (NetCDF4, Zarr, GRIB2).</p>
+      <div class="expect"><b>Expect</b>
+        <ul>
+          <li>Each scans, reports its variable/CRS, and puts a first frame on the map.</li>
+          <li>The slider scrubs the time axis; the timestamp advances with it.</li>
+          <li>The legend ramp is a real gradient with numeric bounds.</li>
+          <li><code>reduce('mean')</code> and <code>reduce('max')</code> collapse the axis to one grid.</li>
+          <li>GRIB2 needs its extent override — it should say so rather than mis-place the data.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="mapwrap"><div id="map"></div><div id="keygate" style="display:none"></div></div>
+</main>
+
+<script type="importmap">
+{ "imports": { "fimviz": "../dist/fimviz.js", "fimviz/ui": "../dist/ui.js" } }
+</script>
+
+<script type="module">
+import { FimViz, RasterLayer, VectorLayer, ColorScale } from "fimviz";
+import {
+  createToast, connectToast, createTooltip, bindHoverValue,
+  createInfoWindow, bindFeatureInfo, createToolsPanel, renderLegend, renderStats,
+  createRegionDraw, createOperationsPanel,
+} from "fimviz/ui";
+
+const $ = (s) => document.querySelector(s);
+const pill = (id, t, cls = "") => { const e = $(id); if (e) { e.textContent = t; e.className = "pill " + cls; } };
+
+// ── provider ───────────────────────────────────────────────────────────────────────────────────
+const params   = new URLSearchParams(location.search);
+const provider = params.get("provider") === "google" ? "google" : "leaflet";
+const KEY = "fim_gmaps_key";
+const center = { lat: 41.9779, lng: -91.6656 }, zoom = 10;   // Cedar Rapids — matches the samples
+
+$("#switch").innerHTML =
+  `<a href="?provider=leaflet" class="${provider === "leaflet" ? "on" : ""}">Leaflet</a> ` +
+  `<a href="?provider=google" class="${provider === "google" ? "on" : ""}">Google</a>`;
+$("#provnote").textContent = provider === "leaflet" ? "keyless" : "needs a Maps JS API key";
+
+let apiKey = null;
+if (provider === "google") {
+  apiKey = localStorage.getItem(KEY) || "";
+  if (!apiKey) showKeyGate();
+}
+function showKeyGate() {
+  const g = $("#keygate"); g.style.display = "flex";
+  g.innerHTML = `<p class="dim">Enter a Google Maps JS API key (kept in this browser's localStorage only):</p>`;
+  const i = document.createElement("input"); i.type = "text"; i.placeholder = "AIza…"; i.style.width = "min(420px,80%)";
+  const b = document.createElement("button"); b.textContent = "Save & load";
+  b.onclick = () => { if (i.value.trim()) { localStorage.setItem(KEY, i.value.trim()); location.reload(); } };
+  const a = document.createElement("a"); a.href = "?provider=leaflet"; a.textContent = "…or use Leaflet (no key)";
+  a.style.cssText = "color:var(--accent);font-size:12px";
+  g.append(i, b, a);
+}
+
+// ── verdict tracking ───────────────────────────────────────────────────────────────────────────
+const STORE = `fimviz.verify.${provider}`;
+const verdicts = JSON.parse(localStorage.getItem(STORE) || "{}");
+const steps = [...document.querySelectorAll(".step")];
+
+for (const step of steps) {
+  const id = step.dataset.step;
+  const bar = document.createElement("div");
+  bar.className = "verdict";
+  bar.innerHTML =
+    `<button class="p" data-v="pass" aria-pressed="false">Pass</button>` +
+    `<button class="f" data-v="fail" aria-pressed="false">Fail</button>` +
+    `<button class="s" data-v="skip" aria-pressed="false">Skip</button>` +
+    `<input type="text" placeholder="note (optional)" />`;
+  step.querySelector(".body").append(bar);
+  bar.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    const v = verdicts[id]?.v === b.dataset.v ? null : b.dataset.v;   // click again to clear
+    verdicts[id] = v ? { v, note: bar.querySelector("input").value } : undefined;
+    if (!v) delete verdicts[id];
+    paint();
+  }));
+  bar.querySelector("input").addEventListener("input", (e) => {
+    if (verdicts[id]) { verdicts[id].note = e.target.value; save(); }
+  });
+}
+function save() { localStorage.setItem(STORE, JSON.stringify(verdicts)); }
+function paint() {
+  let p = 0, f = 0, left = 0;
+  for (const step of steps) {
+    const id = step.dataset.step, v = verdicts[id]?.v;
+    step.classList.toggle("pass", v === "pass");
+    step.classList.toggle("fail", v === "fail");
+    step.querySelectorAll(".verdict button").forEach((b) =>
+      b.setAttribute("aria-pressed", String(b.dataset.v === v)));
+    const inp = step.querySelector(".verdict input");
+    if (verdicts[id]?.note != null && inp.value !== verdicts[id].note) inp.value = verdicts[id].note;
+    if (v === "pass") p++; else if (v === "fail") f++; else if (v !== "skip") left++;
+  }
+  $("#s-pass").textContent = p; $("#s-fail").textContent = f; $("#s-left").textContent = left;
+  save();
+}
+paint();
+
+$("#reset").addEventListener("click", () => {
+  for (const k of Object.keys(verdicts)) delete verdicts[k];
+  steps.forEach((s) => { s.querySelector(".verdict input").value = ""; });
+  paint();
+});
+$("#report").addEventListener("click", async () => {
+  const lines = [
+    `# FIMViz guided verification — ${provider}`,
+    ``,
+    `- ${new Date().toISOString()}`,
+    `- ${navigator.userAgent}`,
+    ``,
+    `| # | Step | Result | Note |`,
+    `|---|------|--------|------|`,
+    ...steps.map((s) => {
+      const id = s.dataset.step, r = verdicts[id];
+      const mark = r?.v === "pass" ? "✅ pass" : r?.v === "fail" ? "❌ FAIL" : r?.v === "skip" ? "— skip" : "· untested";
+      return `| ${id} | ${s.dataset.title} | ${mark} | ${(r?.note || "").replace(/\|/g, "\\|")} |`;
+    }),
+  ];
+  const text = lines.join("\n");
+  try { await navigator.clipboard.writeText(text); $("#report").textContent = "Copied ✓"; }
+  catch { $("#report").textContent = "See console"; console.log(text); }
+  setTimeout(() => { $("#report").textContent = "Copy report"; }, 1600);
+});
+
+// ── boot ───────────────────────────────────────────────────────────────────────────────────────
+let fim = null, toast = null, tooltip = null, infoWindow = null;
+let rasterLayer = null, rasterTools = null, hoverBinding = null, opsPanel = null;
+let vectorLayer = null, vectorTools = null, infoBinding = null, pointLayer = null;
+let colorScale = null, lastRegionFilter = null;
+
+async function refreshReadModels() {
+  if (!rasterLayer) return;
+  $("#ras-legend").innerHTML = renderLegend(rasterLayer.getLegend(), { html: true });
+  $("#ras-stats").innerHTML  = renderStats(await rasterLayer.getStats(), { html: true });
+}
+
+async function boot() {
+  fim = await FimViz.mount("map", { provider, apiKey, center, zoom });
+  fim.enableMapEvents(["click", "hover"]);
+  toast = connectToast(fim, createToast());
+  tooltip = createTooltip(fim);
+  infoWindow = createInfoWindow(fim);
+
+  document.querySelectorAll("[data-toast]").forEach((b) => b.addEventListener("click", () =>
+    fim.emit("notify", { message: `A ${b.dataset.toast} message on ${provider}`, level: b.dataset.toast })));
+
+  $("#bootinfo").textContent =
+    `provider : ${provider}\ncentre   : ${center.lat}, ${center.lng}  zoom ${zoom}\n` +
+    `map      : ${fim.map ? "created" : "MISSING"}\nfim      : window.FIM`;
+  pill("#p1", "booted", "ok");
+
+  window.FIM = { fim, toast, tooltip, infoWindow,
+    get rasterLayer() { return rasterLayer; },
+    get vectorLayer() { return vectorLayer; },
+    get pointLayer() { return pointLayer; } };
+  console.log(`[fimviz] verify.html ready on ${provider} — window.FIM`);
+}
+if (!(provider === "google" && !apiKey)) {
+  boot().catch((e) => { pill("#p1", "boot failed", "bad"); $("#bootinfo").textContent = String(e?.stack || e); console.error(e); });
+}
+
+// ── 3 · raster ─────────────────────────────────────────────────────────────────────────────────
+async function useRaster(source, label) {
+  pill("#p3", "parsing…");
+  try {
+    const ds = await FimViz.parseFile(source);
+    rasterLayer?.remove(); rasterTools?.destroy(); hoverBinding?.off(); opsPanel?.destroy();
+    rasterLayer = new RasterLayer({ map: fim, type: "userRaster", sources: [ds] });
+    await rasterLayer.render(); rasterLayer.fit();
+
+    const s0 = await rasterLayer.getStats();
+    colorScale = new ColorScale({ palette: "viridis", min: s0.min, max: s0.max,
+                                  continuous: true, unit: rasterLayer.meta?.unit || "" });
+    rasterLayer.set({ colorScale });
+
+    rasterTools = createToolsPanel("#ras-tools", { layer: rasterLayer, pretty: true });
+    hoverBinding = bindHoverValue(rasterLayer, { tooltip, format: (v) => `${v.toFixed(2)} ${colorScale.unit}` });
+    opsPanel = createOperationsPanel("#ras-ops", {
+      layer: rasterLayer, region: () => lastRegionFilter, pretty: true,
+      onApply: (_l, err) => { refreshReadModels(); pill("#p9", err ? "error" : "applied", err ? "bad" : "ok"); },
+    });
+    rasterLayer.on("restyle", refreshReadModels);
+    rasterLayer.on("recomputed", refreshReadModels);
+    await refreshReadModels();
+    pill("#p3", label, "ok");
+  } catch (e) {
+    pill("#p3", "error", "bad"); console.error(e);
+    $("#ras-legend").textContent = String(e?.message || e);
+  }
+}
+$("#load-raster").addEventListener("click", async () => {
+  pill("#p3", "fetching…");
+  const r = await fetch("../assets/SampleFiles/4326.tif");
+  if (!r.ok) { pill("#p3", `fetch failed (${r.status}) — serve the repo ROOT`, "bad"); return; }
+  await useRaster(new File([await r.blob()], "4326.tif", { type: "image/tiff" }), "rendered");
+});
+$("#ras-file").addEventListener("change", (e) => { if (e.target.files[0]) useRaster(e.target.files[0], "rendered"); });
+
+// ── 5 · vector ─────────────────────────────────────────────────────────────────────────────────
+async function useVector(source) {
+  pill("#p5", "parsing…");
+  try {
+    const ds = await FimViz.parseFile(source);
+    vectorLayer?.remove(); vectorTools?.destroy(); infoBinding?.off();
+    vectorLayer = new VectorLayer({ map: fim, type: ds.format, sources: [ds] });
+    vectorLayer.render({ style: { fillColor: "#58a6ff", fillOpacity: 0.25, strokeColor: "#1f6feb", strokeWidth: 1.5 } });
+    vectorLayer.fit();
+    vectorTools = createToolsPanel("#vec-tools", { layer: vectorLayer, pretty: true });
+    infoBinding = bindFeatureInfo(vectorLayer, { infoWindow });
+    pill("#p5", "rendered · click a polygon", "ok");
+  } catch (e) { pill("#p5", "error", "bad"); console.error(e); }
+}
+$("#load-vector").addEventListener("click", async () => {
+  pill("#p5", "fetching…");
+  const r = await fetch("../assets/SampleFiles/Iowa_County_Boundaries.json");
+  if (!r.ok) { pill("#p5", `fetch failed (${r.status}) — serve the repo ROOT`, "bad"); return; }
+  await useVector(new File([await r.blob()], "Iowa_County_Boundaries.json", { type: "application/geo+json" }));
+});
+$("#vec-file").addEventListener("change", (e) => { if (e.target.files[0]) useVector(e.target.files[0]); });
+
+// ── 6 · points ─────────────────────────────────────────────────────────────────────────────────
+// Six points across the map centre. The style is a FUNCTION, so each point resolves its own colour
+// and radius from the SAME neutral vocabulary the polygons use — the thing that silently did
+// nothing on points before.
+const POINT_COLORS = ["#440154", "#414487", "#2a788e", "#22a884", "#7ad151", "#fde725"];
+$("#load-points").addEventListener("click", () => {
+  pointLayer?.remove();
+  const features = POINT_COLORS.map((_, i) => ({
+    type: "Feature",
+    geometry: { type: "Point", coordinates: [center.lng - 0.5 + i * 0.2, center.lat] },
+    properties: { i, label: `point ${i}` },
+  }));
+  pointLayer = new VectorLayer({
+    map: fim, type: "points",
+    sources: [{ data: { type: "FeatureCollection", features }, bounds: {} }],
+  });
+  pointLayer.render({
+    style: ({ index }) => ({
+      fillColor: POINT_COLORS[index], fillOpacity: 0.95,
+      strokeColor: "#0b0f14", strokeWidth: 1.5,
+      pointRadius: 4 + index * 2,                       // 4 → 14 px
+    }),
+  });
+  pill("#p6", "6 points added", "ok");
+});
+$("#clear-points").addEventListener("click", () => { pointLayer?.remove(); pointLayer = null; pill("#p6", "cleared"); });
+
+// ── 7 · multi-layer dispatch ───────────────────────────────────────────────────────────────────
+const ML_COLORS = ["#f85149", "#3fb950", "#58a6ff"];    // z=0 bottom … z=2 top
+let mlLayers = [], mlLog = [];
+function mapCenter() {
+  const c = fim.map.getCenter();
+  return provider === "leaflet" ? { lat: c.lat, lng: c.lng } : { lat: c.lat(), lng: c.lng() };
+}
+function testBounds() {
+  const c = mapCenter(), d = 0.05;
+  return { north: c.lat + d, south: c.lat - d, east: c.lng + d, west: c.lng - d };
+}
+async function makeTestLayer(z, b) {
+  const layer = new RasterLayer({ map: fim, type: `test${z}` });
+  layer.result = { kind: "raster", pixels: [1, 1, 1, 1], width: 2, height: 2, bounds: b, noData: null, meta: {} };
+  layer.set({ colorScale: new ColorScale({ stops: [{ value: 1, color: ML_COLORS[z] }] }) });
+  await layer.render();
+  await layer.settings.set({ opacity: 0.3 });
+  fim.layers.push(layer);
+  layer.on("click", (e) => {
+    mlLog.push(`  z=${z} received`);
+    if (z === mlLayers.length - 1 && $("#ml-absorb").checked) {
+      e.stopPropagation(); mlLog.push(`    z=${z} ABSORBED — dispatch stops`);
+    }
+  });
+  return layer;
+}
+$("#ml-stack").addEventListener("click", async () => {
+  mlLayers.forEach((l) => l.remove()); mlLayers = [];
+  const b = testBounds();
+  for (let z = 0; z < 3; z++) mlLayers.push(await makeTestLayer(z, b));
+  $("#ml-log").textContent = "3 overlays stacked (red=bottom, blue=top). Click where they overlap.";
+  pill("#p7", "stacked", "ok");
+});
+$("#ml-clear").addEventListener("click", () => {
+  mlLayers.forEach((l) => l.remove()); mlLayers = [];
+  $("#ml-log").textContent = "cleared."; pill("#p7", "idle");
+});
+$("#ml-simul").addEventListener("change", (e) => { fim.simultaneousLayerEvents = e.target.checked; });
+
+// ── 8 · region draw ────────────────────────────────────────────────────────────────────────────
+let regionDraw = null, regionLayer = null;
+function drawRegionOnMap(points, closed) {
+  regionLayer?.remove(); regionLayer = null;
+  if (points.length < 2) return;
+  const coords = points.map((p) => [p.lng, p.lat]);
+  const geometry = closed && points.length >= 3
+    ? { type: "Polygon", coordinates: [[...coords, coords[0]]] }
+    : { type: "LineString", coordinates: coords };
+  regionLayer = new VectorLayer({
+    map: fim, type: "region",
+    sources: [{ data: { type: "Feature", geometry, properties: {} }, bounds: {} }],
+  });
+  regionLayer.render({ style: { strokeColor: "#f85149", strokeWidth: 2, fillColor: "#f85149", fillOpacity: 0.15 } });
+}
+$("#rg-draw").addEventListener("click", () => {
+  if (!rasterLayer) { pill("#p8", "load the raster in step 3 first", "bad"); return; }
+  regionDraw = createRegionDraw(fim, {
+    onPoint: (pts) => {
+      drawRegionOnMap(pts, false);
+      $("#rg-out").textContent = `${pts.length} point(s) — click more, then Finish`;
+    },
+    onComplete: async (filter, pts) => {
+      drawRegionOnMap(pts, true);
+      if (!filter) { $("#rg-out").textContent = "need ≥3 points"; pill("#p8", "too few points", "bad"); return; }
+      lastRegionFilter = filter;                        // step 9's Mask reads this
+      const stats = await rasterLayer.getStats({ filter });
+      $("#rg-out").innerHTML =
+        `<p class="dim" style="margin:0 0 4px">scoped to a ${pts.length}-point region:</p>` +
+        renderStats(stats, { html: true });
+      pill("#p8", "scoped", "ok");
+    },
+  });
+  regionDraw.start();
+  $("#rg-out").textContent = "click ≥3 points on the raster, then Finish";
+  pill("#p8", "drawing — dispatch suspended", "ok");
+});
+$("#rg-finish").addEventListener("click", () => regionDraw?.finish());
+$("#rg-clear").addEventListener("click", () => {
+  regionDraw?.cancel(); regionLayer?.remove(); regionLayer = null;
+  lastRegionFilter = null; $("#rg-out").textContent = "—"; pill("#p8", "idle");
+});
+</script>
+</body>
+</html>

@@ -45,13 +45,28 @@
 
     // ══ 1. TWO MAP INSTANCES, TWO PROVIDERS ══════════════════════════════════
     H("1 · mount — two providers");
-    const fim = await mount("g", {
-      isolated: true, provider: "google",
-      apiKey: new URLSearchParams(location.search).get("apiKey") || "",
-      center, zoom,
-    });
+    // The google half needs a key (?apiKey=…); the leaflet half never does. Mounting google FIRST
+    // and letting it throw took the whole page down with it — including every keyless check below.
+    // So it degrades: no key → no google map, the leaflet half still runs, and the page says so.
+    const apiKey = new URLSearchParams(location.search).get("apiKey") || "";
+    const fim = apiKey
+      ? await mount("g", { isolated: true, provider: "google", apiKey, center, zoom })
+      : null;
+    if (!fim) {
+      document.getElementById("g").innerHTML =
+        '<p style="font:13px system-ui;padding:8px;margin:0;background:#fffbdd;border:1px solid #d4a72c">' +
+        "No <code>?apiKey=…</code> in the URL — skipping the Google provider. " +
+        "The Leaflet half below runs keyless; add <code>?apiKey=YOUR_KEY</code> for both.</p>";
+      console.warn("no ?apiKey= — google checks are skipped; leaflet still runs");
+    }
     const fim2 = await mount("l", { isolated: true, provider: "leaflet", center, zoom });
-    console.log("✓ google + leaflet mounted");
+    console.log(fim ? "✓ google + leaflet mounted" : "✓ leaflet mounted (google skipped — no apiKey)");
+
+    // The map every provider-neutral check runs against: google when there is a key, else leaflet.
+    const primary = fim || fim2;
+    // A google-ONLY check: skipped, not failed, when no key was supplied.
+    const checkG = (label, fn) =>
+      (fim ? check(label, fn) : Promise.resolve(console.log("– " + label + "  (skipped — no apiKey)")));
     // await check("FimViz.mapProviders()", () => FimViz.mapProviders().join(", "));
 
     // ══ 2. STYLE — ColorScale / Legend ═══════════════════════════════════════
@@ -133,7 +148,7 @@
     const KMZ    = "https://iowawis.org/layers/inundation/iowa_city/017.0.kmz";
     const PROXY  = "https://hydroinformatics.tulane.edu/lab/cors/";
     let kmzDs = null;
-    await check("A · google · KMZ url → vector layer", async () => {
+    await checkG("A · google · KMZ url → vector layer", async () => {
       kmzDs = await fim.addDataset(PROXY + KMZ, { name: "017.0.kmz" });
       const layer = await fim.addLayer("vector", { source: kmzDs, style: kmzStyle(googleColor) });
       layer.fit();
@@ -144,16 +159,18 @@
     // other provider, in a DIFFERENT color from the same scale. Skips cleanly if the fetch failed.
     await check("A2 · leaflet · SAME KMZ Dataset, different color", async () => {
       if (!kmzDs) return "skipped — KMZ fetch/parse failed above";
-      const layer = await fim2.addLayer("vector", { source: kmzDs, style: kmzStyle(googleColor) });
+      const layer = await fim2.addLayer("vector", { source: kmzDs, style: kmzStyle(leafletColor) });
       layer.fit();
       return `color ${leafletColor}, layer ${layer.id} on ${fim2.app.config.provider}`;
     });
 
-    // Layer B — the inline box on GOOGLE (Blob source, self-contained so it always renders).
+    // Layer B — the inline box (Blob source, self-contained so it always renders). On google when a
+    // key is present, otherwise on leaflet: section 8 below needs a real layer to inspect, and the
+    // registry API it exercises is provider-neutral, so either map proves the same thing.
     let layerB;
-    await check("B · google · inline GeoJSON blob → vector layer", async () => {
-      const ds2 = await fim.addDataset(boxBlob(), { name:"demo.geojson" });
-      layerB = await fim.addLayer("vector", { source: ds2, style: boxStyle });
+    await check(`B · ${primary.app.config.provider} · inline GeoJSON blob → vector layer`, async () => {
+      const ds2 = await primary.addDataset(boxBlob(), { name:"demo.geojson" });
+      layerB = await primary.addLayer("vector", { source: ds2, style: boxStyle });
       return `${ds2.kind}/${ds2.format}, layer ${layerB.id}`;
     });
 
@@ -168,17 +185,17 @@
 
     // ══ 8. FimMap registry ═══════════════════════════════════════════════════
     H("8 · FimMap registry");
-    await check("fim.datasets", () => fim.datasets.map(d => d.name).join(", "));
-    await check("fim.layers", () => fim.layers.map(l => `${l.type}:${l.id.slice(-4)}`).join(", "));
-    await check("fim.getLayer(id) resolves", () => layerB && fim.getLayer(layerB.id) === layerB);
+    await check("fim.datasets", () => primary.datasets.map(d => d.name).join(", "));
+    await check("fim.layers", () => primary.layers.map(l => `${l.type}:${l.id.slice(-4)}`).join(", "));
+    await check("fim.getLayer(id) resolves", () => layerB && primary.getLayer(layerB.id) === layerB);
     await check("layer.remove() fires 'removed' + drops from fim.layers", async () => {
-      const tmp = await fim.addLayer("vector", { source: layerB.dataset });   // throwaway
-      const before = fim.layers.length;
+      const tmp = await primary.addLayer("vector", { source: layerB.dataset });   // throwaway
+      const before = primary.layers.length;
       let removed = false;
       tmp.on("removed", () => { removed = true; });
       tmp.remove();
-      const gone = fim.layers.indexOf(tmp) === -1;
-      return `removed-event=${removed}, dropped=${gone}, count ${before}→${fim.layers.length}`;
+      const gone = primary.layers.indexOf(tmp) === -1;
+      return `removed-event=${removed}, dropped=${gone}, count ${before}→${primary.layers.length}`;
     });
 
     console.log("\n✓ smoke test complete.");

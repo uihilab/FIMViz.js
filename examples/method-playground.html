@@ -475,7 +475,7 @@ async function runMapTests(fim) {
   await runA("rl.compute()", () => rl.compute());                                 // force sources → this.result
   await runA("rl.render({render:'auto'})", () => rl.render({ render: "auto" }));   // render({ render:'auto'|'in-place'|'recreate' })
   run("rl.fit()", () => rl.fit());
-  run("rl.set({ colorScale: cs })", () => rl.set({ colorScale: new ColorScale({ palette: "viridis", min: 0, max: 46, continuous: true, unit: "m" } })));
+  run("rl.set({ colorScale: cs })", () => rl.set({ colorScale: new ColorScale({ palette: "viridis", min: 0, max: 46, continuous: true, unit: "m" }) }));
   run("rl.getLegend()", () => rl.getLegend());
   await runA("rl.getStats({filter})", () => rl.getStats({ filter: new SpatialFilter(leftHalf) }));
   run("rl.valueAt(center) — inside", () => rl.valueAt(CENTER.lat, CENTER.lng));   // valueAt(lat, lng) → number|null

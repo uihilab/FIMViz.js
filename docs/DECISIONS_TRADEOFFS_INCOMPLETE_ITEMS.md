@@ -245,6 +245,35 @@ is the *why*, those are the *what*.
   deliberate decision, not oversight: `Legend.toHtml()` emits this app's DOM markup, but the model is
   already data-complete (`stops`/`toJSON`) and moving `toHtml` to a `ui/` renderer isn't worth the churn.
 
+- **The neutral style vocabulary covers points as a circle on every provider, not as each provider's
+  default marker.** `fillColor`/`strokeColor` are *path* options: `google.maps.Data` draws a Point with
+  its `icon`, and Leaflet's default Point is an `L.marker` with `Icon.Default`. Neither reads the path
+  style, so every style key silently did nothing on points — on both providers. Leaflet was worse than
+  silent: `Icon.Default` resolves its PNGs from the URL of a `<script src=".../leaflet.js">` tag, and this
+  package *bundles* Leaflet, so no such tag exists, the path fell back to a page-relative
+  `images/marker-icon.png`, and every point rendered as a **broken image**. Both adapters now translate the
+  same neutral style into their own circle primitive — a `google.maps.Symbol` (`styleToGooglePoint`, a
+  literal SVG arc path rather than `google.maps.SymbolPath.CIRCLE` so the translation stays a pure
+  function testable under Node) and an `L.circleMarker` — sized by a new `pointRadius` key. A host that
+  genuinely wants a pin still passes a provider-native `icon` through the documented escape hatch, which
+  wins over the injected symbol. **Rejected:** shipping the Leaflet marker PNGs as assets, or setting
+  `L.Icon.Default.imagePath`. Both restore a marker that still ignores the neutral vocabulary, so points
+  would remain the one geometry you cannot style portably — and they add an asset-path problem to every
+  consumer's build.
+
+- **`Filter.from` is duck-typed on `test()`, not `instanceof Filter`.** `fimviz` and `fimviz/ui` are two
+  separate webpack bundles, and `ui/regionDraw.js` imports `SpatialFilter` from `package/filter.js` — so
+  `dist/ui.js` carries its **own copy** of that class. A `SpatialFilter` built by the UI module's own
+  `createRegionDraw` was therefore not `instanceof` the engine bundle's `Filter`, and
+  `layer.getStats({ filter })` threw `Filter.from: unrecognized filter input` on the UI module's own
+  output. Class identity is per-module-instance; testing for the method — the only thing any call site
+  uses — is what actually holds across the seam, and it is what the rest of the engine already does
+  (nothing does `instanceof Dataset`). Arrays are checked first, since a polygon is an object too.
+  **Rejected:** externalizing `fimviz` from the `ui` bundle. It would give one shared class, but
+  `fimviz/ui` exists precisely so a host can take a toast or a tools panel for ~17 KB instead of pulling
+  the whole engine; duck-typing fixes the identity problem without giving that up, and generalizes to a
+  host passing its own filter object.
+
 ### 1.2 Instance-scoped DOM, event inversion, and the engine→host boundary
 
 - **The engine must never call an app function — not by import, and not through `window.*` either.** A
@@ -613,13 +642,35 @@ own runtime from its own composition root.
   possible because the recipe is immutable and hashable, but premature until a real usage path shows the
   redundancy actually costing something.
 
-### 5.3 Browser verification still owed
+### 5.3 Browser verification — what a real-Chrome pass found
 
 Recorded because it's easy to lose track of what's been confirmed by hand vs. only by `npm test`, which
-does not cover `google.maps` rendering or the GDAL WASM warp. Owed, at the engine level: vector-layer
-rendering + neutral-style translation on both providers (Google and Leaflet); raster overlay
-colorize/opacity/hit-test on Google; the GDAL WASM reproject forced at a real terminal; and the
-`http://[::1]:PORT` loopback fix (confirm data actually fetches over IPv6 loopback, not just `localhost`).
+does not cover `google.maps` rendering, Leaflet, canvas, or the GDAL WASM warp.
+
+**Discharged on Leaflet** by a headless-Chrome pass over every page in `examples/` — all 14 load with a
+clean console, and `ui-tools.html` + `temporal-netcdf.html` were driven end to end (file load → tools
+panel → legend/stats → hover → dispatch → region draw → scoped stats; and scan → scrub → `reduce`
+across NetCDF4, Zarr and GRIB2). Four defects that `npm test` structurally could not see:
+
+- **Two example pages were entirely dead.** A stray `}` in `ui-tools.html` and `method-playground.html`
+  meant the module never parsed, so nothing on either page ran. A syntax error in an inline
+  `<script type="module">` produces exactly one console line and no other symptom — nothing in the
+  repo checked those scripts, because they are HTML, not JS.
+- **Every Point feature rendered as a broken image on Leaflet.** See §1.1's point-styling entry.
+- **`fimviz/ui`'s own region-draw output was rejected by the engine.** See §1.1's `Filter.from` entry.
+- **`mount("map", …)` produced two nodes with `id="map"`.** The injection guard checked the
+  container's *descendants* for a `#map`, so a container that was *itself* `#map` got another one
+  nested inside it. Fixed by treating a container named `map` as already providing the map div on the
+  bare-engine path (with a runtime there is a real widget to inject, and the host owns the naming).
+
+**Still owed:** everything Google-side — vector rendering and neutral-style translation on
+`google.maps.Data` (including the new point symbol), and raster overlay colorize/opacity/hit-test. Also
+the GDAL WASM reproject forced at a real terminal, and the `http://[::1]:PORT` loopback fix (confirm
+data actually fetches over IPv6 loopback, not just `localhost`).
+
+`examples/verify.html` is the guided pass for the parts that need a human eye — legibility, tooltip
+tracking, gradient rendering, dispatch order, modal capture. It carries its own instructions and emits
+a Markdown report; see [examples/README.md](../examples/README.md).
 
 ### 5.4 Bigger, further-out additions
 

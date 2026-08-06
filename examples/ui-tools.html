@@ -238,7 +238,7 @@ function testBounds() {
 async function makeTestLayer(z, b) {
   const layer = new RasterLayer({ map: fim, type: `test${z}` });
   layer.result = { kind: "raster", pixels: [1, 1, 1, 1], width: 2, height: 2, bounds: b, noData: null, meta: {} };
-  layer.set({ colorScale: new ColorScale({ stops: [{ value: 1, color: ML_COLORS[z] }] } }));   // solid colour
+  layer.set({ colorScale: new ColorScale({ stops: [{ value: 1, color: ML_COLORS[z] }] }) });   // solid colour
   await layer.render();                 // real overlay via provider.addRasterImage
   await layer.settings.set({ opacity: 0.3 });
   fim.layers.push(layer);

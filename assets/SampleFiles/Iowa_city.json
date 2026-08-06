@@ -6,7 +6,7 @@
         "flood_level": "12 ft",
         "date_created": "Jan 2011",
         "terms_of_use": "provisional - not for regulatory use",
-        "depth_service_url": "https://ifis.iowafloodcenter.org/ifis/app/inc/inc_get_inundepth.php?lat=[lat]&lng=[lng]&tid=[layer_id]",
+        "depth_service_url": "https://ifis.iowafloodcenter.org/ifis/app/inc/inc_get_inundepth.php?lat=[lat]&lng=[lng]&tid=[layer_id]"
     },
     "coordinates": {
         "latitude": 41.971945,

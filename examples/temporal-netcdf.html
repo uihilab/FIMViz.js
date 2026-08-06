@@ -380,8 +380,9 @@ $("#bbox").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && lastSource) { stop(); open(lastSource.source, lastSource.name); }
 });
 // Three bundled samples, all Hurricane Idalia so the reductions are comparable across formats. The
-// GRIB2 one carries a data-bbox: NCEP Stage IV is polar-stereographic, so scan() derives no extent
-// and it needs the override — the same thing you do for any curvilinear file.
+// GRIB2 one carries a data-bbox because SciWrid's scan() only derives an extent on its netcdf4/
+// zarr/parquet paths — so EVERY grib2 and netcdf3 file arrives without one, whatever its
+// projection, and needs the override. The same override is what you reach for on a curvilinear file.
 for (const btn of document.querySelectorAll("button.sample")) {
   btn.addEventListener("click", async () => {
     stop();

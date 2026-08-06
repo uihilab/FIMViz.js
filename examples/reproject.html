@@ -161,7 +161,8 @@ $("#go").addEventListener("click", async () => {
   }
 });
 
-window.FIM = { FimViz, providerAcceptsCRS, get ds() { return lastDataset; } };
+// providerAcceptsCRS is a STATIC on FimViz, not a barrel export — see src/package/lib.js.
+window.FIM = { FimViz, providerAcceptsCRS: FimViz.providerAcceptsCRS, get ds() { return lastDataset; } };
 console.log("[fimviz] reproject example ready — FimViz + last dataset on window.FIM");
 </script>
 </body>
