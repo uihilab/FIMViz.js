@@ -8,7 +8,7 @@
 
 > **createLayer**(`fim`, `type?`, `opts?`): [`Layer`](../classes/Layer.md) \| `Promise`\<[`Layer`](../classes/Layer.md)\>
 
-Defined in: [package/layer.js:1103](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/layer.js#L1103)
+Defined in: [package/layer.js:1103](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/layer.js#L1103)
 
 Construct a Layer of `type` for `fim`. `type` is normally a registry string ('vector', 'raster',
 …), but a bare source works too: pass a Dataset (or anything else) in the `type` slot and it is

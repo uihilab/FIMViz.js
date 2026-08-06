@@ -8,7 +8,7 @@
 
 > **vectorControls**(`layer`): [`Control`](../interfaces/Control.md)[]
 
-Defined in: [ui/toolsPanel.js:51](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/ui/toolsPanel.js#L51)
+Defined in: [ui/toolsPanel.js:51](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/ui/toolsPanel.js#L51)
 
 PURE: the control spec for a vector layer — fill/stroke colour + fill opacity, plus the palette
 controls when the layer is grading features by a property (`colorScale` + `colorBy`). Those two

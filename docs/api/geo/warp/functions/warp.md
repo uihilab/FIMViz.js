@@ -8,7 +8,7 @@
 
 > **warp**(`ds`, `toCrs`): `Promise`\<[`Dataset`](../../../package/dataset/classes/Dataset.md)\>
 
-Defined in: [geo/warp.js:44](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/geo/warp.js#L44)
+Defined in: [geo/warp.js:44](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/geo/warp.js#L44)
 
 Reproject `ds` to `toCrs` (e.g. 'EPSG:4326'). Returns a NEW Dataset — value semantics — with a
 new id, since reprojected pixels are a new value rather than an edit of the old one. Returns

@@ -8,7 +8,7 @@
 
 > **geomContains**(`geom`, `x`, `y`): `boolean`
 
-Defined in: [package/layer.js:1023](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/layer.js#L1023)
+Defined in: [package/layer.js:1023](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/layer.js#L1023)
 
 Point-in-geometry for GeoJSON (x=lng, y=lat). Polygon/MultiPolygon exact; Point within ~0.0005°;
 GeometryCollection recurses; lines/others → false. Exported for tests.

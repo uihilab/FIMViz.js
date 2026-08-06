@@ -8,7 +8,7 @@
 
 > **rgbaToDataURL**(`rgba`, `width`, `height`): `string`
 
-Defined in: [package/rasterImage.js:60](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/rasterImage.js#L60)
+Defined in: [package/rasterImage.js:60](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/rasterImage.js#L60)
 
 RGBA buffer → PNG data URL via an offscreen canvas (browser).
 

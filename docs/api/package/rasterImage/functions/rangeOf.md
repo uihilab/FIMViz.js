@@ -8,7 +8,7 @@
 
 > **rangeOf**(`grid`): `object`
 
-Defined in: [package/rasterImage.js:17](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/rasterImage.js#L17)
+Defined in: [package/rasterImage.js:17](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/rasterImage.js#L17)
 
 Min/max over a grid's pixels, skipping noData/NaN — to seed a default continuous scale when the
 caller attaches none. Exported so a caller building its own default ColorScale (e.g.

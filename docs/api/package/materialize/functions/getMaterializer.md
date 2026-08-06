@@ -8,7 +8,7 @@
 
 > **getMaterializer**(`format`): [`Materializer`](../type-aliases/Materializer.md)
 
-Defined in: [package/materialize.js:113](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/materialize.js#L113)
+Defined in: [package/materialize.js:113](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/materialize.js#L113)
 
 The decoder for `format`, or null. Dataset.#force uses this; a null result becomes a clear
 "no materializer registered for '<format>' — import fimviz/src/io/materializers.js" error.

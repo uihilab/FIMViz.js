@@ -6,7 +6,7 @@
 
 # Interface: NeutralStyle
 
-Defined in: [package/mapProvider.js:134](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/mapProvider.js#L134)
+Defined in: [package/mapProvider.js:134](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/mapProvider.js#L134)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [package/mapProvider.js:134](https://github.com/uihilab/FIMViz.js/bl
 
 > `optional` **fillColor?**: `string`
 
-Defined in: [package/mapProvider.js:135](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/mapProvider.js#L135)
+Defined in: [package/mapProvider.js:135](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/mapProvider.js#L135)
 
 ***
 
@@ -22,7 +22,7 @@ Defined in: [package/mapProvider.js:135](https://github.com/uihilab/FIMViz.js/bl
 
 > `optional` **fillOpacity?**: `number`
 
-Defined in: [package/mapProvider.js:136](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/mapProvider.js#L136)
+Defined in: [package/mapProvider.js:136](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/mapProvider.js#L136)
 
 ***
 
@@ -30,7 +30,7 @@ Defined in: [package/mapProvider.js:136](https://github.com/uihilab/FIMViz.js/bl
 
 > `optional` **strokeColor?**: `string`
 
-Defined in: [package/mapProvider.js:137](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/mapProvider.js#L137)
+Defined in: [package/mapProvider.js:137](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/mapProvider.js#L137)
 
 ***
 
@@ -38,7 +38,7 @@ Defined in: [package/mapProvider.js:137](https://github.com/uihilab/FIMViz.js/bl
 
 > `optional` **strokeOpacity?**: `number`
 
-Defined in: [package/mapProvider.js:139](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/mapProvider.js#L139)
+Defined in: [package/mapProvider.js:139](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/mapProvider.js#L139)
 
 ***
 
@@ -46,4 +46,4 @@ Defined in: [package/mapProvider.js:139](https://github.com/uihilab/FIMViz.js/bl
 
 > `optional` **strokeWidth?**: `number`
 
-Defined in: [package/mapProvider.js:138](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/package/mapProvider.js#L138)
+Defined in: [package/mapProvider.js:138](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/mapProvider.js#L138)

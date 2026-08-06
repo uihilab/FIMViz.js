@@ -8,7 +8,7 @@
 
 > **createRegionDraw**(`fim`, `opts?`): `object`
 
-Defined in: [ui/regionDraw.js:19](https://github.com/uihilab/FIMViz.js/blob/cf0b670babbcd8bf33ef47bbe5f1e8ec9a645e8b/src/ui/regionDraw.js#L19)
+Defined in: [ui/regionDraw.js:19](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/ui/regionDraw.js#L19)
 
 ## Parameters
 
