@@ -663,6 +663,18 @@ across NetCDF4, Zarr and GRIB2). Four defects that `npm test` structurally could
   nested inside it. Fixed by treating a container named `map` as already providing the map div on the
   bare-engine path (with a runtime there is a real widget to inject, and the host owns the naming).
 
+**Open — region draw drops its first vertex.** Driving step 8 of `verify.html` with four clicks records
+only three, and the recorded ring is the *last three* corners: the first click after
+`createRegionDraw().start()` never reaches the capture handler. A user clicking the minimum three
+points therefore gets two and is told "need ≥3 points", which reads as the tool being broken. A second
+anomaly in the same trace is unexplained: the recorded vertices span twice the expected lat/lng range
+for their pixel positions — an exact 2× scale error, as if the click→LatLng conversion used a zoom one
+level below the displayed one. Both are visible in the page's own `[verify]` console trace; the vertex
+entries now carry the map's zoom and bounds at the moment of each click, which is the next thing to
+read. Not yet diagnosed to engine vs. example vs. Leaflet animation timing (`#rg-draw` calls
+`rasterLayer.fit()` immediately before `start()`, so an in-flight zoom animation is a live suspect for
+both symptoms).
+
 **Still owed:** everything Google-side — vector rendering and neutral-style translation on
 `google.maps.Data` (including the new point symbol), and raster overlay colorize/opacity/hit-test. Also
 the GDAL WASM reproject forced at a real terminal, and the `http://[::1]:PORT` loopback fix (confirm
