@@ -48,8 +48,8 @@ raw File/Blob/ArrayBuffer/URL into a Dataset for you.
 
 | Method                          | Params                                                                                                    | Returns                                      | Notes                                                                                                                                                                                                                                                       |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `select(coord, opts?)`          | `coord: number|string`; `opts.axis=0` (index/name), `opts.nearest=true`, `opts.variant`, `opts.base`      | `Dataset|null`                               | Resolves one axis entry to a child Dataset — URL-rooted, or rooted on this Dataset's own source for an in-file selector ([below](#axis-entries-one-file-per-entry-or-one-file-many-entries)). Only meaningful on a Dataset with `.axes` (a selection-axis series) — a plain parsed file has none. `null` on no match. `opts.variant` required when the entry's `ref` is `{raster, vector}`-shaped. |
-| `selectRange(from, to, opts?)`  | `from`/`to`: inclusive bounds (same type as the coords); `opts.axis=0`                                    | `Dataset|null`                               | **Series in, series out** — narrows one axis to a window instead of resolving one entry, so `select()`/`reduce()` still work on the result ("the mean of these six hours" is `selectRange(a,b).reduce('mean')`). Reversed bounds swap. No nearest-match: a window narrower than the sampling returns `null` rather than silently widening. Other axes are untouched. |
+| `select(coord, opts?)`          | `coord: number|string`; `opts.axis=0` (index/name), `opts.nearest=true`, `opts.variant`, `opts.base`      | `Dataset|null`                               | Resolves one axis entry to a child Dataset — URL-rooted, or rooted on this Dataset's own source for an in-file selector ([below](#axis-entries-one-file-per-entry-or-one-file-many-entries)). **PEELS** one axis: the coord folds into the selector and that axis drops, while any other axes stay — so on `(time × member)` this leaves a member series, and a second `select()` finishes it. **Throws** when the named/indexed axis does not exist (a mistake); returns `null` when the axis exists but no entry matches (a data condition). `opts.variant` required when the entry's `ref` is `{raster, vector}`-shaped. |
+| `selectRange(from, to, opts?)`  | `from`/`to`: inclusive bounds (same type as the coords); `opts.axis=0`                                    | `Dataset|null`                               | **Series in, series out** — narrows one axis to a window instead of resolving one entry, so `select()`/`reduce()` still work on the result ("the mean of these six hours" is `selectRange(a,b).reduce('mean')`). Reversed bounds swap. No nearest-match: a window narrower than the sampling returns `null` rather than silently widening. Other axes are untouched. **Throws** on a missing axis, or on an axis declared `ordered: false`. |
 | `selectAxisEntry(coord, opts?)` | same `opts` (no `variant`/`base`)                                                                         | `DatasetAxisEntry|null`                      | What `select` looks up before resolving the URL — exact match first, nearest **numeric** coord on a miss (`nearest:true`, default).                                                                                                                         |
 | `reduce(op?, opts?)`            | `op: 'sum'|'mean'|'min'|'max'` (default `'mean'`); `opts.axis=0`, `opts.method='nearest'`, `opts.variant` | `Dataset`                                    | Collapse a temporal/vertical axis to one grid — sugar over `select()` every entry + `combine()`. Throws if no axis / empty axis / an entry fails to resolve.                                                                                                |
 | `toRecord(opts?)`               | `opts.storeMaterialized=false`                                                                            | `Object`                                     | Structured-cloneable snapshot for `Storage.put()`. Default = source + op recipe (small); `storeMaterialized:true` also embeds the decoded grid/features (call `await ds.load()` first, or it throws).                                                       |
@@ -246,9 +246,34 @@ All throw `"<op>: raster-only op"` if called on a vector Dataset.
 | `aspect()`                                       | —                                                                                                                                                                                    | Downslope compass bearing, Horn's method.                                                                                                                                                                                   |
 | `hillshade(opts?)`                               | `opts.altitude`, `opts.azimuth`, `opts.zFactor`, `opts.cellsizeX`, `opts.cellsizeY`                                                                                                  | Shaded-relief illumination.                                                                                                                                                                                                 |
 | `zonalStats(zones, opts?)` — **terminal, async** | `zones: [{id?,polygon?,filter?}]`; `opts.noData`                                                                                                                                     | Returns data (an array), not a Dataset. Forces the grid.                                                                                                                                                                    |
+| `groupBy(by, opts?)` — **terminal, async** | `by`: a raster `Dataset` whose values define the groups; `opts.bins` (a count → equal-width bands, or explicit edges), `opts.method`, `opts.noData`, `opts.byNoData` | Reduce this raster **grouped by another raster's values** — "mean depth per land-use class", "rainfall binned by elevation". Returns a table. `by` is conformed onto this grid (the same LHS rule `combine` uses); a pixel counts only where **both** rasters have a value. |
 
 
 
+
+### Three kinds of reduction — which verb collapses what
+
+Easy to conflate, so stated once. All three shrink something; they differ in *what* and *by what*:
+
+| verb | collapses | grouped by | returns |
+|---|---|---|---|
+| `reduce(op)` | a **selection axis** (time, level, member) | — | a `Dataset` (one grid) |
+| `zonalStats(zones)` | **space** | geometry (polygons) | a table |
+| `groupBy(by)` | **space** | **another raster's values** | a table |
+
+`groupBy` is what "one variable as a series against another" means concretely. It is a distinct verb
+rather than an overload of the other two because its grouping key comes from *data* — not from the
+axis model, and not from geometry.
+
+```js
+await depth.groupBy(landuse);                        // one row per distinct class
+await rain.groupBy(dem, { bins: 10 });                // ten equal-width elevation bands
+await rain.groupBy(dem, { bins: [0, 100, 500, 2000] });  // explicit edges
+// -> [{ class, range?, count, sum, min, max, mean, area }, ...]
+```
+
+Note what is *not* here: producing a new **grid** from two variables is `combine`/`difference` (band
+math). `groupBy` is the table-producing half of the same question.
 
 ## Raster — binary / N-ary
 

@@ -109,7 +109,7 @@ export { colorizeGrid, gridToDataURL } from "./rasterImage.js";
 // The pure raster-grid transforms behind the lazy Dataset ops (ds.clip/mask/reclassify) — surfaced so
 // a consumer can transform a decoded grid directly. See docs/PACKAGE_ROADMAP.md §2.
 export {
-  maskGrid, clipGrid, reclassifyGrid, combineGrids, zonalStats,
+  maskGrid, clipGrid, reclassifyGrid, combineGrids, zonalStats, groupByGrid,
   slopeGrid, aspectGrid, hillshadeGrid, rasterizeFeatures,
 } from "./rasterOps.js";
 // Grid alignment behind ComparisonLayer/EnsembleAggregationLayer (and any N-raster comparison a host

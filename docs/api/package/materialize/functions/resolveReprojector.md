@@ -8,7 +8,7 @@
 
 > **resolveReprojector**(): `Promise`\<[`Reprojector`](../type-aliases/Reprojector.md)\>
 
-Defined in: [package/materialize.js:174](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/materialize.js#L174)
+Defined in: [package/materialize.js:174](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/materialize.js#L174)
 
 The reprojector to warp with, running the default loader (once, memoized) if nothing is registered
 yet. Dataset's reproject force calls this instead of getReprojector() so the JIT default gets a

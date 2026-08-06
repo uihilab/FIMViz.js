@@ -8,7 +8,7 @@
 
 > **createToast**(`root?`, `opts?`): `object`
 
-Defined in: [ui/toast.js:17](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/ui/toast.js#L17)
+Defined in: [ui/toast.js:17](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/ui/toast.js#L17)
 
 Create a toast container and a `show()` to push messages into it.
 

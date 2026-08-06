@@ -6,7 +6,7 @@
 
 # Class: FimVizInstance
 
-Defined in: [package/fimViz.js:20](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L20)
+Defined in: [package/fimViz.js:20](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L20)
 
 A FimViz instance: the shared service container behind one or more FimMaps. The user
 rarely holds one directly — they work in Maps/Layers and the default is implicit.
@@ -17,7 +17,7 @@ rarely holds one directly — they work in Maps/Layers and the default is implic
 
 > **new FimVizInstance**(`opts?`): `FimVizInstance`
 
-Defined in: [package/fimViz.js:38](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L38)
+Defined in: [package/fimViz.js:38](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L38)
 
 #### Parameters
 
@@ -39,7 +39,7 @@ Defined in: [package/fimViz.js:38](https://github.com/uihilab/FIMViz.js/blob/39c
 
 > **get** **config**(): `any`
 
-Defined in: [package/fimViz.js:173](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L173)
+Defined in: [package/fimViz.js:173](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L173)
 
 This app's own config object (defaults merged with whatever was passed to `mount()`/`create()`).
 
@@ -55,7 +55,7 @@ This app's own config object (defaults merged with whatever was passed to `mount
 
 > **get** **datasets**(): [`Dataset`](../../dataset/classes/Dataset.md)[]
 
-Defined in: [package/fimViz.js:74](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L74)
+Defined in: [package/fimViz.js:74](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L74)
 
 Every Dataset parsed on this app, by any of its maps. A copy — register via `fim.addDataset()`
 (or `fim.addLayer(rawFile)`, which parses implicitly), not by pushing here.
@@ -72,7 +72,7 @@ Every Dataset parsed on this app, by any of its maps. A copy — register via `f
 
 > **get** **emitter**(): `any`
 
-Defined in: [package/fimViz.js:152](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L152)
+Defined in: [package/fimViz.js:152](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L152)
 
 The underlying event emitter backing `on`/`off`/`emit`.
 
@@ -88,7 +88,7 @@ The underlying event emitter backing `on`/`off`/`emit`.
 
 > **get** **hasMaps**(): `boolean`
 
-Defined in: [package/fimViz.js:185](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L185)
+Defined in: [package/fimViz.js:185](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L185)
 
 Does this app have at least one mounted `FimMap`? Used as the single-instance mount guard.
 
@@ -104,7 +104,7 @@ Does this app have at least one mounted `FimMap`? Used as the single-instance mo
 
 > **get** **isDefault**(): `boolean`
 
-Defined in: [package/fimViz.js:148](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L148)
+Defined in: [package/fimViz.js:148](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L148)
 
 Is this the shared ambient default app (vs. one created via `{ isolated: true }`)?
 
@@ -120,7 +120,7 @@ Is this the shared ambient default app (vs. one created via `{ isolated: true }`
 
 > **get** **maps**(): [`FimMap`](../../fimMap/classes/FimMap.md)[]
 
-Defined in: [package/fimViz.js:150](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L150)
+Defined in: [package/fimViz.js:150](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L150)
 
 Every `FimMap` currently mounted on this app.
 
@@ -136,7 +136,7 @@ Every `FimMap` currently mounted on this app.
 
 > **get** **storage**(): [`Storage`](../../../io/storage/classes/Storage.md)
 
-Defined in: [package/fimViz.js:53](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L53)
+Defined in: [package/fimViz.js:53](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L53)
 
 Client-side storage — shared across this app's maps. Lazily built from `config.storage`,
 because Storage is GENERIC: the host owns the database name and schema, so the library has
@@ -157,7 +157,7 @@ up is a programming error.
 
 > **adoptDataset**(`ds`): [`Dataset`](../../dataset/classes/Dataset.md)
 
-Defined in: [package/fimViz.js:91](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L91)
+Defined in: [package/fimViz.js:91](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L91)
 
 Register a Dataset parsed elsewhere — typically one crossing over from another app, since a
 Dataset is a free value that any map can render. Idempotent; returns the Dataset for chaining.
@@ -180,7 +180,7 @@ Dataset is a free value that any map can render. Idempotent; returns the Dataset
 
 > **configure**(`options?`): `void`
 
-Defined in: [package/fimViz.js:160](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L160)
+Defined in: [package/fimViz.js:160](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L160)
 
 Merge host options into config. No-op (with a warning) once locked.
 
@@ -200,7 +200,7 @@ Merge host options into config. No-op (with a warning) once locked.
 
 > **destroy**(): `void`
 
-Defined in: [package/fimViz.js:224](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L224)
+Defined in: [package/fimViz.js:224](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L224)
 
 Force-teardown of every map on this app (rare; the ref-counted path is the norm).
 
@@ -214,7 +214,7 @@ Force-teardown of every map on this app (rare; the ref-counted path is the norm)
 
 > **emit**(`evt`, `payload?`): `FimVizInstance`
 
-Defined in: [package/fimViz.js:181](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L181)
+Defined in: [package/fimViz.js:181](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L181)
 
 Emit an app-level event to every subscriber.
 
@@ -238,7 +238,7 @@ Emit an app-level event to every subscriber.
 
 > **lockConfig**(): `void`
 
-Defined in: [package/fimViz.js:171](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L171)
+Defined in: [package/fimViz.js:171](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L171)
 
 Lock config against further changes — called once the first map on this app has booted.
 
@@ -252,7 +252,7 @@ Lock config against further changes — called once the first map on this app ha
 
 > **off**(`evt`, `fn`): `FimVizInstance`
 
-Defined in: [package/fimViz.js:179](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L179)
+Defined in: [package/fimViz.js:179](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L179)
 
 Unsubscribe a listener previously added with `on`.
 
@@ -276,7 +276,7 @@ Unsubscribe a listener previously added with `on`.
 
 > **on**(`evt`, `fn`): `FimVizInstance`
 
-Defined in: [package/fimViz.js:177](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L177)
+Defined in: [package/fimViz.js:177](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L177)
 
 Subscribe to an app-level event (`error`, `notify`, `storage:changed`, …).
 
@@ -300,7 +300,7 @@ Subscribe to an app-level event (`error`, `notify`, `storage:changed`, …).
 
 > **removeDataset**(`ds`, `opts?`): `boolean`
 
-Defined in: [package/fimViz.js:105](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L105)
+Defined in: [package/fimViz.js:105](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L105)
 
 Forget a Dataset: drop it from this registry and release its decode.
 

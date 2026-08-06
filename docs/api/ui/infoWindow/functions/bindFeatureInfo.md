@@ -8,7 +8,7 @@
 
 > **bindFeatureInfo**(`layer`, `opts?`): `object`
 
-Defined in: [ui/infoWindow.js:77](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/ui/infoWindow.js#L77)
+Defined in: [ui/infoWindow.js:77](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/ui/infoWindow.js#L77)
 
 Wire a VectorLayer's feature clicks to an info window. The per-layer `click` fires only over a
 feature (dispatch hitTest), so this opens on the clicked feature. Requires `fim.enableMapEvents()`.

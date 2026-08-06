@@ -165,6 +165,99 @@ export function combineGrids(grids, { op = "difference", method = "nearest" } = 
 }
 
 /**
+ * Group a raster's pixels by **another raster's values** and reduce each group — the third kind of
+ * reduction, alongside `reduce()` (collapse a selection axis) and `zonalStats()` (collapse space by
+ * geometry). This one collapses space by *value*: "mean depth per land-use class", "rainfall binned
+ * by elevation", a rating curve of one variable against another.
+ *
+ * It is deliberately NOT `select`/`reduce`, and not an overload of `zonalStats`: the grouping key
+ * comes from DATA rather than from the axis model or from geometry, so it earns its own verb rather
+ * than making an existing one mean two things.
+ *
+ * `by` is conformed to `grid` (resampled onto its cells) exactly as `combineGrids` conforms its
+ * inputs — same LHS-conform rule, same resampler, so the two agree on what "aligned" means.
+ *
+ * Two grouping modes:
+ * - **discrete** (default) — every distinct value of `by` is a class. For classification rasters
+ *   (land use, soil type) where the values ARE the categories.
+ * - **binned** — `bins: [0, 100, 500]` uses those edges; `bins: 5` cuts `by`'s finite range into five
+ *   equal-width bands. For continuous `by` (elevation, discharge), where distinct values are useless.
+ *
+ * A pixel is skipped when EITHER raster is absent there (NaN or the respective noData), so the result
+ * only covers cells where both rasters actually have a value.
+ *
+ * @param {RasterGrid} grid - the values being reduced
+ * @param {RasterGrid} by - the values that define the groups
+ * @param {{ bins?: number|number[], method?: string, noData?: number, byNoData?: number }} [opts]
+ * @returns {Array<{class: number|string, range?: [number, number], count: number, sum: number,
+ *   min: number|null, max: number|null, mean: number|null, area: number}>} one row per non-empty
+ *   group, ordered by class/bin
+ */
+export function groupByGrid(grid, by, { bins, method = "nearest", noData, byNoData } = {}) {
+  if (!grid?.pixels || !by?.pixels) throw new Error("groupBy: two grids are required");
+  const meta = gridMeta(grid);
+  const byPixels = (by.width === grid.width && by.height === grid.height
+    && by.bounds.west === grid.bounds.west && by.bounds.north === grid.bounds.north
+    && by.bounds.east === grid.bounds.east && by.bounds.south === grid.bounds.south)
+    ? by.pixels
+    : resampleGrid(by.pixels, gridMeta(by), meta, { method, noData: by.noData });
+
+  const nd = noData ?? grid.noData;
+  const bnd = byNoData ?? by.noData;
+  const absent = (v, sentinel) => Number.isNaN(v) || (sentinel != null && v === sentinel);
+  const { north, south, east, west } = grid.bounds;
+  const pxArea = ((east - west) / grid.width) * ((north - south) / grid.height);
+
+  // Bin edges, when binning. A count cuts `by`'s own finite range; an explicit array is used as given.
+  let edges = null;
+  if (Array.isArray(bins)) {
+    edges = [...bins].sort((a, b) => a - b);
+  } else if (Number.isFinite(bins) && bins > 0) {
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < byPixels.length; i++) {
+      const b = byPixels[i];
+      if (absent(b, bnd)) continue;
+      if (b < lo) lo = b;
+      if (b > hi) hi = b;
+    }
+    if (!Number.isFinite(lo)) return [];
+    const step = (hi - lo) / bins || 1;
+    edges = Array.from({ length: bins + 1 }, (_, i) => lo + i * step);
+  }
+  // Last bin is closed at the top so the maximum value lands somewhere instead of falling out.
+  const binOf = (b) => {
+    for (let i = 0; i < edges.length - 1; i++) {
+      if (b >= edges[i] && (b < edges[i + 1] || i === edges.length - 2)) return i;
+    }
+    return null;
+  };
+
+  const acc = new Map();
+  for (let i = 0; i < grid.pixels.length; i++) {
+    const v = grid.pixels[i], b = byPixels[i];
+    if (absent(v, nd) || absent(b, bnd)) continue;
+    const key = edges ? binOf(b) : b;
+    if (key == null) continue;
+    let a = acc.get(key);
+    if (!a) acc.set(key, (a = { count: 0, sum: 0, min: Infinity, max: -Infinity }));
+    a.count++; a.sum += v;
+    if (v < a.min) a.min = v;
+    if (v > a.max) a.max = v;
+  }
+
+  return [...acc.entries()]
+    .sort((x, y) => x[0] - y[0])
+    .map(([key, a]) => ({
+      class: edges ? key : key,
+      ...(edges ? { range: [edges[key], edges[key + 1]] } : {}),
+      count: a.count, sum: a.sum,
+      min: a.count ? a.min : null, max: a.count ? a.max : null,
+      mean: a.count ? a.sum / a.count : null,
+      area: a.count * pxArea,
+    }));
+}
+
+/**
  * Zonal statistics: per-zone min/max/mean/sum/count/area over a raster. `zones` = [{ id?, polygon | filter }]
  * (a ring/multi-ring of {lat,lng}|[lat,lng], or a SpatialFilter). noData/NaN pixels are excluded; `area`
  * is in the bounds' units² (WGS84 → deg²; scale to metres in the caller if needed).

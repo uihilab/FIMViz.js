@@ -31,7 +31,7 @@ import {
 } from "./materialize.js";
 import {
   maskGrid, clipGrid, reclassifyGrid, combineGrids, zonalStats,
-  slopeGrid, aspectGrid, hillshadeGrid, rasterizeFeatures,
+  slopeGrid, aspectGrid, hillshadeGrid, rasterizeFeatures, groupByGrid,
 } from "./rasterOps.js";
 // resampleGrid is pure JS / headless (geo/resample.js has zero imports of its own) — same status as
 // rasterOps.js, which already imports it for combine()'s LHS-conform resampling. registerResampler
@@ -462,6 +462,41 @@ export class Dataset {
    * grid); returns data, not a Dataset. @param {Array<{id?, polygon?, filter?}>} zones
    * @param {{ noData?: number }} [opts] @returns {Promise<Array>}
    */
+  /**
+   * Reduce this raster's pixels **grouped by another raster's values** — a TERMINAL returning a table,
+   * not a Dataset. The third kind of reduction in the model:
+   *
+   * | verb | collapses | grouped by | returns |
+   * |---|---|---|---|
+   * | `reduce(op)` | a selection axis | — | a Dataset (one grid) |
+   * | `zonalStats(zones)` | space | geometry | a table |
+   * | `groupBy(by)` | space | **another raster's values** | a table |
+   *
+   * This is what "one variable as a series against another" means concretely — mean depth per
+   * land-use class, rainfall binned by elevation, a rating curve. It is a distinct verb rather than an
+   * overload because the grouping key comes from data, not from the axis model or from geometry.
+   *
+   * `by` is conformed onto THIS Dataset's grid (the same LHS-conform rule `combine` uses), and a pixel
+   * counts only where both rasters have a value.
+   *
+   * ```js
+   * await depth.groupBy(landuse);                  // one row per distinct land-use code
+   * await rain.groupBy(dem, { bins: 10 });          // ten equal-width elevation bands
+   * await rain.groupBy(dem, { bins: [0, 100, 500, 2000] });
+   * ```
+   * @param {Dataset} by - a raster Dataset whose values define the groups
+   * @param {{ bins?: number|number[], method?: string, noData?: number, byNoData?: number }} [opts]
+   * @returns {Promise<Array<Object>>}
+   */
+  async groupBy(by, opts = {}) {
+    this.#assertRasterOp("groupBy");
+    if (!by || typeof by.grid !== "function") {
+      throw new Error("groupBy: `by` must be a raster Dataset whose values define the groups");
+    }
+    const [mine, theirs] = await Promise.all([this.grid(), by.grid()]);
+    return groupByGrid(mine, theirs, opts);
+  }
+
   async zonalStats(zones, opts = {}) {
     this.#assertRasterOp("zonalStats");
     return zonalStats(await this.grid(), zones, opts);

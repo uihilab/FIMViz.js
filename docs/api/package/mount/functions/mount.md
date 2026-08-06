@@ -8,7 +8,7 @@
 
 > **mount**(`target`, `options?`): `Promise`\<[`FimMap`](../../fimMap/classes/FimMap.md)\> & `object`
 
-Defined in: [package/mount.js:231](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/mount.js#L231)
+Defined in: [package/mount.js:231](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/mount.js#L231)
 
 mount(target, options) — the public entry point; an alias for `create()`. With a registered
 runtime it boots the full widget; otherwise it boots a bare map (see the note above `_runtime`).

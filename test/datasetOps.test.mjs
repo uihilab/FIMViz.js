@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { Dataset } from "../src/package/dataset.js";
 import { RasterGrid, VectorFeatures, registerMaterializer, registerReprojector } from "../src/package/materialize.js";
 import {
-  maskGrid, clipGrid, reclassifyGrid, combineGrids, zonalStats,
+  maskGrid, clipGrid, reclassifyGrid, combineGrids, zonalStats, groupByGrid,
   slopeGrid, aspectGrid, hillshadeGrid, rasterizeFeatures,
 } from "../src/package/rasterOps.js";
 
@@ -398,5 +398,80 @@ describe("Dataset.reduce (axis stack → one grid, sugar over select+combine)", 
   test("throws when the axis has no entries", () => {
     const empty = new Dataset({ name: "x", axes: [{ name: "stage", entries: [] }] });
     assert.throws(() => empty.reduce("mean"), /no selection axis/);
+  });
+});
+
+// groupBy — the THIRD kind of reduction. reduce() collapses a selection axis; zonalStats() collapses
+// space by geometry; this collapses space by ANOTHER RASTER'S VALUES. "Mean depth per land-use class",
+// "rainfall binned by elevation" — i.e. one variable as a series against another.
+describe("groupByGrid / ds.groupBy", () => {
+  const g = (px) => new RasterGrid({ pixels: Float32Array.from(px), width: 4, height: 4,
+    bounds: { north: 4, south: 0, east: 4, west: 0 } });
+  //                 one NaN, to prove absent pixels are skipped ─────────────┐
+  const depth = () => g([1, 1, 2, 2, 1, 1, 2, 2, 3, 3, 4, 4, 3, 3, NaN, 4]);
+  const use = () => g([10, 10, 20, 20, 10, 10, 20, 20, 30, 30, 30, 30, 30, 30, 30, 30]);
+  const dem = () => g([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]);
+
+  test("discrete: every distinct value of `by` is a class", () => {
+    const rows = groupByGrid(depth(), use());
+    assert.deepEqual(rows.map((r) => r.class), [10, 20, 30], "ordered by class");
+    assert.deepEqual(rows.map((r) => r.count), [4, 4, 7], "class 30's NaN pixel is excluded");
+    assert.equal(rows[0].mean, 1);
+    assert.equal(rows[1].mean, 2);
+    assert.equal(rows[2].mean, 24 / 7);
+    assert.equal(rows[2].area, 7, "area is count × pixel area, same convention as zonalStats");
+  });
+
+  test("binned by a count: equal-width bands over `by`'s own range", () => {
+    const rows = groupByGrid(depth(), dem(), { bins: 3 });
+    assert.equal(rows.length, 3);
+    assert.deepEqual(rows.map((r) => r.count), [5, 5, 5], "15 valid pixels, evenly split");
+    assert.deepEqual(rows[0].range, [0, 50]);
+    assert.equal(rows[2].range[1], 150, "the top edge is `by`'s max…");
+    assert.ok(rows[2].count > 0, "…and the last bin is closed, so the max value lands in it");
+  });
+
+  test("binned by explicit edges, used as given", () => {
+    const rows = groupByGrid(depth(), dem(), { bins: [0, 50, 200] });
+    assert.deepEqual(rows.map((r) => r.count), [5, 10]);
+    assert.deepEqual(rows.map((r) => r.range), [[0, 50], [50, 200]]);
+  });
+
+  test("a pixel counts only where BOTH rasters have a value", () => {
+    const holeyBy = g([10, 10, 20, 20, 10, 10, 20, 20, 30, 30, 30, 30, NaN, NaN, NaN, NaN]);
+    const rows = groupByGrid(depth(), holeyBy);
+    assert.equal(rows.reduce((n, r) => n + r.count, 0), 12,
+      "16 − the 4 absent in `by`; the values' own NaN sits inside that block, so it is not a 5th loss");
+    // The other order, to show it is a genuine intersection rather than one raster winning:
+    const holeyValues = g([1, 1, NaN, NaN, 1, 1, 2, 2, 3, 3, 4, 4, 3, 3, 4, 4]);
+    assert.equal(groupByGrid(holeyValues, use()).reduce((n, r) => n + r.count, 0), 14);
+  });
+
+  test("noData sentinels are honoured on both sides, not just NaN", () => {
+    const v = new RasterGrid({ ...depth(), pixels: Float32Array.from(
+      [1, 1, 2, 2, 1, 1, 2, 2, 3, 3, 4, 4, 3, 3, -9999, 4]), noData: -9999 });
+    assert.equal(groupByGrid(v, use()).find((r) => r.class === 30).count, 7);
+  });
+
+  test("`by` on a different grid is conformed onto ours — the same LHS rule combine uses", () => {
+    const coarse = new RasterGrid({ pixels: Float32Array.from([10, 20, 30, 30]), width: 2, height: 2,
+      bounds: { north: 4, south: 0, east: 4, west: 0 } });
+    const rows = groupByGrid(depth(), coarse);
+    assert.deepEqual(rows.map((r) => r.class), [10, 20, 30]);
+    assert.equal(rows.reduce((n, r) => n + r.count, 0), 15, "every valid pixel is grouped");
+  });
+
+  test("no overlapping data yields an empty table, not a throw", () => {
+    const allAbsent = g(new Array(16).fill(NaN));
+    assert.deepEqual(groupByGrid(depth(), allAbsent), []);
+  });
+
+  test("ds.groupBy is a terminal returning a table, and is raster-only", async () => {
+    const a = Dataset.fromGrid(depth());
+    const b = Dataset.fromGrid(use());
+    const rows = await a.groupBy(b);
+    assert.equal(rows.length, 3);
+    assert.equal(rows[2].mean, 24 / 7);
+    await assert.rejects(() => a.groupBy(null), /must be a raster Dataset/);
   });
 });

@@ -8,7 +8,7 @@
 
 > **getDefaultApp**(): [`FimVizInstance`](../classes/FimVizInstance.md)
 
-Defined in: [package/fimViz.js:233](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/fimViz.js#L233)
+Defined in: [package/fimViz.js:233](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/package/fimViz.js#L233)
 
 The ambient default FimViz, created on first use.
 

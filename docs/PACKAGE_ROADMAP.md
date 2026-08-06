@@ -102,6 +102,21 @@ N-ary ops (`combine`/`difference`) are deliberately absent from the layer — "w
 operand" has no answer there — and `layer.rasterize()` throws, since a kind change cannot return the same
 layer.
 
+✅ **Landed: `groupBy` — reduction grouped by another raster's values** (`groupByGrid` in
+`rasterOps.js` + `ds.groupBy(by, opts)`, node-tested, barrel-exported). The third kind of reduction:
+`reduce()` collapses a *selection axis*, `zonalStats()` collapses *space by geometry*, and this
+collapses *space by value* — "mean depth per land-use class", "rainfall binned by elevation", a rating
+curve. That is what "one variable as a series against another" reduces to in practice, and it is a
+distinct verb rather than an overload because the grouping key comes from **data** rather than from the
+axis model or from geometry (the same "one word must not mean both" rule that keeps `reclassify` apart
+from `ColorScale`). Two modes: **discrete** (each distinct value of `by` is a class — classification
+rasters) and **binned** (`bins: 5` cuts `by`'s own range into equal-width bands, `bins: [edges]` uses
+those, last bin closed so the maximum lands somewhere). `by` is conformed onto the left grid by the
+same LHS rule and the same resampler `combine` uses, so the two agree on what "aligned" means; a pixel
+counts only where **both** rasters have a value, honouring NaN and each side's `noData`. Note the
+division of labour it completes: producing a new *grid* from two variables is `combine`/`difference`;
+`groupBy` is the table-producing half of the same question.
+
 **Still open:** **polygonize** (raster→vector — the other half of "vectorize/rasterize"; unlike rasterize,
 this needs contour tracing (marching squares / connected-component boundary tracing), a materially
 different and larger algorithm than the point-in-polygon tests the rest of §2 reuses — deliberately not

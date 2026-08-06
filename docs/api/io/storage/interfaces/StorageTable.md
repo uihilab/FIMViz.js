@@ -6,7 +6,7 @@
 
 # Interface: StorageTable
 
-Defined in: [io/storage.js:41](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/io/storage.js#L41)
+Defined in: [io/storage.js:41](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/io/storage.js#L41)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [io/storage.js:41](https://github.com/uihilab/FIMViz.js/blob/39cf3cb
 
 > **clear**: () => `Promise`\<`boolean`\>
 
-Defined in: [io/storage.js:47](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/io/storage.js#L47)
+Defined in: [io/storage.js:47](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/io/storage.js#L47)
 
 #### Returns
 
@@ -26,7 +26,7 @@ Defined in: [io/storage.js:47](https://github.com/uihilab/FIMViz.js/blob/39cf3cb
 
 > **delete**: (`key`) => `Promise`\<`boolean`\>
 
-Defined in: [io/storage.js:46](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/io/storage.js#L46)
+Defined in: [io/storage.js:46](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/io/storage.js#L46)
 
 #### Parameters
 
@@ -44,7 +44,7 @@ Defined in: [io/storage.js:46](https://github.com/uihilab/FIMViz.js/blob/39cf3cb
 
 > **get**: (`key`) => `Promise`\<`any`\>
 
-Defined in: [io/storage.js:44](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/io/storage.js#L44)
+Defined in: [io/storage.js:44](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/io/storage.js#L44)
 
 #### Parameters
 
@@ -62,7 +62,7 @@ Defined in: [io/storage.js:44](https://github.com/uihilab/FIMViz.js/blob/39cf3cb
 
 > **has**: (`key`) => `Promise`\<`boolean`\>
 
-Defined in: [io/storage.js:45](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/io/storage.js#L45)
+Defined in: [io/storage.js:45](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/io/storage.js#L45)
 
 #### Parameters
 
@@ -80,7 +80,7 @@ Defined in: [io/storage.js:45](https://github.com/uihilab/FIMViz.js/blob/39cf3cb
 
 > **list**: (`opts?`) => `Promise`\<`any`[]\>
 
-Defined in: [io/storage.js:48](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/io/storage.js#L48)
+Defined in: [io/storage.js:48](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/io/storage.js#L48)
 
 #### Parameters
 
@@ -104,7 +104,7 @@ Defined in: [io/storage.js:48](https://github.com/uihilab/FIMViz.js/blob/39cf3cb
 
 > **map**: (`fn`) => `Promise`\<`number`\>
 
-Defined in: [io/storage.js:49](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/io/storage.js#L49)
+Defined in: [io/storage.js:49](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/io/storage.js#L49)
 
 #### Parameters
 
@@ -122,7 +122,7 @@ Defined in: [io/storage.js:49](https://github.com/uihilab/FIMViz.js/blob/39cf3cb
 
 > **name**: `string`
 
-Defined in: [io/storage.js:42](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/io/storage.js#L42)
+Defined in: [io/storage.js:42](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/io/storage.js#L42)
 
 ***
 
@@ -130,7 +130,7 @@ Defined in: [io/storage.js:42](https://github.com/uihilab/FIMViz.js/blob/39cf3cb
 
 > **put**: (`key`, `value`) => `Promise`\<`IDBValidKey`\>
 
-Defined in: [io/storage.js:43](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/io/storage.js#L43)
+Defined in: [io/storage.js:43](https://github.com/uihilab/FIMViz.js/blob/9e18afac2775f0224216af175bd5a318723bb4c9/src/io/storage.js#L43)
 
 #### Parameters
 
