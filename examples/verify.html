@@ -249,19 +249,22 @@
   <div class="step" data-step="8" data-title="Region draw → scoped stats (modal capture)">
     <h2><span class="n">8</span> Region draw → scoped stats <span class="pill" id="p8">idle</span></h2>
     <div class="body">
-      <p class="do"><b>Do</b> Click <em>Draw region</em>, click ≥3 points <strong>on the raster</strong>,
-        then <em>Finish</em>. While drawing, try hovering the raster.</p>
+      <p class="do"><b>Do</b> Click <em>Draw region</em> — the map snaps back to the raster first. Click 3–5
+        points around a <strong>small patch well inside</strong> it, then <em>Finish</em>. While drawing, try
+        hovering the raster.</p>
       <div class="row">
         <button id="rg-draw">Draw region</button>
         <button class="sec" id="rg-finish">Finish</button>
         <button class="sec" id="rg-clear">Clear</button>
+        <button class="sec" id="rg-fit">Fit to raster</button>
       </div>
       <div class="host" id="rg-out">—</div>
       <div class="expect" style="margin-top:9px"><b>Expect</b>
         <ul>
           <li>The outline draws as you click, and closes into a polygon on Finish.</li>
           <li>While drawing, the hover tooltip is <em>suppressed</em> — that is the modal capture.</li>
-          <li>Finish prints stats scoped to the region: a <em>smaller count</em> than step 3's.</li>
+          <li>Finish reports <em>scoped count</em> vs <em>total</em>. A small patch should be a small
+            fraction — draw around the whole raster instead and the two numbers should match.</li>
           <li>Hover works again afterwards.</li>
         </ul>
       </div>
@@ -282,6 +285,22 @@
           <li>Each op is a <em>lazy Dataset op</em> — the source file is never re-read.</li>
         </ul>
       </div>
+    </div>
+  </div>
+
+  <!-- log ─────────────────────────────────────────────────────────────────── -->
+  <div class="step" data-nolog="1">
+    <h2><span class="n">log</span> Console trace <span class="pill" id="p-log">0 entries</span></h2>
+    <div class="body">
+      <p class="dim" style="margin:0 0 8px">Everything below is also written to the browser console with a
+        <code>[verify]</code> prefix — open DevTools and filter on it. Live objects are on
+        <code>window.FIM</code> (<code>.rasterLayer</code>, <code>.vectorLayer</code>, <code>.pointLayer</code>,
+        <code>.lastFilter</code>, <code>.regionDraw</code>, <code>.log</code>).</p>
+      <div class="row">
+        <button class="sec" id="log-copy">Copy log</button>
+        <button class="sec" id="log-clear">Clear</button>
+      </div>
+      <pre id="log">— nothing yet —</pre>
     </div>
   </div>
 
@@ -322,6 +341,34 @@ import {
 
 const $ = (s) => document.querySelector(s);
 const pill = (id, t, cls = "") => { const e = $(id); if (e) { e.textContent = t; e.className = "pill " + cls; } };
+
+// ── log ────────────────────────────────────────────────────────────────────────────────────────
+// Every interesting value goes to the browser console AND to the on-page pane, so a manual tester
+// can read what actually happened without opening DevTools — and can paste it into a bug report.
+const logLines = [];
+function log(tag, data) {
+  const t = new Date().toISOString().slice(11, 23);
+  const body = data === undefined ? ""
+    : typeof data === "string" ? data
+    : JSON.stringify(data, (k, v) => (typeof v === "number" ? Number(v.toFixed(6)) : v));
+  logLines.push(`${t}  ${tag}${body ? "  " + body : ""}`);
+  const pane = $("#log");
+  if (pane) { pane.textContent = logLines.join("\n"); pane.scrollTop = pane.scrollHeight; }
+  pill("#p-log", `${logLines.length} entries`);
+  console.log("[verify]", tag, data ?? "");
+}
+document.addEventListener("DOMContentLoaded", () => {
+  $("#log-copy")?.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(logLines.join("\n")); $("#log-copy").textContent = "Copied ✓"; }
+    catch { console.log(logLines.join("\n")); $("#log-copy").textContent = "See console"; }
+    setTimeout(() => { $("#log-copy").textContent = "Copy log"; }, 1500);
+  });
+  $("#log-clear")?.addEventListener("click", () => {
+    logLines.length = 0; $("#log").textContent = "— nothing yet —"; pill("#p-log", "0 entries");
+  });
+});
+window.addEventListener("error", (e) => log("window.error", e.message));
+window.addEventListener("unhandledrejection", (e) => log("unhandled rejection", String(e.reason?.message || e.reason)));
 
 // ── provider ───────────────────────────────────────────────────────────────────────────────────
 const params   = new URLSearchParams(location.search);
@@ -457,10 +504,12 @@ async function boot() {
     `map      : ${fim.map ? "created" : "MISSING"}\nfim      : window.FIM`;
   pill("#p1", "booted", "ok");
 
-  window.FIM = { fim, toast, tooltip, infoWindow,
+  window.FIM = { fim, toast, tooltip, infoWindow, log, lastFilter: null,
     get rasterLayer() { return rasterLayer; },
     get vectorLayer() { return vectorLayer; },
-    get pointLayer() { return pointLayer; } };
+    get pointLayer() { return pointLayer; },
+    get regionDraw() { return regionDraw; } };
+  log("booted", { provider, centre: center, zoom, map: !!fim.map });
   console.log(`[fimviz] verify.html ready on ${provider} — window.FIM`);
 }
 if (!(provider === "google" && !apiKey)) {
@@ -491,6 +540,15 @@ async function useRaster(source, label) {
     rasterLayer.on("recomputed", refreshReadModels);
     await refreshReadModels();
     pill("#p3", label, "ok");
+
+    const g = rasterLayer.result;
+    log("raster loaded", {
+      name: ds.name, crs: ds.crs, bounds: rasterLayer._bounds(),
+      grid: `${g.width}x${g.height}`, totalPixels: g.width * g.height,
+      noData: g.noData, validPixels: s0.count,
+      validPct: +((s0.count / (g.width * g.height)) * 100).toFixed(1),
+      min: s0.min, max: s0.max,
+    });
   } catch (e) {
     pill("#p3", "error", "bad"); console.error(e);
     $("#ras-legend").textContent = String(e?.message || e);
@@ -606,22 +664,57 @@ function drawRegionOnMap(points, closed) {
   });
   regionLayer.render({ style: { strokeColor: "#f85149", strokeWidth: 2, fillColor: "#f85149", fillOpacity: 0.15 } });
 }
+$("#rg-fit").addEventListener("click", () => {
+  if (rasterLayer) rasterLayer.fit(); else pill("#p8", "load the raster in step 3 first", "bad");
+});
+
 $("#rg-draw").addEventListener("click", () => {
   if (!rasterLayer) { pill("#p8", "load the raster in step 3 first", "bad"); return; }
+  // Steps 5–7 each fit() the map to their OWN subject, and the bundled samples are in three
+  // different places (the GeoTIFF is in Mississippi, the counties in Iowa). Working top to bottom
+  // therefore left the raster off-screen by the time you got here, so "click on the raster" was
+  // impossible and every region came back count=0. Snap back to it before capturing.
+  rasterLayer.fit();
   regionDraw = createRegionDraw(fim, {
     onPoint: (pts) => {
       drawRegionOnMap(pts, false);
       $("#rg-out").textContent = `${pts.length} point(s) — click more, then Finish`;
+      const mb = fim.map.getBounds?.();
+      log(`region vertex ${pts.length}`, {
+        ...pts[pts.length - 1],
+        zoom: fim.map.getZoom?.(),
+        view: mb ? { n: mb.getNorth(), s: mb.getSouth(), e: mb.getEast(), w: mb.getWest() } : null,
+      });
     },
     onComplete: async (filter, pts) => {
       drawRegionOnMap(pts, true);
       if (!filter) { $("#rg-out").textContent = "need ≥3 points"; pill("#p8", "too few points", "bad"); return; }
       lastRegionFilter = filter;                        // step 9's Mask reads this
-      const stats = await rasterLayer.getStats({ filter });
+      window.FIM.lastFilter = filter;
+      // Both numbers, so the scoping is legible: a filtered count on its own says nothing.
+      const [scoped, total] = await Promise.all([
+        rasterLayer.getStats({ filter }), rasterLayer.getStats(),
+      ]);
+      const pct = total.count ? ((scoped.count / total.count) * 100).toFixed(1) : "0";
+
+      const g = rasterLayer.result, bn = rasterLayer._bounds();
+      const ring = filter.features[0] || [];
+      log("region finished", {
+        vertices: pts.length,
+        ringLat: [Math.min(...ring.map((p) => p.lat)), Math.max(...ring.map((p) => p.lat))],
+        ringLng: [Math.min(...ring.map((p) => p.lng)), Math.max(...ring.map((p) => p.lng))],
+        rasterLat: [bn.south, bn.north], rasterLng: [bn.west, bn.east],
+        pixelBbox: filter.pixelBbox({ bw: bn.west, bs: bn.south, be: bn.east, bn: bn.north,
+                                      width: g.width, height: g.height }),
+        scopedCount: scoped.count, totalCount: total.count, pct: +pct,
+      });
       $("#rg-out").innerHTML =
-        `<p class="dim" style="margin:0 0 4px">scoped to a ${pts.length}-point region:</p>` +
-        renderStats(stats, { html: true });
-      pill("#p8", "scoped", "ok");
+        `<p class="dim" style="margin:0 0 4px">${pts.length}-point region — ` +
+        `<b style="color:var(--fg)">${scoped.count.toLocaleString()}</b> of ` +
+        `${total.count.toLocaleString()} pixels (${pct}%)` +
+        (scoped.count === 0 ? ` — <b style="color:var(--bad)">nothing inside; draw over the raster</b>` : "") +
+        `</p>` + renderStats(scoped, { html: true });
+      pill("#p8", scoped.count ? `scoped · ${pct}%` : "empty region", scoped.count ? "ok" : "bad");
     },
   });
   regionDraw.start();
