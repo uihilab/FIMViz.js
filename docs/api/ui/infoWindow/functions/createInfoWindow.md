@@ -8,7 +8,7 @@
 
 > **createInfoWindow**(`fim?`, `opts?`): `object`
 
-Defined in: [ui/infoWindow.js:16](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/ui/infoWindow.js#L16)
+Defined in: [ui/infoWindow.js:16](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/ui/infoWindow.js#L16)
 
 A dismissible info window positioned at the pointer.
 

@@ -8,7 +8,7 @@
 
 > **fimForMap**(`providerMap`): [`FimMap`](../classes/FimMap.md)
 
-Defined in: [package/fimMap.js:54](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L54)
+Defined in: [package/fimMap.js:54](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/fimMap.js#L54)
 
 The FimMap that owns `providerMap`, or null if it is not one this library mounted.
 

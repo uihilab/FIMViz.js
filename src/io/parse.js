@@ -67,7 +67,7 @@ function detectFormat(name) {
     // Multi-dimensional scientific formats — all routed to one adapter, which asks scan() which of
     // them the bytes actually are. `.cdf` is the old NetCDF3 extension; `.zarr` names a directory
     // store rather than a file, so it arrives as a URL.
-    case "nc": case "nc4": case "netcdf": case "cdf":
+    case "nc": case "nc3": case "nc4": case "netcdf": case "cdf":
     case "grib": case "grib2": case "grb": case "grb2":
     case "zarr":
       return "multidim";

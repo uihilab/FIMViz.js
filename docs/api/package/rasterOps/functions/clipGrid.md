@@ -8,7 +8,7 @@
 
 > **clipGrid**(`grid`, `bbox`): [`RasterGrid`](../../materialize/classes/RasterGrid.md)
 
-Defined in: [package/rasterOps.js:55](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/rasterOps.js#L55)
+Defined in: [package/rasterOps.js:55](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/rasterOps.js#L55)
 
 Crop a grid to a bbox (intersected with the grid footprint), snapped to pixel edges → a smaller
 grid with new bounds. Preserves the pixel array's type.

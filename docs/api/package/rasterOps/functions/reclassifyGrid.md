@@ -8,7 +8,7 @@
 
 > **reclassifyGrid**(`grid`, `rules`, `opts?`): [`RasterGrid`](../../materialize/classes/RasterGrid.md)
 
-Defined in: [package/rasterOps.js:94](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/rasterOps.js#L94)
+Defined in: [package/rasterOps.js:94](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/rasterOps.js#L94)
 
 Value remap. `rules` is EITHER an array of `{ min?, max?, value? }` range rules (a pixel v matches
 the first rule whose `(min==null||v>=min) && (max==null||v<max)`; the output is `value` when

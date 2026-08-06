@@ -8,7 +8,7 @@
 
 > **registerBuiltinMaterializers**(): `void`
 
-Defined in: [io/materializers.js:79](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/materializers.js#L79)
+Defined in: [io/materializers.js:79](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/materializers.js#L79)
 
 Register the built-in decoders into the materialize seam. Idempotent. Called once on import (so a
 node test that `import`s this file — or any consumer of the barrel — gets them), and exported so a

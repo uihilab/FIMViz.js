@@ -8,7 +8,7 @@
 
 > **getLayerTypes**(): `string`[]
 
-Defined in: [package/layer.js:1088](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/layer.js#L1088)
+Defined in: [package/layer.js:1088](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/layer.js#L1088)
 
 Every layer type `fim.addLayer(type, …)` can currently construct — the built-ins plus anything a
 host registered. The public query, mirroring `mapProviderNames()`/`materializerFormats()`.

@@ -259,55 +259,69 @@ describe("sciwrid adapter: Zarr v2", () => {
   });
 });
 
-// NetCDF3 still reports no extent — SciWrid populates a bbox only on its netcdf4/zarr/parquet paths.
-// What it DOES do, contrary to the first reading of "scan() surfaces no times", is index the leading
-// dimension perfectly well: only the LABELS are missing (the CF units accessor is outstanding
-// upstream), not the ability to slice. So the dimension the file declares becomes a synthesized index
-// axis, and the temporal half of §8 applies after all — with positions instead of timestamps.
-describe("sciwrid adapter: NetCDF3 (unlabelled, but not untraversable)", () => {
+// NetCDF3 needed BOTH an extent override and an acknowledgement, and neither limitation was real:
+// SciWrid populates a bbox only on its netcdf4/zarr/parquet paths and cannot yet decode NetCDF3 time
+// units, but the files themselves carry `lon`/`lat`/`time` coordinate variables with CF units right
+// there in the header. io/netcdf3.js reads them, so a NetCDF3 file now opens with no options at all.
+describe("sciwrid adapter: NetCDF3 (header-supplemented — no overrides needed)", () => {
   const FIX = fileURLToPath(new URL("../assets/SampleFiles/sample.nc3", import.meta.url));
-  const EXTENT = { grid: { bbox: [-10, -5, 10, 5] } };
 
-  test("needs an extent — the format never reports one, whatever the grid looks like", async () => {
-    await assert.rejects(() => parseSciwrid(readFileSync(FIX)), (e) => {
-      assert.match(e.message, /never derives an extent for netcdf3/,
-        "must blame the format, not send the reader hunting for curvilinear coordinates");
-      return true;
-    });
-  });
-
-  test("the leading dimension becomes an INDEX axis — no acknowledgement needed", async () => {
-    // shape is (time=3, lat=4, lon=5). scan() gives no times, but the dimension is declared in the
-    // shape and extractGrid indexes it, so there is nothing to collapse and nothing to acknowledge.
-    const ds = await parseSciwrid(readFileSync(FIX), EXTENT);
-    assert.equal(ds.meta.extraDims, undefined, "nothing is collapsed any more");
+  test("opens with NO options — extent and timestamps both come from the file's own header", async () => {
+    const ds = await parseSciwrid(readFileSync(FIX));
+    // lat centres 30..33 step 1, lon centres -95..-91 step 1 → cell EDGES, not centres.
+    assert.deepEqual(ds.bounds, { west: -95.5, south: 29.5, east: -90.5, north: 33.5 },
+      "cell edges — using centres would lose half a cell on every side");
+    assert.equal(ds.meta.extraDims, undefined, "nothing collapsed, so nothing to acknowledge");
     assert.equal(ds.axis.entries.length, 3);
-    assert.equal(ds.axis.unit, "index", "positions, NOT timestamps — the honest signal");
-    assert.deepEqual(ds.axis.entries.map((e) => e.coord), [0, 1, 2]);
-    assert.equal(ds.meta.synthesizedAxis, true, "and a UI can tell it apart from a labelled axis");
+    assert.equal(ds.axis.unit, "ms", "'hours since 2020-01-01' on a standard calendar → real instants");
+    assert.equal(ds.meta.axisSource, "header");
+    assert.deepEqual(ds.axis.entries.map((e) => e.coord), [
+      Date.parse("2020-01-01T00:00:00Z"), Date.parse("2020-01-01T06:00:00Z"),
+      Date.parse("2020-01-01T12:00:00Z"),
+    ]);
   });
 
   test("select() and reduce() work on it — the payoff of routing through the axis", async () => {
-    const ds = await parseSciwrid(readFileSync(FIX), EXTENT);
-    const g0 = await ds.select(0).grid();
+    const ds = await parseSciwrid(readFileSync(FIX));
+    const g0 = await ds.select(Date.parse("2020-01-01T00:00:00Z")).grid();
     assert.equal(g0.width, 5);
     assert.equal(g0.height, 4);
     assert.equal(range(g0.pixels).n, 20, "every cell decoded");
-    const g2 = await ds.select(2).grid();
+    const g2 = await ds.select(Date.parse("2020-01-01T12:00:00Z")).grid();
     assert.notDeepEqual([...g0.pixels], [...g2.pixels], "different steps are genuinely different data");
     const mean = await ds.reduce("mean").grid();
     assert.equal(range(mean.pixels).n, 20, "and the whole axis collapses with no new grid math");
   });
 
-  test("series.coords supplies the labels the format cannot — a REAL time axis", async () => {
-    // The file knows it has three steps; only what they mean is missing. A caller who knows supplies
-    // it, and the axis becomes indistinguishable from a NetCDF4 one: epoch ms, nearest-match select.
+  test("header: false restores the unsupplemented behaviour — the extent error returns", async () => {
+    // Worth pinning both halves: the supplement is what makes the file work, and turning it off must
+    // land exactly on the old, correct diagnosis rather than on some third state.
+    await assert.rejects(() => parseSciwrid(readFileSync(FIX), { header: false }), (e) => {
+      assert.match(e.message, /never derives an extent for netcdf3/,
+        "must blame the format, not send the reader hunting for curvilinear coordinates");
+      return true;
+    });
+    const ds = await parseSciwrid(readFileSync(FIX),
+      { header: false, grid: { bbox: [-10, -5, 10, 5] } });
+    assert.equal(ds.axis.unit, "index", "and with no header the axis falls back to positions");
+    assert.equal(ds.meta.axisSource, "index");
+  });
+
+  test("an explicit override still beats the header — the caller is always the authority", async () => {
     const ds = await parseSciwrid(readFileSync(FIX), {
-      ...EXTENT,
+      grid: { bbox: [-100, 20, -80, 40] },
+      series: { coords: [10, 20, 30] },
+    });
+    assert.deepEqual(ds.bounds, { west: -100, south: 20, east: -80, north: 40 });
+    assert.deepEqual(ds.axis.entries.map((e) => e.coord), [10, 20, 30]);
+    assert.equal(ds.meta.axisSource, "caller");
+  });
+
+  test("a coords GENERATOR is accepted too, and nearest-match works off it", async () => {
+    const ds = await parseSciwrid(readFileSync(FIX), {
       series: { coords: (i) => new Date(Date.UTC(2001, i, 1)), name: "time" },
     });
     assert.equal(ds.axis.unit, "ms");
-    assert.equal(ds.meta.synthesizedAxis, undefined, "the caller labelled it, so it is not synthesized");
     assert.deepEqual(ds.axis.entries.map((e) => e.coord),
       [Date.UTC(2001, 0, 1), Date.UTC(2001, 1, 1), Date.UTC(2001, 2, 1)]);
     // Nearest-match on a date the file never names — the thing a time slider needs.
@@ -317,11 +331,10 @@ describe("sciwrid adapter: NetCDF3 (unlabelled, but not untraversable)", () => {
 
   test("series: false restores the old single-grid behaviour, acknowledgement and all", async () => {
     await assert.rejects(
-      () => parseSciwrid(readFileSync(FIX), { ...EXTENT, series: false }),
+      () => parseSciwrid(readFileSync(FIX), { series: false }),
       /has 3 dimensions.*only 2 are modelled/s,
       "with no axis to model it, the leading dimension is unmodelled again");
-    const ds = await parseSciwrid(readFileSync(FIX),
-      { ...EXTENT, series: false, allowExtraDims: true });
+    const ds = await parseSciwrid(readFileSync(FIX), { series: false, allowExtraDims: true });
     assert.equal(ds.axes, null);
     assert.deepEqual(ds.selector, { variable: "temperature", time: 0 });
   });

@@ -8,7 +8,7 @@
 
 > **groupByGrid**(`grid`, `by`, `opts?`): `object`[]
 
-Defined in: [package/rasterOps.js:196](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/rasterOps.js#L196)
+Defined in: [package/rasterOps.js:196](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/rasterOps.js#L196)
 
 Group a raster's pixels by **another raster's values** and reduce each group — the third kind of
 reduction, alongside `reduce()` (collapse a selection axis) and `zonalStats()` (collapse space by

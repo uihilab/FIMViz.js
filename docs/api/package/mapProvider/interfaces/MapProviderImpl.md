@@ -6,7 +6,7 @@
 
 # Interface: MapProviderImpl
 
-Defined in: [package/mapProvider.js:49](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L49)
+Defined in: [package/mapProvider.js:49](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L49)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [package/mapProvider.js:49](https://github.com/uihilab/FIMViz.js/blo
 
 > `optional` **acceptsCRS?**: (`crs`) => `boolean`
 
-Defined in: [package/mapProvider.js:51](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L51)
+Defined in: [package/mapProvider.js:51](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L51)
 
 can this provider render content in `crs`?
   Asked by `Layer`'s render precondition before drawing. Omitted = permissive (accepts anything).
@@ -35,7 +35,7 @@ can this provider render content in `crs`?
 
 > **addRasterImage**: (`map`, `dataUrl`, `bounds`, `opts?`) => `any`
 
-Defined in: [package/mapProvider.js:60](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L60)
+Defined in: [package/mapProvider.js:60](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L60)
 
 position a pre-rendered image (data URL or any image URL) over `bounds`; returns an opaque
   raster-image handle. Non-interactive (`clickable:false`) by default so map events pass through to
@@ -90,7 +90,7 @@ position a pre-rendered image (data URL or any image URL) over `bounds`; returns
 
 > **addVector**: (`map`, `geojson`, `opts?`) => `any`
 
-Defined in: [package/mapProvider.js:55](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L55)
+Defined in: [package/mapProvider.js:55](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L55)
 
 render a GeoJSON FeatureCollection/Feature onto `map`; returns an opaque vector handle.
 
@@ -120,7 +120,7 @@ render a GeoJSON FeatureCollection/Feature onto `map`; returns an opaque vector 
 
 > **create**: (`el`, `options`) => `Promise`\<`any`\>
 
-Defined in: [package/mapProvider.js:53](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L53)
+Defined in: [package/mapProvider.js:53](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L53)
 
 build the map in `el`; returns the provider's native map object (exposed as `fim.map`).
 
@@ -144,7 +144,7 @@ build the map in `el`; returns the provider's native map object (exposed as `fim
 
 > **fitBounds**: (`map`, `bounds`) => `void`
 
-Defined in: [package/mapProvider.js:58](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L58)
+Defined in: [package/mapProvider.js:58](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L58)
 
 fit the map's viewport to `bounds`.
 
@@ -182,7 +182,7 @@ fit the map's viewport to `bounds`.
 
 > **onMapEvent**: (`map`, `type`, `cb`) => () => `void`
 
-Defined in: [package/mapProvider.js:74](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L74)
+Defined in: [package/mapProvider.js:74](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L74)
 
 subscribe to a normalized map event; returns an unsubscribe function. `hover` maps to the
   provider's mousemove equivalent.
@@ -211,7 +211,7 @@ subscribe to a normalized map event; returns an unsubscribe function. `hover` ma
 
 > **onMapMouseMove**: (`map`, `cb`) => () => `void`
 
-Defined in: [package/mapProvider.js:72](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L72)
+Defined in: [package/mapProvider.js:72](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L72)
 
 subscribe to mouse-move on the map, normalized to `{lat, lng}`; returns an unsubscribe function.
 
@@ -235,7 +235,7 @@ subscribe to mouse-move on the map, normalized to `{lat, lng}`; returns an unsub
 
 > **removeRasterImage**: (`map`, `handle`) => `void`
 
-Defined in: [package/mapProvider.js:65](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L65)
+Defined in: [package/mapProvider.js:65](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L65)
 
 tear a raster-image handle down.
 
@@ -259,7 +259,7 @@ tear a raster-image handle down.
 
 > **removeVector**: (`map`, `handle`) => `void`
 
-Defined in: [package/mapProvider.js:57](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L57)
+Defined in: [package/mapProvider.js:57](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L57)
 
 tear a vector handle down.
 
@@ -283,7 +283,7 @@ tear a vector handle down.
 
 > `optional` **requiresApiKey?**: `boolean`
 
-Defined in: [package/mapProvider.js:50](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L50)
+Defined in: [package/mapProvider.js:50](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L50)
 
 does `create()` need `options.apiKey`? (google: true, leaflet: false)
 
@@ -293,7 +293,7 @@ does `create()` need `options.apiKey`? (google: true, leaflet: false)
 
 > **setRasterImageOpacity**: (`handle`, `opacity`) => `void`
 
-Defined in: [package/mapProvider.js:66](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L66)
+Defined in: [package/mapProvider.js:66](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L66)
 
 change a raster-image handle's opacity (0..1).
 
@@ -317,7 +317,7 @@ change a raster-image handle's opacity (0..1).
 
 > **setRasterImageUrl**: (`map`, `handle`, `dataUrl`, `bounds`, `opts?`) => `any`
 
-Defined in: [package/mapProvider.js:68](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L68)
+Defined in: [package/mapProvider.js:68](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L68)
 
 swap a raster-image handle's image (e.g. a palette repaint). The caller MUST use the RETURNED
   handle going forward — some providers (google) cannot swap the image in place and recreate the

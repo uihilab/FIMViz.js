@@ -118,8 +118,10 @@ await fim.addDataset(file, {
 });
 ```
 
-A file with no CF times still gets a real axis — integer positions over its declared leading
-dimension, with `axis.unit === 'index'` so a UI can tell it apart from timestamps.
+Most files need none of that. NetCDF3 in particular used to demand a hand-supplied extent; its extent
+and timestamps are now read from the file's own CF coordinate variables, so it opens like any other
+format. A file that genuinely labels nothing still gets a real axis — integer positions over its
+declared leading dimension, with `axis.unit === 'index'` so a UI can tell it apart from timestamps.
 
 Their decoder carries a ~193 KB wasm, so it is **external to the bundle and loaded on demand**: a
 consumer who never opens one of these files downloads nothing for them, and a page that does needs

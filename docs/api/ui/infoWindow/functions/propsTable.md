@@ -8,7 +8,7 @@
 
 > **propsTable**(`props?`): `string`
 
-Defined in: [ui/infoWindow.js:61](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/ui/infoWindow.js#L61)
+Defined in: [ui/infoWindow.js:61](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/ui/infoWindow.js#L61)
 
 A tiny HTML table of a feature's properties — the default info-window content.
 

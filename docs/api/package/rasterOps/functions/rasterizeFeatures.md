@@ -8,7 +8,7 @@
 
 > **rasterizeFeatures**(`featureCollection`, `bounds`, `opts?`): [`RasterGrid`](../../materialize/classes/RasterGrid.md)
 
-Defined in: [package/rasterOps.js:422](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/rasterOps.js#L422)
+Defined in: [package/rasterOps.js:422](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/rasterOps.js#L422)
 
 Rasterize vector features onto a new grid (vector→raster, the kind-changing op). Each pixel
 centre is point-tested against every feature's polygon; `field` burns the feature's property value,

@@ -6,7 +6,7 @@
 
 # Interface: GoogleCreateOptions
 
-Defined in: [package/mapProvider.js:270](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L270)
+Defined in: [package/mapProvider.js:270](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L270)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [package/mapProvider.js:270](https://github.com/uihilab/FIMViz.js/bl
 
 > **apiKey**: `string`
 
-Defined in: [package/mapProvider.js:271](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L271)
+Defined in: [package/mapProvider.js:271](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L271)
 
 Google Maps JS API key (required — this provider's `requiresApiKey` is `true`).
 
@@ -24,7 +24,7 @@ Google Maps JS API key (required — this provider's `requiresApiKey` is `true`)
 
 > `optional` **center?**: `object`
 
-Defined in: [package/mapProvider.js:274](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L274)
+Defined in: [package/mapProvider.js:274](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L274)
 
 initial map center; defaults to the continental US.
 
@@ -42,7 +42,7 @@ initial map center; defaults to the continental US.
 
 > `optional` **libraries?**: `string`[]
 
-Defined in: [package/mapProvider.js:273](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L273)
+Defined in: [package/mapProvider.js:273](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L273)
 
 additional Maps JS API libraries to load (e.g. `['visualization']`).
 
@@ -52,7 +52,7 @@ additional Maps JS API libraries to load (e.g. `['visualization']`).
 
 > `optional` **mapId?**: `string`
 
-Defined in: [package/mapProvider.js:276](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L276)
+Defined in: [package/mapProvider.js:276](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L276)
 
 a Google Cloud-configured Map ID (cloud-based styling / Advanced Markers).
 
@@ -62,7 +62,7 @@ a Google Cloud-configured Map ID (cloud-based styling / Advanced Markers).
 
 > `optional` **mapOptions?**: `any`
 
-Defined in: [package/mapProvider.js:277](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L277)
+Defined in: [package/mapProvider.js:277](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L277)
 
 raw `google.maps.MapOptions`, merged LAST — wins over every default/derived option above.
 
@@ -72,7 +72,7 @@ raw `google.maps.MapOptions`, merged LAST — wins over every default/derived op
 
 > `optional` **version?**: `string`
 
-Defined in: [package/mapProvider.js:272](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L272)
+Defined in: [package/mapProvider.js:272](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L272)
 
 the Maps JS API version channel.
 
@@ -82,6 +82,6 @@ the Maps JS API version channel.
 
 > `optional` **zoom?**: `number`
 
-Defined in: [package/mapProvider.js:275](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mapProvider.js#L275)
+Defined in: [package/mapProvider.js:275](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L275)
 
 initial zoom level; defaults to `5`.

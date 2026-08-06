@@ -8,7 +8,7 @@
 
 > **createTooltip**(`fim?`, `opts?`): `object`
 
-Defined in: [ui/tooltip.js:13](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/ui/tooltip.js#L13)
+Defined in: [ui/tooltip.js:13](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/ui/tooltip.js#L13)
 
 A tooltip element that shows/hides and follows the pointer.
 

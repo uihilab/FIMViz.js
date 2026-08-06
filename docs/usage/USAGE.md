@@ -209,10 +209,12 @@ The result is a `Dataset` with a real **time axis**, so `select()` scrubs a time
 collapses the series. Extra options, all optional: `{ variable }` (defaults to the first supported
 one — one variable per Dataset), `{ grid: { bbox, width, height } }` (a **partial** override of the
 native grid; required for GRIB2/NetCDF3 and for curvilinear files, which report no extent),
-`{ series }` (the time axis — supply `coords` to label a file the format cannot, or `false` for a
+`{ series }` (the time axis — supply `coords` to label a file nothing else can, or `false` for a
 single grid), `{ dims: { order } }` (`'yx'` CF default, or `'xy'`), `{ lon }`
 (`'native'`/`'-180..180'`/`'0..360'`), and `{ allowExtraDims: true }` to accept a collapsed vertical
-level or ensemble member. See
+level or ensemble member. NetCDF3 needs none of these in practice: its extent and timestamps are read
+from the file's own CF coordinate variables by `io/netcdf3.js`, the one container format FIMViz parses
+itself (header only, and only for files it fully recognises). See
 [DATASET_OPERATIONS.md → Reading NetCDF / GRIB2 / Zarr](./DATASET_OPERATIONS.md#reading-netcdf--grib2--zarr)
 and the live page at `examples/temporal-netcdf.html`.
 

@@ -128,19 +128,31 @@ One call covers every format — the differences live inside the adapter (GRIB2 
 instead of a `shape`; Zarr reports `shape` as an array rather than a string). What differs for a
 *caller* is what `scan()` can tell us about a file, which is not uniform:
 
-| Format | Extent from `scan()` | Series axis | So you get |
+| Format | Extent | Series axis | So you get |
 |---|---|---|---|
-| **NetCDF4** | ✅ from 1-D coords | ✅ CF timestamps | the full temporal path |
-| **Zarr v2** | ✅ when the store has CF coords | ✅ CF timestamps | the full temporal path |
+| **NetCDF4** | ✅ `scan()`, from 1-D coords | ✅ CF timestamps | the full temporal path |
+| **Zarr v2** | ✅ `scan()`, when the store has CF coords | ✅ CF timestamps | the full temporal path |
 | **GRIB2** | ❌ never — supply `grid.bbox` | ✅ CF timestamps | scrub + `reduce()`, with an extent |
-| **NetCDF3** | ❌ never — supply `grid.bbox` | ⚠️ **indices**, unlabelled | scrub + `reduce()` by position; pass `series.coords` for real dates |
+| **NetCDF3** | ✅ **the file's own header** | ✅ **the file's own header** | the full temporal path |
 
-NetCDF3 is worth a sentence of its own, because the obvious reading of "`scan()` reports no times" is
-wrong in a costly way. What is missing is the **labels** — the CF units accessor is outstanding
-upstream — not the ability to slice: the dimension is declared in the variable's own `shape`, and the
-reader indexes it perfectly well. So the axis is built from integer positions, `axis.unit` is
-`'index'` rather than `'ms'`, and `meta.synthesizedAxis` is `true` so a UI can format the slider
-honestly. Supply `series.coords` and it becomes an ordinary time axis.
+NetCDF3 gets its extent and its timestamps from a different place than the other three, and that is
+worth knowing about. `scan()` supplies neither — SciWrid populates a bbox only on its
+netcdf4/zarr/parquet paths, and its NetCDF3 time-units accessor is still outstanding upstream. But the
+files themselves carry `lon`/`lat`/`time` coordinate variables with CF `units` right there in the
+header, so [`io/netcdf3.js`](../../src/io/netcdf3.js) reads them. It is the **one** container format
+FIMViz parses itself, it reads the **header only** (never pixels — point it at a data variable and it
+refuses), and it declines any bytes that are not NetCDF-3 classic, so it cannot affect the other
+formats. `meta.axisSource` records where the axis came from: `'scan'`, `'header'`, `'caller'`, or
+`'index'`. Pass `header: false` to switch the supplement off.
+
+One consequence worth stating: this works from **inline bytes only**. A NetCDF3 opened from a URL is
+never fetched just to read its header — that would undo the laziness the URL path exists for — so it
+still needs `grid.bbox`.
+
+**Calendars that are not Gregorian keep the file's own numbers.** A `360_day` or `noleap` calendar has
+no real instants to convert to, so rather than fabricating dates *or* falling back to bare positions,
+the axis carries the raw offsets with the file's units as `axis.unit` — e.g. `'days since 2001-1-1'`
+with coords `15, 45, 75…`. Ordered, exact, and selectable; just not calendar dates.
 
 #### Dimensions beyond (lat, lon) + time
 
@@ -174,7 +186,8 @@ await ds.reduce('max').grid();     // …or the storm peak
 |---|---|
 | `variable` | which variable; defaults to the first `supported` one. **One variable per Dataset** — call it again for another. |
 | `grid` | **Partial** override of the native grid — anything omitted comes from the variable's own shape and `scan().bbox`. Pass `width`/`height` alone to decode coarser than native; pass `bbox` alone when the file's extent can't be derived (below). |
-| `series` | The series (time) axis: `{ coords, length, name, unit }`. `coords` may be an array or a generator `(i, n) => …`; ISO strings and `Date`s become epoch ms. Defaults to the file's CF times, else integer indices over its leading dimension. **`series: false`** forces a single grid. |
+| `series` | The series (time) axis: `{ coords, length, name, unit }`. `coords` may be an array or a generator `(i, n) => …`; ISO strings and `Date`s become epoch ms. Resolved in priority order: this option → `scan()`'s CF times → the file's own header (NetCDF3) → integer indices. **`series: false`** forces a single grid. |
+| `header` | `false` disables the NetCDF3 header supplement, so extent and times come from `scan()` alone. Diagnostic; there is no reason to set it in normal use. |
 | `dims` | `{ order: 'yx' \| 'xy' }` — which trailing pair of the declared shape is (lat, lon). `'yx'` is CF order and the default; `'xy'` is for a variable declared `(…, lon, lat)`. Decides native height/width only. |
 | `lon` | `'native'` (default), `'-180..180'`, or `'0..360'` — re-express the extent in a longitude convention. |
 | `allowExtraDims` | accept a dimension beyond (lat, lon) + the series axis, collapsed by the reader. |

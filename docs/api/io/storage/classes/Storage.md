@@ -6,7 +6,7 @@
 
 # Class: Storage
 
-Defined in: [io/storage.js:58](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L58)
+Defined in: [io/storage.js:58](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L58)
 
 ## Constructors
 
@@ -14,7 +14,7 @@ Defined in: [io/storage.js:58](https://github.com/uihilab/FIMViz.js/blob/fa826b6
 
 > **new Storage**(`opts?`): `Storage`
 
-Defined in: [io/storage.js:93](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L93)
+Defined in: [io/storage.js:93](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L93)
 
 #### Parameters
 
@@ -71,7 +71,7 @@ STRUCTURAL version-upgrade hook, run INSIDE the versionchange transaction when `
 
 > `static` **DELETE**: `symbol`
 
-Defined in: [io/storage.js:64](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L64)
+Defined in: [io/storage.js:64](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L64)
 
 Sentinel a `map(table, fn)` callback returns to DELETE the current row (returning a value updates
 it; returning `undefined` leaves it unchanged). A Symbol so it can never collide with a real
@@ -85,7 +85,7 @@ stored value.
 
 > **get** **declaredVersion**(): `number`
 
-Defined in: [io/storage.js:271](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L271)
+Defined in: [io/storage.js:271](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L271)
 
 The version this instance was CONSTRUCTED with (`null` when omitted). A plain noun — it is what
 the host asked for, not what is on disk; `await db.version()` is the latter, and the two diverge
@@ -103,7 +103,7 @@ as soon as `createTable`/`dropTable` bumps it.
 
 > **get** **name**(): `string`
 
-Defined in: [io/storage.js:106](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L106)
+Defined in: [io/storage.js:106](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L106)
 
 ##### Returns
 
@@ -115,7 +115,7 @@ Defined in: [io/storage.js:106](https://github.com/uihilab/FIMViz.js/blob/fa826b
 
 > **clear**(`table`): `Promise`\<`boolean`\>
 
-Defined in: [io/storage.js:383](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L383)
+Defined in: [io/storage.js:383](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L383)
 
 Delete every row in `table`, keeping the table itself (contrast `clearAll()`, which clears every table).
 
@@ -135,7 +135,7 @@ Delete every row in `table`, keeping the table itself (contrast `clearAll()`, wh
 
 > **clearAll**(): `Promise`\<`string`[]\>
 
-Defined in: [io/storage.js:465](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L465)
+Defined in: [io/storage.js:465](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L465)
 
 Clear every row from every existing store in ONE transaction — a full data wipe that keeps the
 schema and the version. This is the "refresh completely" for a key-value store: to start over you
@@ -154,7 +154,7 @@ the tables that were cleared
 
 > **close**(): `Promise`\<`void`\>
 
-Defined in: [io/storage.js:480](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L480)
+Defined in: [io/storage.js:480](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L480)
 
 Drop the in-memory connection. Data persists; the next call reopens.
 
@@ -168,7 +168,7 @@ Drop the in-memory connection. Data persists; the next call reopens.
 
 > **createTable**(`table`): `Promise`\<`boolean`\>
 
-Defined in: [io/storage.js:289](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L289)
+Defined in: [io/storage.js:289](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L289)
 
 Create a table. Returns false if it already existed. Bumps the DB version.
 
@@ -188,7 +188,7 @@ Create a table. Returns false if it already existed. Bumps the DB version.
 
 > **delete**(`table`, `key`): `Promise`\<`boolean`\>
 
-Defined in: [io/storage.js:373](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L373)
+Defined in: [io/storage.js:373](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L373)
 
 Delete one row.
 
@@ -212,7 +212,7 @@ Delete one row.
 
 > **destroy**(): `Promise`\<`any`\>
 
-Defined in: [io/storage.js:488](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L488)
+Defined in: [io/storage.js:488](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L488)
 
 Delete the entire database.
 
@@ -226,7 +226,7 @@ Delete the entire database.
 
 > **dropTable**(`table`): `Promise`\<`boolean`\>
 
-Defined in: [io/storage.js:301](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L301)
+Defined in: [io/storage.js:301](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L301)
 
 Drop a table. Returns false if it did not exist. Bumps the DB version.
 
@@ -246,7 +246,7 @@ Drop a table. Returns false if it did not exist. Bumps the DB version.
 
 > **get**(`table`, `key`): `Promise`\<`any`\>
 
-Defined in: [io/storage.js:352](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L352)
+Defined in: [io/storage.js:352](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L352)
 
 → the stored value, or undefined if absent. (Absent and broken are distinguishable: a
 broken read REJECTS rather than resolving undefined, unlike the old io/db.js.)
@@ -271,7 +271,7 @@ broken read REJECTS rather than resolving undefined, unlike the old io/db.js.)
 
 > **has**(`table`, `key`): `Promise`\<`boolean`\>
 
-Defined in: [io/storage.js:362](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L362)
+Defined in: [io/storage.js:362](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L362)
 
 True if `key` exists (distinguishes a stored `undefined` from a missing row).
 
@@ -295,7 +295,7 @@ True if `key` exists (distinguishes a stored `undefined` from a missing row).
 
 > **list**(`table`, `opts?`): `Promise`\<`object`[] \| `IDBValidKey`[]\>
 
-Defined in: [io/storage.js:397](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L397)
+Defined in: [io/storage.js:397](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L397)
 
 List rows. `{ keys: true }` returns just the keys (cheap — no values deserialized), which is
 what a picker listing filenames wants. `range` is an optional IDBKeyRange.
@@ -326,7 +326,7 @@ what a picker listing filenames wants. `range` is an optional IDBKeyRange.
 
 > **map**(`table`, `fn`): `Promise`\<`number`\>
 
-Defined in: [io/storage.js:434](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L434)
+Defined in: [io/storage.js:434](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L434)
 
 Iterate `table`'s key→value pairs IN KEY ORDER, transforming each row in place — the general
 iterate/transform primitive, and the DATA-migration tool (rename/add/drop a field, re-shape a
@@ -362,7 +362,7 @@ how many rows were updated or deleted
 
 > **put**(`table`, `key`, `value`): `Promise`\<`IDBValidKey`\>
 
-Defined in: [io/storage.js:339](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L339)
+Defined in: [io/storage.js:339](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L339)
 
 Store `value` under `key`, verbatim.
 
@@ -394,7 +394,7 @@ the key
 
 > **table**(`table`): [`StorageTable`](../interfaces/StorageTable.md)
 
-Defined in: [io/storage.js:317](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L317)
+Defined in: [io/storage.js:317](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L317)
 
 A handle scoped to one table, so row ops read as verbs on the table itself
 (`storage.table('userFiles').put(key, value)`) instead of repeating the table name as an
@@ -418,7 +418,7 @@ state of its own (cheap to create, nothing to dispose).
 
 > **tables**(): `Promise`\<`string`[]\>
 
-Defined in: [io/storage.js:279](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L279)
+Defined in: [io/storage.js:279](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L279)
 
 Table names currently in the database.
 
@@ -432,7 +432,7 @@ Table names currently in the database.
 
 > **version**(): `Promise`\<`number`\>
 
-Defined in: [io/storage.js:257](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L257)
+Defined in: [io/storage.js:257](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L257)
 
 This database's CURRENT on-disk version, or `null` if it does not exist yet.
 
@@ -450,7 +450,7 @@ connection is already open its live `db.version` is authoritative (and needs no
 
 > `static` **databases**(): `Promise`\<`object`[]\>
 
-Defined in: [io/storage.js:228](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L228)
+Defined in: [io/storage.js:228](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L228)
 
 Every IndexedDB database in this origin, with its current version.
 
@@ -468,7 +468,7 @@ answer and could tempt a host into destroying live data.
 
 > `static` **exists**(`name`): `Promise`\<`boolean`\>
 
-Defined in: [io/storage.js:245](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/storage.js#L245)
+Defined in: [io/storage.js:245](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/storage.js#L245)
 
 Does a database of this name already exist in this origin?
 

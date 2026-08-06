@@ -605,6 +605,37 @@ does not match CF's overwhelming majority is a configuration problem rather than
   window throws, because `bounds` cannot express `east < west` and splitting a grid is a different
   operation from relabelling one.
 
+✅ **Landed: `io/netcdf3.js` — the one container format we read ourselves, and only its header.**
+NetCDF3 needed both a hand-supplied extent and (before the index axis) an `allowExtraDims`
+acknowledgement. Neither limitation was ever a property of the *files*: they carry `lon`/`lat`/`time`
+coordinate variables with CF `units` in the header, and only SciWrid's WASM path fails to surface
+them. So a small, dependency-free reader now supplies exactly that, and **a NetCDF3 file opens with no
+options at all** — extent from cell edges, real timestamps, `select()`/`reduce()` working.
+
+This is a deliberate exception to "we do not write decoders" (§3's "research needed" item), and it is
+narrow on purpose:
+
+- **Header only, coordinates only.** `readValues` handles 1-D numeric variables and refuses anything
+  else — point it at a 3-D field and it returns null. No pixels, no slicing, no second decode path.
+  The division of labour is unchanged: SciWrid decodes, we model, this fills in metadata it skips.
+- **Self-limiting by construction.** It returns `null` for any magic it does not recognise, so
+  NetCDF-4 (an HDF5 container) and every other format simply decline. There is no way for it to
+  affect a format it does not fully understand.
+- **A supplement, never a gate.** Every failure is "we know nothing" — a malformed or truncated
+  header returns null rather than throwing, because a working decoder is already in play and this must
+  never take down a parse that would otherwise have succeeded. Precedence is
+  `caller → scan() → header → index`, so it only ever fills a gap.
+- **Justified by scope, not by ambition.** NetCDF-3 classic is small, frozen and completely specified;
+  that is what makes it a bounded job rather than the start of a parser collection. GRIB2 and HDF5 are
+  emphatically not, and remain SciWrid's.
+- **Non-Gregorian calendars keep the file's own numbers.** `360_day`/`noleap` have no real instants to
+  convert to. Rather than fabricating dates or discarding the axis, the raw offsets become the coords
+  and the CF units string becomes `axis.unit` (`'days since 2001-1-1'`). Exact, ordered, selectable —
+  and not claiming to be something it isn't. `meta.axisSource` records which of the four sources won.
+- **Inline bytes only.** A URL source is never fetched to read a header: the URL path exists so that
+  nothing downloads until a slice is forced, and a coordinate variable can sit anywhere in the file,
+  so there is no useful range request. A URL-rooted NetCDF3 still needs `grid.bbox`.
+
 **What is deliberately NOT a parameter, and why.** *Which* dimension is the series axis. `scan()`
 reports a variable's shape as bare numbers with no dimension **names** (`VariableInfo` carries `shape`
 and `ndims`, nothing more), and `extractGrid` exposes exactly one index knob — `time`. So the series

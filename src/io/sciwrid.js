@@ -21,6 +21,10 @@
 
 import { Dataset } from "../package/dataset.js";
 import { RasterGrid } from "../package/materialize.js";
+// The one place FIMViz reads a container format itself — and only its HEADER, for the extent and
+// timestamps SciWrid's NetCDF3 path does not surface. Pure, dependency-free, and self-limiting: it
+// declines any bytes that are not NetCDF-3 classic. See io/netcdf3.js's header for the full rationale.
+import { describeNetcdf3 } from "./netcdf3.js";
 
 /** Formats this adapter can decode. Registered by `registerSciwridFormats()`. @type {string[]} */
 export const SCIWRID_FORMATS = ["netcdf4", "netcdf3", "grib2", "zarr"];
@@ -127,7 +131,7 @@ function usableDims(variable) {
   return usable;
 }
 
-function nativeGridOf(scanResult, variable, override, dimOrder = "yx") {
+function nativeGridOf(scanResult, variable, override, dimOrder = "yx", header = null) {
   const usable = usableDims(variable);
   if (usable.length < 2) {
     throw new Error(`parseFile: variable "${variable.name}" has no usable 2-D shape ` +
@@ -143,7 +147,9 @@ function nativeGridOf(scanResult, variable, override, dimOrder = "yx") {
     : [usable.at(-2), usable.at(-1)];
   const height = override?.height ?? nativeH;
   const width = override?.width ?? nativeW;
-  const bbox = override?.bbox ?? scanResult.bbox;
+  // The file's own coordinate variables are the LAST resort, not the first: `scan()` speaks for the
+  // formats it covers, and only where it says nothing does reading the header ourselves add anything.
+  const bbox = override?.bbox ?? scanResult.bbox ?? header?.bbox ?? null;
   const problem = bbox == null ? "none was found" : geographicBboxProblem(bbox);
   if (override?.bbox && problem) {
     throw new Error("parseFile: the grid.bbox option must be [minLon, minLat, maxLon, maxLat] in " +
@@ -210,37 +216,60 @@ const isDateLike = (v) => v instanceof Date || (typeof v === "string" && !Number
 /**
  * The series axis to build, or `null` for a single-grid Dataset.
  *
- * Three sources, in order: the CF times `scan()` decoded; coordinates the caller supplied; or — the
- * fallback that makes NetCDF3 and any other unlabelled file usable — **synthesized integer indices**
- * over the leading dimension. The last one is not a guess about the data: the dimension is declared in
- * the variable's own shape, and `extractGrid` demonstrably indexes it. What is genuinely unknown is
- * only what each step *means*, which is exactly what `series.coords` is for.
+ * Four sources, in priority order:
+ *
+ * 1. **`series.coords`** — the caller knows, and always wins.
+ * 2. **`scan()`'s CF times** — netcdf4/grib2/zarr decode them.
+ * 3. **The file's own header** (`io/netcdf3.js`) — NetCDF3 carries a `time` coordinate variable with
+ *    CF `units` that SciWrid does not surface. Real timestamps when the calendar is one a JS `Date`
+ *    can express; otherwise the RAW offsets in the file's own units, which are still ordered and
+ *    meaningful (a 360-day calendar has no Gregorian instants, but "day 45 since 2001-1-1" is exact).
+ * 4. **Synthesized integer indices** over the leading dimension. Not a guess about the data: the
+ *    dimension is declared in the variable's own shape and `extractGrid` demonstrably indexes it.
+ *    Only what each step *means* is unknown — which is what `series.coords` is for.
  *
  * @param {Object} scanResult
  * @param {Object} variable
  * @param {number[]} dims - the variable's declared dimension lengths
  * @param {Object|false} [opt] - `false` disables the axis entirely (single grid)
- * @returns {{name: string, unit: string, coords: number[], labels: Array<*>, synthesized: boolean}|null}
+ * @param {Object|null} [header] - `describeNetcdf3()` output, when the bytes were NetCDF-3
+ * @returns {{name: string, unit: string, coords: number[], labels: Array<*>, source: string}|null}
  */
-function seriesOf(scanResult, variable, dims, opt) {
+function seriesOf(scanResult, variable, dims, opt, header) {
   if (opt === false) return null;
   const o = opt || {};
   const cfTimes = timesOf(scanResult, variable);
   // A leading dimension exists whenever the variable declares more than (lat, lon).
   const leading = dims.length > 2 ? dims[0] : 0;
+  // Only trust the header's axis when it is as long as the dimension being indexed — a mismatch means
+  // it describes a different variable, and a mislabelled axis is worse than an unlabelled one.
+  const headerTimes = header && (!leading || (header.times ?? header.offsets)?.length === leading)
+    ? header
+    : null;
 
-  let labels;
-  if (typeof o.coords === "function") {
-    const n = o.length ?? (cfTimes.length || leading);
-    labels = Array.from({ length: n }, (_, i) => o.coords(i, n));
-  } else if (Array.isArray(o.coords)) {
-    labels = o.coords;
+  let labels, unit, source;
+  if (o.coords != null) {
+    const n = o.length ?? (cfTimes.length || headerTimes?.offsets?.length || leading);
+    labels = typeof o.coords === "function"
+      ? Array.from({ length: n }, (_, i) => o.coords(i, n))
+      : o.coords;
+    source = "caller";
   } else if (cfTimes.length) {
     labels = cfTimes;
+    source = "scan";
+  } else if (headerTimes?.times) {
+    labels = headerTimes.times;
+    source = "header";
+  } else if (headerTimes?.offsets) {
+    // A non-Gregorian calendar: keep the file's own numbers and say what they mean, rather than
+    // pretending they are instants or throwing them away for bare positions.
+    labels = headerTimes.offsets;
+    unit = headerTimes.timeUnits;
+    source = "header";
   } else if (leading > 1) {
-    // No labels anywhere — index the dimension the file declares. `unit: 'index'` is the honest
-    // signal that these coordinates are positions, not timestamps.
     labels = Array.from({ length: o.length ?? leading }, (_, i) => i);
+    unit = "index";     // the honest signal that these coordinates are positions, not timestamps
+    source = "index";
   } else {
     return null;
   }
@@ -249,14 +278,12 @@ function seriesOf(scanResult, variable, dims, opt) {
 
   // A caller who supplied real dates for an unlabelled file gets a real time axis — same 'ms'
   // coordinates, and therefore the same nearest-match select(), as a NetCDF4 file's.
-  const dated = labels.some(isDateLike);
-  const synthesized = !cfTimes.length && !o.coords;
   return {
     name: o.name ?? "time",
-    unit: o.unit ?? (dated ? "ms" : synthesized ? "index" : "ms"),
+    unit: o.unit ?? unit ?? (labels.some(isDateLike) ? "ms" : "index"),
     coords: labels.map(toCoord),
     labels,
-    synthesized,
+    source,
   };
 }
 
@@ -497,13 +524,19 @@ export async function parseSciwrid(source, opts = {}) {
   // `opts.grid` is a partial override, not a replacement: supply just `bbox` for a file whose extent
   // scan() could not derive (curvilinear coords) and the pixel dims still come from the variable's
   // own shape; supply width/height alone to decode coarser than native.
-  const grid = nativeGridOf(scanned, variable, opts.grid, opts.dims?.order);
+  // What the file's own header knows and `scan()` does not. Inline bytes only: a URL source is
+  // deliberately never fetched here — the whole point of the URL path is that nothing is downloaded
+  // until a slice is forced, and a coordinate variable can sit anywhere in the file, so there is no
+  // useful range request to make. `header: false` opts out entirely.
+  const header = (opts.header === false || !data) ? null : describeNetcdf3(data);
+
+  const grid = nativeGridOf(scanned, variable, opts.grid, opts.dims?.order, header);
 
   const name = opts.name || (isUrl ? url.split("/").pop().split("?")[0] : null) ||
     `${variable.name}.${scanned.format}`;
 
   const dims = usableDims(variable);
-  const series = seriesOf(scanned, variable, dims, opts.series);
+  const series = seriesOf(scanned, variable, dims, opts.series, header);
 
   // Re-express the extent in the requested longitude convention. Computed once here so that every
   // timestep of a series rolls identically; the materializer applies it to each decoded grid.
@@ -550,9 +583,11 @@ export async function parseSciwrid(source, opts = {}) {
     // Recorded, not silent: which slice of these the reader picked is its business, but a consumer
     // can at least see that a dimension was collapsed.
     ...(extraDims > 0 ? { extraDims, shape: variable.shape } : {}),
-    // Equally not silent: an axis whose coordinates are positions rather than timestamps is a weaker
-    // thing than one the file labelled, and a UI formatting a slider needs to know which it has.
-    ...(series?.synthesized ? { synthesizedAxis: true } : {}),
+    // Equally not silent: where the axis came from. A UI formatting a slider needs to distinguish
+    // timestamps the file declared ('scan'/'header') from bare positions we counted ('index'), and a
+    // caller reading `unit` alone cannot tell which.
+    ...(series ? { axisSource: series.source } : {}),
+    ...(series?.source === "index" ? { synthesizedAxis: true } : {}),
   };
 
   const base = {

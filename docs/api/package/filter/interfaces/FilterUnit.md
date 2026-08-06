@@ -6,7 +6,7 @@
 
 # Interface: FilterUnit
 
-Defined in: [package/filter.js:16](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/filter.js#L16)
+Defined in: [package/filter.js:16](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/filter.js#L16)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [package/filter.js:16](https://github.com/uihilab/FIMViz.js/blob/fa8
 
 > `optional` **at?**: (`x`, `y`) => `number`
 
-Defined in: [package/filter.js:20](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/filter.js#L20)
+Defined in: [package/filter.js:20](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/filter.js#L20)
 
 raster: read the flat pixel array
 
@@ -38,7 +38,7 @@ raster: read the flat pixel array
 
 > `optional` **feature?**: `any`
 
-Defined in: [package/filter.js:21](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/filter.js#L21)
+Defined in: [package/filter.js:21](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/filter.js#L21)
 
 vector: the GeoJSON feature
 
@@ -48,7 +48,7 @@ vector: the GeoJSON feature
 
 > `optional` **lat?**: `number`
 
-Defined in: [package/filter.js:22](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/filter.js#L22)
+Defined in: [package/filter.js:22](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/filter.js#L22)
 
 ***
 
@@ -56,7 +56,7 @@ Defined in: [package/filter.js:22](https://github.com/uihilab/FIMViz.js/blob/fa8
 
 > `optional` **lng?**: `number`
 
-Defined in: [package/filter.js:23](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/filter.js#L23)
+Defined in: [package/filter.js:23](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/filter.js#L23)
 
 ***
 
@@ -64,7 +64,7 @@ Defined in: [package/filter.js:23](https://github.com/uihilab/FIMViz.js/blob/fa8
 
 > `optional` **value?**: `number`
 
-Defined in: [package/filter.js:17](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/filter.js#L17)
+Defined in: [package/filter.js:17](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/filter.js#L17)
 
 raster: the pixel value
 
@@ -74,7 +74,7 @@ raster: the pixel value
 
 > `optional` **x?**: `number`
 
-Defined in: [package/filter.js:18](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/filter.js#L18)
+Defined in: [package/filter.js:18](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/filter.js#L18)
 
 raster: pixel x
 
@@ -84,6 +84,6 @@ raster: pixel x
 
 > `optional` **y?**: `number`
 
-Defined in: [package/filter.js:19](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/filter.js#L19)
+Defined in: [package/filter.js:19](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/filter.js#L19)
 
 raster: pixel y
