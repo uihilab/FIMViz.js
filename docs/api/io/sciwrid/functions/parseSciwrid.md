@@ -8,7 +8,7 @@
 
 > **parseSciwrid**(`source`, `opts?`): `Promise`\<[`Dataset`](../../../package/dataset/classes/Dataset.md)\>
 
-Defined in: [io/sciwrid.js:258](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/io/sciwrid.js#L258)
+Defined in: [io/sciwrid.js:273](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/io/sciwrid.js#L273)
 
 Read a multi-dimensional scientific file into a `Dataset` with a real temporal axis.
 
@@ -40,6 +40,15 @@ this first slice does not yet have.)
 `string` \| `ArrayBuffer` \| `ArrayBufferView`\<`ArrayBufferLike`\> \| `File` \| `Blob` \| `URL`
 
 ### opts?
+
+#### allowExtraDims?
+
+`boolean`
+
+proceed with a variable carrying dimensions beyond
+  (lat, lon) + time — a vertical level, ensemble member or band. Off by default: the reader collapses
+  them with no say from the caller, so this is an acknowledgement, not a fix. Recorded on
+  `meta.extraDims`
 
 #### grid?
 

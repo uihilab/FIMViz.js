@@ -397,6 +397,6 @@ describe("Dataset.reduce (axis stack → one grid, sugar over select+combine)", 
   });
   test("throws when the axis has no entries", () => {
     const empty = new Dataset({ name: "x", axes: [{ name: "stage", entries: [] }] });
-    assert.throws(() => empty.reduce("mean"), /no selection-axis entries/);
+    assert.throws(() => empty.reduce("mean"), /no selection axis/);
   });
 });

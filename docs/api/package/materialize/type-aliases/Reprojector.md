@@ -8,7 +8,7 @@
 
 > **Reprojector** = (`grid`, `targetCrs`) => `Promise`\<[`RasterGrid`](../classes/RasterGrid.md)\>
 
-Defined in: [package/materialize.js:125](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/materialize.js#L125)
+Defined in: [package/materialize.js:125](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/materialize.js#L125)
 
 ## Type Parameters
 

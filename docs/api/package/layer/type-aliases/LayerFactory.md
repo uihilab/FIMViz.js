@@ -8,7 +8,7 @@
 
 > **LayerFactory** = (`fim`, `opts`) => [`Layer`](../classes/Layer.md) \| `Promise`\<[`Layer`](../classes/Layer.md)\>
 
-Defined in: [package/layer.js:1059](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/layer.js#L1059)
+Defined in: [package/layer.js:1059](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/layer.js#L1059)
 
 ## Type Parameters
 

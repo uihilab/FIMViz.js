@@ -8,7 +8,7 @@
 
 > **boundsOf**(`geojson`): `object`
 
-Defined in: [io/parse.js:402](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/io/parse.js#L402)
+Defined in: [io/parse.js:402](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/io/parse.js#L402)
 
 ## Parameters
 

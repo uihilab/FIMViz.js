@@ -288,7 +288,7 @@ describe("sciwrid adapter: NetCDF3 (degraded, deliberately pinned)", () => {
   test("reduce() therefore throws — there is no axis, and it says so", async () => {
     const ds = await parseSciwrid(readFileSync(FIX),
       { grid: { bbox: [-10, -5, 10, 5] }, allowExtraDims: true });
-    assert.throws(() => ds.reduce("mean"), /no selection-axis entries to reduce/);
+    assert.throws(() => ds.reduce("mean"), /no selection axis 0 .*no axes at all/s);
   });
 });
 

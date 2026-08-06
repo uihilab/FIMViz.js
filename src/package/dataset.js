@@ -100,9 +100,32 @@ const isSelectorRef = (ref) =>
  * @property {Object} [meta]
  */
 /**
+ * A selection axis, and **its algebra**. Which verbs are legal is a property of the axis, not of the
+ * verb — so a band, variable or ensemble axis is safe by construction instead of by special case.
+ *
+ * The two flags are **independent**, which is the whole reason there are two. Ensemble member is the
+ * proof: unordered (member 3 is not "between" 2 and 4) yet perfectly reducible (the members are the
+ * same quantity, differently realised). Band is the mirror image: ordered by index, but a mean of red
+ * and near-infrared is not a thing.
+ *
+ * | axis | `ordered` | `commensurable` |
+ * |---|---|---|
+ * | time, level, stage, depth | ✅ | ✅ |
+ * | ensemble member | ✗ | ✅ |
+ * | band (R/G/B) | ✅ | ✗ |
+ * | variable (Rainf/Tair) | ✗ | ✗ |
+ *
+ * Both default to `true`, which is what every axis built before them was: FIM Scenario's stage and
+ * the NetCDF/GRIB2/Zarr time axis are ordered and commensurable.
+ *
  * @typedef {Object} DatasetAxis
  * @property {string} name
  * @property {string|null} [unit]
+ * @property {boolean} [ordered=true] - do the coords have a magnitude, so that "between" and
+ *   "nearest" mean something? Gates `selectRange` and `selectAxisEntry`'s nearest-match. Without it,
+ *   nearest-match would happily snap `select(1.5)` to band 2.
+ * @property {boolean} [commensurable=true] - do the entries measure the same quantity in the same
+ *   units, so that averaging across them is meaningful? Gates `reduce`.
  * @property {DatasetAxisEntry[]} entries
  */
 /**
@@ -506,9 +529,13 @@ export class Dataset {
     if (!["sum", "mean", "min", "max"].includes(op)) {
       throw new Error(`reduce: op must be one of sum/mean/min/max (got "${op}")`);
     }
-    const ax = typeof axis === "number" ? this.axes?.[axis] : this.axes?.find((a) => a.name === axis);
-    const entries = ax?.entries;
-    if (!entries?.length) throw new Error("reduce: no selection-axis entries to reduce (no axis, or the named axis is empty)");
+    const { ax } = this.#requireAxis(axis);
+    if (ax.commensurable === false) {
+      throw new Error(`reduce: axis "${ax.name}" is not commensurable — its entries measure different ` +
+        "quantities (a variable or band axis), so averaging across them has no meaning. select() one " +
+        "entry, or reduce a different axis.");
+    }
+    const entries = ax.entries;
     const datasets = entries.map((e) => this.select(e.coord, { axis, variant }));
     if (datasets.some((d) => !d)) throw new Error("reduce: an axis entry failed to resolve to a Dataset");
     return datasets[0].combine(datasets.slice(1), { op, method });
@@ -550,6 +577,7 @@ export class Dataset {
    * @returns {Dataset|null}
    */
   select(coord, opts = {}) {
+    const { idx } = this.#requireAxis(opts.axis ?? 0);
     const entry = this.selectAxisEntry(coord, opts);
     if (!entry) return null;
     let ref = entry.ref;
@@ -562,6 +590,12 @@ export class Dataset {
         throw new Error(`select: "${this.name}"'s axis entry ${JSON.stringify(entry.coord)} is an ` +
           "in-file selector, but this Dataset has no source to select from (no data, no url).");
       }
+      // Selecting PEELS one axis: the chosen coordinate is folded into the selector and that axis is
+      // dropped, while every other axis stays. So on a (time × member) series, select(t) leaves a
+      // member series rather than a payload, and a second select() finishes the job — which is what
+      // makes axes the model for extra dimensions rather than a special case for exactly one. The
+      // selector MERGES for the same reason: {t} then {m} must arrive at the decoder as {t, m}.
+      const remaining = (this.axes || []).filter((_, i) => i !== idx);
       return new Dataset({
         name: ref.name || `${this.name}[${entry.coord}]`,
         kind: this.kind, format: this.format,
@@ -569,7 +603,8 @@ export class Dataset {
         bounds: ref.bounds ?? this.#bounds,
         meta: { ...(this.#meta || {}), ...(entry.meta || {}) },
         data: this.data, url: this.#url, resolveUrl: this.#resolveUrl,
-        selector: ref.select,
+        selector: { ...(this.#selector || {}), ...ref.select },
+        axes: remaining.length ? remaining : null,
       });
     }
 
@@ -587,6 +622,31 @@ export class Dataset {
 
   /** The in-file selection this Dataset forces with, or null. @returns {Object|null} */
   get selector() { return this.#selector; }
+
+  /**
+   * Resolve an axis by index or name for the OPERATIONS (`select`/`selectRange`/`reduce`), throwing
+   * when it does not exist.
+   *
+   * The split this settles: asking for an axis that isn't there is a **programming error** — the
+   * caller believed this Dataset was a series and it isn't — while asking for a coordinate no entry
+   * carries is a **data condition**, which stays `null`. Previously the same "no axis" case returned
+   * `null` from `select` and threw from `reduce`, so identical mistakes surfaced two different ways.
+   * The lookup (`selectAxisEntry`) keeps returning `null` throughout: a lookup that finds nothing is
+   * not a mistake.
+   * @param {number|string} axis
+   * @returns {{ ax: DatasetAxis, idx: number }}
+   */
+  #requireAxis(axis) {
+    const idx = typeof axis === "number" ? axis : (this.axes?.findIndex((a) => a.name === axis) ?? -1);
+    const ax = idx >= 0 ? this.axes?.[idx] : null;
+    if (!ax?.entries?.length) {
+      throw new Error(`"${this.name}": no selection axis ${JSON.stringify(axis)} — ` + (this.axes?.length
+        ? `available: ${this.axes.map((a, i) => `${i}:${a.name ?? "?"}(${a.entries?.length ?? 0})`).join(", ")}`
+        : "this Dataset has no axes at all (a plain parsed file has none, and neither has a fully " +
+          "selected one). Check `ds.axes` before offering a slider."));
+    }
+    return { ax, idx };
+  }
 
   /**
    * Narrow one axis to the window `[from, to]` — a **series in, series out** operation, which is what
@@ -622,9 +682,11 @@ export class Dataset {
    *   the axis is missing/empty or nothing falls inside the window
    */
   selectRange(from, to, { axis = 0 } = {}) {
-    const idx = typeof axis === "number" ? axis : this.axes?.findIndex((a) => a.name === axis);
-    const ax = idx >= 0 ? this.axes?.[idx] : null;
-    if (!ax?.entries?.length) return null;
+    const { ax, idx } = this.#requireAxis(axis);
+    if (ax.ordered === false) {
+      throw new Error(`selectRange: axis "${ax.name}" is unordered — its coords are identities, not ` +
+        "magnitudes, so there is no \"between\" to select. Use select(coord) per entry.");
+    }
     const [lo, hi] = from <= to ? [from, to] : [to, from];
     const entries = ax.entries.filter((e) => e.coord >= lo && e.coord <= hi);
     if (!entries.length) return null;
@@ -653,7 +715,9 @@ export class Dataset {
     if (!entries?.length) return null;
     const exact = entries.find((e) => e.coord === coord);
     if (exact) return exact;
-    if (!nearest || typeof coord !== "number") return null;
+    // Nearest is a magnitude operation: on an unordered axis "closest" is meaningless, and snapping
+    // e.g. select(1.5) to band 2 would be a confident wrong answer rather than a miss.
+    if (!nearest || ax.ordered === false || typeof coord !== "number") return null;
     let best = null, bestD = Infinity;
     for (const e of entries) {
       if (typeof e.coord !== "number") continue;
@@ -701,10 +765,13 @@ export class Dataset {
     // In-file selectors changed that: a NetCDF/GRIB2/Zarr series carries the whole file, so the
     // series check has to come first and stand on `axes` alone. A node with its own `selector` is the
     // exception — it is one resolved slice, and forcing it is exactly right.
-    if (this.axes?.length && !this.#selector) {
-      throw new Error(`load(): "${this.name}" is a selection-axis series (${this.axes.length} ` +
-        `axis/axes, ${this.axes[0]?.entries?.length ?? 0} entries on the first) — select(coord) an ` +
-        "entry first, or reduce(op) to collapse the axis.");
+    // ANY remaining axis means unresolved: `select()` peels one axis at a time, so a partially
+    // selected node carries both a selector and the axes still outstanding. Keying this off the
+    // selector's absence would let that node through and decode an incomplete selection.
+    if (this.axes?.length) {
+      throw new Error(`load(): "${this.name}" is a selection-axis series — ` +
+        `${this.axes.map((a) => `${a.name || "?"}(${a.entries?.length ?? 0})`).join(", ")} ` +
+        "still unresolved. select(coord) each remaining axis, or reduce(op) to collapse one.");
     }
     if (!this.#url && this.data == null) {
       throw new Error(`load(): "${this.name}" has no source (no data, no url)`);

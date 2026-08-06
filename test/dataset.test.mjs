@@ -360,7 +360,9 @@ describe("Dataset: selectRange — series in, series out", () => {
     // samples, so widening silently would hand back a bigger span than was asked for.
     assert.equal(series().selectRange(11, 19), null);
     assert.equal(series().selectRange(100, 200), null, "outside the axis entirely");
-    assert.equal(new Dataset({ name: "no-axes" }).selectRange(0, 1), null, "no axis at all");
+    // …but asking for an axis that does not exist is a MISTAKE, not an empty result, so it throws.
+    assert.throws(() => new Dataset({ name: "no-axes" }).selectRange(0, 1),
+      /no selection axis 0 .*no axes at all/s);
   });
 
   test("ISO-8601 string coords compare chronologically, being lexicographic", () => {
@@ -388,5 +390,48 @@ describe("Dataset: selectRange — series in, series out", () => {
     // no-source check caught it by accident. It has to stand on `axes` alone now.
     await assert.rejects(() => series().load(), /selection-axis series.*select\(coord\)/s);
     await assert.rejects(() => series().selectRange(10, 30).load(), /selection-axis series/);
+  });
+});
+
+// An axis carries its own algebra: which verbs are legal is a property of the AXIS, not the verb.
+// The two flags are independent, which is why there are two — ensemble member is unordered yet
+// reducible; a band axis is ordered yet not. See DatasetAxis in package/dataset.js.
+describe("Dataset: axis algebra (ordered / commensurable)", () => {
+  const entries = [0, 1, 2].map((c) => ({ coord: c, ref: { select: { i: c } } }));
+  const ds = (patch) => new Dataset({ name: "a", kind: "raster", format: "test-nd",
+    data: new ArrayBuffer(4), axis: { name: "ax", entries, ...patch } });
+
+  test("both default to true — every axis built before the flags existed was both", () => {
+    const d = ds({});
+    assert.equal(d.selectAxisEntry(0.4).coord, 0, "nearest-match still applies");
+    assert.ok(d.selectRange(0, 1), "and so does a window");
+    assert.doesNotThrow(() => d.reduce("mean"));
+  });
+
+  test("an UNORDERED axis has no 'between' and no 'nearest' — identities, not magnitudes", () => {
+    const d = ds({ ordered: false });
+    assert.equal(d.selectAxisEntry(1).coord, 1, "exact match is still fine");
+    assert.equal(d.selectAxisEntry(1.4), null,
+      "…but 1.4 must NOT snap to member 1: closest is meaningless on an identity axis");
+    assert.throws(() => d.selectRange(0, 2), /unordered.*no "between"/s);
+    assert.doesNotThrow(() => d.reduce("mean"),
+      "reduce is unaffected — ensemble members are unordered yet perfectly averageable");
+  });
+
+  test("a NON-COMMENSURABLE axis cannot be reduced — different quantities", () => {
+    const d = ds({ commensurable: false });
+    assert.throws(() => d.reduce("mean"), /not commensurable.*different quantities/s);
+    assert.ok(d.select(1), "selecting one entry is still correct");
+    assert.ok(d.selectRange(0, 1), "and a window is fine — bands are ordered even when incomparable");
+  });
+
+  test("the flags are independent, not two names for one thing", () => {
+    // band: ordered, not commensurable. member: unordered, commensurable. Neither implies the other.
+    const band = ds({ ordered: true, commensurable: false });
+    const member = ds({ ordered: false, commensurable: true });
+    assert.ok(band.selectRange(0, 1));
+    assert.throws(() => band.reduce("mean"));
+    assert.throws(() => member.selectRange(0, 1));
+    assert.doesNotThrow(() => member.reduce("mean"));
   });
 });

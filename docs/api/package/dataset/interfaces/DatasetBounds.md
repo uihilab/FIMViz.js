@@ -6,7 +6,7 @@
 
 # Interface: DatasetBounds
 
-Defined in: [package/dataset.js:109](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/dataset.js#L109)
+Defined in: [package/dataset.js:132](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/dataset.js#L132)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [package/dataset.js:109](https://github.com/uihilab/FIMViz.js/blob/a
 
 > **east**: `number`
 
-Defined in: [package/dataset.js:110](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/dataset.js#L110)
+Defined in: [package/dataset.js:133](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/dataset.js#L133)
 
 ***
 
@@ -22,7 +22,7 @@ Defined in: [package/dataset.js:110](https://github.com/uihilab/FIMViz.js/blob/a
 
 > **north**: `number`
 
-Defined in: [package/dataset.js:110](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/dataset.js#L110)
+Defined in: [package/dataset.js:133](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/dataset.js#L133)
 
 ***
 
@@ -30,7 +30,7 @@ Defined in: [package/dataset.js:110](https://github.com/uihilab/FIMViz.js/blob/a
 
 > **south**: `number`
 
-Defined in: [package/dataset.js:110](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/dataset.js#L110)
+Defined in: [package/dataset.js:133](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/dataset.js#L133)
 
 ***
 
@@ -38,4 +38,4 @@ Defined in: [package/dataset.js:110](https://github.com/uihilab/FIMViz.js/blob/a
 
 > **west**: `number`
 
-Defined in: [package/dataset.js:110](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/dataset.js#L110)
+Defined in: [package/dataset.js:133](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/dataset.js#L133)

@@ -8,7 +8,7 @@
 
 > `const` **FimViz**: `object` & `object`
 
-Defined in: [package/mount.js:253](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/mount.js#L253)
+Defined in: [package/mount.js:253](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/mount.js#L253)
 
 ## Type Declaration
 

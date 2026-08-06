@@ -173,6 +173,30 @@ is the *why*, those are the *what*.
     incompatible axis shapes and a `reduce()` that works on only one. Because `reduce()` is already
     sugar over `select()` + `combine()`, folding the in-file case into `select()` bought temporal
     aggregation for free. Landed with the NetCDF4/GRIB2/Zarr adapter — [PACKAGE_ROADMAP.md §8](./PACKAGE_ROADMAP.md#8-multi-dimensional-formats--real-temporal-datasets-sciwrid-toolkit-as-a-materializer).
+  - **RESOLVED: the model is 2-D grids + selection axes, NOT an N-D array algebra.** Once one file can
+    back a whole axis, the pull toward xarray is constant — broadcasting, partial reduction, a cube
+    value type — and each step looks small on its own. The decision is to stop at: a `Dataset` forces
+    to a **2-D grid**, and every other dimension (time, level, ensemble member, band, variable) is a
+    **selection axis** you resolve down. Anything genuinely N-D is iterated in app code.
+    - **What that buys.** One decoded representation (`RasterGrid`/`VectorFeatures`) that every op,
+      `Stats`, `ColorScale`, `Legend` and `RasterLayer` already understands. Adding an axis costs
+      nothing downstream, because downstream never sees an axis.
+    - **What it costs, accepted.** No `a.combine(b)` that pairs entries by matching coordinate
+      (broadcasting), and no *partial* reduce — collapsing time on a `(time × member)` series to leave
+      a member series is N reductions, not one, and needs the alignment machinery this decision
+      declines. Reducing **every** remaining axis is fine (the cross-product flattens to one list of
+      payloads), so `reduce` refuses only the partial case.
+    - **Consequences that fell out immediately.** `select()` must **peel** one axis rather than resolve
+      to a payload: selecting a timestep from `(time × member)` leaves a member series, and the
+      selector merges (`{t}` then `{m}` reaches the decoder as `{t, m}`). Forcing is gated on *any*
+      remaining axis, not on the selector's absence. And an axis had to start declaring **its own
+      algebra** — `ordered` gates `selectRange`/nearest-match, `commensurable` gates `reduce` — two
+      independent flags, since an ensemble member axis is unordered yet reducible and a band axis is
+      ordered yet not. That keeps verb legality a property of the axis instead of a guard per axis kind.
+    - **The alternative, rejected:** grow toward N-D array semantics. Not because it is wrong — it is
+      what xarray is for — but because the halfway house is the bad outcome: broadcasting for one case,
+      then `reduce` needing alignment, then needing a cube, with each step justified by the last. A
+      consumer wanting real N-D algebra is better served composing FIMViz with a library built for it.
 - **App-specific domain formats get adapters; the neutral core never learns a proprietary schema.**
   `parseFile` handles only generic formats (geojson/kml/kmz/shp/geotiff; HAZUS damage is included because
   it's a FEMA *standard*, not one lab's schema). Two FIMViz-specific JSON formats stayed out, **not

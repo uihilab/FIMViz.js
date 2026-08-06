@@ -6,15 +6,26 @@
 
 # Interface: DatasetAxis
 
-Defined in: [package/dataset.js:103](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/dataset.js#L103)
+Defined in: [package/dataset.js:121](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/dataset.js#L121)
 
 ## Properties
+
+### commensurable?
+
+> `optional` **commensurable?**: `boolean`
+
+Defined in: [package/dataset.js:127](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/dataset.js#L127)
+
+do the entries measure the same quantity in the same
+  units, so that averaging across them is meaningful? Gates `reduce`.
+
+***
 
 ### entries
 
 > **entries**: [`DatasetAxisEntry`](DatasetAxisEntry.md)[]
 
-Defined in: [package/dataset.js:106](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/dataset.js#L106)
+Defined in: [package/dataset.js:129](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/dataset.js#L129)
 
 ***
 
@@ -22,7 +33,19 @@ Defined in: [package/dataset.js:106](https://github.com/uihilab/FIMViz.js/blob/a
 
 > **name**: `string`
 
-Defined in: [package/dataset.js:104](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/dataset.js#L104)
+Defined in: [package/dataset.js:122](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/dataset.js#L122)
+
+***
+
+### ordered?
+
+> `optional` **ordered?**: `boolean`
+
+Defined in: [package/dataset.js:124](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/dataset.js#L124)
+
+do the coords have a magnitude, so that "between" and
+  "nearest" mean something? Gates `selectRange` and `selectAxisEntry`'s nearest-match. Without it,
+  nearest-match would happily snap `select(1.5)` to band 2.
 
 ***
 
@@ -30,4 +53,4 @@ Defined in: [package/dataset.js:104](https://github.com/uihilab/FIMViz.js/blob/a
 
 > `optional` **unit?**: `string`
 
-Defined in: [package/dataset.js:105](https://github.com/uihilab/FIMViz.js/blob/a23ccba65224d3481fd21299491ab6e3a23f0f47/src/package/dataset.js#L105)
+Defined in: [package/dataset.js:123](https://github.com/uihilab/FIMViz.js/blob/39cf3cbcc95a54d593615b2073cde0e6bbbdb15a/src/package/dataset.js#L123)

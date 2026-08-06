@@ -592,10 +592,14 @@ path was never affected because `colorizeGrid` pre-filters `NaN` itself.
 
 **Deliberately out of this slice:**
 
-- **Cubing** (holding an N-D cube as a value and operating on it) — `RasterGrid` and `VectorFeatures`
-  are the only two value types, and `reduce()` exists precisely to collapse an axis *to a grid*. A
-  third value type would touch materialize, the ops, `Stats`, and `toRecord` round-tripping. Worth
-  doing eventually; folding it in here is how the NetCDF slice slips.
+- **Cubing** (holding an N-D cube as a value and operating on it) — now **settled rather than merely
+  deferred**: [DECISIONS §1.1](DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md#11-the-object-models-shape)
+  records that the model is *2-D grids + selection axes*, not an N-D array algebra. `RasterGrid` and
+  `VectorFeatures` stay the only two value types; `reduce()` exists precisely to collapse an axis *to
+  a grid*. The two things that decision declines are **broadcasting** (`a.combine(b)` pairing entries
+  by matching coord) and **partial reduce** (collapsing time on a `(time × member)` series to leave a
+  member series — N reductions, not one). Reducing *every* remaining axis is fine, since the
+  cross-product flattens to a single list of payloads.
 - ~~**Temporal range selection**~~ — ✅ **landed** as `ds.selectRange(from, to, { axis })`. The shape
   that made it cheap: **series in, series out.** `select()` resolves one entry and hands back a
   forceable payload; `selectRange` hands back another selection-axis Dataset, so everything already
