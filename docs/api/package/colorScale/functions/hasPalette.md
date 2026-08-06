@@ -8,7 +8,7 @@
 
 > **hasPalette**(`name`): `boolean`
 
-Defined in: [package/colorScale.js:50](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/colorScale.js#L50)
+Defined in: [package/colorScale.js:50](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/colorScale.js#L50)
 
 True if `name` resolves to a built-in or registered palette.
 

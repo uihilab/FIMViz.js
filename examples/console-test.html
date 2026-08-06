@@ -17,12 +17,18 @@
 <div id="lmap">Leaflet Map Here</div>
 <div id="dropzone">Drop files here</div>
 <p>Empty scratch bench. Open DevTools console — <code>window.FimViz</code> and <code>window.FIM.*</code>
-(every named export from the barrel) are ready to call directly. Nothing else runs on this page.</p>
+(every named export from the barrel) are ready to call directly. Nothing else runs on this page.
+<code>addDataset</code> handles <code>.nc</code>/<code>.grib2</code>/<code>.zarr</code> too — that
+reader is <em>external</em> to the bundle, which is the one import-map entry below that is not ours.</p>
 <p>Loads from <code>dist/fimviz.js</code> — run <code>npm run build</code> after editing
 library source, then reload this page, to pick up the change.</p>
 
 <script type="importmap">
-{ "imports": { "fimviz": "../dist/fimviz.js", "fimviz/ui": "../dist/ui.js" } }
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js",
+    "sciwrid-toolkit": "../node_modules/sciwrid-toolkit/dist/index.js"
+} }
 </script>
 
 <script type="module">

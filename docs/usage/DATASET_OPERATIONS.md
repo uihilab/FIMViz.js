@@ -111,22 +111,36 @@ Writing a materializer that understands selectors is one `if`: `root.select` is 
 ordinary sources, so existing decoders are unaffected. See
 [APP_STARTUP_ADVANCED.md → Materialize / decode extension seam](./APP_STARTUP_ADVANCED.md#materialize--decode-extension-seam).
 
-### Reading NetCDF / GRIB2 / Zarr (`parseSciwrid`)
+### Reading NetCDF / GRIB2 / Zarr
 
-The concrete producer of selector axes — multi-dimensional scientific formats, via
-[SciWrid Toolkit](https://github.com/uihilab/SciWrid-Toolkit). **Opt-in and not on the barrel**: the
-engine never imports it, so the ~193 KB wasm stays out of every other consumer's bundle.
+The concrete producer of selector axes — multi-dimensional scientific formats. They open through the
+ordinary `fim.addDataset(file)` / `FimViz.parseFile(file)`, on extension (`.nc`, `.nc4`, `.cdf`,
+`.grib`, `.grib2`, `.grb2`, `.zarr`); the file's own header decides which of the four it is.
+
+Under it is [SciWrid Toolkit](https://github.com/uihilab/SciWrid-Toolkit), reached through a dynamic
+import and left **external to the bundle**, so its ~193 KB wasm is downloaded only by a page that
+actually opens one of these files, and is never bundled into `dist/fimviz.js`. The consequence for a
+consumer is that `sciwrid-toolkit` must be *resolvable* — an npm dependency under a bundler, an
+import-map entry in a raw browser page (`examples/temporal-netcdf.html` shows one). Only these four
+formats depend on it, and the thrown error says so.
 
 One call covers every format — the differences live inside the adapter (GRIB2 reports `nx`/`ny`
 instead of a `shape`; Zarr reports `shape` as an array rather than a string). What differs for a
 *caller* is what `scan()` can tell us about a file, which is not uniform:
 
-| Format | Extent from `scan()` | Time axis | So you get |
+| Format | Extent from `scan()` | Series axis | So you get |
 |---|---|---|---|
-| **NetCDF4** | ✅ from 1-D coords | ✅ | the full temporal path |
-| **Zarr v2** | ✅ when the store has CF coords | ✅ | the full temporal path |
-| **GRIB2** | ❌ never — supply `grid.bbox` | ✅ | scrub + `reduce()`, with an extent |
-| **NetCDF3** | ❌ never — supply `grid.bbox` | ❌ invisible | a **single grid** + `allowExtraDims` |
+| **NetCDF4** | ✅ from 1-D coords | ✅ CF timestamps | the full temporal path |
+| **Zarr v2** | ✅ when the store has CF coords | ✅ CF timestamps | the full temporal path |
+| **GRIB2** | ❌ never — supply `grid.bbox` | ✅ CF timestamps | scrub + `reduce()`, with an extent |
+| **NetCDF3** | ❌ never — supply `grid.bbox` | ⚠️ **indices**, unlabelled | scrub + `reduce()` by position; pass `series.coords` for real dates |
+
+NetCDF3 is worth a sentence of its own, because the obvious reading of "`scan()` reports no times" is
+wrong in a costly way. What is missing is the **labels** — the CF units accessor is outstanding
+upstream — not the ability to slice: the dimension is declared in the variable's own `shape`, and the
+reader indexes it perfectly well. So the axis is built from integer positions, `axis.unit` is
+`'index'` rather than `'ms'`, and `meta.synthesizedAxis` is `true` so a UI can format the slider
+honestly. Supply `series.coords` and it becomes an ordinary time axis.
 
 #### Dimensions beyond (lat, lon) + time
 
@@ -135,7 +149,7 @@ member or band, so a 4-D variable **throws** rather than silently handing you wh
 reader chose:
 
 ```js
-await parseSciwrid(file, { allowExtraDims: true });   // accept it; recorded on meta.extraDims
+await fim.addDataset(file, { allowExtraDims: true });   // accept it; recorded on meta.extraDims
 ```
 
 This is arithmetic on the declared `shape`, not on what the reader admits to — which is why a
@@ -143,9 +157,8 @@ This is arithmetic on the declared `shape`, not on what the reader admits to —
 but still there, and was being collapsed unannounced.
 
 ```js
-import { parseSciwrid } from 'fimviz/src/io/sciwrid.js';
-
-const ds = await parseSciwrid(file);              // scan() only — nothing decoded
+const ds = await fim.addDataset(file);            // header only — nothing decoded
+ds.format;                                         // 'netcdf4' — from the file, not the extension
 ds.axis.entries.length;                            // 120 timesteps
 ds.meta.grid;                                      // { width, height, bbox, bounds } — the file's NATIVE grid
 ds.meta.unit;                                      // 'kg m-2'
@@ -161,8 +174,36 @@ await ds.reduce('max').grid();     // …or the storm peak
 |---|---|
 | `variable` | which variable; defaults to the first `supported` one. **One variable per Dataset** — call it again for another. |
 | `grid` | **Partial** override of the native grid — anything omitted comes from the variable's own shape and `scan().bbox`. Pass `width`/`height` alone to decode coarser than native; pass `bbox` alone when the file's extent can't be derived (below). |
+| `series` | The series (time) axis: `{ coords, length, name, unit }`. `coords` may be an array or a generator `(i, n) => …`; ISO strings and `Date`s become epoch ms. Defaults to the file's CF times, else integer indices over its leading dimension. **`series: false`** forces a single grid. |
+| `dims` | `{ order: 'yx' \| 'xy' }` — which trailing pair of the declared shape is (lat, lon). `'yx'` is CF order and the default; `'xy'` is for a variable declared `(…, lon, lat)`. Decides native height/width only. |
+| `lon` | `'native'` (default), `'-180..180'`, or `'0..360'` — re-express the extent in a longitude convention. |
+| `allowExtraDims` | accept a dimension beyond (lat, lon) + the series axis, collapsed by the reader. |
 | `workers` | `extractGrid`'s worker count. Defaults to SciWrid's own in a browser, and to `0` under Node, where the worker pool never resolves. |
 | `name` / `resolveUrl` | as elsewhere. |
+
+#### Which axis is the series axis (and why you cannot choose)
+
+The series axis is always the file's **outermost non-spatial dimension**. That is not a simplification
+we chose — `scan()` reports a variable's shape as bare numbers (`'24x170x180'`) with no dimension
+*names*, and the decoder exposes exactly one index knob. You can say how long that axis is, what its
+coordinates mean, and what to call it; there is nothing that could act on "use dimension 2 instead".
+A file whose layout genuinely differs needs `dims.order` (for the spatial pair) or a transposed copy.
+
+#### Longitude conventions are applied by us, not by the reader
+
+Asking the decoder for a `[-180, …, 180]` window on a `0..360` file returns **the file's own pixels
+with the requested bbox echoed back** — same data, new label, Pacific drawn where the Atlantic
+belongs. So `lon` is implemented as a column roll on the decoded grid:
+
+- a **global** extent (span 360°) is genuinely rolled, half the grid width for the usual case;
+- a **regional** extent a whole turn away (`270..285` → `-90..-75`) is relabelled with no pixel work;
+- anything else — a regional extent that would cross the antimeridian in the target window — **throws**,
+  because expressing it would need the grid split and re-joined, and `bounds` cannot hold `east < west`.
+
+```js
+await fim.addDataset(file, { grid: { bbox: [0, -80, 360, 90] }, lon: '-180..180' });
+// bounds → { west: -180, east: 180, … }, and every decoded timestep is rolled to match
+```
 
 **Axis coordinates are epoch milliseconds**, not ISO strings — `select()`'s nearest-match is
 numeric-only, and that is what a time slider needs. The ISO timestamp is on each entry's `meta.time`,
@@ -200,7 +241,7 @@ FIMViz will not guess one — a wrong extent silently puts every pixel in the wr
 same failure the CRS precondition exists to prevent. Supply it instead:
 
 ```js
-await parseSciwrid(file, { grid: { bbox: [-180, -90, 180, 90] } });   // width/height stay native
+await fim.addDataset(file, { grid: { bbox: [-180, -90, 180, 90] } });   // width/height stay native
 ```
 
 The thrown error names the variable, its shape, and the variables present, so you can tell which case

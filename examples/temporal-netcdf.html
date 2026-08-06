@@ -46,7 +46,8 @@
 
 <header>
   <h1>FIMViz — temporal NetCDF: a time axis you can scrub</h1>
-  <p>The first slice of <code>docs/PACKAGE_ROADMAP.md</code> §8. <code>parseSciwrid(file)</code> scans a
+  <p>The first slice of <code>docs/PACKAGE_ROADMAP.md</code> §8. <code>fim.addDataset(file)</code> — the
+     same call a GeoTIFF takes — reads a
      multi-dimensional file into a <strong>lazy Dataset with a real time axis</strong> — one entry per
      timestep, each an <em>in-file selector</em> rather than a separate download. Scrubbing the slider is
      <code>layer.setSources([ds.select(coord)])</code>: one slice decodes off the same bytes. The two
@@ -89,6 +90,15 @@
         those two formats always need one supplied. NetCDF4 and Zarr derive theirs from 1-D coordinate
         variables, and only fail when a file has none (curvilinear ocean grids, CF-less Zarr stores).
         The first NetCDF4 decode pulls <code>h5wasm</code> from a CDN.
+      </p>
+      <p class="dim" style="margin:8px 0 0">
+        The extent box is one of four overrides <code>addDataset</code> takes for these formats; the
+        others have no control here but are worth knowing about — <code>series</code> (label an axis
+        the format cannot: a NetCDF3 file gets integer positions by default, and
+        <code>series.coords</code> turns those into real dates), <code>dims.order</code> (which
+        trailing pair of the shape is lat/lon) and <code>lon</code> (re-express the extent as
+        <code>-180..180</code> or <code>0..360</code>, rolling a global grid). See
+        <code>docs/usage/DATASET_OPERATIONS.md</code>.
       </p>
       <pre id="scan">— nothing loaded —</pre>
     </div>
@@ -147,22 +157,15 @@
 </script>
 
 <script type="module">
-// The engine comes from the built bundle; the SciWrid adapter is INTERNAL (deliberately not on the
-// barrel — see DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md's "what is public" rule), so it is reached
-// through `fimviz/src/*`, the documented escape hatch. Its whole import closure (dataset/materialize/
-// rasterOps/filter/resample) is relative-only, so a raw browser loads it with no bundler.
-//
-// That leaves two copies of the model live: the one inside dist/fimviz.js and the one under src/. It
-// stays coherent because the engine is duck-typed end to end (there is no `instanceof Dataset`
-// anywhere) and the adapter registers its decoder into the same src registry the src Dataset reads —
-// a Dataset built here decodes here, and the layer only ever sees a plain grid. A real app bundles
-// both halves together and has one copy; this is an example page, not a pattern to copy.
-//
-// `sciwrid-toolkit` maps straight to its OWN browser bundle rather than being re-bundled, which is
-// what keeps its h5wasm CDN fallback working: it loads h5wasm through `await import(c)` with a
-// variable, and a bundler compiles that into a build-time lookup that can never reach the network.
+// Everything comes from the built bundle — a NetCDF opens through the ordinary `fim.addDataset(file)`,
+// the same call a GeoTIFF takes. The reader behind it is loaded on demand and never bundled, which is
+// the one thing this page still has to arrange: the import map above points `sciwrid-toolkit` at its
+// OWN browser build. That is deliberate rather than incidental — it loads h5wasm through
+// `await import(c)` with a VARIABLE, which a bundler compiles into a build-time lookup that can never
+// reach the network, and its wasm/worker resolve against its own import.meta.url. So the library
+// marks it external (webpack.config.cjs) and the consumer resolves it. Any page opening .nc/.grib2/
+// .zarr needs this entry; nothing else does.
 import { FimViz, ColorScale, Stats } from "fimviz";
-import { parseSciwrid } from "../src/io/sciwrid.js";
 
 const $ = (s) => document.querySelector(s);
 const log = (msg, cls = "") => {
@@ -201,8 +204,8 @@ async function open(source, name) {
   lastSource = { source, name };
   pill("#pill-src", "scanning…", "warn");
   try {
-    // scan() only — no pixels are decoded here, however many timesteps the file holds.
-    ds = await parseSciwrid(source, { name, grid: gridOverride() });
+    // Header only — no pixels are decoded here, however many timesteps the file holds.
+    ds = await fim.addDataset(source, { name, grid: gridOverride() });
   } catch (e) {
     pill("#pill-src", "failed", "bad");
     $("#scan").textContent = `${e.name}: ${e.message}`;
@@ -215,7 +218,7 @@ async function open(source, name) {
       log("this file carries no 1-D lat/lon coordinates, so its extent is unknown — type one in " +
           "“extent override” (or click <b>world</b> for a global file) and load it again", "warn");
     } else {
-      log(`parseSciwrid failed — ${e.message}`, "bad");
+      log(`addDataset failed — ${e.message}`, "bad");
     }
     return;
   }

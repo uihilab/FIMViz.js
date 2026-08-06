@@ -1,12 +1,19 @@
-// Multi-dimensional scientific formats (NetCDF4/HDF5 today; GRIB2/NetCDF3/Zarr next), read through
-// SciWrid Toolkit. See docs/PACKAGE_ROADMAP.md §8 for the design and the rejected alternatives.
+// Multi-dimensional scientific formats (netcdf4/netcdf3/grib2/zarr), read through SciWrid Toolkit.
+// See docs/PACKAGE_ROADMAP.md §8 for the design and the rejected alternatives.
 //
-// THIS MODULE IS OPT-IN. `io/materializers.js` does NOT import it and does not auto-register these
-// formats, because SciWrid pulls a ~193 KB wasm (plus lazily h5wasm/numcodecs/...) that would
-// otherwise land in every consumer's initial bundle and undo the §6 payload work. A host that wants
-// these formats imports this module and calls `registerSciwridFormats()`; everyone else pays nothing.
-// SciWrid itself is reached through a dynamic `import()`, the same deferral GDAL uses in geo/warp.js,
-// so even a host that imports this module downloads the wasm only when a Dataset is actually forced.
+// THIS MODULE IS AN IMPLEMENTATION DETAIL, not an API. Callers reach these formats the same way they
+// reach a GeoTIFF — `fim.addDataset(file)` / `FimViz.parseFile(file)` — and `io/parse.js` routes here
+// on extension. Nothing user-facing says "sciwrid": the vendor is our choice of reader, not a fact
+// about the caller's data, and the thrown errors name the public call instead (see the messages
+// below). `parseSciwrid` stays exported for the composition root and tests, exactly like `parseSource`.
+//
+// STILL NEVER STATICALLY IMPORTED. `io/materializers.js` does not touch it, and parse.js reaches it
+// through a dynamic `import()`, because SciWrid pulls a ~193 KB wasm (plus lazily h5wasm/numcodecs/…)
+// that would otherwise land in every consumer's initial bundle and undo the §6 payload work. Two
+// deferrals stack: parse.js keeps this adapter out of the initial bundle, and the `sciwrid()` import
+// below keeps the READER out until a Dataset is actually forced — the same deferral GDAL uses in
+// geo/warp.js. The webpack build additionally marks `sciwrid-toolkit` external, so the wasm never
+// enters dist at all.
 //
 // The division of labour: SciWrid decodes and resamples; FIMViz owns the model. We take its readers
 // and NOT its renderers (`gridToImageData`/`RAMPS`/`gridToGeoTIFF` duplicate colorizeGrid/ColorScale,
@@ -36,8 +43,13 @@ async function sciwrid() {
     try {
       _mod = await import("sciwrid-toolkit");
     } catch (e) {
-      throw new Error("sciwrid: the 'sciwrid-toolkit' package is not installed — it is vendored as " +
-        "vendor/sciwrid-toolkit-<version>.tgz and installed by `npm install` (see README). " +
+      // The one message that must name the reader, because the fix is to make that exact specifier
+      // resolve. It is external to our bundle by design (see webpack.config.cjs), so this fires for a
+      // browser page with no import map entry as often as for a missing install.
+      throw new Error("parseFile: this format needs the 'sciwrid-toolkit' reader, which could not be " +
+        "loaded. Under Node/a bundler it is vendored as vendor/sciwrid-toolkit-<version>.tgz and " +
+        "installed by `npm install`; in a raw browser page it needs an import map entry pointing at " +
+        "node_modules/sciwrid-toolkit/dist/index.js (see examples/temporal-netcdf.html). " +
         `Underlying error: ${e.message}`);
     }
   }
@@ -115,20 +127,27 @@ function usableDims(variable) {
   return usable;
 }
 
-function nativeGridOf(scanResult, variable, override) {
+function nativeGridOf(scanResult, variable, override, dimOrder = "yx") {
   const usable = usableDims(variable);
   if (usable.length < 2) {
-    throw new Error(`sciwrid: variable "${variable.name}" has no usable 2-D shape ` +
+    throw new Error(`parseFile: variable "${variable.name}" has no usable 2-D shape ` +
       `(shape=${JSON.stringify(variable.shape)}, nx=${variable.nx}, ny=${variable.ny}) — a griddable ` +
       "variable needs at least (lat, lon).");
   }
-  const height = override?.height ?? usable.at(-2);
-  const width = override?.width ?? usable.at(-1);
+  // CF order puts (lat, lon) last, which is what 'yx' means and what almost every file uses. `'xy'`
+  // is for the exception — a variable declared (…, lon, lat). This ONLY decides which trailing number
+  // is the native height and which the width: `extractGrid` resamples onto whatever we ask for, so
+  // getting it backwards does not mislocate data, it just decodes at a transposed resolution.
+  const [nativeH, nativeW] = dimOrder === "xy"
+    ? [usable.at(-1), usable.at(-2)]
+    : [usable.at(-2), usable.at(-1)];
+  const height = override?.height ?? nativeH;
+  const width = override?.width ?? nativeW;
   const bbox = override?.bbox ?? scanResult.bbox;
   const problem = bbox == null ? "none was found" : geographicBboxProblem(bbox);
   if (override?.bbox && problem) {
-    throw new Error("sciwrid: opts.grid.bbox must be [minLon, minLat, maxLon, maxLat] in WGS84 " +
-      `degrees — ${problem} (got ${JSON.stringify(override.bbox)}).`);
+    throw new Error("parseFile: the grid.bbox option must be [minLon, minLat, maxLon, maxLat] in " +
+      `WGS84 degrees — ${problem} (got ${JSON.stringify(override.bbox)}).`);
   }
   const bounds = problem ? null : boundsOf(bbox);
   if (!bounds) {
@@ -150,9 +169,9 @@ function nativeGridOf(scanResult, variable, override) {
           "store with no CF coordinates leaves nothing to place the data with")
       : `scan() reported ${JSON.stringify(bbox)}, which was REJECTED because ${problem}`;
     throw new Error(
-      `sciwrid: "${variable.name}" has no usable geographic extent, so it cannot be placed on a map. ` +
+      `parseFile: "${variable.name}" has no usable geographic extent, so it cannot be placed on a map. ` +
       `${cause}. The pixels are readable — only the extent is unknown — so pass one explicitly:\n` +
-      `  parseSciwrid(file, { variable: ${JSON.stringify(variable.name)}, ` +
+      `  addDataset(file, { variable: ${JSON.stringify(variable.name)}, ` +
       `grid: { bbox: [minLon, minLat, maxLon, maxLat] } })   // ${width}x${height} dims stay native\n` +
       `Scan reported: format=${scanResult.format}, shape=${JSON.stringify(variable.shape)}, ` +
       `variables=[${(scanResult.variable_names || []).join(", ")}].`);
@@ -163,9 +182,153 @@ function nativeGridOf(scanResult, variable, override) {
   return { height, width, bbox, bounds };
 }
 
-/** The decoded time axis for a variable — hoisted to the file when every variable shares one. */
+/** The CF-decoded time axis for a variable — hoisted to the file when every variable shares one. */
 const timesOf = (scanResult, variable) =>
   (variable?.times ?? scanResult.times)?.values ?? [];
+
+// --- the series axis -------------------------------------------------------------------
+//
+// WHAT IS AND IS NOT SELECTABLE HERE, because the constraint is not ours and is easy to mistake for
+// an oversight. `scan()` reports a variable's `shape` as bare NUMBERS ('24x170x180') with no dimension
+// NAMES, and `extractGrid` exposes exactly one index knob, `time`. So the series axis is always the
+// file's OUTERMOST non-spatial dimension — the only one the reader can index. A caller can say how
+// long it is, what its coordinates mean, and what to call it; a caller cannot point at a different
+// dimension, because nothing downstream could act on the answer. See PACKAGE_ROADMAP.md §8.
+
+/** A coordinate as a sortable number: Date/ISO string → epoch ms, anything else → Number. */
+function toCoord(v) {
+  if (v instanceof Date) return v.getTime();
+  if (typeof v === "string") {
+    const t = Date.parse(v);
+    return Number.isNaN(t) ? Number(v) : t;
+  }
+  return Number(v);
+}
+
+const isDateLike = (v) => v instanceof Date || (typeof v === "string" && !Number.isNaN(Date.parse(v)));
+
+/**
+ * The series axis to build, or `null` for a single-grid Dataset.
+ *
+ * Three sources, in order: the CF times `scan()` decoded; coordinates the caller supplied; or — the
+ * fallback that makes NetCDF3 and any other unlabelled file usable — **synthesized integer indices**
+ * over the leading dimension. The last one is not a guess about the data: the dimension is declared in
+ * the variable's own shape, and `extractGrid` demonstrably indexes it. What is genuinely unknown is
+ * only what each step *means*, which is exactly what `series.coords` is for.
+ *
+ * @param {Object} scanResult
+ * @param {Object} variable
+ * @param {number[]} dims - the variable's declared dimension lengths
+ * @param {Object|false} [opt] - `false` disables the axis entirely (single grid)
+ * @returns {{name: string, unit: string, coords: number[], labels: Array<*>, synthesized: boolean}|null}
+ */
+function seriesOf(scanResult, variable, dims, opt) {
+  if (opt === false) return null;
+  const o = opt || {};
+  const cfTimes = timesOf(scanResult, variable);
+  // A leading dimension exists whenever the variable declares more than (lat, lon).
+  const leading = dims.length > 2 ? dims[0] : 0;
+
+  let labels;
+  if (typeof o.coords === "function") {
+    const n = o.length ?? (cfTimes.length || leading);
+    labels = Array.from({ length: n }, (_, i) => o.coords(i, n));
+  } else if (Array.isArray(o.coords)) {
+    labels = o.coords;
+  } else if (cfTimes.length) {
+    labels = cfTimes;
+  } else if (leading > 1) {
+    // No labels anywhere — index the dimension the file declares. `unit: 'index'` is the honest
+    // signal that these coordinates are positions, not timestamps.
+    labels = Array.from({ length: o.length ?? leading }, (_, i) => i);
+  } else {
+    return null;
+  }
+  if (o.length != null && labels.length !== o.length) labels = labels.slice(0, o.length);
+  if (labels.length < 2) return null;
+
+  // A caller who supplied real dates for an unlabelled file gets a real time axis — same 'ms'
+  // coordinates, and therefore the same nearest-match select(), as a NetCDF4 file's.
+  const dated = labels.some(isDateLike);
+  const synthesized = !cfTimes.length && !o.coords;
+  return {
+    name: o.name ?? "time",
+    unit: o.unit ?? (dated ? "ms" : synthesized ? "index" : "ms"),
+    coords: labels.map(toCoord),
+    labels,
+    synthesized,
+  };
+}
+
+// --- longitude convention --------------------------------------------------------------
+//
+// A file on 0..360 (ocean/global products, and the `tos` sample in particular) renders badly on a map
+// that expects -180..180, and the reverse happens too. THE READER CANNOT DO THIS FOR US: asking
+// extractGrid for [-180,…,180] on a 0..360 file returns the file's own data with the requested bbox
+// echoed back verbatim — same pixels, new label — which would place the Pacific where the Atlantic
+// belongs. So we decode on the file's native convention and roll the decoded grid ourselves. That is
+// arithmetic on our own RasterGrid, not a second decoder.
+
+/**
+ * How to re-express `bounds` in the requested longitude convention.
+ *
+ * Returns the new bounds plus the column shift the decoded grid needs. A pure relabel (a regional
+ * extent moved by a whole 360°) comes back with `shiftCols: 0` and no pixel work.
+ * @param {{west: number, east: number, north: number, south: number}} bounds
+ * @param {'native'|'-180..180'|'0..360'} mode
+ * @param {number} width
+ * @returns {{bounds: Object, shiftCols: number}|null} null when `mode` is 'native' or already satisfied
+ */
+function lonConvention(bounds, mode, width) {
+  if (!mode || mode === "native") return null;
+  const span = bounds.east - bounds.west;
+  const global = Math.abs(span - 360) < 1e-6;
+  const target = mode === "0..360" ? 0 : -180;
+
+  let west;
+  if (global) {
+    west = target;
+  } else {
+    // Move the western edge into the target window by WHOLE TURNS only, so the pixels are untouched
+    // and nothing but the label changes. (This is why there is no "partial shift" case to handle: the
+    // offset is always a multiple of 360 by construction.)
+    const lo = target, hi = target + 360;
+    west = bounds.west;
+    while (west < lo) west += 360;
+    while (west >= hi) west -= 360;
+    // …but a relabelled regional extent can still fall off the far edge of the window, which is a
+    // real extent crossing the antimeridian (or the prime meridian, for '0..360'). `bounds` cannot
+    // express east < west, and splitting the grid into two pieces is a different operation from
+    // re-labelling one — so this is refused rather than silently wrapped.
+    if (west + span > hi + 1e-9) {
+      throw new Error(`parseFile: the extent [${bounds.west}, ${bounds.east}] cannot be expressed in ` +
+        `${mode} — it is neither global nor a whole 360° turn away from that window, so it crosses ` +
+        `the ${mode === "0..360" ? "prime meridian" : "antimeridian"} and the grid would have to be ` +
+        "split and re-joined rather than relabelled. Decode it with lon: 'native' and clip to the " +
+        "window you want instead.");
+    }
+  }
+  if (Math.abs(west - bounds.west) < 1e-9) return null;   // already in the requested convention
+
+  // For a global grid the shift IS a roll: column j of the output reads column (j + shiftCols) of the
+  // native grid, modulo width. For a relabel the shift is a whole turn and this comes out 0.
+  const degPerCol = span / width;
+  const shiftCols = global
+    ? ((Math.round((bounds.west - west) / degPerCol) % width) + width) % width
+    : 0;
+  return { bounds: { ...bounds, west, east: west + span }, shiftCols };
+}
+
+/** Roll a row-major grid horizontally by `shiftCols` columns (wrapping). Pure array work. */
+function rollColumns(pixels, width, height, shiftCols) {
+  if (!shiftCols) return pixels;
+  const out = new pixels.constructor(pixels.length);
+  for (let r = 0; r < height; r++) {
+    const row = r * width;
+    for (let c = 0; c < width; c++) out[row + c] = pixels[row + ((c + shiftCols) % width)];
+  }
+  return out;
+}
 
 /**
  * The materializer. Reads `root.select` — the in-file selection an axis entry produced — and decodes
@@ -181,12 +344,12 @@ async function materializeSciwrid(root, ds) {
   // Validated BEFORE the dynamic import: a misconfigured Dataset should fail immediately rather than
   // pull a ~193 KB chunk (and a wasm compile) only to throw.
   if (!select.variable) {
-    throw new Error(`sciwrid: "${ds.name}" has no variable to decode — build it with parseSciwrid(), ` +
-      "which records the variable on each axis entry.");
+    throw new Error(`parseFile: "${ds.name}" has no variable to decode — build it with addDataset()/` +
+      "parseFile(), which records the variable on each axis entry.");
   }
   if (!grid?.width || !grid?.height || !grid?.bbox) {
-    throw new Error(`sciwrid: "${ds.name}" has no target grid on meta.grid ({width, height, bbox}) — ` +
-      "extractGrid resamples, so it cannot be called without one. parseSciwrid() derives it from scan().");
+    throw new Error(`parseFile: "${ds.name}" has no target grid on meta.grid ({width, height, bbox}) — ` +
+      "the reader resamples, so it cannot run without one. addDataset() derives it from the file's scan.");
   }
   const { extractGrid } = await sciwrid();
   const source = root.kind === "url" ? root.url : new Uint8Array(root.data);
@@ -201,11 +364,19 @@ async function materializeSciwrid(root, ds) {
   const workers = ds.meta?.workers ?? (typeof Worker === "undefined" ? 0 : undefined);
   if (workers !== undefined) opts.workers = workers;
   const out = await extractGrid(source, opts);
+  // The longitude re-expression, applied HERE rather than by asking the reader for a shifted bbox —
+  // that request comes back as the same pixels wearing a different label (see lonConvention above).
+  // `meta.lon` carries the {bounds, shiftCols} computed once at parse time, so every timestep of a
+  // series rolls identically and the cost is one array copy per decoded slice.
+  const lon = ds.meta?.lon;
+  const pixels = lon?.shiftCols
+    ? rollColumns(out.data, out.width, out.height, lon.shiftCols)
+    : out.data;
   // extractGrid is row-major north-up (row 0 = maxLat) with NaN for missing — the same convention
   // RasterGrid uses throughout, so pixels transfer with no re-ordering and no nodata sentinel.
   return new RasterGrid({
-    pixels: out.data, width: out.width, height: out.height,
-    bounds: boundsOf(out.bbox) || grid.bounds,
+    pixels, width: out.width, height: out.height,
+    bounds: lon?.bounds || boundsOf(out.bbox) || grid.bounds,
     crs: "EPSG:4326",       // extractGrid resamples onto a geographic bbox — already renderable
     noData: null,           // missing is NaN, which colorize/Stats already treat as absent
     meta: {
@@ -229,7 +400,10 @@ export function registerSciwridFormats(formats = SCIWRID_FORMATS) {
 }
 
 /**
- * Read a multi-dimensional scientific file into a `Dataset` with a real temporal axis.
+ * Read a multi-dimensional scientific file into a `Dataset` with a real temporal axis. This is the
+ * implementation behind `FimViz.parseFile`/`fim.addDataset` for `.nc`/`.grib2`/`.zarr` — **use those**;
+ * this export exists for the composition root and tests, exactly like `parseSource`. Every option
+ * documented below is passed straight through from them.
  *
  * Nothing is decoded here — `scan()` reads metadata only, and the returned Dataset is a lazy series.
  * Each axis entry is an **in-file selector** (`ref: { select: { variable, time } }`), so selecting a
@@ -237,16 +411,18 @@ export function registerSciwridFormats(formats = SCIWRID_FORMATS) {
  * force. Every op, `Stats`, `ColorScale` and `RasterLayer` then work on it unchanged.
  *
  * ```js
- * const ds = await parseSciwrid(file);           // a 120-step NetCDF4 → a time axis
+ * const ds = await fim.addDataset(file);         // a 120-step NetCDF4 → a time axis
  * const t  = ds.select(Date.parse('2023-08-28T06:00:00Z'));   // → one grid, lazily
  * await fim.addLayer(t);
  * await ds.reduce('mean').grid();                 // temporal mean over the whole axis
  * ```
  *
- * **Axis coordinates are epoch milliseconds**, not ISO strings, so `select()`'s nearest-match works
- * (it is numeric-only) — which is what a time slider needs. The ISO string is kept on each entry's
- * `meta.time`. This deliberately differs from the WaterML/NWIS adapter's string coords, where exact
- * match was acceptable because `latest()` covered the common case.
+ * **Axis coordinates are numbers**, not ISO strings, so `select()`'s nearest-match works (it is
+ * numeric-only) — which is what a time slider needs. Epoch milliseconds (`axis.unit === 'ms'`) when the
+ * file carries CF times or the caller supplies dates; plain **positions** (`'index'`) when the file
+ * declares a leading dimension but no labels for it, which is the NetCDF3 case. The original label is
+ * kept on each entry's `meta.time`. This deliberately differs from the WaterML/NWIS adapter's string
+ * coords, where exact match was acceptable because `latest()` covered the common case.
  *
  * One variable per Dataset: call it once per variable you want. (Folding variable in as a second axis
  * is roadmapped — §8 — but a variable axis cannot be `reduce()`d meaningfully, so it needs a guard
@@ -261,12 +437,27 @@ export function registerSciwridFormats(formats = SCIWRID_FORMATS) {
  *   alone for a file whose extent scan() could not derive (2-D curvilinear coordinates — ocean
  *   `tos`-style products, rotated poles, Zarr with no CF coords); pass `width`/`height` alone to
  *   decode coarser than native
+ * @param {false|{coords?: Array<number|string|Date>|Function, length?: number, name?: string,
+ *   unit?: string}} [opts.series] - the series (time) axis. Omit for the default: the file's CF times
+ *   when it has them, otherwise integer indices over its leading dimension. `false` forces a single
+ *   grid. `coords` is an array of one coordinate per step, or a generator `(i, n) => coord`; ISO
+ *   strings and `Date`s become epoch ms, so an unlabelled file gains a REAL time axis —
+ *   `{ series: { coords: i => new Date(Date.UTC(2001, i, 1)) } }`. `length` caps the step count
+ *   (default: the leading dimension), `name` defaults to `'time'`, and `unit` defaults to `'ms'` for
+ *   dates or `'index'` for synthesized positions
+ * @param {{order?: 'yx'|'xy'}} [opts.dims] - which trailing pair of the shape is (lat, lon). `'yx'`
+ *   (CF order, the default) or `'xy'` for a variable declared (…, lon, lat). Decides native
+ *   height/width only — `extractGrid` resamples onto whatever is requested
+ * @param {'native'|'-180..180'|'0..360'} [opts.lon='native'] - re-express the extent in a longitude
+ *   convention. A global grid is genuinely **rolled** (the reader cannot do this — asking it for a
+ *   shifted bbox returns the same pixels relabelled); a regional extent a whole turn away is
+ *   relabelled with no pixel work; anything else throws rather than splitting the grid
  * @param {number} [opts.workers] - extractGrid's worker count; defaults to SciWrid's own in a browser
  *   and to `0` (inline) under Node, where the worker pool never resolves
  * @param {boolean} [opts.allowExtraDims=false] - proceed with a variable carrying dimensions beyond
- *   (lat, lon) + time — a vertical level, ensemble member or band. Off by default: the reader collapses
- *   them with no say from the caller, so this is an acknowledgement, not a fix. Recorded on
- *   `meta.extraDims`
+ *   (lat, lon) + the series axis — a vertical level, ensemble member or band. Off by default: the
+ *   reader collapses them with no say from the caller, so this is an acknowledgement, not a fix.
+ *   Recorded on `meta.extraDims`
  * @param {(url: string) => string} [opts.resolveUrl] - host CORS-proxy/mirror, applied at force time
  * @returns {Promise<Dataset>}
  */
@@ -285,49 +476,64 @@ export async function parseSciwrid(source, opts = {}) {
   } else if (typeof source?.arrayBuffer === "function") {   // File | Blob
     data = await source.arrayBuffer();
   } else {
-    throw new Error("parseSciwrid: source must be an ArrayBuffer, TypedArray, Blob/File, URL or URL string");
+    throw new Error("parseFile: source must be an ArrayBuffer, TypedArray, Blob/File, URL or URL string");
   }
 
-  const scanned = await sw.scan(isUrl ? url : new Uint8Array(data));
+  // scan() fetches too, so it must go through the host's URL resolver (CORS proxy/mirror/auth) the
+  // same way `parseSource`'s fetch does. The Dataset below keeps the ORIGINAL url plus the resolver,
+  // because dataset.js applies it again at force time — resolving here as well would double-wrap it.
+  const scanUrl = isUrl && typeof opts.resolveUrl === "function" ? opts.resolveUrl(url) : url;
+  const scanned = await sw.scan(isUrl ? scanUrl : new Uint8Array(data));
 
   const vars = scanned.variables || [];
   const variable = opts.variable
     ? vars.find((v) => v.name === opts.variable)
     : vars.find((v) => v.supported) || vars[0];
   if (!variable) {
-    throw new Error(`parseSciwrid: variable "${opts.variable}" not found in ${scanned.format} — ` +
+    throw new Error(`parseFile: variable "${opts.variable}" not found in ${scanned.format} — ` +
       `available: ${(scanned.variable_names || []).join(", ") || "(none)"}`);
   }
 
   // `opts.grid` is a partial override, not a replacement: supply just `bbox` for a file whose extent
   // scan() could not derive (curvilinear coords) and the pixel dims still come from the variable's
   // own shape; supply width/height alone to decode coarser than native.
-  const grid = nativeGridOf(scanned, variable, opts.grid);
+  const grid = nativeGridOf(scanned, variable, opts.grid, opts.dims?.order);
 
   const name = opts.name || (isUrl ? url.split("/").pop().split("?")[0] : null) ||
     `${variable.name}.${scanned.format}`;
-  const times = timesOf(scanned, variable);
 
-  // A variable with MORE dimensions than (lat, lon) + an optional time is carrying something we do
-  // not model — a vertical level, an ensemble member, a spectral band. `T(time, level, lat, lon)` is
+  const dims = usableDims(variable);
+  const series = seriesOf(scanned, variable, dims, opts.series);
+
+  // Re-express the extent in the requested longitude convention. Computed once here so that every
+  // timestep of a series rolls identically; the materializer applies it to each decoded grid.
+  const lon = lonConvention(grid.bounds, opts.lon, grid.width);
+
+  // A variable with MORE dimensions than (lat, lon) + the series axis is carrying something we do not
+  // model — a vertical level, an ensemble member, a spectral band. `T(time, level, lat, lon)` is
   // ordinary in ERA5/GFS/CMIP output, and left alone it fails the worst way available: a normal-looking
-  // time scrubber over a level nobody chose. Not a placement error (the lat/lon are right), but still
+  // scrubber over a level nobody chose. Not a placement error (the lat/lon are right), but still
   // "confidently answering a question that wasn't asked".
   //
   // We cannot resolve it either — extractGrid's options are variable/time/date/bbox/width/height, with
   // no way to pick a level — so this throws rather than pretending. `allowExtraDims` is the
   // acknowledgement: proceed, and let the reader collapse the dimension however it does, with the fact
   // recorded on meta rather than lost.
-  const dims = usableDims(variable);
-  const modelled = 2 + (times.length ? 1 : 0);
+  //
+  // The arithmetic is on the DECLARED shape, never on what the reader admits to. That is what made it
+  // catch NetCDF3's invisible time dimension; now that such a dimension becomes a synthesized index
+  // axis, `modelled` counts it, and a 3-D NetCDF3 variable is fully modelled rather than needing an
+  // acknowledgement. A 4-D one still trips, which is correct — the second extra dimension is still
+  // unreachable.
+  const modelled = 2 + (series ? 1 : 0);
   const extraDims = dims.length - modelled;
   if (extraDims > 0 && !opts.allowExtraDims) {
     throw new Error(
-      `sciwrid: "${variable.name}" has ${dims.length} dimensions (${JSON.stringify(variable.shape)}) ` +
-      `but only ${modelled} are modelled — (lat, lon)${times.length ? " + time" : ""}. The extra ` +
+      `parseFile: "${variable.name}" has ${dims.length} dimensions (${JSON.stringify(variable.shape)}) ` +
+      `but only ${modelled} are modelled — (lat, lon)${series ? ` + ${series.name}` : ""}. The extra ` +
       `${extraDims} (a vertical level, ensemble member or spectral band) would be collapsed by the ` +
       "reader with no say from you, and no indication of which slice you got.\n" +
-      "  parseSciwrid(file, { allowExtraDims: true })   // accept the reader's choice, recorded on meta\n" +
+      "  addDataset(file, { allowExtraDims: true })   // accept the reader's choice, recorded on meta\n" +
       "A real second axis needs a level/member selector the decoder does not currently expose — see " +
       "docs/PACKAGE_ROADMAP.md §8.");
   }
@@ -340,30 +546,36 @@ export async function parseSciwrid(source, opts = {}) {
     timeRange: scanned.timeRange ?? null,
     sourceFormat: scanned.format,
     ...(opts.workers === undefined ? {} : { workers: opts.workers }),
+    ...(lon ? { lon } : {}),
     // Recorded, not silent: which slice of these the reader picked is its business, but a consumer
     // can at least see that a dimension was collapsed.
     ...(extraDims > 0 ? { extraDims, shape: variable.shape } : {}),
+    // Equally not silent: an axis whose coordinates are positions rather than timestamps is a weaker
+    // thing than one the file labelled, and a UI formatting a slider needs to know which it has.
+    ...(series?.synthesized ? { synthesizedAxis: true } : {}),
   };
 
   const base = {
     name, kind: "raster", format: scanned.format, crs: "EPSG:4326",
-    bounds: grid.bounds, meta, data, url, resolveUrl: opts.resolveUrl ?? null,
+    bounds: lon?.bounds ?? grid.bounds, meta, data, url, resolveUrl: opts.resolveUrl ?? null,
   };
 
-  // No time axis → a plain single-grid Dataset that forces directly, carrying its own selector.
-  if (!times.length) {
+  // No series at all (a genuinely 2-D variable, or `series: false`) → a plain single-grid Dataset
+  // that forces directly, carrying its own selector.
+  if (!series) {
     return new Dataset({ ...base, selector: { variable: variable.name, time: 0 } });
   }
 
   return new Dataset({
     ...base,
     axis: {
-      name: "time",
-      unit: "ms",   // epoch milliseconds — numeric, so select()'s nearest-match applies
-      entries: times.map((iso, i) => ({
-        coord: Date.parse(iso),
-        ref: { select: { variable: variable.name, time: i }, name: `${variable.name} @ ${iso}` },
-        meta: { time: iso, index: i },
+      name: series.name,
+      unit: series.unit,   // 'ms' or 'index' — numeric either way, so select()'s nearest-match applies
+      entries: series.coords.map((coord, i) => ({
+        coord,
+        ref: { select: { variable: variable.name, time: i },
+          name: `${variable.name} @ ${series.labels[i]}` },
+        meta: { time: series.labels[i], index: i },
       })),
     },
   });

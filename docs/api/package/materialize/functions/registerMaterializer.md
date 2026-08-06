@@ -8,7 +8,7 @@
 
 > **registerMaterializer**(`format`, `fn`): `void`
 
-Defined in: [package/materialize.js:102](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/materialize.js#L102)
+Defined in: [package/materialize.js:102](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/materialize.js#L102)
 
 Register the decoder for a `format` (e.g. 'geotiff', 'geojson'). Called by io/materializers.js on
 import (and by tests). The decoder fetches (for a URL root) and decodes into a RasterGrid/

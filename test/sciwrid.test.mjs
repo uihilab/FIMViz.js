@@ -41,14 +41,25 @@ describe("sciwrid adapter: registration + preconditions", () => {
     registerSciwridFormats();
     const ds = new Dataset({ name: "bare.nc", format: "netcdf4", data: new ArrayBuffer(8),
       meta: { grid: { width: 2, height: 2, bbox: [0, 0, 1, 1] } } });
-    await assert.rejects(() => ds.grid(), /no variable to decode.*parseSciwrid/s);
+    await assert.rejects(() => ds.grid(), /no variable to decode.*addDataset/s);
   });
 
   test("a Dataset with no target grid fails fast, saying why one is needed", async () => {
     registerSciwridFormats();
     const ds = new Dataset({ name: "nogrid.nc", format: "netcdf4", data: new ArrayBuffer(8),
       selector: { variable: "TMP", time: 0 } });
-    await assert.rejects(() => ds.grid(), /no target grid.*extractGrid resamples/s);
+    await assert.rejects(() => ds.grid(), /no target grid.*resamples/s);
+  });
+
+  // The reader is our implementation choice, not a fact about the caller's data — so a user who
+  // never opens src/ has no way to learn the name, and no reason to. Pinned because it is exactly the
+  // kind of thing that erodes one message at a time.
+  test("no user-facing error names the reader", () => {
+    const src = readFileSync(fileURLToPath(new URL("../src/io/sciwrid.js", import.meta.url)), "utf8");
+    const thrown = src.match(/new Error\((?:[^()]|\([^()]*\))*\)/gs) || [];
+    const leaks = thrown.filter((m) => /sciwrid/i.test(m) && !/'sciwrid-toolkit' reader/.test(m));
+    assert.deepEqual(leaks, [], "thrown messages must name the public call, not the vendor " +
+      "(the sole exception is the load failure, whose fix IS that specifier)");
   });
 
   test("an unusable source type is rejected before anything is read", async () => {
@@ -207,7 +218,7 @@ describe("sciwrid adapter: GRIB2", () => {
       assert.match(e.message, /never derives an extent for grib2/, "must blame the format");
       assert.ok(!/curvilinear/i.test(e.message),
         "and must NOT suggest curvilinear coords, which is a different cause entirely");
-      assert.match(e.message, /parseSciwrid\(file, \{/, "and show the call that fixes it");
+      assert.match(e.message, /addDataset\(file, \{/, "and show the PUBLIC call that fixes it");
       return true;
     });
   });
@@ -248,12 +259,14 @@ describe("sciwrid adapter: Zarr v2", () => {
   });
 });
 
-// NetCDF3 is the weakest of the four formats, so it is pinned rather than assumed. It decodes, but
-// scan() surfaces neither an extent nor a time axis for it — the first because SciWrid only
-// populates a bbox on its netcdf4/zarr/parquet paths, the second because the C accessor for NetCDF3
-// times is still outstanding upstream. Registered and usable; the temporal half of §8 does not apply.
-describe("sciwrid adapter: NetCDF3 (degraded, deliberately pinned)", () => {
+// NetCDF3 still reports no extent — SciWrid populates a bbox only on its netcdf4/zarr/parquet paths.
+// What it DOES do, contrary to the first reading of "scan() surfaces no times", is index the leading
+// dimension perfectly well: only the LABELS are missing (the CF units accessor is outstanding
+// upstream), not the ability to slice. So the dimension the file declares becomes a synthesized index
+// axis, and the temporal half of §8 applies after all — with positions instead of timestamps.
+describe("sciwrid adapter: NetCDF3 (unlabelled, but not untraversable)", () => {
   const FIX = fileURLToPath(new URL("../assets/SampleFiles/sample.nc3", import.meta.url));
+  const EXTENT = { grid: { bbox: [-10, -5, 10, 5] } };
 
   test("needs an extent — the format never reports one, whatever the grid looks like", async () => {
     await assert.rejects(() => parseSciwrid(readFileSync(FIX)), (e) => {
@@ -263,32 +276,126 @@ describe("sciwrid adapter: NetCDF3 (degraded, deliberately pinned)", () => {
     });
   });
 
-  test("its time dimension is INVISIBLE to scan(), so it must be acknowledged too", async () => {
-    // shape is (time=3, lat=4, lon=5) but scan() surfaces no times for netcdf3, so dimension 0 would
-    // be collapsed by the reader with nobody choosing which of the three steps you got.
+  test("the leading dimension becomes an INDEX axis — no acknowledgement needed", async () => {
+    // shape is (time=3, lat=4, lon=5). scan() gives no times, but the dimension is declared in the
+    // shape and extractGrid indexes it, so there is nothing to collapse and nothing to acknowledge.
+    const ds = await parseSciwrid(readFileSync(FIX), EXTENT);
+    assert.equal(ds.meta.extraDims, undefined, "nothing is collapsed any more");
+    assert.equal(ds.axis.entries.length, 3);
+    assert.equal(ds.axis.unit, "index", "positions, NOT timestamps — the honest signal");
+    assert.deepEqual(ds.axis.entries.map((e) => e.coord), [0, 1, 2]);
+    assert.equal(ds.meta.synthesizedAxis, true, "and a UI can tell it apart from a labelled axis");
+  });
+
+  test("select() and reduce() work on it — the payoff of routing through the axis", async () => {
+    const ds = await parseSciwrid(readFileSync(FIX), EXTENT);
+    const g0 = await ds.select(0).grid();
+    assert.equal(g0.width, 5);
+    assert.equal(g0.height, 4);
+    assert.equal(range(g0.pixels).n, 20, "every cell decoded");
+    const g2 = await ds.select(2).grid();
+    assert.notDeepEqual([...g0.pixels], [...g2.pixels], "different steps are genuinely different data");
+    const mean = await ds.reduce("mean").grid();
+    assert.equal(range(mean.pixels).n, 20, "and the whole axis collapses with no new grid math");
+  });
+
+  test("series.coords supplies the labels the format cannot — a REAL time axis", async () => {
+    // The file knows it has three steps; only what they mean is missing. A caller who knows supplies
+    // it, and the axis becomes indistinguishable from a NetCDF4 one: epoch ms, nearest-match select.
+    const ds = await parseSciwrid(readFileSync(FIX), {
+      ...EXTENT,
+      series: { coords: (i) => new Date(Date.UTC(2001, i, 1)), name: "time" },
+    });
+    assert.equal(ds.axis.unit, "ms");
+    assert.equal(ds.meta.synthesizedAxis, undefined, "the caller labelled it, so it is not synthesized");
+    assert.deepEqual(ds.axis.entries.map((e) => e.coord),
+      [Date.UTC(2001, 0, 1), Date.UTC(2001, 1, 1), Date.UTC(2001, 2, 1)]);
+    // Nearest-match on a date the file never names — the thing a time slider needs.
+    assert.equal(ds.select(Date.UTC(2001, 1, 5)).selector.time, 1, "Feb 5 → the Feb 1 step");
+    assert.equal(ds.select(Date.UTC(2001, 1, 20)).selector.time, 2, "…but Feb 20 is nearer Mar 1");
+  });
+
+  test("series: false restores the old single-grid behaviour, acknowledgement and all", async () => {
     await assert.rejects(
-      () => parseSciwrid(readFileSync(FIX), { grid: { bbox: [-10, -5, 10, 5] } }),
-      /has 3 dimensions.*only 2 are modelled/s);
+      () => parseSciwrid(readFileSync(FIX), { ...EXTENT, series: false }),
+      /has 3 dimensions.*only 2 are modelled/s,
+      "with no axis to model it, the leading dimension is unmodelled again");
+    const ds = await parseSciwrid(readFileSync(FIX),
+      { ...EXTENT, series: false, allowExtraDims: true });
+    assert.equal(ds.axes, null);
+    assert.deepEqual(ds.selector, { variable: "temperature", time: 0 });
+  });
+});
+
+// The two geometry conventions a caller can override. Both default to what CF files overwhelmingly
+// use, so neither changes an existing call.
+describe("sciwrid adapter: grid conventions (dims.order, lon)", () => {
+  const FIX = fileURLToPath(new URL("../assets/SampleFiles/idalia-nldas2.nc", import.meta.url));
+
+  test("dims.order picks which trailing pair is (lat, lon); 'yx' is CF and the default", async () => {
+    const cf = await parseSciwrid(readFileSync(FIX));
+    assert.equal(cf.meta.grid.height, 96, "shape 120x96x104 → (…, lat=96, lon=104)");
+    assert.equal(cf.meta.grid.width, 104);
+    const xy = await parseSciwrid(readFileSync(FIX), { dims: { order: "xy" } });
+    assert.equal(xy.meta.grid.height, 104, "'xy' reads the pair as (…, lon, lat)");
+    assert.equal(xy.meta.grid.width, 96);
   });
 
-  test("decodes to a SINGLE grid once both are given — no time axis to scrub", async () => {
-    const ds = await parseSciwrid(readFileSync(FIX),
-      { grid: { bbox: [-10, -5, 10, 5] }, allowExtraDims: true });
-    assert.equal(ds.meta.extraDims, 1, "the collapsed dimension is recorded, not lost");
-    assert.equal(ds.format, "netcdf3");
-    assert.equal(ds.axes, null, "scan() surfaces no times for netcdf3");
-    assert.deepEqual(ds.selector, { variable: "temperature", time: 0 },
-      "so the Dataset carries its own selector and forces directly");
-    const g = await ds.grid();
-    assert.equal(g.width, 5);
-    assert.equal(g.height, 4);
-    assert.equal(range(g.pixels).n, 20, "every cell decoded");
+  test("an explicit width/height still wins over either order", async () => {
+    const ds = await parseSciwrid(readFileSync(FIX), { dims: { order: "xy" }, grid: { width: 10, height: 20 } });
+    assert.equal(ds.meta.grid.width, 10);
+    assert.equal(ds.meta.grid.height, 20);
   });
 
-  test("reduce() therefore throws — there is no axis, and it says so", async () => {
+  test("lon defaults to 'native' — the file's own convention is left alone", async () => {
+    const ds = await parseSciwrid(readFileSync(FIX), { grid: { bbox: [270, 24, 285, 37] } });
+    assert.deepEqual(ds.bounds, { west: 270, south: 24, east: 285, north: 37 });
+    assert.equal(ds.meta.lon, undefined, "nothing recorded, nothing to undo at decode time");
+  });
+
+  test("a regional extent a whole turn away is RELABELLED — no pixel work at all", async () => {
     const ds = await parseSciwrid(readFileSync(FIX),
-      { grid: { bbox: [-10, -5, 10, 5] }, allowExtraDims: true });
-    assert.throws(() => ds.reduce("mean"), /no selection axis 0 .*no axes at all/s);
+      { grid: { bbox: [270, 24, 285, 37] }, lon: "-180..180" });
+    assert.deepEqual(ds.bounds, { west: -90, south: 24, east: -75, north: 37 });
+    assert.equal(ds.meta.lon.shiftCols, 0, "a pure relabel — the data is identical");
+    const g = await ds.select(ds.axis.entries[0].coord).grid();
+    assert.deepEqual(g.bounds, { west: -90, south: 24, east: -75, north: 37 },
+      "and the decoded grid agrees with the Dataset");
+  });
+
+  test("a GLOBAL extent is genuinely rolled — the reader cannot do this for us", async () => {
+    // Asking extractGrid for [-180,…,180] on a 0..360 file returns the same pixels with the requested
+    // bbox echoed back, which would put the Pacific where the Atlantic belongs. So the roll happens
+    // here, on the decoded grid. The bbox below is synthetic (this is a regional file) — what is being
+    // pinned is the column arithmetic, which is what would silently misplace data if it were wrong.
+    const opts = { grid: { bbox: [0, 24, 360, 37], width: 104, height: 96 } };
+    const native = await parseSciwrid(readFileSync(FIX), opts);
+    const rolled = await parseSciwrid(readFileSync(FIX), { ...opts, lon: "-180..180" });
+    assert.deepEqual(rolled.bounds, { west: -180, south: 24, east: 180, north: 37 });
+    assert.equal(rolled.meta.lon.shiftCols, 52, "half of 104 columns — the antimeridian moves to centre");
+
+    const a = await native.select(native.axis.entries[0].coord).grid();
+    const b = await rolled.select(rolled.axis.entries[0].coord).grid();
+    const eq = (x, y) => (Number.isNaN(x) && Number.isNaN(y)) || x === y;
+    for (let r = 0; r < 96; r++) {
+      for (let c = 0; c < 104; c++) {
+        assert.ok(eq(b.pixels[r * 104 + c], a.pixels[r * 104 + ((c + 52) % 104)]),
+          `row ${r} col ${c} must read the native column 52 to its east`);
+      }
+    }
+  });
+
+  test("'0..360' is the same machinery in the other direction", async () => {
+    const ds = await parseSciwrid(readFileSync(FIX),
+      { grid: { bbox: [-90, 24, -75, 37] }, lon: "0..360" });
+    assert.deepEqual(ds.bounds, { west: 270, south: 24, east: 285, north: 37 });
+  });
+
+  test("an extent that can be neither rolled nor relabelled throws instead of guessing", async () => {
+    // Straddling the target window's edge without being global would need the grid split and rejoined.
+    await assert.rejects(
+      () => parseSciwrid(readFileSync(FIX), { grid: { bbox: [170, 24, 190, 37] }, lon: "-180..180" }),
+      /neither global nor a whole 360.*split and re-joined/s);
   });
 });
 
@@ -305,14 +412,15 @@ describe("sciwrid adapter: unmodelled dimensions", () => {
     assert.equal(ds.axis.entries.length, 120);
   });
 
-  test("a dimension scan() cannot see still counts as unmodelled", async () => {
-    // The guard is arithmetic on the SHAPE, not on what the reader admits to. sample.nc3 is
-    // (time, lat, lon) but netcdf3 surfaces no times, so dimension 0 is invisible AND unmodelled —
-    // exactly the case where trusting the reader's silence would have hidden the collapse.
+  test("a dimension nothing models still counts as unmodelled", async () => {
+    // The guard is arithmetic on the DECLARED SHAPE, not on what the reader admits to. sample.nc3 is
+    // (time, lat, lon); `series: false` removes the axis that models dimension 0, so it is unmodelled
+    // again and the guard must catch it — the same arithmetic that caught netcdf3's invisible time
+    // dimension before the index axis existed to model it.
     const nc3 = readFileSync(fileURLToPath(new URL("../assets/SampleFiles/sample.nc3", import.meta.url)));
-    await assert.rejects(() => parseSciwrid(nc3, { grid: { bbox: [-10, -5, 10, 5] } }),
-      /has 3 dimensions.*only 2 are modelled/s);
-    const ok = await parseSciwrid(nc3, { grid: { bbox: [-10, -5, 10, 5] }, allowExtraDims: true });
+    const base = { grid: { bbox: [-10, -5, 10, 5] }, series: false };
+    await assert.rejects(() => parseSciwrid(nc3, base), /has 3 dimensions.*only 2 are modelled/s);
+    const ok = await parseSciwrid(nc3, { ...base, allowExtraDims: true });
     assert.equal(ok.meta.extraDims, 1);
     assert.equal(ok.meta.shape, "3x4x5", "the shape is kept so a consumer can see what was dropped");
   });

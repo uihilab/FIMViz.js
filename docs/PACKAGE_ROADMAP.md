@@ -420,10 +420,12 @@ under Node, so it is coverable by `npm test` rather than joining §5.3's owed br
   stay — they are the ones wired into `Legend`, `Stats.byClass`, and the `LayerSettings` knobs. The
   dependency is scoped to **decode only**.
 - **Bundle discipline is non-negotiable here.** SciWrid carries a ~193 KB wasm plus lazily-loaded
-  h5wasm/numcodecs/hyparquet/jsfive. It hangs off an opt-in adapter behind a dynamic `import()` —
+  h5wasm/numcodecs/hyparquet/jsfive. It hangs off an adapter behind a dynamic `import()` —
   never `io/materializers.js`'s module-scope auto-run, which would put it in every consumer's initial
   bundle and undo §6's 678 KB → 201 KB reduction. Same rule as HDF5/full-GDAL/netcdf in
-  Cross-cutting notes below.
+  Cross-cutting notes below. (Originally this was enforced by making the adapter **opt-in**, i.e. by
+  keeping it off the public parser. The two turned out to be separable — see the landed note below —
+  so the formats are now ordinary `addDataset` formats while the payload rule holds unchanged.)
 
 **Known friction, priced in rather than discovered later:**
 
@@ -527,6 +529,91 @@ NetCDF3 file arrives as a **single grid with a mandatory extent override** — `
 have no axis to work on. Registered and usable, but the temporal half of §8 does not apply to it, and
 a test pins exactly that so the limitation cannot quietly change.
 
+⚠️ **Correction to the paragraph above: "no time axis" was the wrong conclusion from "no times".**
+Driving a real 24-step NetCDF3 (the CMIP `tos_O1_2001-2002` sample) showed that `extractGrid`'s `time`
+index works fine on that path — three indices returned three demonstrably different fields. What is
+missing is only the **labels**, which is what the outstanding CF-units accessor supplies. The
+dimension itself is declared in the variable's own `shape` and is perfectly indexable. Reading
+"scan() surfaces no times" as "the dimension is unreachable" cost NetCDF3 its entire temporal half for
+no reason, and — worse — turned a modellable dimension into an `allowExtraDims` acknowledgement, which
+is the API telling the user to accept a silent collapse that was never actually necessary. Superseded
+by the generalized axis below.
+
+✅ **Landed: these formats are no longer opt-in — they are just formats.** `detectFormat` gained
+`.nc`/`.nc4`/`.cdf`/`.grib`/`.grib2`/`.grb2`/`.zarr`, and `parseSource` routes them to the adapter, so
+`fim.addDataset(file)` opens a NetCDF exactly the way it opens a GeoTIFF. The original design made the
+adapter opt-in *as the mechanism for keeping its payload out of everyone's bundle*; that conflated two
+things, and separating them costs nothing:
+
+- **The payload rule is unchanged, and now enforced in two places instead of one.** `parse.js` reaches
+  the adapter through `import("./sciwrid.js")`, so the adapter is an async chunk (8 KB) that a consumer
+  who never opens one of these files never fetches; the adapter still reaches the reader through its own
+  `import("sciwrid-toolkit")`. Measured after the change: `dist/fimviz.js` is 206 KB and contains zero
+  occurrences of "sciwrid". Two tests pin it — one asserts parse.js has no *static* import of the
+  adapter, the other that `io/materializers.js` still never names it.
+- **`sciwrid-toolkit` became a webpack `external`.** Bundling it was never viable — it loads h5wasm via
+  `await import(c)` on a **variable**, which a bundler compiles into a build-time lookup that can never
+  reach the CDN, and its wasm/worker resolve against its own `import.meta.url`. Marking it external
+  emits a bare `import("sciwrid-toolkit")` that the consumer's import map or bundler resolves to the
+  package's own browser build — the arrangement `examples/temporal-netcdf.html` already used by hand.
+  The cost is a resolution requirement on consumers, isolated to these four formats and named by the
+  error thrown when it isn't met.
+- **The vendor name is gone from every user-facing string.** Which reader decodes a NetCDF is our
+  implementation choice, not a fact about the caller's data. Thrown messages are prefixed `parseFile:`
+  like every other parse error and name the *public* remediation (`addDataset(file, { grid: … })`), not
+  `parseSciwrid`. The single deliberate exception is the load failure, whose fix genuinely *is* that
+  specifier. A test greps the module's `new Error(...)` sites so this cannot erode one message at a time.
+- **`parseSciwrid` stays exported, and is now exactly what `parseSource` is** — the internal
+  implementation behind a public entry point, kept for the composition root and the tests.
+- **The extension only routes; `scan()` still names the format.** `.nc` cannot distinguish NetCDF3 from
+  NetCDF4, so `detectFormat` returns a `'multidim'` sentinel and the Dataset ends up carrying whichever
+  of the four the header actually declared. The concrete names are accepted as an explicit
+  `{ format }` override.
+- **A URL source is never fetched to be routed.** Detection runs on the *name*, which every source type
+  yields without being read, so the multi-dimensional branch is taken before `toBlobAndName` — a URL
+  stays a URL. Normalizing to a Blob first would have downloaded a whole 120-timestep file to answer a
+  question about its header, undoing the laziness the axis model exists for. (`scan()` now applies the
+  host's `resolveUrl` too, which the opt-in path had missed: it fetches, so it must go through the same
+  CORS-proxy seam as `parseSource`'s own fetch.)
+
+✅ **Landed: the series axis and the grid conventions are parameters, not assumptions.** Everything the
+adapter used to infer silently is now a documented default with an override beside it, so a file that
+does not match CF's overwhelming majority is a configuration problem rather than an unsupported one.
+
+- **`series`** — the axis. Three sources in priority order: the CF times `scan()` decoded, coordinates
+  the caller supplied, or **synthesized integer indices** over the leading dimension. The third is what
+  makes NetCDF3 (and any unlabelled file) traversable; `axis.unit` is `'index'` rather than `'ms'` and
+  `meta.synthesizedAxis` is set, because an axis of positions is a weaker thing than one the file
+  labelled and a UI must be able to tell. `series.coords` accepts an array or a generator, and turns
+  ISO strings / `Date`s into epoch ms — so a caller who knows the file is monthly gets an axis
+  indistinguishable from NetCDF4's, nearest-match `select()` included. `series: false` restores the
+  single-grid behaviour.
+- **The guard got *stronger* by being made narrower.** `modelled` now counts the series axis, so a 3-D
+  NetCDF3 variable is fully modelled and needs no acknowledgement, while a 4-D one still trips —
+  correctly, since the second extra dimension really is unreachable. The arithmetic is still on the
+  declared shape, never on what the reader admits to.
+- **`dims.order`** — which trailing pair of the shape is (lat, lon). `'yx'` (CF) by default, `'xy'` for
+  a variable declared `(…, lon, lat)`. It decides native height/width only; `extractGrid` resamples
+  onto whatever is asked for, so getting it wrong transposes the resolution rather than mislocating
+  data.
+- **`lon`** — `'native'` (default), `'-180..180'` or `'0..360'`. **Implemented as a column roll on the
+  decoded grid, deliberately not as a shifted request to the reader**, because the reader cannot do it:
+  asking `extractGrid` for `[-180,…,180]` on a 0..360 file returns the file's own pixels with the
+  requested bbox echoed back verbatim — measured, identical finite count and mean — which would place
+  the Pacific where the Atlantic belongs. A global extent is genuinely rolled; a regional one a whole
+  turn away is relabelled with no pixel work; one that would cross the antimeridian in the target
+  window throws, because `bounds` cannot express `east < west` and splitting a grid is a different
+  operation from relabelling one.
+
+**What is deliberately NOT a parameter, and why.** *Which* dimension is the series axis. `scan()`
+reports a variable's shape as bare numbers with no dimension **names** (`VariableInfo` carries `shape`
+and `ndims`, nothing more), and `extractGrid` exposes exactly one index knob — `time`. So the series
+axis is necessarily the outermost non-spatial dimension, and an option to select a different one would
+be an option nothing downstream could honour. Offering it would be worse than not having it: the
+caller would believe a claim the library cannot keep. Closing this needs either dimension names on
+`scan()` or a general index selector on `extractGrid` — both upstream, both preferable to decoding the
+container ourselves, which would mean a second reader for every format.
+
 ### 8.1 Which grids we actually support (scope, and the silent-failure guard)
 
 Recorded because "it reads NetCDF" is far too coarse a claim: the *format* is rarely the hard part —
@@ -589,6 +676,13 @@ makes it useful. It immediately caught our own NetCDF3 fixture: `sample.nc3` is 
 lon=5)`, but since `scan()` surfaces no times for netcdf3, dimension 0 was *invisible and unmodelled*,
 and had been collapsed unannounced since the format landed. Trusting the reader's silence would have
 hidden exactly the bug the guard exists to find.
+
+**That finding has since been taken one step further, and it is the more useful reading.** The guard
+was right that dimension 0 was unmodelled; the mistake was concluding it was *unmodellable*. The
+synthesized index axis (§8 above) models it, so `sample.nc3` now yields a 3-step axis and trips nothing
+— the guard fires only for what remains genuinely unreachable, which for a 4-D variable it still does.
+A guard that says "something is being dropped" is doing its job; it is not evidence that the thing must
+stay dropped.
 
 **Beyond the horizontal grid**, three axis families matter for this domain and none is modelled yet:
 **vertical coordinates** (pressure/height/depth are directly usable; sigma, hybrid sigma-pressure and

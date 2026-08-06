@@ -8,7 +8,7 @@
 
 > **parseFile**(`source`, `options?`): `Promise`\<[`Dataset`](../../dataset/classes/Dataset.md)\>
 
-Defined in: [package/mount.js:241](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/mount.js#L241)
+Defined in: [package/mount.js:248](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mount.js#L248)
 
 parseFile(source, options) — pure parse (no instance, no map). Returns a Dataset.
 
@@ -16,7 +16,7 @@ parseFile(source, options) — pure parse (no instance, no map). Returns a Datas
 
 ### source
 
-`string` \| `ArrayBuffer` \| `File` \| `Blob`
+`string` \| `ArrayBuffer` \| `Blob` \| `File`
 
 ### options?
 

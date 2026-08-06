@@ -17,8 +17,11 @@ Two things go wrong most often:
 - **Serving `examples/` instead of the repo root.** The pages read `../dist/*` and
   `../assets/SampleFiles/*`; both are above `examples/`, so they 404 and the page looks dead.
 - **Forgetting `npm run build` after changing `src/`.** The pages load `dist/`, so source edits are
-  invisible until you rebuild. (`examples/temporal-netcdf.html` is the one exception — it imports the
-  SciWrid adapter straight from `../src/io/sciwrid.js`, which is deliberately never bundled.)
+  invisible until you rebuild.
+- **Opening a `.nc`/`.grib2`/`.zarr` from a page with no `sciwrid-toolkit` import-map entry.** That
+  reader is external to the bundle by design (it must load its own wasm and workers), so a page that
+  wants those formats maps it to `../node_modules/sciwrid-toolkit/dist/index.js` — see the import map
+  in `temporal-netcdf.html` or `console-test.html`. Nothing else needs it.
 
 `file://` will not work: ES modules, `fetch`, and IndexedDB all need a real HTTP origin.
 
@@ -35,7 +38,7 @@ Leaflet pages need nothing. Google pages need a Maps JS API key that you supply 
 |---|---|
 | **`verify.html`** | **Guided manual verification.** Ten numbered steps, each with instructions, expected results, and Pass/Fail capture. Start here when checking a change. |
 | `ui-tools.html` | The fullest tour of `fimviz/ui` on a real map — toast, tooltip, info window, tools panel, read-models, dispatch, region draw, operations panel. |
-| `temporal-netcdf.html` | NetCDF4 / Zarr / GRIB2 via the SciWrid adapter: a time axis you can scrub, and `reduce()` over the whole axis. |
+| `temporal-netcdf.html` | NetCDF4 / Zarr / GRIB2 through the ordinary `addDataset`: a time axis you can scrub, and `reduce()` over the whole axis. |
 | `dataset-layer.html` | The `Dataset → Layer` pipeline against a tiny in-page demo provider (no real map). |
 | `method-playground.html` | Every public method called once with sample parameters. A scratch bench, not a test. |
 | `reproject.html` | `Dataset.reproject(crs)` — the GDAL WASM warp, forced only at a terminal. No map. |

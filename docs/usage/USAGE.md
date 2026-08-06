@@ -198,16 +198,29 @@ name/extension). Supported: `geotiff` (.tif/.tiff), `geojson` (.geojson/.json, i
 `kmz`, `shp` (a .zip with .shp/.dbf/.shx), `csv` (a `latField`/`lngField` column pair, or a
 `geometryField` of WKT/GeoJSON per row — auto-detected from common column names when omitted; use
 `csvHeaders(text)` to read the header row and build a mapping picker **before** calling `parseFile`),
-`xyz` (headerless `x y z` point files; `{ swapXY: true }` for northing-first exports). **Parsing never
-reprojects** — the Dataset comes back in its **native** `crs`; warp deliberately with
-[`warp`](#warp).
+`xyz` (headerless `x y z` point files; `{ swapXY: true }` for northing-first exports), and the
+multi-dimensional scientific formats below. **Parsing never reprojects** — the Dataset comes back in
+its **native** `crs`; warp deliberately with [`warp`](#warp).
 
-**Multi-dimensional scientific formats — NetCDF4/NetCDF3/GRIB2/Zarr — are deliberately NOT here.**
-They need a decoder carrying a ~193 KB wasm, so they live behind an opt-in adapter that the engine
-never imports: `parseSciwrid()` in `fimviz/src/io/sciwrid.js`. It returns a `Dataset` with a real
-**time axis**, so `select()` scrubs a timestep and `reduce()` collapses the series. See
-[DATASET_OPERATIONS.md → Reading NetCDF / GRIB2 / Zarr](./DATASET_OPERATIONS.md#reading-netcdf--grib2--zarr-parsesciwrid)
+**Multi-dimensional scientific formats** — `netcdf4`/`netcdf3` (.nc/.nc4/.cdf), `grib2`
+(.grib/.grib2/.grb2) and `zarr` (a store URL) — parse through this same call. The extension only
+routes; the file's own header decides which of the four it is, and that is what lands on `ds.format`.
+The result is a `Dataset` with a real **time axis**, so `select()` scrubs a timestep and `reduce()`
+collapses the series. Extra options, all optional: `{ variable }` (defaults to the first supported
+one — one variable per Dataset), `{ grid: { bbox, width, height } }` (a **partial** override of the
+native grid; required for GRIB2/NetCDF3 and for curvilinear files, which report no extent),
+`{ series }` (the time axis — supply `coords` to label a file the format cannot, or `false` for a
+single grid), `{ dims: { order } }` (`'yx'` CF default, or `'xy'`), `{ lon }`
+(`'native'`/`'-180..180'`/`'0..360'`), and `{ allowExtraDims: true }` to accept a collapsed vertical
+level or ensemble member. See
+[DATASET_OPERATIONS.md → Reading NetCDF / GRIB2 / Zarr](./DATASET_OPERATIONS.md#reading-netcdf--grib2--zarr)
 and the live page at `examples/temporal-netcdf.html`.
+
+> **One packaging caveat.** The reader for these four formats is a ~193 KB-wasm dependency that is
+> **external** to `dist/fimviz.js`: nothing is downloaded unless one of these files is actually
+> opened, and nothing at all is bundled. A bundler consumer needs `sciwrid-toolkit` installed; a raw
+> `<script type="module">` page needs an import-map entry for it (see `examples/temporal-netcdf.html`).
+> Without either, only these formats fail, and the thrown error says exactly this.
 
 ### `FimVizInstance` (via `FimViz.current()` or `fim.app`)
 

@@ -308,8 +308,13 @@ export class FimMap {
   /**
    * Parse a source (File | Blob | ArrayBuffer | URL) into a Dataset and register it on this
    * instance. Returns the Dataset (not yet rendered — addLayer draws it).
+   *
+   * Format comes from the extension: geotiff, geojson, kml, kmz, shp, csv, xyz, and the
+   * multi-dimensional scientific formats (.nc/.nc4/.cdf, .grib/.grib2/.grb2, .zarr), which return a
+   * Dataset carrying a **time axis** to `select()` and `reduce()` over. `options` is passed through
+   * to the parser — see `parseSource` for the per-format keys.
    * @param {File|Blob|ArrayBuffer|string} source
-   * @param {Object} [options]
+   * @param {Object} [options] - see `io/parse.js`'s `parseSource`
    * @returns {Promise<import('./dataset.js').Dataset>}
    */
   async addDataset(source, options = {}) {

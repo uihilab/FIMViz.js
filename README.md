@@ -95,19 +95,36 @@ const legend = Legend.fromColorScale(cs);
 
 ## Temporal & multi-dimensional data
 
-NetCDF4/NetCDF3/GRIB2/Zarr are read through an **opt-in** adapter (the engine never imports it, so its
-decoder stays out of everyone else's bundle). One file with many timesteps becomes a `Dataset` with a
-real **time axis**:
+NetCDF4/NetCDF3/GRIB2/Zarr open through the same `addDataset`/`parseFile` as a GeoTIFF. One file with
+many timesteps becomes a `Dataset` with a real **time axis**:
 
 ```js
-import { parseSciwrid } from 'fimviz/src/io/sciwrid.js';
-
-const ds = await parseSciwrid(file);                       // scan() only — nothing decoded
+const ds = await fim.addDataset(file);                     // header only — nothing decoded
 const t  = ds.select(Date.parse('2023-08-28T06:00:00Z'));  // one slice, off the same bytes
 await fim.addLayer(t);                                      // already EPSG:4326 — no GDAL warp
 
 await ds.reduce('mean').grid();                             // collapse every timestep
 ```
+
+Everything the reader has to assume about a file is a **default with an override beside it** — so a
+file that does not match CF's overwhelming majority is a configuration problem, not an unsupported one:
+
+```js
+await fim.addDataset(file, {
+  grid:   { bbox: [0, -80, 360, 90] },            // extent, when the file reports none
+  series: { coords: i => new Date(Date.UTC(2001, i, 16)) },  // label an axis the format can't
+  dims:   { order: 'yx' },                         // which trailing pair is (lat, lon)
+  lon:    '-180..180',                             // re-express the extent; a global grid is rolled
+});
+```
+
+A file with no CF times still gets a real axis — integer positions over its declared leading
+dimension, with `axis.unit === 'index'` so a UI can tell it apart from timestamps.
+
+Their decoder carries a ~193 KB wasm, so it is **external to the bundle and loaded on demand**: a
+consumer who never opens one of these files downloads nothing for them, and a page that does needs
+`sciwrid-toolkit` resolvable (an npm dependency under a bundler, an import-map entry in a raw browser
+page — see `examples/temporal-netcdf.html`).
 
 Every `Dataset` op, `Stats`, `ColorScale` and `Legend` work on the result unchanged. Scope and the
 grid geometries that need a manual extent are in

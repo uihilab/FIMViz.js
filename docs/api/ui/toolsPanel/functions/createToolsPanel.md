@@ -8,7 +8,7 @@
 
 > **createToolsPanel**(`root`, `opts?`): `object`
 
-Defined in: [ui/toolsPanel.js:130](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/ui/toolsPanel.js#L130)
+Defined in: [ui/toolsPanel.js:130](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/ui/toolsPanel.js#L130)
 
 Mount a tools panel for `layer` into `root`. `controls` overrides the preset — an array or a
 `(layer) => Control[]` function. `pretty:true` injects a scoped stylesheet; otherwise the panel is

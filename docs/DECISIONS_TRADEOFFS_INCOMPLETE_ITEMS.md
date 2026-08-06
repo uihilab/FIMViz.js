@@ -734,3 +734,16 @@ Everything else stayed internal and the docs now say so:
 because it happens to be exported from its module. Everything remains reachable through
 `fimviz/src/*` for anyone who really needs it — with no types and no stability promise, which is the
 honest signal that they are off the supported path.
+
+**A corollary, learned from `parseSciwrid`.** The multi-dimensional formats (NetCDF/GRIB2/Zarr) spent
+their first iteration reachable *only* through `fimviz/src/io/sciwrid.js`, and the reason given was
+bundle payload: the reader carries a ~193 KB wasm that must not land in every consumer's initial
+download. But "off the barrel" was never what enforced that — a **dynamic `import()`** was, and it
+still is. Making the caller type the adapter's name bought nothing and cost the obvious thing: opening
+a `.nc` looked like a different kind of act from opening a `.tif`, and the vendor's name leaked into
+user code and error messages for no reason a user could act on. `io/parse.js` now routes those
+extensions itself, behind `import("./sciwrid.js")`, and `dist/fimviz.js` contains zero occurrences of
+"sciwrid" — the payload rule intact, the API surface honest. `parseSciwrid` stays internal, in exactly
+the sense `parseSource` is. The general lesson: **when an internal name is the only way to do
+something ordinary, the boundary is in the wrong place** — the fix is to serve the need publicly, not
+to promote the internal.

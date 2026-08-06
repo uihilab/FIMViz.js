@@ -8,7 +8,7 @@
 
 > **hasLayerType**(`type`): `boolean`
 
-Defined in: [package/layer.js:1076](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/layer.js#L1076)
+Defined in: [package/layer.js:1076](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/layer.js#L1076)
 
 True if a factory is registered for `type`.
 

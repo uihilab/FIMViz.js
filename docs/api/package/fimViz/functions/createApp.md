@@ -8,7 +8,7 @@
 
 > **createApp**(): [`FimVizInstance`](../classes/FimVizInstance.md)
 
-Defined in: [package/fimViz.js:246](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimViz.js#L246)
+Defined in: [package/fimViz.js:246](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimViz.js#L246)
 
 An ISOLATED app — its own config, event bus, storage and single-map guard, NOT the shared
 default. This is what lets two independent widgets (e.g. a Google map and a Leaflet map) coexist

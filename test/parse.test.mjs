@@ -202,6 +202,56 @@ describe("io/parse: formats", () => {
   });
 });
 
+// The multi-dimensional formats reach the SAME public parser as a GeoTIFF — `addDataset(file)`, no
+// opt-in import, no adapter name in the caller's code. What makes that affordable is that parse.js
+// reaches the adapter through a dynamic import, so a consumer who never opens one of these files
+// never loads it; these tests pin both halves.
+describe("io/parse: multi-dimensional formats route to the adapter", () => {
+  const NC = fileURLToPath(new URL("../assets/SampleFiles/idalia-nldas2.nc", import.meta.url));
+
+  test("a .nc parses through parseSource with no adapter import by the caller", async () => {
+    const ds = await parseSource(ab("idalia-nldas2.nc"), { name: "idalia-nldas2.nc" });
+    assert.equal(ds.format, "netcdf4", "the scanner names the format — '.nc' cannot");
+    assert.equal(ds.kind, "raster");
+    assert.equal(ds.axis.name, "time");
+    assert.equal(ds.axis.entries.length, 120);
+  });
+
+  test("options pass straight through to the adapter", async () => {
+    const ds = await parseSource(ab("idalia-nldas2.nc"),
+      { name: "override.nc", grid: { bbox: [-90, 24, -74, 38] } });
+    assert.deepEqual(ds.bounds, { west: -90, south: 24, east: -74, north: 38 });
+    assert.equal(ds.name, "override.nc");
+  });
+
+  test("its errors name the public call, so the adapter stays invisible in failure too", async () => {
+    await assert.rejects(
+      () => parseSource(readFileSync(NC), { name: "x.nc", grid: { bbox: [10, 10, 5, 5] } }),
+      (e) => {
+        assert.match(e.message, /^parseFile:/, "prefixed like every other parse error");
+        assert.ok(!/sciwrid/i.test(e.message), "and never names the reader");
+        return true;
+      });
+  });
+
+  test("the sentinel list matches the adapter's own, so the copy cannot drift", async () => {
+    // parse.js duplicates SCIWRID_FORMATS rather than importing it — a static import would pull the
+    // adapter into the initial bundle and undo the deferral this whole arrangement exists for.
+    const { SCIWRID_FORMATS } = await import("../src/io/sciwrid.js");
+    const src = readFileSync(fileURLToPath(new URL("../src/io/parse.js", import.meta.url)), "utf8");
+    const listed = /MULTIDIM_FORMATS = new Set\(\[([^\]]*)\]\)/.exec(src)[1]
+      .match(/"([^"]+)"/g).map((s) => s.slice(1, -1));
+    assert.deepEqual(listed.filter((f) => f !== "multidim").sort(), [...SCIWRID_FORMATS].sort());
+  });
+
+  test("parse.js does not STATICALLY import the adapter — the payload rule", () => {
+    const src = readFileSync(fileURLToPath(new URL("../src/io/parse.js", import.meta.url)), "utf8");
+    assert.ok(!/^import .*sciwrid/m.test(src),
+      "sciwrid.js must be reached through import(), or its ~193 KB reader lands in every bundle");
+    assert.match(src, /import\("\.\/sciwrid\.js"\)/, "and it must actually be reached that way");
+  });
+});
+
 describe("wktToGeometry", () => {
   test("POINT", () => {
     assert.deepEqual(wktToGeometry("POINT (10 20)"), { type: "Point", coordinates: [10, 20] });

@@ -6,7 +6,7 @@
 
 # Class: FimMap
 
-Defined in: [package/fimMap.js:71](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L71)
+Defined in: [package/fimMap.js:71](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L71)
 
 ## Constructors
 
@@ -14,7 +14,7 @@ Defined in: [package/fimMap.js:71](https://github.com/uihilab/FIMViz.js/blob/aa1
 
 > **new FimMap**(`opts`): `FimMap`
 
-Defined in: [package/fimMap.js:101](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L101)
+Defined in: [package/fimMap.js:101](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L101)
 
 #### Parameters
 
@@ -66,7 +66,7 @@ runtime-supplied teardown, run by destroy()
 
 > **layers**: [`Layer`](../../layer/classes/Layer.md)[] = `[]`
 
-Defined in: [package/fimMap.js:78](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L78)
+Defined in: [package/fimMap.js:78](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L78)
 
 ## Accessors
 
@@ -76,7 +76,7 @@ Defined in: [package/fimMap.js:78](https://github.com/uihilab/FIMViz.js/blob/aa1
 
 > **get** **actionNames**(): `string`[]
 
-Defined in: [package/fimMap.js:268](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L268)
+Defined in: [package/fimMap.js:268](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L268)
 
 All action names registered on THIS instance (excludes the window fallback).
 
@@ -92,7 +92,7 @@ All action names registered on THIS instance (excludes the window fallback).
 
 > **get** **app**(): [`FimVizInstance`](../../fimViz/classes/FimVizInstance.md)
 
-Defined in: [package/fimMap.js:111](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L111)
+Defined in: [package/fimMap.js:111](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L111)
 
 The owning FimViz (default or private) — the up-chain reference.
 
@@ -108,7 +108,7 @@ The owning FimViz (default or private) — the up-chain reference.
 
 > **get** **capturing**(): `boolean`
 
-Defined in: [package/fimMap.js:510](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L510)
+Defined in: [package/fimMap.js:515](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L515)
 
 Is a modal interaction currently capturing events?
 
@@ -124,7 +124,7 @@ Is a modal interaction currently capturing events?
 
 > **get** **config**(): `any`
 
-Defined in: [package/fimMap.js:169](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L169)
+Defined in: [package/fimMap.js:169](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L169)
 
 This instance's runtime config — always the app that owns THIS map, so two isolated apps on one
 page never read each other's settings. This is THE way the engine reads config: there is no
@@ -143,7 +143,7 @@ because GDAL is a per-page singleton). See package/config.js.
 
 > **get** **datasets**(): [`Dataset`](../../dataset/classes/Dataset.md)[]
 
-Defined in: [package/fimMap.js:150](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L150)
+Defined in: [package/fimMap.js:150](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L150)
 
 Datasets parsed on this app — SHARED with every other map on it, exactly like `storage`.
 
@@ -164,7 +164,7 @@ stays per-map.
 
 > **get** **exclusiveClaimant**(): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/fimMap.js:447](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L447)
+Defined in: [package/fimMap.js:452](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L452)
 
 The Layer currently holding the exclusive display slot, or null.
 
@@ -180,7 +180,7 @@ The Layer currently holding the exclusive display slot, or null.
 
 > **get** **layerPanel**(): `any`
 
-Defined in: [package/fimMap.js:178](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L178)
+Defined in: [package/fimMap.js:178](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L178)
 
 This instance's Layer Panel — the per-instance UI object, lazily built against #root via the
 factory mount.js injects (createLayerPanel). The model never imports ui/; the composition root
@@ -199,7 +199,7 @@ Replaces the module-level `window.layerPanel` singleton, so two maps drive their
 
 > **get** **map**(): `any`
 
-Defined in: [package/fimMap.js:124](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L124)
+Defined in: [package/fimMap.js:124](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L124)
 
 ##### Returns
 
@@ -215,7 +215,7 @@ the provider's map object — a `google.maps.Map`, an `L.Map`, or another provid
 
 > **get** **namedLayers**(): [`Layer`](../../layer/classes/Layer.md)[]
 
-Defined in: [package/fimMap.js:402](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L402)
+Defined in: [package/fimMap.js:407](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L407)
 
 All currently-registered named user-file Layers.
 
@@ -231,7 +231,7 @@ All currently-registered named user-file Layers.
 
 > **get** **root**(): `Element`
 
-Defined in: [package/fimMap.js:114](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L114)
+Defined in: [package/fimMap.js:114](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L114)
 
 The mount container element (query scope).
 
@@ -247,7 +247,7 @@ The mount container element (query scope).
 
 > **get** **simultaneousLayerEvents**(): `boolean`
 
-Defined in: [package/fimMap.js:493](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L493)
+Defined in: [package/fimMap.js:498](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L498)
 
 ##### Returns
 
@@ -257,7 +257,7 @@ Defined in: [package/fimMap.js:493](https://github.com/uihilab/FIMViz.js/blob/aa
 
 > **set** **simultaneousLayerEvents**(`v`): `void`
 
-Defined in: [package/fimMap.js:491](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L491)
+Defined in: [package/fimMap.js:496](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L496)
 
 Dispatch mode. false (default) = precedence: top hit layer first, absorption stops propagation.
 true = simultaneous: every hit-tested layer receives the event (no veto). PACKAGE_ROADMAP §1.
@@ -280,7 +280,7 @@ true = simultaneous: every hit-tested layer receives the event (no veto). PACKAG
 
 > **get** **storage**(): [`Storage`](../../../io/storage/classes/Storage.md)
 
-Defined in: [package/fimMap.js:139](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L139)
+Defined in: [package/fimMap.js:139](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L139)
 
 Shared client-side storage (owned by the app).
 
@@ -294,7 +294,7 @@ Shared client-side storage (owned by the app).
 
 > **$**(`sel`): `Element`
 
-Defined in: [package/fimMap.js:201](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L201)
+Defined in: [package/fimMap.js:201](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L201)
 
 Scoped query helpers — resolve against this instance's root, not the whole document.
 The linchpin for multi-instance: duplicate IDs across instances stop being ambiguous
@@ -327,7 +327,7 @@ mangling quoted attribute values), so they remain subject to the engine quirk ab
 
 > **$$**(`sel`): `Element`[]
 
-Defined in: [package/fimMap.js:203](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L203)
+Defined in: [package/fimMap.js:203](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L203)
 
 #### Parameters
 
@@ -345,20 +345,27 @@ Defined in: [package/fimMap.js:203](https://github.com/uihilab/FIMViz.js/blob/aa
 
 > **addDataset**(`source`, `options?`): `Promise`\<[`Dataset`](../../dataset/classes/Dataset.md)\>
 
-Defined in: [package/fimMap.js:315](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L315)
+Defined in: [package/fimMap.js:320](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L320)
 
 Parse a source (File | Blob | ArrayBuffer | URL) into a Dataset and register it on this
 instance. Returns the Dataset (not yet rendered — addLayer draws it).
+
+Format comes from the extension: geotiff, geojson, kml, kmz, shp, csv, xyz, and the
+multi-dimensional scientific formats (.nc/.nc4/.cdf, .grib/.grib2/.grb2, .zarr), which return a
+Dataset carrying a **time axis** to `select()` and `reduce()` over. `options` is passed through
+to the parser — see `parseSource` for the per-format keys.
 
 #### Parameters
 
 ##### source
 
-`string` \| `ArrayBuffer` \| `File` \| `Blob`
+`string` \| `ArrayBuffer` \| `Blob` \| `File`
 
 ##### options?
 
 `any` = `{}`
+
+see `io/parse.js`'s `parseSource`
 
 #### Returns
 
@@ -370,7 +377,7 @@ instance. Returns the Dataset (not yet rendered — addLayer draws it).
 
 > **addLayer**(`type?`, `opts?`): `Promise`\<[`Layer`](../../layer/classes/Layer.md)\>
 
-Defined in: [package/fimMap.js:341](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L341)
+Defined in: [package/fimMap.js:346](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L346)
 
 Create a rendered Layer of `type`. Dispatches to the subsystem factory registered via
 registerLayerType. `type` can be a bare Dataset instead of a registry string — `fim.addLayer(ds)`
@@ -406,7 +413,7 @@ a registry name, a bare source to infer
 
 > **adoptDataset**(`ds`): `any`
 
-Defined in: [package/fimMap.js:153](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L153)
+Defined in: [package/fimMap.js:153](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L153)
 
 Register a Dataset parsed elsewhere on this map's app.
 
@@ -426,7 +433,7 @@ Register a Dataset parsed elsewhere on this map's app.
 
 > **bindActions**(): `FimMap`
 
-Defined in: [package/fimMap.js:271](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L271)
+Defined in: [package/fimMap.js:271](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L271)
 
 Attach the delegated listener to this instance's root. Idempotent.
 
@@ -440,7 +447,7 @@ Attach the delegated listener to this instance's root. Idempotent.
 
 > **captureInteraction**(`handler`): () => `void`
 
-Defined in: [package/fimMap.js:503](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L503)
+Defined in: [package/fimMap.js:508](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L508)
 
 Register a MODAL interaction (e.g. a region-draw tool) that takes ALL map events until released.
 While captured, the normal layer dispatch + `map:${type}` mirror are suppressed — every event
@@ -463,7 +470,7 @@ capture at a time (a new one replaces the prior). PACKAGE_ROADMAP §1.
 
 > **destroy**(): `void`
 
-Defined in: [package/fimMap.js:528](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L528)
+Defined in: [package/fimMap.js:533](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L533)
 
 Best-effort teardown for SPA unmount. Detaches the map, removes injected markup, and
 releases this map from its app (which frees the ambient default's shared services when
@@ -479,7 +486,7 @@ the last map goes). Module-level singletons in host subsystems are NOT reset.
 
 > **disableMapEvents**(): `FimMap`
 
-Defined in: [package/fimMap.js:480](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L480)
+Defined in: [package/fimMap.js:485](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L485)
 
 Stop routing provider map events.
 
@@ -493,7 +500,7 @@ Stop routing provider map events.
 
 > **emit**(`evt`, `payload?`): `FimMap`
 
-Defined in: [package/fimMap.js:212](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L212)
+Defined in: [package/fimMap.js:212](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L212)
 
 #### Parameters
 
@@ -515,7 +522,7 @@ Defined in: [package/fimMap.js:212](https://github.com/uihilab/FIMViz.js/blob/aa
 
 > **enableMapEvents**(`types?`, `opts?`): `FimMap`
 
-Defined in: [package/fimMap.js:464](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L464)
+Defined in: [package/fimMap.js:469](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L469)
 
 Start routing provider map events (default: click + hover) to layers via hitTest + z-order
 dispatch, and mirror each as `map:${type}` on the bus. Idempotent; needs a mounted map and a
@@ -545,7 +552,7 @@ simultaneous:true → every hit layer gets the event
 
 > **getAction**(`name`): `Function`
 
-Defined in: [package/fimMap.js:263](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L263)
+Defined in: [package/fimMap.js:263](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L263)
 
 The handler for `name` — this instance's registry first, then the transitional window bridge.
 
@@ -565,7 +572,7 @@ The handler for `name` — this instance's registry first, then the transitional
 
 > **getLayer**(`id`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/fimMap.js:377](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L377)
+Defined in: [package/fimMap.js:382](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L382)
 
 The Layer with this id (or null).
 
@@ -585,7 +592,7 @@ The Layer with this id (or null).
 
 > **getLayerByName**(`name`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/fimMap.js:399](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L399)
+Defined in: [package/fimMap.js:404](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L404)
 
 The named user-file Layer for `name` (or null).
 
@@ -605,7 +612,7 @@ The named user-file Layer for `name` (or null).
 
 > **off**(`evt`, `fn`): `FimMap`
 
-Defined in: [package/fimMap.js:210](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L210)
+Defined in: [package/fimMap.js:210](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L210)
 
 #### Parameters
 
@@ -627,7 +634,7 @@ Defined in: [package/fimMap.js:210](https://github.com/uihilab/FIMViz.js/blob/aa
 
 > **on**(`evt`, `fn`): `FimMap`
 
-Defined in: [package/fimMap.js:208](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L208)
+Defined in: [package/fimMap.js:208](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L208)
 
 #### Parameters
 
@@ -649,7 +656,7 @@ Defined in: [package/fimMap.js:208](https://github.com/uihilab/FIMViz.js/blob/aa
 
 > **registerAction**(`name`, `fn`): `FimMap`
 
-Defined in: [package/fimMap.js:242](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L242)
+Defined in: [package/fimMap.js:242](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L242)
 
 Register a handler for `data-action="name"`.
 
@@ -673,7 +680,7 @@ Register a handler for `data-action="name"`.
 
 > **registerActions**(`map?`): `FimMap`
 
-Defined in: [package/fimMap.js:253](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L253)
+Defined in: [package/fimMap.js:253](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L253)
 
 Register many at once: registerActions({ foo, bar }).
 
@@ -691,7 +698,7 @@ Register many at once: registerActions({ foo, bar }).
 
 > **registerNamedLayer**(`name`, `layer`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/fimMap.js:388](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L388)
+Defined in: [package/fimMap.js:393](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L393)
 
 Register a Layer under a filename key — the user-file registry that floodExtent's
 toggle_uploaded_file drives (one displayed user file → one Layer). Wires the up-chain `_map`
@@ -718,7 +725,7 @@ adds the layer to `this.layers`.
 
 > **releaseInteraction**(): `FimMap`
 
-Defined in: [package/fimMap.js:508](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L508)
+Defined in: [package/fimMap.js:513](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L513)
 
 Release any modal interaction, restoring normal layer dispatch.
 
@@ -732,7 +739,7 @@ Release any modal interaction, restoring normal layer dispatch.
 
 > **removeDataset**(`ds`, `opts?`): `boolean`
 
-Defined in: [package/fimMap.js:160](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L160)
+Defined in: [package/fimMap.js:160](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L160)
 
 Forget a Dataset — drops it from the app registry and releases its decode. Throws while any
 layer on this app still renders it (pass `{ force: true }` to override).
@@ -759,7 +766,7 @@ layer on this app still renders it (pass `{ force: true }` to override).
 
 > **removeLayer**(`idOrLayer`): `void`
 
-Defined in: [package/fimMap.js:405](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/fimMap.js#L405)
+Defined in: [package/fimMap.js:410](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/fimMap.js#L410)
 
 Remove a Layer by id or instance — tears down its render and unregisters it.
 

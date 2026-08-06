@@ -81,11 +81,11 @@
   <div class="grid">
     <a class="card" href="temporal-netcdf.html">
       <h3>temporal-netcdf.html</h3>
-      <p>NetCDF4 / Zarr / GRIB2 through the SciWrid Toolkit adapter: <code>scan()</code> a file into a
+      <p>NetCDF4 / Zarr / GRIB2 through the ordinary <code>addDataset()</code>: read a file into a
         <code>Dataset</code> with a <strong>time axis</strong>, scrub it with a slider, and collapse the whole axis with
         <code>reduce('mean'|'max')</code>. Three bundled Hurricane Idalia samples, one per format. Also shows the
-        extent override a GRIB2/NetCDF3 file needs, since <code>scan()</code> derives no bbox for those.</p>
-      <div class="tags"><span class="tag star">SciWrid</span><span class="tag keyless">Leaflet</span></div>
+        extent override a GRIB2/NetCDF3 file needs, since neither format ever reports a bbox.</p>
+      <div class="tags"><span class="tag star">Temporal</span><span class="tag keyless">Leaflet</span></div>
     </a>
   </div>
 

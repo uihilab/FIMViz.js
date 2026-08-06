@@ -8,7 +8,7 @@
 
 > **create**(`target`, `options?`): `Promise`\<[`FimMap`](../../fimMap/classes/FimMap.md)\> & `object`
 
-Defined in: [package/mount.js:85](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/package/mount.js#L85)
+Defined in: [package/mount.js:85](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/package/mount.js#L85)
 
 create(target, options) — boot a FimMap on the ambient default app.
 

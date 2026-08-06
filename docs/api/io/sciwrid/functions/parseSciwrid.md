@@ -8,9 +8,12 @@
 
 > **parseSciwrid**(`source`, `opts?`): `Promise`\<[`Dataset`](../../../package/dataset/classes/Dataset.md)\>
 
-Defined in: [io/sciwrid.js:273](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/io/sciwrid.js#L273)
+Defined in: [io/sciwrid.js:464](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/sciwrid.js#L464)
 
-Read a multi-dimensional scientific file into a `Dataset` with a real temporal axis.
+Read a multi-dimensional scientific file into a `Dataset` with a real temporal axis. This is the
+implementation behind `FimViz.parseFile`/`fim.addDataset` for `.nc`/`.grib2`/`.zarr` — **use those**;
+this export exists for the composition root and tests, exactly like `parseSource`. Every option
+documented below is passed straight through from them.
 
 Nothing is decoded here — `scan()` reads metadata only, and the returned Dataset is a lazy series.
 Each axis entry is an **in-file selector** (`ref: { select: { variable, time } }`), so selecting a
@@ -18,16 +21,18 @@ timestep costs no second fetch: the child shares this Dataset's bytes and decode
 force. Every op, `Stats`, `ColorScale` and `RasterLayer` then work on it unchanged.
 
 ```js
-const ds = await parseSciwrid(file);           // a 120-step NetCDF4 → a time axis
+const ds = await fim.addDataset(file);         // a 120-step NetCDF4 → a time axis
 const t  = ds.select(Date.parse('2023-08-28T06:00:00Z'));   // → one grid, lazily
 await fim.addLayer(t);
 await ds.reduce('mean').grid();                 // temporal mean over the whole axis
 ```
 
-**Axis coordinates are epoch milliseconds**, not ISO strings, so `select()`'s nearest-match works
-(it is numeric-only) — which is what a time slider needs. The ISO string is kept on each entry's
-`meta.time`. This deliberately differs from the WaterML/NWIS adapter's string coords, where exact
-match was acceptable because `latest()` covered the common case.
+**Axis coordinates are numbers**, not ISO strings, so `select()`'s nearest-match works (it is
+numeric-only) — which is what a time slider needs. Epoch milliseconds (`axis.unit === 'ms'`) when the
+file carries CF times or the caller supplies dates; plain **positions** (`'index'`) when the file
+declares a leading dimension but no labels for it, which is the NetCDF3 case. The original label is
+kept on each entry's `meta.time`. This deliberately differs from the WaterML/NWIS adapter's string
+coords, where exact match was acceptable because `latest()` covered the common case.
 
 One variable per Dataset: call it once per variable you want. (Folding variable in as a second axis
 is roadmapped — §8 — but a variable axis cannot be `reduce()`d meaningfully, so it needs a guard
@@ -37,7 +42,7 @@ this first slice does not yet have.)
 
 ### source
 
-`string` \| `ArrayBuffer` \| `ArrayBufferView`\<`ArrayBufferLike`\> \| `File` \| `Blob` \| `URL`
+`string` \| `ArrayBuffer` \| `ArrayBufferView`\<`ArrayBufferLike`\> \| `Blob` \| `File` \| `URL`
 
 ### opts?
 
@@ -46,9 +51,21 @@ this first slice does not yet have.)
 `boolean`
 
 proceed with a variable carrying dimensions beyond
-  (lat, lon) + time — a vertical level, ensemble member or band. Off by default: the reader collapses
-  them with no say from the caller, so this is an acknowledgement, not a fix. Recorded on
-  `meta.extraDims`
+  (lat, lon) + the series axis — a vertical level, ensemble member or band. Off by default: the
+  reader collapses them with no say from the caller, so this is an acknowledgement, not a fix.
+  Recorded on `meta.extraDims`
+
+#### dims?
+
+\{ `order?`: `"yx"` \| `"xy"`; \}
+
+which trailing pair of the shape is (lat, lon). `'yx'`
+  (CF order, the default) or `'xy'` for a variable declared (…, lon, lat). Decides native
+  height/width only — `extractGrid` resamples onto whatever is requested
+
+#### dims.order?
+
+`"yx"` \| `"xy"`
 
 #### grid?
 
@@ -72,6 +89,15 @@ PARTIAL override of the
 
 `number`
 
+#### lon?
+
+`"native"` \| `"-180..180"` \| `"0..360"`
+
+re-express the extent in a longitude
+  convention. A global grid is genuinely **rolled** (the reader cannot do this — asking it for a
+  shifted bbox returns the same pixels relabelled); a regional extent a whole turn away is
+  relabelled with no pixel work; anything else throws rather than splitting the grid
+
 #### name?
 
 `string`
@@ -83,6 +109,18 @@ Dataset name; defaults to the filename/URL tail
 (`url`) => `string`
 
 host CORS-proxy/mirror, applied at force time
+
+#### series?
+
+`false` \| \{ `coords?`: `Function` \| (`string` \| `number` \| `Date`)[]; `length?`: `number`; `name?`: `string`; `unit?`: `string`; \}
+
+the series (time) axis. Omit for the default: the file's CF times
+  when it has them, otherwise integer indices over its leading dimension. `false` forces a single
+  grid. `coords` is an array of one coordinate per step, or a generator `(i, n) => coord`; ISO
+  strings and `Date`s become epoch ms, so an unlabelled file gains a REAL time axis —
+  `{ series: { coords: i => new Date(Date.UTC(2001, i, 1)) } }`. `length` caps the step count
+  (default: the leading dimension), `name` defaults to `'time'`, and `unit` defaults to `'ms'` for
+  dates or `'index'` for synthesized positions
 
 #### variable?
 

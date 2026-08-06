@@ -8,7 +8,7 @@
 
 > **wktToGeometry**(`wkt`): `object`
 
-Defined in: [io/parse.js:308](https://github.com/uihilab/FIMViz.js/blob/aa18b967902eed757d90bb15d02c8e250d2c0aa7/src/io/parse.js#L308)
+Defined in: [io/parse.js:380](https://github.com/uihilab/FIMViz.js/blob/fa826b69548017771e1f4e174a9441d835478f4f/src/io/parse.js#L380)
 
 Parse a WKT geometry string into GeoJSON geometry. Supports POINT/MULTIPOINT/LINESTRING/
 MULTILINESTRING/POLYGON/MULTIPOLYGON (2-D only). Throws on anything else.

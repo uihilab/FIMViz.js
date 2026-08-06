@@ -280,7 +280,7 @@ through a CORS proxy.
 ## 8. CHIRPS precipitation — **4** (ERA5-Zarr variant: **2**)
 
 **Works today** on the NetCDF path, which is the one proven end-to-end:
-`parseSciwrid` builds a time axis of in-file selector refs, and
+`addDataset` builds a time axis of in-file selector refs, and
 `ds.reduce('sum')` collapses it with no new grid math — verified against a real
 120-step NLDAS-2 file (roadmap §8). A rolling 7-day window is expressible without
 `selectRange`: select the seven entries and `a.combine([...six], { op: 'sum' })`.
@@ -399,7 +399,7 @@ that is genuinely the interesting half.
 ## 2. NWM streamflow — **1** as scoped
 
 **The blocker is structural, not missing glue.** NWM retrospective `chrtout` is a
-`(time, feature_id)` array — a per-reach time series, not a grid. `parseSciwrid`
+`(time, feature_id)` array — a per-reach time series, not a grid. The parser
 derives its native grid from the variable's **last two dimensions** plus
 `scan().bbox` and throws when a file has no geographic extent
 ([io/sciwrid.js](../src/io/sciwrid.js), and see
