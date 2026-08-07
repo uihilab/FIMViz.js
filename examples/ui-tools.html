@@ -33,7 +33,10 @@
 <header>
   <h1>FIMViz — UI components</h1>
   <span>Everything on the left is a <code>fimviz/ui</code> export, mounted the way an app would mount
-        it. Serve from the repo root; run <code>npm run build</code> after editing <code>src/</code>.</span>
+        it. Six layers in <strong>two overlapping clusters</strong> — three coincident rasters plus a
+        vector over Mississippi, two overlapping vectors over Iowa. Click one spot twice to cycle
+        through what is stacked there; use <em>fit</em> in the layer list to travel between clusters.
+        Serve from the repo root; run <code>npm run build</code> after editing <code>src/</code>.</span>
 </header>
 
 <main>
@@ -97,15 +100,71 @@ const toast = createToast(document.body);
 const fim = await FimViz.mount("#map", { provider: "leaflet" });
 connectToast(fim, toast);
 
-const raster = await fim.addLayer(await fim.addDataset("../assets/SampleFiles/Compare_0-0-DEP-12840.tif"));
-const lakes = await fim.addLayer(await fim.addDataset("../assets/SampleFiles/iowa_lakes_meta.geojson"));
-fim.enableMapEvents(["click", "hover"]);
-raster.fit();
+// ── the layers ──────────────────────────────────────────────────────────────────────────
+// Deliberately arranged as TWO overlapping clusters, because that is what exercises the layer
+// tier: clicking one spot twice cycles to whatever is underneath, and "fit" is how you travel
+// between clusters when a layer is nowhere near the current view.
+//
+//   Mississippi — three rasters at EXACTLY the same extent, plus a vector drawn over them.
+//   Iowa        — two vectors that overlap each other.
+//
+// The Mississippi vector is built here rather than loaded: no bundled sample covers that extent,
+// and the point is a mixed raster+vector stack. Everything else is a real file from assets/.
+const MS = { west: -89.98, east: -89.831, south: 34.327, north: 34.402 };
 
-// Hover values on the raster, feature properties on the vector. Both are passive bindings on the
-// ordinary event bus, so they coexist with each other and with selection.
-bindHoverValue(raster, { tooltip: createTooltip(fim) });
-bindFeatureInfo(lakes, { infoWindow: createInfoWindow(fim) });
+function studyAreaGeoJSON() {
+  const { west: w, east: e, south: s, north: n } = MS;
+  const box = (x0, y0, x1, y1, name) => ({
+    type: "Feature",
+    properties: { name, note: "synthetic — drawn over the raster extent" },
+    geometry: { type: "Polygon", coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] },
+  });
+  const dx = (e - w) / 4, dy = (n - s) / 4;
+  return new Blob([JSON.stringify({
+    type: "FeatureCollection",
+    features: [
+      box(w + dx, s + dy, w + 2 * dx, s + 2 * dy, "Study area A"),
+      box(w + 2.2 * dx, s + 2 * dy, e - dx * 0.3, n - dy * 0.4, "Study area B"),
+    ],
+  })], { type: "application/geo+json" });
+}
+
+// Loaded bottom-to-top: the last one added ends up on top of the stack.
+const SOURCES = [
+  ["../assets/SampleFiles/4326.tif", "4326.tif"],
+  ["../assets/SampleFiles/Compare_0-0-DEP-12840.tif", "compare-12840.tif"],
+  ["../assets/SampleFiles/Compare_0-0-DEP-17780.tif", "compare-17780.tif"],
+  [studyAreaGeoJSON(), "study-area.geojson"],
+  ["../assets/SampleFiles/Iowa_County_Boundaries.json", "iowa-counties.json"],
+  ["../assets/SampleFiles/iowa_lakes_meta.geojson", "iowa-lakes.geojson"],
+];
+
+const layers = [];
+for (const [source, name] of SOURCES) {
+  try {
+    layers.push(await fim.addLayer(await fim.addDataset(source, { name })));
+  } catch (e) {
+    toast.show(`${name} failed — ${e.message}`, { level: "error", timeout: 8000 });
+    console.error(name, e);
+  }
+}
+if (!layers.length) throw new Error("no layers loaded — is the server rooted at the repo, not examples/?");
+
+fim.enableMapEvents(["click", "hover"]);
+
+// Hover values on every raster, feature properties on every vector. Both are passive bindings on
+// the ordinary event bus, so they coexist with each other and with selection.
+const tooltip = createTooltip(fim);
+const infoWindow = createInfoWindow(fim);
+for (const l of layers) {
+  if (typeof l.valueAt === "function") bindHoverValue(l, { tooltip });
+  else bindFeatureInfo(l, { infoWindow });
+}
+
+const raster = layers.find((l) => typeof l.valueAt === "function") ?? layers[0];
+raster.fit();
+toast.show(`${layers.length} layers — two overlapping clusters. Click a spot twice to cycle.`,
+  { timeout: 6000 });
 
 // ── the panels ──────────────────────────────────────────────────────────────────────────
 // One selected layer drives the settings and operations panels. The layer list and map clicks are
