@@ -29,7 +29,7 @@ Two things go wrong most often:
 
 Leaflet pages need nothing. Google pages need a Maps JS API key that you supply — never committed:
 
-- `verify.html` — prompts for it and keeps it in `localStorage`. (`ui-tools.html` is Leaflet-only and needs no key.)
+- `verify.html` and `ui-tools.html` — both take `?provider=google` and prompt once for the key, keeping it in `localStorage`. Without that parameter they run on Leaflet and need nothing.
 - `test2.html` — reads `?apiKey=…` from the URL, and skips the Google half cleanly without one.
 
 ## Which page to open

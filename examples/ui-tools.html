@@ -41,7 +41,9 @@
         it. Six layers in <strong>two overlapping clusters</strong> — three coincident rasters plus a
         vector over Mississippi, two overlapping vectors over Iowa. Click one spot twice to cycle
         through what is stacked there; use <em>fit</em> in the layer list to travel between clusters.
-        Serve from the repo root; run <code>npm run build</code> after editing <code>src/</code>.</span>
+        Leaflet by default; add <code>?provider=google</code> to run the same page on Google (it will
+        ask once for a key). Serve from the repo root; run <code>npm run build</code> after editing
+        <code>src/</code>.</span>
 </header>
 
 <main>
@@ -116,7 +118,24 @@ const $ = (s) => document.querySelector(s);
 // Toast first, so anything that fails below is visible on the page and not only in the console.
 const toast = createToast(document.body);
 
-const fim = await FimViz.mount("#map", { provider: "leaflet" });
+// Provider is switchable, because the layer panel's reorder is the ONE thing that behaves differently
+// per provider: Google's GroundOverlay has no z-index, so `applyLayerOrder` restacks a raster by
+// removing and recreating it. That path is only reachable from a page that mounts the layer panel,
+// and this is the only one — so it has to be able to run on Google.
+// Add ?provider=google and it will prompt once for a Maps JS API key (localStorage, never committed).
+const params = new URLSearchParams(location.search);
+const provider = params.get("provider") === "google" ? "google" : "leaflet";
+let apiKey = null;
+if (provider === "google") {
+  apiKey = params.get("apiKey") || localStorage.getItem("fim_gmaps_key") || "";
+  if (!apiKey) {
+    apiKey = (prompt("Google Maps JS API key (kept in this browser only):") || "").trim();
+    if (apiKey) localStorage.setItem("fim_gmaps_key", apiKey);
+    else throw new Error("no API key — reload without ?provider=google to use Leaflet");
+  }
+}
+
+const fim = await FimViz.mount("#map", { provider, apiKey });
 
 // connectToast also surfaces the two engine warnings that used to reach only console.warn — a raster
 // too big for one image, and a CRS this provider cannot draw. Both describe something visibly wrong
