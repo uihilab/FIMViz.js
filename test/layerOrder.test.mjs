@@ -163,6 +163,40 @@ describe("provider: setDraggable", () => {
   });
 });
 
+// What lets a tool be sized in SCREEN units without touching a map SDK.
+describe("provider: viewMetrics", () => {
+  // Web Mercator: the equator is one 256 px tile at zoom 0, so ~156.5 km/px there, halving per level.
+  test("leaflet reports metres-per-pixel and the map's pixel size", () => {
+    const m = leaflet.viewMetrics({
+      getZoom: () => 0, getCenter: () => ({ lat: 0 }), getSize: () => ({ x: 800, y: 400 }),
+    });
+    assert.ok(Math.abs(m.metresPerPixel - 156543.03) < 1);
+    assert.deepEqual([m.width, m.height], [800, 400]);
+  });
+
+  test("google reports the same numbers through its own accessors", () => {
+    const m = google.viewMetrics({
+      getZoom: () => 0, getCenter: () => ({ lat: () => 0 }), getDiv: () => ({ offsetWidth: 800, offsetHeight: 400 }),
+    });
+    assert.ok(Math.abs(m.metresPerPixel - 156543.03) < 1);
+    assert.deepEqual([m.width, m.height], [800, 400]);
+  });
+
+  test("a pixel covers less ground as you zoom in, and away from the equator", () => {
+    const at = (lat, zoom) => leaflet.viewMetrics({
+      getZoom: () => zoom, getCenter: () => ({ lat }), getSize: () => ({ x: 1, y: 1 }),
+    }).metresPerPixel;
+    assert.ok(Math.abs(at(0, 1) / at(0, 0) - 0.5) < 1e-9, "one zoom level halves it");
+    assert.ok(Math.abs(at(60, 0) / at(0, 0) - 0.5) < 1e-3, "cos(60°) halves it too");
+  });
+
+  test("null when the map cannot answer, so a caller can fall back instead of crashing", () => {
+    assert.equal(leaflet.viewMetrics(null), null);
+    assert.equal(leaflet.viewMetrics({}), null);
+    assert.equal(google.viewMetrics({ getZoom: () => 3 }), null);
+  });
+});
+
 describe("FimMap.setMapDraggable", () => {
   const fimWith = async (provider) => {
     registerMapProvider("drag-spy", provider);
@@ -194,12 +228,71 @@ describe("FimMap.setMapDraggable", () => {
   });
 });
 
+// Scratch vectors: a tool's in-progress shape, drawn through the provider's ordinary vector tier but
+// deliberately NOT a Layer — never hit-tested, reordered, listed or saved.
+describe("FimMap scratch vectors and viewMetrics", () => {
+  let seq = 0;
+  const fimWith = async (provider) => {
+    const name = `scratch-spy-${seq++}`;      // a fresh registration per test, so stubs cannot bleed
+    registerMapProvider(name, provider);
+    const { FimMap } = await import("../src/package/fimMap.js");
+    const fim = new FimMap({ app: { config: { provider: name }, emit() {}, on() {} } });
+    fim._adoptMap({ MAP: true });
+    return fim;
+  };
+  const geojson = { type: "FeatureCollection", features: [] };
+
+  test("adds through the provider's vector tier and never touches fim.layers", async () => {
+    const added = [];
+    const fim = await fimWith({
+      create: async () => ({}),
+      addVector: (m, gj, opts) => { added.push({ m, gj, opts }); return { H: 1 }; },
+      removeVector: () => {},
+    });
+    const handle = fim.addScratchVector(geojson, { style: { strokeColor: "#f00" } });
+    assert.deepEqual(handle, { H: 1 });
+    assert.equal(added[0].gj, geojson);
+    assert.deepEqual(added[0].opts.style, { strokeColor: "#f00" });
+    assert.equal(fim.layers.length, 0, "scaffolding is not a layer");
+  });
+
+  test("removes through the provider, and survives a handle already gone", async () => {
+    const removed = [];
+    const fim = await fimWith({
+      create: async () => ({}),
+      addVector: () => ({ H: 1 }),
+      removeVector: (m, h) => { if (h.boom) throw new Error("already detached"); removed.push(h); },
+    });
+    fim.removeScratchVector({ H: 1 });
+    assert.equal(removed.length, 1);
+    assert.doesNotThrow(() => fim.removeScratchVector({ boom: true }), "teardown must not throw");
+    assert.doesNotThrow(() => fim.removeScratchVector(null));
+  });
+
+  test("null geometry, no map, or a provider with no vector tier are all no-ops", async () => {
+    const fim = await fimWith({ create: async () => ({}) });
+    assert.equal(fim.addScratchVector(geojson), null, "no addVector on the provider");
+    const withVec = await fimWith({ create: async () => ({}), addVector: () => ({ H: 1 }) });
+    assert.equal(withVec.addScratchVector(null), null, "nothing to draw");
+    withVec._adoptMap(null);
+    assert.equal(withVec.addScratchVector(geojson), null, "no map yet");
+  });
+
+  test("viewMetrics forwards, and answers null when the provider has none", async () => {
+    const withIt = await fimWith({ create: async () => ({}), viewMetrics: () => ({ metresPerPixel: 7, width: 1, height: 2 }) });
+    assert.deepEqual(withIt.viewMetrics(), { metresPerPixel: 7, width: 1, height: 2 });
+    const without = await fimWith({ create: async () => ({}) });
+    assert.equal(without.viewMetrics(), null);
+  });
+});
+
 describe("the contract is OPTIONAL — a provider may declare none of them", () => {
-  test("both built-ins implement all three methods", () => {
+  test("both built-ins implement all four optional methods", () => {
     for (const [name, p] of [["leaflet", leaflet], ["google", google]]) {
       assert.equal(typeof p.whenIdle, "function", `${name}.whenIdle`);
       assert.equal(typeof p.applyLayerOrder, "function", `${name}.applyLayerOrder`);
       assert.equal(typeof p.setDraggable, "function", `${name}.setDraggable`);
+      assert.equal(typeof p.viewMetrics, "function", `${name}.viewMetrics`);
     }
   });
 
@@ -209,5 +302,6 @@ describe("the contract is OPTIONAL — a provider may declare none of them", () 
     assert.equal(p.whenIdle, undefined);
     assert.equal(p.applyLayerOrder, undefined);
     assert.equal(p.setDraggable, undefined);
+    assert.equal(p.viewMetrics, undefined);
   });
 });

@@ -555,6 +555,45 @@ export class FimMap {
     return this;
   }
 
+  /**
+   * Draw a GeoJSON overlay that is NOT a Layer — a tool's in-progress shape, a rubber band, a
+   * highlight. It never enters `fim.layers`, so it is not hit-tested, not reordered, not listed in the
+   * layer panel and not saved: it is scaffolding the user is looking at, not data they loaded.
+   *
+   * This exists because the selection tools are headless by design — they produce `{lat,lng}` and name
+   * no map SDK — which left "show me what I am drawing" with nowhere to live. Putting it here rather
+   * than in `fimviz/ui` keeps the provider registry (and Leaflet) out of the `dist/ui.js` bundle.
+   *
+   * @param {Object} geojson - a Feature or FeatureCollection
+   * @param {{ style?: Object|Function }} [opts] - the neutral style vocabulary `VectorLayer` uses
+   * @returns {*} an opaque handle to pass to {@link removeScratchVector}, or null if there is no map
+   */
+  addScratchVector(geojson, { style } = {}) {
+    const provider = getMapProvider(this.config?.provider || DEFAULT_PROVIDER);
+    if (!this.map || typeof provider?.addVector !== "function" || !geojson) return null;
+    return provider.addVector(this.map, geojson, { style });
+  }
+
+  /** Tear down a handle from {@link addScratchVector}. Safe on null. @param {*} handle @returns {FimMap} */
+  removeScratchVector(handle) {
+    const provider = getMapProvider(this.config?.provider || DEFAULT_PROVIDER);
+    if (handle && this.map && typeof provider?.removeVector === "function") {
+      try { provider.removeVector(this.map, handle); } catch { /* already gone */ }
+    }
+    return this;
+  }
+
+  /**
+   * Ground metres per screen pixel, plus the map's pixel size — what lets a tool be sized in SCREEN
+   * units (a brush that stays the same width as you zoom) without touching a map SDK.
+   * @returns {{metresPerPixel: number, width: number, height: number}|null} null when unavailable
+   */
+  viewMetrics() {
+    const provider = getMapProvider(this.config?.provider || DEFAULT_PROVIDER);
+    if (!this.map || typeof provider?.viewMetrics !== "function") return null;
+    return provider.viewMetrics(this.map);
+  }
+
   async whenIdle(opts = {}) {
     const provider = getMapProvider(this.config?.provider || DEFAULT_PROVIDER);
     const map = this.map;

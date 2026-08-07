@@ -246,14 +246,20 @@
   </div>
 
   <!-- 8 ───────────────────────────────────────────────────────────────────── -->
-  <div class="step" data-step="8" data-title="Region draw → scoped stats (modal capture)">
-    <h2><span class="n">8</span> Region draw → scoped stats <span class="pill" id="p8">idle</span></h2>
+  <div class="step" data-step="8" data-title="Selection tools → scoped stats (modal capture)">
+    <h2><span class="n">8</span> Selection tools → scoped stats <span class="pill" id="p8">idle</span></h2>
     <div class="body">
-      <p class="do"><b>Do</b> Click <em>Draw region</em> — the map snaps back to the raster first. Click 3–5
-        points around a <strong>small patch well inside</strong> it, then <em>Finish</em>. While drawing, try
-        hovering the raster.</p>
+      <p class="do"><b>Do</b> Pick a tool — that <em>arms</em> it, and the map snaps back to the raster
+        first. Draw a <strong>small patch well inside</strong> the raster, then <em>Finish</em> (polygon
+        only; the other three finish themselves). While drawing, try hovering the raster.
+        <b>Run all four.</b></p>
+      <div class="row" id="rg-modes"></div>
+      <div class="row" id="rg-brush-wrap" style="display:none;align-items:center;gap:6px">
+        <span class="dim">brush</span>
+        <input id="rg-brush" type="range" min="0.4" max="8" step="0.2" value="1.6" style="flex:1" />
+        <span class="dim" id="rg-brush-val">1.6vw</span>
+      </div>
       <div class="row">
-        <button id="rg-draw">Draw region</button>
         <button class="sec" id="rg-finish">Finish</button>
         <button class="sec" id="rg-clear">Clear</button>
         <button class="sec" id="rg-fit">Fit to raster</button>
@@ -261,11 +267,19 @@
       <div class="host" id="rg-out">—</div>
       <div class="expect" style="margin-top:9px"><b>Expect</b>
         <ul>
-          <li>The outline draws as you click, and closes into a polygon on Finish.</li>
-          <li>While drawing, the hover tooltip is <em>suppressed</em> — that is the modal capture.</li>
+          <li><b>Every tool draws as you go</b> — a dot on the very first click, a dashed line at two
+            points, a filled polygon at three. If the map stays empty, the overlay is broken.</li>
+          <li><b>polygon</b> one click per corner · <b>rectangle</b> two clicks, the second finishes it ·
+            <b>freehand</b> press-drag-release · <b>brush</b> press-drag-release, painting a band.</li>
+          <li><b>Dragging with freehand or brush must NOT pan the map.</b> If the map moves under the
+            stroke, the drag lock failed.</li>
+          <li>The brush slider is in <em>vw</em>: zoom in and out mid-stroke and the painted band should
+            keep the same width <em>on screen</em>, not on the ground.</li>
+          <li><kbd>Esc</kbd> cancels, <kbd>Enter</kbd> finishes, <kbd>Backspace</kbd> drops the last point.</li>
+          <li>While drawing, the hover tooltip is <em>suppressed</em> — that is the modal capture — and it
+            works again afterwards. A drag must not leave a layer selected when it ends.</li>
           <li>Finish reports <em>scoped count</em> vs <em>total</em>. A small patch should be a small
             fraction — draw around the whole raster instead and the two numbers should match.</li>
-          <li>Hover works again afterwards.</li>
         </ul>
       </div>
     </div>
@@ -336,7 +350,7 @@ import { FimViz, RasterLayer, VectorLayer, ColorScale } from "fimviz";
 import {
   createToast, connectToast, createTooltip, bindHoverValue,
   createInfoWindow, bindFeatureInfo, createToolsPanel, renderLegend, renderStats,
-  createRegionDraw, createOperationsPanel,
+  createRegionDraw, REGION_MODES, createRegionOverlay, createOperationsPanel,
 } from "fimviz/ui";
 
 const $ = (s) => document.querySelector(s);
@@ -482,7 +496,9 @@ async function refreshReadModels() {
 
 async function boot() {
   fim = await FimViz.mount("map", { provider, apiKey, center, zoom });
-  fim.enableMapEvents(["click", "hover"]);
+  // mousedown/mouseup are what step 8's freehand and brush trace with. Without them those two fall
+  // back to click-to-start / click-to-stop — which works, but is not the gesture being verified.
+  fim.enableMapEvents(["click", "hover", "mousedown", "mouseup"]);
   toast = connectToast(fim, createToast());
   tooltip = createTooltip(fim);
   infoWindow = createInfoWindow(fim);
@@ -649,92 +665,137 @@ $("#ml-clear").addEventListener("click", () => {
 });
 $("#ml-simul").addEventListener("change", (e) => { fim.simultaneousLayerEvents = e.target.checked; });
 
-// ── 8 · region draw ────────────────────────────────────────────────────────────────────────────
-let regionDraw = null, regionLayer = null;
-function drawRegionOnMap(points, closed) {
-  regionLayer?.remove(); regionLayer = null;
-  if (points.length < 2) return;
-  const coords = points.map((p) => [p.lng, p.lat]);
-  const geometry = closed && points.length >= 3
-    ? { type: "Polygon", coordinates: [[...coords, coords[0]]] }
-    : { type: "LineString", coordinates: coords };
-  regionLayer = new VectorLayer({
-    map: fim, type: "region",
-    sources: [{ data: { type: "Feature", geometry, properties: {} }, bounds: {} }],
-  });
-  regionLayer.render({ style: { strokeColor: "#f85149", strokeWidth: 2, fillColor: "#f85149", fillOpacity: 0.15 } });
-}
-$("#rg-fit").addEventListener("click", () => {
-  if (rasterLayer) rasterLayer.fit(); else pill("#p8", "load the raster in step 3 first", "bad");
-});
+// ── 8 · selection tools ────────────────────────────────────────────────────────────────────────
+// The region used to be drawn here by hand, as a throwaway VectorLayer rebuilt on every vertex. That
+// is now `createRegionOverlay` — the same job, done by the library, so this page verifies the export
+// instead of a private copy of it. It draws through `fim.addScratchVector`, so the shape is not a
+// Layer: it never appears in step 7's dispatch or in fim.layers.
+const HOWTO = {
+  polygon: "click ≥3 points on the raster, then Finish",
+  rectangle: "click two opposite corners — the second finishes it",
+  freehand: "press and drag to trace an outline; release to finish",
+  brush: "press and drag to paint; the map must NOT pan under the stroke",
+};
 
-$("#rg-draw").addEventListener("click", () => {
-  if (!rasterLayer) { pill("#p8", "load the raster in step 3 first", "bad"); return; }
-  // Steps 5–7 each fit() the map to their OWN subject, and the bundled samples are in three
-  // different places (the GeoTIFF is in Mississippi, the counties in Iowa). Working top to bottom
-  // therefore left the raster off-screen by the time you got here, so "click on the raster" was
-  // impossible and every region came back count=0. Snap back to it before capturing.
-  const zoomBefore = fim.map.getZoom?.();
-  rasterLayer.fit();
-  // The zoom either side of the fit, logged rather than waited on. A change of one level is exactly a
-  // 2x coordinate error for anything resolved before the animation lands, which is the shape of the
-  // reported defect — so this is the number to read if vertices still come back wrong. There is
-  // deliberately NO await here: gating the tool on the camera made the button appear to hang, which
-  // is a worse failure than the one it was chasing. `fim.whenIdle()` remains available for a host
-  // that wants it.
-  log("region draw armed", {
-    zoomBefore, zoomAfterFitCall: fim.map.getZoom?.(),
-    note: "if these differ, a click landing mid-animation resolves at the wrong scale",
-  });
-  regionDraw = createRegionDraw(fim, {
-    onPoint: (pts) => {
-      drawRegionOnMap(pts, false);
-      $("#rg-out").textContent = `${pts.length} point(s) — click more, then Finish`;
+// Built on FIRST USE, not at module scope: boot() is fired without being awaited (so the page renders
+// while the map loads), which means `fim` is still null while this file is being evaluated. Both of
+// these capture `fim` at construction, so building them now would bind them to nothing.
+let regionDraw = null, regionOverlay = null;
+function selection() {
+  if (regionDraw) return regionDraw;
+  regionOverlay = createRegionOverlay(fim);
+  regionDraw = createRegionDraw(fim, REGION_OPTS);
+  return regionDraw;
+}
+
+const REGION_OPTS = {
+  brushRadius: "1.6vw",       // a SCREEN size: it should hold its width as you zoom
+  minSampleMetres: 8,
+  onPreview: (rings, pts) => regionOverlay.show(rings, pts),
+  onPoint: (pts) => {
+    $("#rg-out").textContent = `${pts.length} point(s) — ${HOWTO[regionDraw.mode]}`;
+    // Only for the click-driven tools: a freehand stroke fires this per mousemove, and logging a
+    // few hundred lines per drag buries everything else in the trace.
+    if (regionDraw.mode === "polygon" || regionDraw.mode === "rectangle") {
       const mb = fim.map.getBounds?.();
       log(`region vertex ${pts.length}`, {
         ...pts[pts.length - 1],
         zoom: fim.map.getZoom?.(),
         view: mb ? { n: mb.getNorth(), s: mb.getSouth(), e: mb.getEast(), w: mb.getWest() } : null,
       });
-    },
-    onComplete: async (filter, pts) => {
-      drawRegionOnMap(pts, true);
-      if (!filter) { $("#rg-out").textContent = "need ≥3 points"; pill("#p8", "too few points", "bad"); return; }
-      lastRegionFilter = filter;                        // step 9's Mask reads this
-      window.FIM.lastFilter = filter;
-      // Both numbers, so the scoping is legible: a filtered count on its own says nothing.
-      const [scoped, total] = await Promise.all([
-        rasterLayer.getStats({ filter }), rasterLayer.getStats(),
-      ]);
-      const pct = total.count ? ((scoped.count / total.count) * 100).toFixed(1) : "0";
+    }
+  },
+  onCancel: () => { armMode(null); regionOverlay.clear(); },
+  onComplete: async (filter, pts, rings) => {
+    armMode(null);
+    regionOverlay.show(rings, pts);
+    if (!filter) {
+      $("#rg-out").textContent = `not enough of a shape (${pts.length} point(s))`;
+      pill("#p8", "too few points", "bad"); return;
+    }
+    lastRegionFilter = filter;                        // step 9's Mask reads this
+    window.FIM.lastFilter = filter;
+    // Both numbers, so the scoping is legible: a filtered count on its own says nothing.
+    const [scoped, total] = await Promise.all([
+      rasterLayer.getStats({ filter }), rasterLayer.getStats(),
+    ]);
+    const pct = total.count ? ((scoped.count / total.count) * 100).toFixed(1) : "0";
 
-      const g = rasterLayer.result, bn = rasterLayer._bounds();
-      const ring = filter.features[0] || [];
-      log("region finished", {
-        vertices: pts.length,
-        ringLat: [Math.min(...ring.map((p) => p.lat)), Math.max(...ring.map((p) => p.lat))],
-        ringLng: [Math.min(...ring.map((p) => p.lng)), Math.max(...ring.map((p) => p.lng))],
-        rasterLat: [bn.south, bn.north], rasterLng: [bn.west, bn.east],
-        pixelBbox: filter.pixelBbox({ bw: bn.west, bs: bn.south, be: bn.east, bn: bn.north,
-                                      width: g.width, height: g.height }),
-        scopedCount: scoped.count, totalCount: total.count, pct: +pct,
-      });
-      $("#rg-out").innerHTML =
-        `<p class="dim" style="margin:0 0 4px">${pts.length}-point region — ` +
-        `<b style="color:var(--fg)">${scoped.count.toLocaleString()}</b> of ` +
-        `${total.count.toLocaleString()} pixels (${pct}%)` +
-        (scoped.count === 0 ? ` — <b style="color:var(--bad)">nothing inside; draw over the raster</b>` : "") +
-        `</p>` + renderStats(scoped, { html: true });
-      pill("#p8", scoped.count ? `scoped · ${pct}%` : "empty region", scoped.count ? "ok" : "bad");
-    },
+    const g = rasterLayer.result, bn = rasterLayer._bounds();
+    const ring = filter.features[0] || [];
+    log("region finished", {
+      mode: regionDraw.mode, vertices: pts.length, rings: rings.length,
+      ringLat: [Math.min(...ring.map((p) => p.lat)), Math.max(...ring.map((p) => p.lat))],
+      ringLng: [Math.min(...ring.map((p) => p.lng)), Math.max(...ring.map((p) => p.lng))],
+      rasterLat: [bn.south, bn.north], rasterLng: [bn.west, bn.east],
+      pixelBbox: filter.pixelBbox({ bw: bn.west, bs: bn.south, be: bn.east, bn: bn.north,
+                                    width: g.width, height: g.height }),
+      scopedCount: scoped.count, totalCount: total.count, pct: +pct,
+    });
+    $("#rg-out").innerHTML =
+      `<p class="dim" style="margin:0 0 4px">${regionDraw.mode} — ${pts.length} point(s), ` +
+      `${rings.length} ring(s) — <b style="color:var(--fg)">${scoped.count.toLocaleString()}</b> of ` +
+      `${total.count.toLocaleString()} pixels (${pct}%)` +
+      (scoped.count === 0 ? ` — <b style="color:var(--bad)">nothing inside; draw over the raster</b>` : "") +
+      `</p>` + renderStats(scoped, { html: true });
+    pill("#p8", scoped.count ? `${regionDraw.mode} · ${pct}%` : "empty region", scoped.count ? "ok" : "bad");
+  },
+};
+
+// Picking a tool ARMS it. Deliberately not a separate "Draw" button: start() is what takes pan-by-drag
+// away, so a UI where choosing "brush" does not start the tool pans the map under the stroke instead
+// of painting — which is exactly the defect this step now checks for.
+const rgButtons = new Map();
+function armMode(mode) {
+  for (const [m, b] of rgButtons) b.classList.toggle("on", m === mode);
+  $("#rg-brush-wrap").style.display = mode === "brush" ? "flex" : "none";
+}
+for (const mode of REGION_MODES) {
+  const b = document.createElement("button");
+  b.textContent = mode;
+  b.className = "sec";
+  rgButtons.set(mode, b);
+  b.addEventListener("click", async () => {
+    if (!rasterLayer) { pill("#p8", "load the raster in step 3 first", "bad"); return; }
+    const draw = selection();
+    if (draw.active && draw.mode === mode) { draw.cancel(); return; }
+
+    // Steps 5–7 each fit() the map to their OWN subject, and the bundled samples are in three
+    // different places (the GeoTIFF is in Mississippi, the counties in Iowa). Working top to bottom
+    // therefore left the raster off-screen by the time you got here, so "click on the raster" was
+    // impossible and every region came back count=0. Snap back to it before capturing.
+    const zoomBefore = fim.map.getZoom?.();
+    rasterLayer.fit();
+    // THIS is the difference from the version that reported the 2x-coordinate defect: it did not wait,
+    // so a click could land mid-animation and resolve against the pre-fit projection — off by exactly
+    // 2x when the fit changed zoom by one level. whenIdle resolves on a timeout when the map is already
+    // still, so it cannot hang the button the way an unbounded wait would have.
+    await fim.whenIdle();
+    log("selection armed", {
+      mode, zoomBefore, zoomAfterSettle: fim.map.getZoom?.(),
+      note: "if these differ, the fit animation moved the camera — the wait above is what makes that safe",
+    });
+
+    draw.setMode(mode);
+    armMode(mode);
+    draw.start();
+    $("#rg-out").textContent = HOWTO[mode];
+    pill("#p8", `${mode} — dispatch suspended`, "ok");
   });
-  regionDraw.start();
-  $("#rg-out").textContent = "click ≥3 points on the raster, then Finish";
-  pill("#p8", "drawing — dispatch suspended", "ok");
+  $("#rg-modes").append(b);
+}
+
+$("#rg-brush").addEventListener("input", (e) => {
+  const vw = `${Number(e.target.value).toFixed(1)}vw`;
+  $("#rg-brush-val").textContent = vw;
+  if (regionDraw) regionDraw.brushRadius = vw;      // takes effect on the NEXT stamp, mid-stroke
+});
+$("#rg-fit").addEventListener("click", () => {
+  if (rasterLayer) rasterLayer.fit(); else pill("#p8", "load the raster in step 3 first", "bad");
 });
 $("#rg-finish").addEventListener("click", () => regionDraw?.finish());
 $("#rg-clear").addEventListener("click", () => {
-  regionDraw?.cancel(); regionLayer?.remove(); regionLayer = null;
+  regionDraw?.cancel(); regionOverlay?.clear();
   lastRegionFilter = null; $("#rg-out").textContent = "—"; pill("#p8", "idle");
 });
 </script>

@@ -44,6 +44,30 @@ function circleRing(lat, lng, radius, sides = 16) {
   return ring;
 }
 
+/**
+ * Resolve a brush size to ground metres.
+ *
+ * A plain number is metres — a fixed footprint, which is what an analyst wants when the brush means
+ * "300 m either side of this line". A CSS-like string is a SCREEN size, resolved against the live
+ * view, which is what a *painter* wants: `'2vw'` stays two percent of the map's width no matter how
+ * far you zoom, so the brush feels like a brush instead of growing and shrinking under the cursor.
+ *
+ * `vw`/`vh` are percentages of the MAP container, not the browser window — the map is the surface
+ * being painted, and a page with a sidebar would otherwise give a brush wider than the map.
+ * Falls back to `fallback` metres when the map cannot report its scale (no map yet, or a provider
+ * with no `viewMetrics`), so a screen-sized brush degrades instead of throwing.
+ */
+function resolveRadius(size, fim, fallback) {
+  if (typeof size === "number") return size;
+  const m = /^\s*([\d.]+)\s*(vw|vh|px)\s*$/.exec(String(size ?? ""));
+  if (!m) throw new Error(`brushRadius: expected metres as a number, or '<n>vw' | '<n>vh' | '<n>px' (got ${JSON.stringify(size)})`);
+  const view = fim.viewMetrics?.();
+  if (!view?.metresPerPixel) return fallback;
+  const n = Number(m[1]);
+  const px = m[2] === "px" ? n : (n / 100) * (m[2] === "vw" ? view.width : view.height);
+  return px * view.metresPerPixel;
+}
+
 /** The axis-aligned box through two opposite corners, as a closed-by-convention 4-point ring. */
 function boxRing(a, b) {
   const [s, n] = a.lat <= b.lat ? [a.lat, b.lat] : [b.lat, a.lat];
@@ -81,14 +105,15 @@ function boxRing(a, b) {
  *
  * @param {import('../package/fimMap.js').FimMap} fim
  * @param {{ mode?: 'polygon'|'rectangle'|'freehand'|'brush',
- *           brushRadius?: number,
+ *           brushRadius?: number|string,
  *           brushSides?: number,
  *           minSampleMetres?: number,
  *           keys?: boolean,
  *           keyTarget?: any,
  *           freezeCamera?: boolean,
  *           onPoint?: (points: Array<{lat: number, lng: number}>, evt: any) => void,
- *           onPreview?: (rings: Array<Array<{lat: number, lng: number}>>) => void,
+ *           onPreview?: (rings: Array<Array<{lat: number, lng: number}>>,
+ *                       points: Array<{lat: number, lng: number}>) => void,
  *           onComplete?: (filter: SpatialFilter|null, points: Array<{lat: number, lng: number}>,
  *                         rings: Array<Array<{lat: number, lng: number}>>) => void,
  *           onCancel?: () => void }} [opts]
@@ -130,10 +155,13 @@ export function createRegionDraw(fim, {
     return points.length >= 3 ? [points.slice()] : [];
   }
 
+  // `points` rides along with the rings because a shape is visible LONG before it is a shape: one and
+  // two clicks produce no ring at all, and a host with only `rings` to draw would show nothing until
+  // the third — which reads as the tool being broken.
   function preview(cursor) {
     if (!onPreview) return;
-    if (mode === "rectangle" && points.length === 1 && cursor) onPreview([boxRing(points[0], cursor)]);
-    else onPreview(ringsOf());
+    if (mode === "rectangle" && points.length === 1 && cursor) onPreview([boxRing(points[0], cursor)], points.slice());
+    else onPreview(ringsOf(), points.slice());
   }
 
   // ── event handling ────────────────────────────────────────────────────────────────────
@@ -146,7 +174,9 @@ export function createRegionDraw(fim, {
   function sample(pt, e) {
     const last = points[points.length - 1];
     if (last && minSampleMetres > 0 && metresBetween(last, pt) < minSampleMetres) return;
-    if (mode === "brush") stamps.push(circleRing(pt.lat, pt.lng, brushRadius, brushSides));
+    // Resolved per stamp, not once per stroke: a screen-sized brush must track a zoom that changed
+    // mid-stroke, and re-resolving is two arithmetic operations.
+    if (mode === "brush") stamps.push(circleRing(pt.lat, pt.lng, resolveRadius(brushRadius, fim, 250), brushSides));
     addVertex(pt, e);
   }
 
@@ -250,7 +280,7 @@ export function createRegionDraw(fim, {
   function cancel() {
     if (!active) return;
     stop(); points = []; stamps = [];
-    onPreview?.([]);
+    onPreview?.([], []);
     onCancel?.();
   }
 
@@ -277,13 +307,20 @@ export function createRegionDraw(fim, {
     if (active) stop();
     points = []; stamps = [];
     mode = next;
-    onPreview?.([]);
+    onPreview?.([], []);
     if (wasActive) start();
   }
 
   return {
     start, finish, cancel, undo, setMode,
     get mode() { return mode; },
+    /**
+     * Settable mid-stroke: a brush-size slider has to take effect on the next stamp, not on the next
+     * time the tool is constructed. Same accepted forms as the option — metres as a number, or
+     * `'<n>vw' | '<n>vh' | '<n>px'` for a screen size.
+     */
+    get brushRadius() { return brushRadius; },
+    set brushRadius(v) { brushRadius = v; },
     get points() { return points.slice(); },
     get rings() { return ringsOf().map((r) => r.slice()); },
     get active() { return active; },

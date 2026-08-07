@@ -242,9 +242,15 @@ Contents by coupling:
   `layer.settings` (DATASET_LAYER_ADT §6d). `controls` is a declarative spec; presets `rasterControls`/
   `vectorControls` build it from a layer; `pretty:true` injects scoped CSS. It only reads/writes
   `layer.settings` and re-renders on the effect events, so a host's own UI and the panel can't disagree.
+  ✅ `rasterControls` now emits **every** key `RasterSettings.SCALE_KEYS` accepts — palette, continuous,
+  min, max, unit, plus editors for the two mode-switching ones (`stops` discrete bands, `colorStops`
+  gradient control points) — so no knob the change-model honours is unreachable from the preset.
 - **Read-model renderers** — `renderLegend(legend, {html})`/`renderStats(stats, {html})`, thin over
   `Legend.toHtml()` / a stats table. Ensemble & comparison "legends" are just `getLegend().toJSON()`/
-  `.toHtml()` — **no binder**.
+  `.toHtml()`. ✅ `bindLegend`/`bindStats` add the LIVE half: the same renderers mounted and kept
+  current off the layer's `restyle`/`recomputed`/`rendered`, with reads coalesced per microtask and
+  stale async results dropped. `createToolsPanel` gains the same behind `reactive:true` — opt-in
+  because it holds live inputs, so it defers a redraw while focus is inside it.
 
 **Explicitly out of the package (decided):** the unified Layer **Panel** (too app-opinionated — the host
 composes its own from `layer.settings` + read-models); the `bind*Tools` event-inversion **binders** (an
@@ -305,6 +311,13 @@ they fill the ring list, and the brush's per-sample stamps are just a multi-poly
 take pan-by-drag away for the length of a stroke via a new optional provider method
 **`setDraggable`** (tracing and panning are the same gesture), and the trailing `click` that follows
 every press-drag-release is **swallowed** rather than allowed to fall through to layer dispatch.
+
+The first browser pass then found the half that was missing: **nothing was drawing the shape**.
+`ui/regionOverlay.js` (`createRegionOverlay`/`regionGeoJSON`) renders it through a new engine seam,
+**`FimMap.addScratchVector`** — the provider's ordinary vector tier, but deliberately not a Layer.
+Vertices appear from the first click, an open edge at two points, a closed ring at three. The same pass
+added **`viewMetrics`** to the provider contract so `brushRadius` can be a screen size (`'2vw'`),
+re-resolved per stamp, instead of a ground size that doubles under the cursor as you zoom.
 
 **Deferred, with a finding:** `damage`/`velocity` **control presets** are deliberately NOT shipped.
 `VelocityLayer` is a Google-only animated canvas driven by positional params (particle density, colour

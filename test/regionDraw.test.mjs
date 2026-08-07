@@ -12,6 +12,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 
 import { createRegionDraw, REGION_MODES } from "../src/ui/regionDraw.js";
+import { createRegionOverlay, regionGeoJSON } from "../src/ui/regionOverlay.js";
 import { SpatialFilter } from "../src/package/filter.js";
 
 /**
@@ -19,9 +20,10 @@ import { SpatialFilter } from "../src/package/filter.js";
  * identity-checked release — a stale release must not clear someone else's capture — because the
  * trailing-click swallow depends on exactly that.
  */
-function fakeMap() {
+function fakeMap({ view = null } = {}) {
   let handler = null;
   const draggable = [];
+  const scratch = [];
   const send = (type) => (lat, lng) => handler?.({ type, lat, lng });
   return {
     captureInteraction(fn) {
@@ -29,10 +31,15 @@ function fakeMap() {
       return () => { if (handler === fn) handler = null; };
     },
     setMapDraggable(on) { draggable.push(on); },
+    viewMetrics: () => view,
+    addScratchVector(geojson, opts) { const h = { geojson, opts, live: true }; scratch.push(h); return h; },
+    removeScratchVector(h) { if (h) h.live = false; },
     click: send("click"), hover: send("hover"),
     down: send("mousedown"), up: send("mouseup"),
     get captured() { return handler !== null; },
     get draggable() { return draggable; },
+    get scratch() { return scratch; },
+    get liveScratch() { return scratch.filter((h) => h.live); },
   };
 }
 
@@ -281,6 +288,179 @@ describe("regionDraw: brush", () => {
     const eq = spanAt(0), far = spanAt(60);
     assert.ok(Math.abs(eq.lat - far.lat) < 1e-9, "latitude degrees are the same length everywhere");
     assert.ok(far.lng > eq.lng * 1.9, `60°N needs ~2× the longitude span (got ${far.lng / eq.lng})`);
+  });
+});
+
+describe("regionDraw: brush size in screen units", () => {
+  // 100 m per pixel over an 800 px-wide map: 2vw = 16 px = 1600 m.
+  const view = { metresPerPixel: 100, width: 800, height: 400 };
+  const spanMetres = (rd, map) => {
+    rd.start(); map.down(0, 0);
+    const ring = rd.rings[0];
+    const dLat = Math.max(...ring.map((p) => p.lat)) - Math.min(...ring.map((p) => p.lat));
+    return (dLat / 2) * (Math.PI / 180) * 6378137;      // half the lat span back to metres
+  };
+
+  test("'vw' is a percentage of the MAP's width, resolved against the live view", () => {
+    const map = fakeMap({ view });
+    const r = spanMetres(createRegionDraw(map, { mode: "brush", brushRadius: "2vw" }), map);
+    assert.ok(Math.abs(r - 1600) < 1, `2vw of 800px at 100 m/px is 1600 m (got ${r})`);
+  });
+
+  test("'vh' measures the height, and 'px' is literal pixels", () => {
+    const map = fakeMap({ view });
+    assert.ok(Math.abs(spanMetres(createRegionDraw(map, { mode: "brush", brushRadius: "2vh" }), map) - 800) < 1);
+    assert.ok(Math.abs(spanMetres(createRegionDraw(map, { mode: "brush", brushRadius: "20px" }), map) - 2000) < 1);
+  });
+
+  test("a plain number stays metres — a fixed ground footprint", () => {
+    const map = fakeMap({ view });
+    assert.ok(Math.abs(spanMetres(createRegionDraw(map, { mode: "brush", brushRadius: 500 }), map) - 500) < 1);
+  });
+
+  // A screen-sized brush must degrade, not throw: the map may not be mounted, or the provider may
+  // not implement viewMetrics at all.
+  test("falls back to a ground size when the map cannot report its scale", () => {
+    const map = fakeMap({ view: null });
+    assert.ok(Math.abs(spanMetres(createRegionDraw(map, { mode: "brush", brushRadius: "2vw" }), map) - 250) < 1);
+  });
+
+  test("a nonsense unit throws, naming what it accepts", () => {
+    const map = fakeMap({ view });
+    const rd = createRegionDraw(map, { mode: "brush", brushRadius: "2 furlongs" });
+    rd.start();
+    assert.throws(() => map.down(0, 0), /expected metres as a number, or '<n>vw'/);
+  });
+
+  test("brushRadius is settable mid-stroke, so a size slider works", () => {
+    const map = fakeMap({ view });
+    const rd = createRegionDraw(map, { mode: "brush", brushRadius: "1vw" });
+    rd.start();
+    map.down(0, 0);
+    rd.brushRadius = "4vw";
+    map.hover(1, 1);
+    const span = (r) => Math.max(...r.map((p) => p.lat)) - Math.min(...r.map((p) => p.lat));
+    assert.ok(span(rd.rings[1]) > span(rd.rings[0]) * 3.5, "the second stamp used the new size");
+    assert.equal(rd.brushRadius, "4vw");
+  });
+
+  test("the size is re-resolved per stamp, so a zoom mid-stroke is honoured", () => {
+    const live = { metresPerPixel: 100, width: 800, height: 400 };
+    const map = fakeMap({ view: live });
+    const rd = createRegionDraw(map, { mode: "brush", brushRadius: "2vw" });
+    rd.start();
+    map.down(0, 0);
+    live.metresPerPixel = 50;                     // the user zoomed in one level mid-drag
+    map.hover(1, 1);
+    const span = (r) => Math.max(...r.map((p) => p.lat)) - Math.min(...r.map((p) => p.lat));
+    assert.ok(Math.abs(span(rd.rings[1]) / span(rd.rings[0]) - 0.5) < 0.01,
+      "half the ground size at half the metres-per-pixel — the same size ON SCREEN");
+  });
+});
+
+describe("regionOverlay", () => {
+  const roles = (gj) => gj.features.map((f) => f.properties.role);
+
+  test("a single point is already visible — a vertex marker from the first click", () => {
+    const gj = regionGeoJSON([], [{ lat: 1, lng: 2 }]);
+    assert.deepEqual(roles(gj), ["vertex"]);
+    assert.deepEqual(gj.features[0].geometry.coordinates, [2, 1], "GeoJSON is x,y — lng first");
+  });
+
+  test("two points draw an open edge; three close into a ring", () => {
+    const pts = [{ lat: 0, lng: 0 }, { lat: 0, lng: 1 }, { lat: 1, lng: 1 }];
+    assert.deepEqual(roles(regionGeoJSON([], pts.slice(0, 2))), ["edge", "vertex", "vertex"]);
+    const closed = regionGeoJSON([pts], pts);
+    assert.deepEqual(roles(closed), ["ring", "vertex", "vertex", "vertex"]);
+    assert.equal(closed.features[0].geometry.coordinates[0].length, 4, "the ring is closed back to its start");
+    assert.ok(!roles(closed).includes("edge"), "the polygon's own outline IS the edge");
+  });
+
+  test("a brush's many stamps each become a ring", () => {
+    const stamp = (lat) => [{ lat, lng: 0 }, { lat, lng: 1 }, { lat: lat + 1, lng: 1 }];
+    assert.deepEqual(roles(regionGeoJSON([stamp(0), stamp(5)], [], { vertices: false })), ["ring", "ring"]);
+  });
+
+  test("vertices:false leaves only the shape", () => {
+    const pts = [{ lat: 0, lng: 0 }, { lat: 0, lng: 1 }, { lat: 1, lng: 1 }];
+    assert.deepEqual(roles(regionGeoJSON([pts], pts, { vertices: false })), ["ring"]);
+  });
+
+  test("show() paints one scratch vector, and repainting replaces rather than stacks", async () => {
+    const map = fakeMap();
+    const overlay = createRegionOverlay(map);
+    const pts = [{ lat: 0, lng: 0 }, { lat: 0, lng: 1 }, { lat: 1, lng: 1 }];
+    overlay.show([pts], pts);
+    overlay.show([pts], pts);
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(map.scratch.length, 1, "two show()s inside one frame cost ONE rebuild");
+    assert.equal(map.liveScratch.length, 1);
+    overlay.show([pts], [...pts, { lat: 2, lng: 2 }]);
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(map.scratch.length, 2);
+    assert.equal(map.liveScratch.length, 1, "the previous overlay was removed, not left on the map");
+  });
+
+  test("clear() and destroy() take the shape off the map", async () => {
+    const map = fakeMap();
+    const overlay = createRegionOverlay(map);
+    const pts = [{ lat: 0, lng: 0 }, { lat: 0, lng: 1 }, { lat: 1, lng: 1 }];
+    overlay.show([pts], pts);
+    await new Promise((r) => setTimeout(r, 30));
+    overlay.clear();
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(map.liveScratch.length, 0);
+    assert.equal(overlay.geojson, null);
+
+    overlay.show([pts], pts);
+    await new Promise((r) => setTimeout(r, 30));
+    overlay.destroy();
+    assert.equal(map.liveScratch.length, 0, "destroy must not leave an orphan overlay behind");
+  });
+
+  test("an empty shape draws nothing at all", async () => {
+    const map = fakeMap();
+    createRegionOverlay(map).show([], []);
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(map.scratch.length, 0, "an empty FeatureCollection is not worth an overlay");
+  });
+
+  test("the default style tells ring, edge and vertex apart", async () => {
+    const map = fakeMap();
+    const overlay = createRegionOverlay(map);
+    const pts = [{ lat: 0, lng: 0 }, { lat: 0, lng: 1 }, { lat: 1, lng: 1 }];
+    overlay.show([pts], pts);
+    await new Promise((r) => setTimeout(r, 30));
+    const style = map.scratch[0].opts.style;
+    const ring = style({ feature: { properties: { role: "ring" } }, index: 0 });
+    const vertex = style({ feature: { properties: { role: "vertex" } }, index: 1 });
+    assert.ok(ring.fillOpacity > 0 && ring.fillOpacity < 1, "a translucent fill, so the raster shows through");
+    assert.equal(vertex.pointRadius, 4, "vertices are circles, in the NEUTRAL style vocabulary");
+    assert.equal(vertex.strokeColor, "#ffffff");
+  });
+
+  test("a caller's own style wins outright", async () => {
+    const map = fakeMap();
+    const mine = { strokeColor: "#f00" };
+    createRegionOverlay(map, { style: mine }).show([[{ lat: 0, lng: 0 }, { lat: 0, lng: 1 }, { lat: 1, lng: 1 }]]);
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(map.scratch[0].opts.style, mine);
+  });
+
+  // The whole reason the overlay exists: the tool is headless, so without this the user draws blind.
+  test("wired to onPreview, a polygon draw is visible from the FIRST click", async () => {
+    const map = fakeMap();
+    const overlay = createRegionOverlay(map);
+    const rd = createRegionDraw(map, { onPreview: (rings, pts) => overlay.show(rings, pts) });
+    rd.start();
+    map.click(0, 0);
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(map.liveScratch.length, 1, "one point is not a ring, but it IS something to look at");
+    assert.deepEqual(roles(overlay.geojson), ["vertex"]);
+
+    map.click(0, 1); map.click(1, 1);
+    await new Promise((r) => setTimeout(r, 30));
+    assert.deepEqual(roles(overlay.geojson), ["ring", "vertex", "vertex", "vertex"]);
   });
 });
 

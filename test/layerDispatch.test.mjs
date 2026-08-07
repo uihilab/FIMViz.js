@@ -204,11 +204,52 @@ describe("modal capture (region-draw interaction)", () => {
 });
 
 describe("tools-panel control specs (pure presets)", () => {
-  test("rasterControls: palette + continuous (with a scale) + opacity + hover", () => {
+  // Every knob RasterSettings.SCALE_KEYS accepts, so the panel and the change-model cannot drift:
+  // a knob the settings layer honours but the preset never offers is a knob nobody can reach.
+  test("rasterControls with a scale: every SCALE_KEY, plus opacity + hover", () => {
     const l = new RasterLayer({});
     l.set({ colorScale: new ColorScale({ palette: "viridis", min: 0, max: 10 }) });
     const keys = rasterControls(l).map((c) => c.key);
-    assert.deepEqual(keys, ["palette", "continuous", "opacity", "hover"]);
+    assert.deepEqual(keys,
+      ["palette", "continuous", "min", "max", "unit", "stops", "colorStops", "opacity", "hover"]);
+  });
+
+  test("rasterControls reads the live scale, not defaults", () => {
+    const l = new RasterLayer({});
+    l.set({ colorScale: new ColorScale({ palette: "viridis", min: 2, max: 46, unit: "m", continuous: true }) });
+    const by = Object.fromEntries(rasterControls(l).map((c) => [c.key, c.value]));
+    assert.equal(by.min, 2);
+    assert.equal(by.max, 46);
+    assert.equal(by.unit, "m");
+    assert.equal(by.continuous, true);
+  });
+
+  // `kind` reports 'classed' whenever stops exist, so reading it would show the box unticked while
+  // the flag it writes was on — and toggling would then appear to do nothing.
+  test("the continuous control reads the FLAG, not the derived kind", () => {
+    const l = new RasterLayer({});
+    const cs = new ColorScale({ palette: "viridis", continuous: true });
+    cs.setStops([{ min: 0, max: 1, color: "#000000" }]);
+    l.set({ colorScale: cs });
+    assert.equal(cs.kind, "classed", "the derived kind says classed…");
+    const by = Object.fromEntries(rasterControls(l).map((c) => [c.key, c.value]));
+    assert.equal(by.continuous, true, "…but the checkbox must reflect the flag it writes");
+  });
+
+  test("the band and gradient controls carry the scale's current mode", () => {
+    const l = new RasterLayer({});
+    const cs = new ColorScale({ palette: "viridis" });
+    cs.setStops([{ min: 0, max: 5, color: "#001122", label: "low" }]);
+    l.set({ colorScale: cs });
+    const by = Object.fromEntries(rasterControls(l).map((c) => [c.key, c.value]));
+    assert.equal(by.stops.length, 1);
+    assert.equal(by.stops[0].color, "#001122");
+    assert.equal(by.colorStops, null, "the three modes are mutually exclusive");
+
+    cs.setColorStops([0, 10], ["#000000", "#ffffff"]);
+    const by2 = Object.fromEntries(rasterControls(l).map((c) => [c.key, c.value]));
+    assert.equal(by2.stops, null, "setColorStops cleared the bands");
+    assert.deepEqual(by2.colorStops, { values: [0, 10], colors: ["#000000", "#ffffff"] });
   });
   test("rasterControls without a scale: just opacity + hover", () => {
     const keys = rasterControls(new RasterLayer({})).map((c) => c.key);

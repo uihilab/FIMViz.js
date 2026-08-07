@@ -64,6 +64,9 @@ const _providers = new Map();
  * @property {(map: any, on: boolean) => void} [setDraggable] - turn pan-by-drag on or off. Drag-based
  *   selection tools suppress it while drawing, because tracing a stroke and panning the map are the
  *   same gesture.
+ * @property {(map: any) => ({metresPerPixel: number, width: number, height: number}|null)} [viewMetrics] -
+ *   ground metres per screen pixel, plus the map's pixel size. What lets a tool be sized in SCREEN
+ *   units (a brush that stays the same width as you zoom) without ever touching a map SDK.
  * @property {(map: any, handles: any[]) => any[]} [applyLayerOrder] - restack overlays to match
  *   `handles`, ordered bottom → top, and RETURN the handles: a provider may have replaced some (the
  *   Google raster path recreates them), so callers must adopt the returned array.
@@ -94,6 +97,14 @@ const _providers = new Map();
  * @type {string}
  */
 export const DEFAULT_PROVIDER = "leaflet";
+
+// Ground metres per screen pixel in Web Mercator: the equator is one 256 px tile at zoom 0, and a
+// degree of longitude shortens by cos(lat). Both providers tile the same way, so both compute it the
+// same way — the only difference is how each spells "give me the zoom and the centre".
+const EQUATOR_M = 40075016.686;
+function metresPerPixelAt(lat, zoom) {
+  return (EQUATOR_M * Math.cos((lat * Math.PI) / 180)) / (256 * Math.pow(2, zoom));
+}
 
 /**
  * Register a map backend.
@@ -426,6 +437,23 @@ registerMapProvider("google", {
    */
   setDraggable(map, on) { map?.setOptions?.({ draggable: !!on }); },
 
+  /**
+   * What one screen pixel is worth on the ground right now, plus the map's pixel size — enough to
+   * express a tool's size in SCREEN units (a brush that stays the same width as you zoom) without the
+   * tool ever touching a map SDK.
+   * @param {any} map @returns {{metresPerPixel: number, width: number, height: number}|null}
+   */
+  viewMetrics(map) {
+    const zoom = map?.getZoom?.(), centre = map?.getCenter?.();
+    if (zoom == null || !centre) return null;
+    const div = map.getDiv?.();
+    return {
+      metresPerPixel: metresPerPixelAt(centre.lat(), zoom),
+      width: div?.offsetWidth ?? 0,
+      height: div?.offsetHeight ?? 0,
+    };
+  },
+
   /** @returns {Promise<void>} resolves once the camera has settled. */
   whenIdle(map, { timeout = 400 } = {}) {
     return new Promise((resolve) => {
@@ -669,6 +697,22 @@ registerMapProvider("leaflet", {
    * @param {any} map @param {boolean} on
    */
   setDraggable(map, on) { if (on) map?.dragging?.enable?.(); else map?.dragging?.disable?.(); },
+
+  /**
+   * Ground metres per screen pixel + the map's pixel size — the same contract the google provider
+   * implements, from Leaflet's own accessors.
+   * @param {any} map @returns {{metresPerPixel: number, width: number, height: number}|null}
+   */
+  viewMetrics(map) {
+    const zoom = map?.getZoom?.(), centre = map?.getCenter?.();
+    if (zoom == null || !centre) return null;
+    const size = map.getSize?.();
+    return {
+      metresPerPixel: metresPerPixelAt(centre.lat, zoom),
+      width: size?.x ?? 0,
+      height: size?.y ?? 0,
+    };
+  },
 
   /** @returns {Promise<void>} resolves once the camera has settled. */
   whenIdle(map, { timeout = 400 } = {}) {

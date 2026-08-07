@@ -26,6 +26,10 @@
   button.on { background:var(--accent); color:#08111f; font-weight:600; }
   code { background:#0f1216; border:1px solid var(--line); border-radius:4px; padding:0 4px; font-size:12px; }
   .none { color:var(--dim); font-size:12px; }
+  .rng { display:none; gap:6px; align-items:center; margin-top:7px; font-size:12px; color:var(--dim); }
+  .rng.on { display:flex; }
+  .rng input { flex:1; min-width:0; }
+  kbd { background:#0f1216; border:1px solid var(--line); border-radius:3px; padding:0 4px; font-size:11px; }
 </style>
 </head>
 <body>
@@ -49,13 +53,16 @@
     <div>
       <h2>Selection <span id="hint-mode"></span></h2>
       <div class="row" id="modes"></div>
+      <label class="rng" id="brush-wrap">brush
+        <input id="brush" type="range" min="0.4" max="8" step="0.2" value="1.6" />
+        <span id="brush-val">1.6vw</span>
+      </label>
       <div class="row" style="margin-top:6px">
-        <button id="draw">Draw</button>
         <button id="finish">Finish</button>
         <button id="clear">Clear</button>
       </div>
       <p class="none" style="margin:6px 0 0">
-        <kbd>Enter</kbd> finish · <kbd>Esc</kbd> cancel · <kbd>Backspace</kbd> undo
+        Pick a tool to arm it · <kbd>Enter</kbd> finish · <kbd>Esc</kbd> cancel · <kbd>Backspace</kbd> undo
       </p>
     </div>
 
@@ -88,12 +95,12 @@
 </script>
 
 <script type="module">
-import { FimViz, Legend } from "fimviz";
+import { FimViz } from "fimviz";
 import {
-  createToast, connectToast, createToolsPanel, createOperationsPanel,
+  createToast, connectToast, createToolsPanel, createOperationsPanel, bindLegend, bindStats,
   createTooltip, bindHoverValue, createInfoWindow, bindFeatureInfo,
-  createRegionDraw, REGION_MODES, createLayerPanel, createLayerSelect,
-  renderLegend, renderStats, layerLabel,
+  createRegionDraw, REGION_MODES, createRegionOverlay, createLayerPanel, createLayerSelect,
+  layerLabel,
 } from "fimviz/ui";
 
 const $ = (s) => document.querySelector(s);
@@ -177,12 +184,12 @@ toast.show(`${layers.length} layers — two overlapping clusters. Click a spot t
 // two ways of choosing it; both route through the same setter so they cannot disagree.
 let selected = raster;
 let regionFilter = null;
-let toolsPanel = null, opsPanel = null;
+let toolsPanel = null, opsPanel = null, legendPanel = null, statsPanel = null;
 
 function refresh() {
   toolsPanel?.destroy();
   opsPanel?.destroy();
-  toolsPanel = createToolsPanel("#tools", { layer: selected, pretty: true });
+  toolsPanel = createToolsPanel("#tools", { layer: selected, pretty: true, reactive: true });
   opsPanel = createOperationsPanel("#ops", {
     layer: selected, pretty: true, fim,
     region: () => regionFilter,
@@ -190,7 +197,6 @@ function refresh() {
     onApply: (l, err) => {
       toast.show(err ? `Operation failed — ${err.message}` : "Applied",
         { level: err ? "error" : "success" });
-      if (!err) readModels();
     },
     // Terminals (zonal stats, group by) return a table, not a layer — so they go to the console
     // rather than the map. A real app would render them; this bench only has to prove they ran.
@@ -201,19 +207,19 @@ function refresh() {
     },
   });
   $("#hint-layers").textContent = `· ${layerLabel(selected)}`;
-  readModels();
-}
 
-async function readModels() {
-  $("#legend").innerHTML = selected.colorScale
-    ? renderLegend(Legend.fromColorScale(selected.colorScale), { html: true })
-    : "<span class='none'>no colour scale</span>";
-  try {
-    $("#stats").innerHTML = renderStats(
-      await selected.getStats({ filter: regionFilter ?? undefined }), { html: true });
-  } catch {
-    $("#stats").innerHTML = "<span class='none'>—</span>";   // a vector layer has no raster stats
-  }
+  // The legend and statistics keep THEMSELVES current: they subscribe to the selected layer's own
+  // restyle/recomputed/rendered events, so nothing below has to remember to re-read after an
+  // operation or a palette change. Only the region is invisible to the layer, so only that calls
+  // update() by hand — see the selection handlers.
+  legendPanel?.destroy();
+  statsPanel?.destroy();
+  legendPanel = bindLegend(selected, { root: $("#legend"), empty: "no colour scale" });
+  statsPanel = bindStats(selected, {
+    root: $("#stats"),
+    filter: () => regionFilter,
+    empty: "—",                     // a vector layer has no raster statistics
+  });
 }
 
 function select(layer) {
@@ -237,59 +243,80 @@ createLayerSelect(fim, { fit: false, onSelect: (l) => layerPanel.select(l) });
 // branches on which mode drew the shape — the statistics call and the Mask operation take the same
 // object either way. That is the whole point of the generalization.
 //
-// There is no on-map outline here on purpose: the engine names no map SDK, so drawing the shape is
-// the host's job. Applying "Mask to region" is the visual confirmation, and a better one — it shows
-// the geometry as the raster ops actually see it.
+// createRegionOverlay is what puts the shape on the map. The draw tool itself is headless (it names
+// no map SDK, which is what lets it work on both providers); the overlay is the other half.
 const HOWTO = {
   polygon: "Click each corner, then Finish (or Enter).",
   rectangle: "Click two opposite corners — the second one finishes it.",
   freehand: "Press and drag to trace an outline; release to finish.",
-  brush: "Press and drag to paint over the area; release to finish.",
+  brush: "Press and drag to paint; the brush is sized in vw, so it holds its width as you zoom.",
 };
 
-let regionDraw = createRegionDraw(fim, {
+const regionOverlay = createRegionOverlay(fim);
+
+const regionDraw = createRegionDraw(fim, {
   mode: "polygon",
-  brushRadius: 400,
-  minSampleMetres: 25,          // a slow drag should not become ten thousand vertices
+  // A screen-relative brush: '1.6vw' is 1.6% of the MAP's width, re-resolved per stamp, so it keeps
+  // its apparent size as you zoom. A plain number would be metres — a fixed ground footprint.
+  brushRadius: "1.6vw",
+  minSampleMetres: 8,           // a slow drag should not become ten thousand vertices
   onPoint: (pts) => { $("#hint-mode").textContent = `· ${pts.length}`; },
+  onPreview: (rings, pts) => regionOverlay.show(rings, pts),
   onComplete: (filter, pts, rings) => {
-    $("#draw").classList.remove("on");
+    setArmed(null);
+    regionOverlay.show(rings, pts);
     regionFilter = filter;
     if (!filter) return toast.show(`Not enough of a shape yet (${pts.length} points)`, { level: "warn" });
     toast.show(`${rings.length} ring${rings.length === 1 ? "" : "s"} from ${pts.length} points — `
       + "statistics are scoped to it; try Mask to region", { level: "success", timeout: 6000 });
-    readModels();
+    statsPanel?.update();      // the layer cannot know a region was drawn — this is the one manual re-read
   },
-  onCancel: () => { $("#draw").classList.remove("on"); $("#hint-mode").textContent = ""; },
+  onCancel: () => { setArmed(null); regionOverlay.clear(); $("#hint-mode").textContent = ""; },
 });
+
+// Picking a tool ARMS it. Having a separate "Draw" button was the wrong shape: choosing "brush" and
+// then dragging is the obvious thing to do, and it silently panned the map instead, because the tool
+// was never started and so never took pan-by-drag away.
+const modeButtons = new Map();
+function setArmed(mode) {
+  for (const [m, b] of modeButtons) b.classList.toggle("on", m === mode);
+  $("#brush-wrap").classList.toggle("on", mode === "brush");
+}
 
 for (const mode of REGION_MODES) {
   const b = document.createElement("button");
   b.textContent = mode;
-  b.classList.toggle("on", mode === regionDraw.mode);
-  b.addEventListener("click", () => {
+  modeButtons.set(mode, b);
+  b.addEventListener("click", async () => {
+    if (regionDraw.active && regionDraw.mode === mode) {   // clicking the armed tool disarms it
+      regionDraw.cancel();
+      return;
+    }
     regionDraw.setMode(mode);
-    for (const other of $("#modes").children) other.classList.toggle("on", other === b);
+    setArmed(mode);
     $("#hint-mode").textContent = "";
+    // The camera must be still before the first click: a click resolved mid-animation is projected
+    // against the pre-animation view and lands somewhere else entirely.
+    await fim.whenIdle();
+    regionDraw.start();
     toast.show(HOWTO[mode], { timeout: 5000 });
   });
   $("#modes").append(b);
 }
 
-$("#draw").addEventListener("click", async () => {
-  $("#draw").classList.add("on");
-  // The camera must be still before the first click: a click resolved mid-animation is projected
-  // against the pre-animation view and lands somewhere else entirely.
-  await fim.whenIdle();
-  regionDraw.start();
-  toast.show(HOWTO[regionDraw.mode]);
+$("#brush").addEventListener("input", (e) => {
+  const vw = `${Number(e.target.value).toFixed(1)}vw`;
+  $("#brush-val").textContent = vw;
+  regionDraw.brushRadius = vw;
 });
+
 $("#finish").addEventListener("click", () => regionDraw.finish());
 $("#clear").addEventListener("click", () => {
   regionDraw.cancel();
+  regionOverlay.clear();
   regionFilter = null;
   $("#hint-mode").textContent = "";
-  readModels();
+  statsPanel?.update();
   toast.show("Region cleared");
 });
 

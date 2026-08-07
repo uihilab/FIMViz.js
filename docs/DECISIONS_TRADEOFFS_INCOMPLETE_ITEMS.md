@@ -270,7 +270,7 @@ is the *why*, those are the *what*.
   uses — is what actually holds across the seam, and it is what the rest of the engine already does
   (nothing does `instanceof Dataset`). Arrays are checked first, since a polygon is an object too.
   **Rejected:** externalizing `fimviz` from the `ui` bundle. It would give one shared class, but
-  `fimviz/ui` exists precisely so a host can take a toast or a tools panel for ~17 KB instead of pulling
+  `fimviz/ui` exists precisely so a host can take a toast or a tools panel for ~42 KB instead of pulling
   the whole engine; duck-typing fixes the identity problem without giving that up, and generalizes to a
   host passing its own filter object.
 
@@ -286,6 +286,28 @@ is the *why*, those are the *what*.
   lifecycle, key handling, camera-freeze and trailing-click discipline — the ~15 lines that differ per
   tool are dwarfed by the ~80 that do not, and a host wanting a toolbar would have had to tear one tool
   down and build another on every mode switch rather than call `setMode()`.
+
+- **"Headless" left the selection tools with nothing drawing them — a real defect, found in the
+  browser.** `createRegionDraw` names no map SDK, which is exactly what lets it run on Google, Leaflet
+  and a test's fake map. The consequence nobody had checked was that clicking three points showed
+  *nothing at all*, which reads as the tool being broken rather than as a documented division of
+  labour. `ui/regionOverlay.js` is the missing half, and it draws three feature kinds because **a
+  selection is visible long before it is a polygon**: a vertex marker from the first click, an open
+  edge line at two points, a closed ring at three. `onPreview` had to start carrying `points` as well
+  as `rings` for the same reason — a host given only rings has nothing to show until the third click.
+  **Rejected:** letting the tool draw directly. It would have to name a map SDK, or `fimviz/ui` would
+  have to import the provider registry — pulling Leaflet into the ~42 KB bundle whose whole point is
+  not to. The seam is `fim.addScratchVector` instead: engine-side, provider-neutral, and deliberately
+  **not a Layer** (never hit-tested, reordered, listed, or saved — scaffolding, not data).
+
+- **Brush size can be a SCREEN size, not just metres.** A brush measured in ground metres doubles and
+  halves under the cursor as you zoom, which is the one thing a brush must not do. `brushRadius` now
+  also takes `'2vw'`/`'2vh'`/`'20px'`, resolved per stamp against a new optional provider method
+  `viewMetrics` (metres-per-pixel + the map's pixel size, computed identically on both providers from
+  zoom and centre latitude). Metres stay available and stay the default, because "300 m either side of
+  this line" is a real analytical request. `vw` is a percentage of the **map container**, not the
+  window: the map is the surface being painted, and a page with a sidebar would otherwise hand you a
+  brush wider than the map.
 
 - **The trailing click after a drag is eaten, not ignored.** A press-drag-release emits `mousedown`,
   `mouseup`, *and then* `click`. Freehand and brush auto-finish on `mouseup` — which releases the modal
@@ -310,6 +332,43 @@ is the *why*, those are the *what*.
   method signatures. `slope(opts)` and `combine(others, opts)` carry no runtime type information, and
   the useful parts — that resample's method list is GDAL-gated, that clip should prefill from the
   layer's own bounds — are not in the signature at all.
+
+- **The tools panel offers every knob the change-model accepts, and the two mode-switching ones needed
+  real editors.** `RasterSettings.SCALE_KEYS` has always listed seven; `rasterControls` offered two. A
+  knob the settings layer honours but no preset exposes is a knob nobody can reach, so the gap was the
+  bug. `min`/`max`/`unit` are ordinary inputs; `stops` (discrete bands) and `colorStops` (gradient
+  control points) are row editors — the same widget with two row shapes, since a band is
+  `{min,max,color,label}` and a control point is `{value,color}`. Both write the WHOLE array on every
+  edit, because that is what `setStops`/`setColorStops` take: there is no per-row engine call to route
+  to. **Rejected:** a JSON textarea for the two array knobs. General, and it would have been an hour's
+  work, but it makes the most structured part of the scale the least editable, and every typo becomes a
+  parse error instead of an impossible state.
+
+  The panel **does not police the three mutually-exclusive colouring modes** — it inherits the exclusion
+  from the engine, where `setPalette`/`setStops`/`setColorStops` each clear the others. So adding a band
+  leaves palette mode on its own, and picking a palette is how you get back. Neither editor has a
+  "clear", because emptying `stops` does not restore palette mode: `setStops([])` leaves the scale
+  explicit with zero bands — nothing painted. A separate "mode" control was **rejected** for the same
+  reason: it would be a second, weaker copy of a rule the engine already enforces, and the two could
+  disagree.
+
+- **The read-model panels bind themselves; the tools panel does so only on request.** `bindLegend`/
+  `bindStats` subscribe to the layer's own `restyle`/`recomputed`/`rendered` and repaint, so a host
+  never has to remember to re-read after an op — the example page's hand-written `readModels()` is
+  gone. `settings` is excluded from that list because it also fires for knobs that change neither the
+  colours nor the pixels. Two properties the hand-rolled version did not have: **coalescing** (one
+  settings write that redraws emits `recomputed` *and* `rendered`, so reads batch per microtask) and
+  **ordering** (`getStats()` is async; a token drops a stale result rather than letting it paint over a
+  newer one — a lagging panel is recoverable, a wrong one is not).
+
+  `createToolsPanel` takes the same treatment behind `reactive: true`, and the asymmetry is deliberate:
+  **it is made of live inputs, and a restyle arrives on every keystroke-driven commit**, so a naive
+  subscription rebuilds the field out from under the cursor. The rule is to defer while focus is inside
+  the panel and redraw on `focusout` — the user's own edits are exactly the ones needing no repaint,
+  since the control they are typing in already holds the value. **Rejected:** re-rendering and then
+  restoring focus + selection by control id. It works until a control's identity changes underneath it
+  (which is precisely what the band editor does when a row is added), and it fights the user for the
+  caret on every keystroke to fix a staleness nobody can observe mid-edit.
 
 - **Terminals stay in the same panel but report on a different channel.** `zonalStats` and `groupBy`
   return a *table*, not a Dataset, so routing them through `onApply` would have told the host "the
@@ -713,6 +772,21 @@ across NetCDF4, Zarr and GRIB2). Four defects that `npm test` structurally could
   container's *descendants* for a `#map`, so a container that was *itself* `#map` got another one
   nested inside it. Fixed by treating a container named `map` as already providing the map div on the
   bare-engine path (with a runtime there is a real widget to inject, and the host owns the naming).
+
+**Fixed — the selection tools drew nothing, and the brush panned the map.** The first browser pass over
+the four-mode selection tier found two defects that every one of the 52 headless tests had been blind to,
+for the same underlying reason: both live in the seam between the tool and the map, and the tool is
+headless by design.
+
+- *Nothing was rendering the shape.* The module produces `{lat,lng}` and names no map SDK, so drawing was
+  "the host's job" — and no host was doing it. Fixed by `ui/regionOverlay.js` + `fim.addScratchVector`;
+  see §1.1. The lesson generalizes: a division of labour that no shipped caller performs is a missing
+  feature, not a documented boundary.
+- *Dragging with the brush selected panned the map.* Not the drag lock — `setDraggable` works. The
+  example's toolbar let you pick a mode without arming the tool, and `start()` is what takes pan-by-drag
+  away, so the obvious gesture (pick "brush", drag) hit an unarmed tool and Leaflet's own dragging. The
+  separate "Draw" button was the wrong shape; picking a tool now arms it. `UI.md` states the rule
+  explicitly, because any host can build the same trap.
 
 **Open — region draw drops its first vertex.** Driving step 8 of `verify.html` with four clicks records
 only three, and the recorded ring is the *last three* corners: the first click after

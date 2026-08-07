@@ -80,13 +80,16 @@ describe("ui: createToolsPanel", () => {
     assert.throws(() => UI.createToolsPanel("#nope", { layer: rasterLayer() }), /not found/);
   });
 
-  test("the raster preset renders palette / continuous / opacity / hover", () => {
+  test("the raster preset renders every ColorScale knob, plus opacity and hover", () => {
     const { el } = UI.createToolsPanel(host(), { layer: rasterLayer() });
-    const labels = [...el.querySelectorAll("span")].map((s) => s.textContent);
-    assert.deepEqual(labels, ["Palette", "Continuous", "Opacity", "Hover value"]);
+    const labels = [...el.querySelectorAll("label>span, .fim-stops>span.hd")].map((s) => s.textContent);
+    assert.deepEqual(labels,
+      ["Palette", "Continuous", "Min", "Max", "Unit", "Bands", "Gradient", "Opacity", "Hover value"]);
     assert.equal(el.querySelector("select").tagName, "SELECT");
     assert.equal(el.querySelectorAll("input[type=checkbox]").length, 2);
     assert.equal(el.querySelector("input[type=range]").max, "1");
+    assert.equal(el.querySelectorAll("input[type=number][data-control]").length, 2, "min and max");
+    assert.equal(el.querySelector("input[type=text][data-control=unit]").tagName, "INPUT");
   });
 
   test("the vector preset offers a colour picker when no scale is attached", () => {
@@ -99,7 +102,8 @@ describe("ui: createToolsPanel", () => {
   test("rasterControls/vectorControls are usable standalone — they return plain specs", () => {
     const spec = UI.rasterControls(rasterLayer());
     assert.ok(Array.isArray(spec));
-    assert.deepEqual(spec.map((c) => c.type), ["select", "checkbox", "range", "checkbox"]);
+    assert.deepEqual(spec.map((c) => c.type),
+      ["select", "checkbox", "number", "number", "text", "bands", "gradient", "range", "checkbox"]);
     assert.ok(UI.rasterControls(spec[0].options ? rasterLayer() : rasterLayer())[0].options.length > 1,
       "the palette select is populated from the real palette registry");
     assert.deepEqual(UI.vectorControls(new VectorLayer({ id: "v" })).map((c) => c.key),
@@ -125,6 +129,182 @@ describe("ui: createToolsPanel", () => {
     hover.checked = false;
     hover.dispatchEvent(new dom.window.Event("change"));
     assert.equal(layer.settings.get("hover"), false);
+  });
+
+  // ── the ColorScale knobs beyond palette (PACKAGE_ROADMAP §5) ─────────────────────────
+  //
+  // These all route through layer.settings.set(), which coalesces the ColorScale-bound keys into one
+  // colorScale.set(patch) — so what is asserted is the SCALE's state, not the panel's.
+  const change = (node) => node.dispatchEvent(new dom.window.Event("change"));
+  const ctl = (el, key) => el.querySelector(`[data-control="${key}"]`);
+  const stopRows = (el, key) => [...ctl(el, key).querySelectorAll(".fim-stop")];
+  const field = (row, name) => row.querySelector(`[data-field="${name}"]`);
+
+  test("min / max / unit reach the ColorScale", () => {
+    const layer = rasterLayer();
+    const { el } = UI.createToolsPanel(host(), { layer });
+    const min = ctl(el, "min"), max = ctl(el, "max"), unit = ctl(el, "unit");
+    assert.equal(min.value, "0", "seeded from the live scale");
+    min.value = "2"; change(min);
+    max.value = "46"; change(max);
+    unit.value = "m"; change(unit);
+    const cs = layer.colorScale.toJSON();
+    assert.equal(cs.min, 2);
+    assert.equal(cs.max, 46);
+    assert.equal(cs.unit, "m");
+  });
+
+  // Blanking a number field to retype it must not be read as zero — that would silently rescale the
+  // colours between two keystrokes.
+  test("an emptied number field commits nothing", () => {
+    const layer = rasterLayer();
+    const { el } = UI.createToolsPanel(host(), { layer });
+    const max = ctl(el, "max");
+    max.value = ""; change(max);
+    assert.equal(layer.colorScale.toJSON().max, 10, "unchanged");
+  });
+
+  test("adding a band switches the scale into discrete mode", () => {
+    const layer = rasterLayer();
+    const { el } = UI.createToolsPanel(host(), { layer });
+    assert.equal(stopRows(el, "stops").length, 0, "a palette scale starts with no bands");
+
+    ctl(el, "stops").querySelector(".fim-stops-add").click();
+    const rows = stopRows(el, "stops");
+    assert.equal(rows.length, 1);
+    const cs = layer.colorScale.toJSON();
+    assert.equal(cs.stops.length, 1, "one band reached the scale");
+    assert.equal(layer.colorScale.isExplicit, true, "…and the scale left palette mode");
+
+    const to = field(rows[0], "max");
+    to.value = "5"; change(to);
+    const label = field(rows[0], "label");
+    label.value = "shallow"; change(label);
+    const after = layer.colorScale.toJSON().stops[0];
+    assert.equal(after.max, 5);
+    assert.equal(after.label, "shallow");
+  });
+
+  test("removing a band rewrites the whole array", () => {
+    const layer = rasterLayer();
+    const { el } = UI.createToolsPanel(host(), { layer });
+    const add = ctl(el, "stops").querySelector(".fim-stops-add");
+    add.click(); add.click();
+    assert.equal(layer.colorScale.toJSON().stops.length, 2);
+    stopRows(el, "stops")[0].querySelector("button").click();
+    assert.equal(layer.colorScale.toJSON().stops.length, 1);
+    assert.equal(stopRows(el, "stops").length, 1, "and the editor redrew");
+  });
+
+  // setColorStops throws below two points, so one is an incomplete edit — shown, not committed.
+  test("a gradient commits only once it has two control points", () => {
+    const layer = rasterLayer();
+    const { el } = UI.createToolsPanel(host(), { layer });
+    const add = ctl(el, "colorStops").querySelector(".fim-stops-add");
+
+    add.click();
+    assert.equal(layer.colorScale.toJSON().colorStops, null, "one point is not a gradient");
+    assert.equal(stopRows(el, "colorStops").length, 1, "but it is on screen, mid-edit");
+
+    add.click();
+    const cs = layer.colorScale.toJSON();
+    assert.equal(cs.colorStops.values.length, 2);
+    assert.equal(cs.colorStops.colors.length, 2);
+  });
+
+  test("switching to a gradient clears the bands, and picking a palette clears both", () => {
+    const layer = rasterLayer();
+    const { el } = UI.createToolsPanel(host(), { layer });
+    ctl(el, "stops").querySelector(".fim-stops-add").click();
+    assert.ok(layer.colorScale.toJSON().stops.length);
+
+    const grad = ctl(el, "colorStops").querySelector(".fim-stops-add");
+    grad.click(); grad.click();
+    assert.equal(layer.colorScale.toJSON().stops, null, "the three modes are mutually exclusive");
+
+    const sel = el.querySelector("select");
+    sel.value = "plasma"; change(sel);
+    const cs = layer.colorScale.toJSON();
+    assert.equal(cs.colorStops, null);
+    assert.equal(cs.palette, "plasma", "picking a palette is how you leave the other two modes");
+  });
+
+  test("the editors are seeded from a scale that already has bands", () => {
+    const layer = rasterLayer();
+    layer.colorScale.setStops([
+      { min: 0, max: 1, color: "#001122", label: "low" },
+      { min: 1, max: 2, color: "#334455", label: "high" },
+    ]);
+    const { el } = UI.createToolsPanel(host(), { layer });
+    const rows = stopRows(el, "stops");
+    assert.equal(rows.length, 2);
+    assert.equal(field(rows[0], "color").value, "#001122");
+    assert.equal(field(rows[1], "label").value, "high");
+  });
+
+  // A colour input rejects anything that is not #rrggbb, so a stop carrying a CSS name would render
+  // as an empty swatch and then write that empty value straight back into the scale.
+  test("a non-hex stop colour degrades to a valid swatch instead of blanking", () => {
+    const layer = rasterLayer();
+    layer.colorScale.setStops([{ min: 0, max: 1, color: "rebeccapurple" }]);
+    const { el } = UI.createToolsPanel(host(), { layer });
+    assert.match(field(stopRows(el, "stops")[0], "color").value, /^#[0-9a-f]{6}$/i);
+  });
+
+  test("a control's note is rendered with it", () => {
+    const { el } = UI.createToolsPanel(host(), { layer: rasterLayer() });
+    const notes = [...el.querySelectorAll(".fim-note")].map((n) => n.textContent);
+    assert.equal(notes.length, 2, "bands and gradient each explain themselves");
+    assert.match(notes[0], /discrete/);
+  });
+
+  // ── reactive mode ────────────────────────────────────────────────────────────────────
+  //
+  // Opt-in, and the focus rule is why: unlike a legend, this panel is made of LIVE INPUTS, and a
+  // restyle arrives on every keystroke-driven commit. Rebuilding blindly would rip the field out from
+  // under the cursor.
+  test("reactive:true follows a change made somewhere else", async () => {
+    const layer = rasterLayer();
+    const { el } = UI.createToolsPanel(host(), { layer, reactive: true });
+    assert.equal(el.querySelector("select").value, "viridis");
+    layer.set({ palette: "plasma" });                 // e.g. another panel, or host code
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(el.querySelector("select").value, "plasma", "the panel re-read the layer");
+  });
+
+  test("reactive:false (the default) does not", async () => {
+    const layer = rasterLayer();
+    const { el } = UI.createToolsPanel(host(), { layer });
+    layer.set({ palette: "plasma" });
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(el.querySelector("select").value, "viridis");
+  });
+
+  test("a redraw is DEFERRED while focus is inside, then happens when focus leaves", async () => {
+    const layer = rasterLayer();
+    const { el } = UI.createToolsPanel(host(), { layer, reactive: true });
+    const unit = el.querySelector('input[data-control="unit"]');
+    unit.focus();
+    assert.equal(document.activeElement, unit);
+
+    layer.set({ palette: "plasma" });
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(document.activeElement, unit, "the field the user is in must survive");
+    assert.equal(el.querySelector("select").value, "viridis", "…so the redraw waited");
+
+    unit.blur();
+    el.dispatchEvent(new dom.window.Event("focusout"));
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(el.querySelector("select").value, "plasma", "and landed once the field was released");
+  });
+
+  test("destroy() releases the subscription", async () => {
+    const layer = rasterLayer();
+    const p = UI.createToolsPanel(host(), { layer, reactive: true });
+    p.destroy();
+    layer.set({ palette: "plasma" });
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(host().querySelectorAll("[data-fim-ui=tools-panel]").length, 0);
   });
 
   test("a custom controls ARRAY replaces the preset", () => {
@@ -671,6 +851,159 @@ describe("ui: renderLegend / renderStats", () => {
   });
 });
 
+// ── the LIVE half: bindLegend / bindStats ───────────────────────────────────────────────
+//
+// The point of these is that a host never has to remember to re-read after a change. So what is
+// asserted is that a change made ANYWHERE — layer.set(), another panel, a preset — reaches the DOM
+// without anyone calling update().
+describe("ui: bindLegend / bindStats", () => {
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+
+  /** A raster layer with real pixels, so getStats() has something to count. */
+  function statsLayer() {
+    const l = rasterLayer();
+    l.rasterData = Float64Array.from([1, 2, 3, 4]);
+    l.meta = { bw: 0, bs: 0, be: 2, bn: 2, width: 2, height: 2, unit: "m" };
+    return l;
+  }
+
+  test("bindLegend mounts, paints, and repaints when the scale changes", async () => {
+    const layer = rasterLayer();
+    const b = UI.bindLegend(layer, { root: host() });
+    await tick();
+    assert.equal(b.el.getAttribute("data-fim-ui"), "legend");
+    assert.ok(b.el.innerHTML.length > 0, "painted on mount, without an explicit update()");
+
+    const before = b.el.innerHTML;
+    layer.set({ palette: "plasma" });
+    await tick();
+    assert.notEqual(b.el.innerHTML, before, "a restyle anywhere reaches the panel");
+  });
+
+  test("bindStats reads the layer's statistics and follows a recompute", async () => {
+    const layer = statsLayer();
+    const b = UI.bindStats(layer, { root: host() });
+    await tick();
+    assert.match(b.el.innerHTML, /count/);
+    assert.ok(b.el.innerHTML.includes("4"), "four pixels");
+
+    layer.rasterData = Float64Array.from([1, 2]);
+    layer.meta = { ...layer.meta, width: 2, height: 1 };
+    layer.emit("recomputed", {});
+    await tick();
+    assert.ok(b.el.innerHTML.includes("2"), "the panel re-read after the pixels changed");
+  });
+
+  test("a filter getter is re-read on update() — a drawn region the layer knows nothing about", async () => {
+    const layer = statsLayer();
+    let region = null;
+    const b = UI.bindStats(layer, { root: host(), filter: () => region });
+    await tick();
+    const all = b.el.innerHTML;
+
+    region = new SpatialFilter([{ lat: 0, lng: 0 }, { lat: 0, lng: 1 }, { lat: 1, lng: 1 }, { lat: 1, lng: 0 }]);
+    b.update();
+    await tick();
+    assert.notEqual(b.el.innerHTML, all, "the scoped count differs from the total");
+  });
+
+  // One logical change can emit two of the subscribed events; the panel must not read twice.
+  test("several events in one tick coalesce into ONE read", async () => {
+    const layer = statsLayer();
+    let reads = 0;
+    const real = layer.getStats.bind(layer);
+    layer.getStats = (o) => { reads++; return real(o); };
+    const b = UI.bindStats(layer, { root: host() });
+    await tick();
+    assert.equal(reads, 1, "the mount paint");
+
+    layer.emit("restyle", {}); layer.emit("recomputed", {}); layer.emit("rendered", {});
+    await tick();
+    assert.equal(reads, 2, "three events, one re-read");
+    b.off();
+  });
+
+  // getStats is async: a fast sequence can resolve out of order, and painting a stale result over a
+  // newer one is worse than lagging — the panel would be simply wrong, with nothing to trigger a fix.
+  test("a slow read that resolves late is DROPPED, not painted over a newer one", async () => {
+    const layer = statsLayer();
+    const delays = [40, 0];
+    layer.getStats = () => new Promise((res) => {
+      const d = delays.shift() ?? 0;
+      const value = d ? { toJSON: () => ({ count: 111 }) } : { toJSON: () => ({ count: 222 }) };
+      setTimeout(() => res(value), d);
+    });
+    const b = UI.bindStats(layer, { root: host() });
+    await tick();
+    layer.emit("restyle", {});              // the second, fast read overtakes the first
+    await new Promise((r) => setTimeout(r, 80));
+    assert.ok(b.el.innerHTML.includes("222"), "the newer result won");
+    assert.ok(!b.el.innerHTML.includes("111"), "and the stale one never landed");
+  });
+
+  test("empty text stands in for a layer with nothing to show", async () => {
+    const layer = new RasterLayer({ id: "bare" });      // no colour scale, no pixels
+    const b = UI.bindLegend(layer, { root: host(), empty: "no colour scale" });
+    await tick();
+    assert.equal(b.el.textContent, "no colour scale");
+  });
+
+  test("off() unsubscribes; destroy() also takes the element away", async () => {
+    const layer = rasterLayer();
+    const b = UI.bindLegend(layer, { root: host() });
+    await tick();
+    const painted = b.el.innerHTML;
+    b.off();
+    layer.set({ palette: "plasma" });
+    await tick();
+    assert.equal(b.el.innerHTML, painted, "a released binding must stop repainting");
+
+    const c = UI.bindStats(statsLayer(), { root: host() });
+    await tick();
+    c.destroy();
+    assert.equal(host().querySelectorAll("[data-fim-ui=stats]").length, 0);
+  });
+
+  test("a removed layer clears its panel and releases the subscription", async () => {
+    const layer = rasterLayer();
+    const b = UI.bindLegend(layer, { root: host(), empty: "—" });
+    await tick();
+    assert.ok(b.el.innerHTML.length > 1);
+    layer.emit("removed", {});
+    await tick();
+    assert.equal(b.el.textContent, "—", "a stale legend for a layer that is gone is worse than none");
+  });
+
+  test("a read that throws is reported, not left half-painted", async () => {
+    const layer = statsLayer();
+    layer.getStats = () => { throw new Error("boom"); };
+    const b = UI.bindLegend(layer, { root: host() });   // legend still fine
+    const s = UI.bindStats(layer, { root: host(), empty: "—" });
+    await tick();
+    assert.equal(s.el.textContent, "—");
+    assert.ok(b.el.innerHTML.length > 0, "one panel failing must not take the other down");
+  });
+
+  test("a custom render function replaces the built-in", async () => {
+    const layer = rasterLayer();
+    const b = UI.bindLegend(layer, { root: host(), render: (l) => `<b>${l ? "yes" : "no"}</b>` });
+    await tick();
+    assert.equal(b.el.innerHTML, "<b>yes</b>");
+  });
+
+  test("without a root the element is detached, for a host that places it itself", async () => {
+    const b = UI.bindLegend(rasterLayer());
+    await tick();
+    assert.equal(b.el.parentElement, null);
+    assert.ok(b.el.innerHTML.length > 0);
+  });
+
+  test("no layer is a clear error, not a silent empty panel", () => {
+    assert.throws(() => UI.bindLegend(null), /a layer is required/);
+    assert.throws(() => UI.bindStats(undefined), /a layer is required/);
+  });
+});
+
 describe("ui: createToast", () => {
   test("mounts a container into the given root and shows a message", () => {
     const toast = UI.createToast(host());
@@ -942,10 +1275,11 @@ describe("ui: every handle member", () => {
 describe("ui: the barrel", () => {
   test("exports exactly the documented names", () => {
     assert.deepEqual(Object.keys(UI).sort(), [
-      "REGION_MODES", "bindFeatureInfo", "bindHoverValue", "connectToast", "createInfoWindow",
-      "createLayerPanel", "createLayerSelect", "createOperationsPanel", "createRegionDraw",
-      "createToast", "createToolsPanel", "createTooltip", "layerLabel", "propsTable",
-      "rasterControls", "renderLegend", "renderStats", "vectorControls",
+      "REGION_MODES", "bindFeatureInfo", "bindHoverValue", "bindLegend", "bindStats", "connectToast",
+      "createInfoWindow", "createLayerPanel", "createLayerSelect", "createOperationsPanel",
+      "createRegionDraw", "createRegionOverlay", "createToast", "createToolsPanel", "createTooltip",
+      "layerLabel", "propsTable", "rasterControls", "regionGeoJSON", "renderLegend", "renderStats",
+      "vectorControls",
     ]);
   });
 });

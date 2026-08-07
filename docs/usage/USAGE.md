@@ -92,7 +92,7 @@ import { createToast, createToolsPanel, bindHoverValue } from 'fimviz/ui';
 | Specifier | Resolves to | For |
 |---|---|---|
 | `fimviz` | `dist/fimviz.js` | the whole engine — everything above |
-| `fimviz/ui` | `dist/ui.js` | the [headless UI module](./UI.md) — its **only** home, deliberately not re-exported by the barrel. Its own build entry pulls just the small pure deps (no geotiff, no Maps loader, no GDAL), so a consumer who wants a toast or a tools panel downloads ~17 KB; and with one entry an app can't end up running two copies with two registries |
+| `fimviz/ui` | `dist/ui.js` | the [headless UI module](./UI.md) — its **only** home, deliberately not re-exported by the barrel. Its own build entry pulls just the small pure deps (no geotiff, no Maps loader, no GDAL), so a consumer who wants a toast or a tools panel downloads ~42 KB; and with one entry an app can't end up running two copies with two registries |
 | `fimviz/src` | `src/package/lib.js` | the same barrel as raw, unbundled source — bring your own bundler |
 | `fimviz/src/*` | any source module | the escape hatch for an internal the barrel doesn't re-export, e.g. `fimviz/src/io/parsePrimitives.js` for the parse primitives without the Maps loader |
 
