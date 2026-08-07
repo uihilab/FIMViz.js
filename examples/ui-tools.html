@@ -3,112 +3,291 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>FIMViz — headless UI module (Google + Leaflet)</title>
-<!-- Leaflet needs its stylesheet to lay the map out; the only asset this page loads. -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<title>FIMViz — every fimviz/ui method</title>
 <style>
-  :root { --bg:#0f1216; --panel:#161b22; --line:#2b3440; --fg:#e6edf3; --dim:#8b949e;
-          --ok:#3fb950; --bad:#f85149; --accent:#58a6ff; }
-  @media (prefers-color-scheme: light) {
-    :root { --bg:#fff; --panel:#f6f8fa; --line:#d0d7de; --fg:#1f2328; --dim:#656d76; }
-  }
+  :root { --bg:#0d1117; --panel:#161b22; --line:#2b3440; --fg:#e6edf3; --dim:#8b949e;
+          --ok:#3fb950; --bad:#f85149; --warn:#d29922; --accent:#58a6ff; }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--fg);
-         font:14px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-  header { padding:16px 24px; border-bottom:1px solid var(--line); display:flex; gap:16px; align-items:baseline; flex-wrap:wrap; }
-  h1 { margin:0; font-size:17px; } code { font-family:ui-monospace,Menlo,monospace; }
-  .switch a { font-size:12px; padding:3px 9px; border-radius:999px; border:1px solid var(--line); color:var(--dim); text-decoration:none; }
-  .switch a.on { background:var(--accent); color:#08111f; border-color:var(--accent); font-weight:600; }
-  main { display:grid; grid-template-columns:minmax(340px,1fr) 1.3fr; gap:0; height:calc(100vh - 62px); }
-  @media (max-width:860px) { main { grid-template-columns:1fr; height:auto; } }
-  .controls { padding:14px 18px; overflow:auto; border-right:1px solid var(--line); }
-  section { border:1px solid var(--line); border-radius:8px; margin:0 0 14px; background:var(--panel); }
-  section > h2 { margin:0; padding:9px 12px; font-size:13px; border-bottom:1px solid var(--line); }
-  .body { padding:10px 12px; }
-  button { background:var(--accent); color:#08111f; border:0; border-radius:6px; padding:5px 10px; font-weight:600; cursor:pointer; font-size:12px; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { padding:18px 22px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 6px; font-size:19px; }
+  header p { margin:0; color:var(--dim); font-size:13px; max-width:92ch; }
+  main { padding:18px 22px 60px; display:grid; grid-template-columns:1fr 300px; gap:18px; align-items:start; }
+  .stack { display:flex; flex-direction:column; gap:16px; min-width:0; }
+  section { border:1px solid var(--line); border-radius:9px; background:var(--panel); }
+  section > h2 { margin:0; padding:10px 13px; font-size:13.5px; border-bottom:1px solid var(--line);
+                 display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .body { padding:12px 13px; display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start; }
+  .col { display:flex; flex-direction:column; gap:7px; min-width:200px; }
+  .grow { flex:1 1 300px; min-width:260px; }
+  button { background:var(--accent); color:#08111f; border:0; border-radius:6px; padding:4px 9px;
+           font-weight:600; cursor:pointer; font-size:11.5px; font-family:ui-monospace,Menlo,monospace; }
   button.sec { background:transparent; color:var(--accent); border:1px solid var(--line); }
-  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  input[type=file] { font-size:12px; max-width:100%; } input[type=text] { background:var(--bg); color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:5px 8px; font-size:12px; }
-  .host { min-height:20px; } .muted { color:var(--dim); font-size:12px; }
-  .pill { font-size:11px; padding:1px 7px; border-radius:999px; border:1px solid var(--line); color:var(--dim); }
-  .ok { color:var(--ok); } .bad { color:var(--bad); }
-  #map { height:100%; min-height:480px; position:relative; background:#1b2230; }
-  #keygate { position:absolute; inset:0; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; text-align:center; padding:24px; }
+  button.prop { background:transparent; color:var(--dim); border:1px dashed var(--line); }
+  .row { display:flex; gap:5px; flex-wrap:wrap; align-items:center; }
+  input, select { background:#0f1216; color:var(--fg); border:1px solid var(--line);
+                  border-radius:5px; padding:3px 6px; font-size:11.5px; }
+  input[type=number], input[type=text] { width:78px; }
+  pre { margin:0; background:#0f1216; border:1px solid var(--line); border-radius:6px; padding:8px 10px;
+        font:11px/1.45 ui-monospace,Menlo,monospace; max-height:190px; overflow:auto; white-space:pre-wrap; }
+  .pill { font:10.5px ui-monospace,Menlo,monospace; padding:2px 7px; border-radius:99px;
+          border:1px solid var(--line); color:var(--dim); }
+  .pill.ok { color:var(--ok); border-color:var(--ok); }
+  .pill.bad { color:var(--bad); border-color:var(--bad); }
+  .pill.warn { color:var(--warn); border-color:var(--warn); }
+  .hint { color:var(--dim); font-size:11.5px; margin:0; }
+  #map { height:270px; border:1px solid var(--line); border-radius:6px; }
+  label { font-size:11.5px; color:var(--dim); display:flex; gap:4px; align-items:center; }
+  code { background:#0f1216; border:1px solid var(--line); border-radius:4px; padding:0 4px; font-size:11.5px; }
+  /* coverage checklist */
+  aside { position:sticky; top:14px; border:1px solid var(--line); border-radius:9px; background:var(--panel); }
+  aside h2 { margin:0; padding:10px 13px; font-size:13.5px; border-bottom:1px solid var(--line); }
+  #cover { padding:9px 12px; max-height:78vh; overflow:auto; font:11px ui-monospace,Menlo,monospace; }
+  #cover .grp { color:var(--dim); margin:8px 0 3px; }
+  #cover .i { display:flex; gap:6px; padding:1px 0; color:#6e7681; }
+  #cover .i.done { color:var(--ok); }
+  #cover .i b { font-weight:400; }
 </style>
 </head>
 <body>
+
 <header>
-  <h1>FIMViz — headless <code>ui/</code> module</h1>
-  <span class="switch" id="switch"></span>
-  <span class="muted" id="prov-note"></span>
+  <h1>FIMViz — every <code>fimviz/ui</code> method</h1>
+  <p>All 14 exports and all 24 members of the handles they return, one control each. The panel on the
+     right ticks off each name as you call it, so "did I exercise the whole surface?" is answerable by
+     looking. Serve from the <strong>repo root</strong> (<code>npx serve .</code>); run
+     <code>npm run build</code> after editing <code>src/</code>. Keyless — Leaflet only.
+     Unit equivalents: <code>test/ui.dom.test.mjs</code>.</p>
 </header>
 
 <main>
-  <div class="controls">
-    <section>
-      <h2>1 · Toast <span class="pill">connectToast(fim)</span></h2>
-      <div class="body">
-        <p class="muted">Buttons emit <code>notify</code> on the bus; <code>connectToast</code> renders it. The engine never calls the toast.</p>
-        <div class="row">
-          <button data-toast="info">info</button><button data-toast="success">success</button>
-          <button data-toast="warn">warn</button><button data-toast="error">error</button>
-        </div>
-      </div>
-    </section>
+<div class="stack">
 
-    <section>
-      <h2>2 · Raster: tools panel + hover tooltip <span class="pill" id="p-ras">idle</span></h2>
-      <div class="body">
-        <input type="file" id="ras-file" accept=".tif,.tiff" />
-        <label class="muted"><input type="checkbox" id="ras-warp" checked /> warp to EPSG:4326</label>
-        <p class="muted" style="margin:8px 0 4px">Tools panel (bound to <code>layer.settings</code>):</p>
-        <div class="host" id="ras-tools"></div>
-        <p class="muted" style="margin:8px 0 4px">Legend / Stats (read-models):</p>
-        <div class="host" id="ras-legend"></div><div class="host" id="ras-stats"></div>
-      </div>
-    </section>
-
-    <section>
-      <h2>3 · Vector: tools panel + feature info window <span class="pill" id="p-vec">idle</span></h2>
-      <div class="body">
-        <input type="file" id="vec-file" accept=".geojson,.json,.kml,.kmz,.zip" />
-        <p class="muted" style="margin:8px 0 4px">Click a feature on the map for its properties. Tools panel:</p>
-        <div class="host" id="vec-tools"></div>
-      </div>
-    </section>
-
-    <section>
-      <h2>4 · Multi-layer dispatch <span class="pill" id="p-ml">idle</span></h2>
-      <div class="body">
-        <p class="muted">Stacks 3 translucent overlays near the map centre (each subscribes to <code>click</code>). Click them: dispatch runs <strong>top-down</strong>, stopping on absorption.</p>
-        <div class="row">
-          <button id="ml-stack">stack 3 layers</button><button class="sec" id="ml-clear">clear</button>
-          <label class="muted"><input type="checkbox" id="ml-absorb" /> top absorbs</label>
-          <label class="muted"><input type="checkbox" id="ml-simul" /> simultaneous</label>
-        </div>
-        <pre id="ml-log" style="margin:8px 0 0;padding:8px;background:var(--bg);border:1px solid var(--line);border-radius:6px;font:12px ui-monospace,Menlo,monospace;min-height:56px;white-space:pre-wrap">Stack, then click an overlay.</pre>
-      </div>
-    </section>
-
-    <section>
-      <h2>5 · Region draw → scoped stats <span class="pill" id="p-rg">idle</span></h2>
-      <div class="body">
-        <p class="muted">A <strong>modal</strong> interaction: while drawing, layer hover/click is suppressed (<code>fim.captureInteraction</code>). Click ≥3 points, Finish → a <code>SpatialFilter</code> scopes <code>rasterLayer.getStats({ filter })</code>. Load a raster (§2) first.</p>
-        <div class="row"><button id="rg-draw">draw region</button><button class="sec" id="rg-finish">finish</button><button class="sec" id="rg-clear">clear</button></div>
-        <div class="host" id="rg-out" style="margin-top:8px">—</div>
-      </div>
-    </section>
-
-    <section>
-      <h2>6 · Dataset operations <span class="pill" id="p-ops">idle</span></h2>
-      <div class="body">
-        <p class="muted">Lazy <code>Dataset</code> ops applied to the live raster via <code>deriveSources</code> — <strong>Threshold</strong> (<code>reclassify</code>), <strong>Mask</strong> to the §5 region (<code>mask</code>), Reset. Legend/stats refresh from the transformed grid. Load a raster (§2) first.</p>
-        <div class="host" id="ras-ops"></div>
-      </div>
-    </section>
+<!-- map -->
+<section>
+  <h2>Fixture · a raster + a vector layer <span class="pill" id="p0">loading…</span></h2>
+  <div class="body">
+    <div class="grow"><div id="map"></div></div>
+    <div class="col">
+      <p class="hint">The bindings need real layers and a live map-event bus. Nothing here is a
+         <code>ui</code> method — it is the fixture the rest runs against.</p>
+      <pre id="log0">—</pre>
+    </div>
   </div>
+</section>
 
-  <div id="map"><div id="keygate" style="display:none"></div></div>
+<!-- toast -->
+<section>
+  <h2>toast.js <span class="pill">createToast · connectToast</span> <span class="pill" id="p1">idle</span></h2>
+  <div class="body">
+    <div class="col">
+      <p class="hint"><code>createToast(root, { corner })</code></p>
+      <div class="row">
+        <button class="sec" data-mk-toast="br">br</button><button class="sec" data-mk-toast="bl">bl</button>
+        <button class="sec" data-mk-toast="tr">tr</button><button class="sec" data-mk-toast="tl">tl</button>
+        <button class="sec" data-mk-toast="">root:body</button>
+      </div>
+      <p class="hint"><code>.show(msg, { level, timeout })</code></p>
+      <div class="row">
+        <button data-toast="info">info</button><button data-toast="success">success</button>
+        <button data-toast="warn">warn</button><button data-toast="error">error</button>
+        <button data-toast="bogus">unknown→info</button>
+      </div>
+      <div class="row"><button class="sec" id="toast-persist">timeout:0</button></div>
+      <p class="hint"><code>.clear()</code> · <code>.destroy()</code> · <code>.el</code></p>
+      <div class="row">
+        <button class="sec" id="toast-clear">clear()</button>
+        <button class="sec" id="toast-destroy">destroy()</button>
+        <button class="prop" id="toast-el">.el</button>
+      </div>
+      <p class="hint"><code>connectToast(fim, toast)</code> — emits a real <code>notify</code></p>
+      <div class="row">
+        <button class="sec" data-notify="info">notify info</button>
+        <button class="sec" data-notify="warn">warn</button>
+        <button class="sec" data-notify="error">error</button>
+        <button class="sec" data-notify="success">success</button>
+        <button class="sec" id="ct-default">connectToast(fim) — no toast arg</button>
+      </div>
+    </div>
+    <pre class="grow" id="log1">—</pre>
+  </div>
+</section>
+
+<!-- tooltip -->
+<section>
+  <h2>tooltip.js <span class="pill">createTooltip · bindHoverValue</span> <span class="pill" id="p2">idle</span></h2>
+  <div class="body">
+    <div class="col">
+      <p class="hint"><code>createTooltip(fim, { style })</code> — driven by hand, no map needed</p>
+      <div class="row">
+        <button class="sec" id="tt-new">new (default style)</button>
+        <button class="sec" id="tt-styled">new ({ style })</button>
+      </div>
+      <div class="row">
+        <button id="tt-show">show(evt, html)</button>
+        <button class="sec" id="tt-hide">hide()</button>
+        <button class="sec" id="tt-destroy">destroy()</button>
+        <button class="prop" id="tt-el">.el</button>
+      </div>
+      <p class="hint"><code>bindHoverValue(layer, { tooltip, format })</code> — hover the raster</p>
+      <div class="row">
+        <button class="sec" id="hv-default">default format</button>
+        <button class="sec" id="hv-custom">custom format</button>
+        <button class="sec" id="hv-own">no tooltip arg (makes its own)</button>
+      </div>
+      <div class="row">
+        <button class="sec" id="hv-off">.off()</button>
+        <button class="prop" id="hv-tooltip">.tooltip</button>
+        <label><input type="checkbox" id="hover-toggle" checked /> layer hover setting</label>
+      </div>
+    </div>
+    <pre class="grow" id="log2">—</pre>
+  </div>
+</section>
+
+<!-- info window -->
+<section>
+  <h2>infoWindow.js <span class="pill">createInfoWindow · propsTable · bindFeatureInfo</span>
+      <span class="pill" id="p3">idle</span></h2>
+  <div class="body">
+    <div class="col">
+      <p class="hint"><code>createInfoWindow(fim, { style })</code></p>
+      <div class="row">
+        <button class="sec" id="iw-new">new</button>
+        <button class="sec" id="iw-styled">new ({ style })</button>
+      </div>
+      <div class="row">
+        <button id="iw-open-html">open(evt, html)</button>
+        <button id="iw-open-node">open(evt, Node)</button>
+        <button class="sec" id="iw-close">close()</button>
+        <button class="sec" id="iw-destroy">destroy()</button>
+        <button class="prop" id="iw-el">.el</button>
+      </div>
+      <p class="hint"><code>propsTable(props)</code></p>
+      <div class="row">
+        <button class="sec" id="pt-obj">propsTable(props)</button>
+        <button class="sec" id="pt-empty">propsTable({})</button>
+        <button class="sec" id="pt-none">propsTable()</button>
+        <button class="sec" id="pt-xss">propsTable(&lt;script&gt;)</button>
+      </div>
+      <p class="hint"><code>bindFeatureInfo(layer, { infoWindow, render })</code> — click a lake</p>
+      <div class="row">
+        <button class="sec" id="fi-default">default render</button>
+        <button class="sec" id="fi-custom">custom render</button>
+        <button class="sec" id="fi-own">no infoWindow arg</button>
+        <button class="sec" id="fi-off">.off()</button>
+        <button class="prop" id="fi-iw">.infoWindow</button>
+      </div>
+    </div>
+    <pre class="grow" id="log3">—</pre>
+  </div>
+</section>
+
+<!-- tools panel -->
+<section>
+  <h2>toolsPanel.js <span class="pill">createToolsPanel · rasterControls · vectorControls</span>
+      <span class="pill" id="p4">idle</span></h2>
+  <div class="body">
+    <div class="col">
+      <p class="hint">raster preset</p><div id="ras-tools"></div>
+      <p class="hint">vector preset</p><div id="vec-tools"></div>
+    </div>
+    <div class="col">
+      <p class="hint"><code>controls</code> option</p>
+      <div class="row">
+        <button class="sec" id="tp-array">array (all 5 types)</button>
+        <button class="sec" id="tp-fn">function</button>
+        <button class="sec" id="tp-preset">preset (omit)</button>
+      </div>
+      <div class="row">
+        <button class="sec" id="tp-pretty">pretty:true</button>
+        <button class="sec" id="tp-bare">pretty:false</button>
+      </div>
+      <p class="hint">handle</p>
+      <div class="row">
+        <button id="tp-update">update()</button>
+        <button class="sec" id="tp-destroy">destroy()</button>
+        <button class="prop" id="tp-el">.el</button>
+      </div>
+      <p class="hint">spec builders, standalone</p>
+      <div class="row">
+        <button class="sec" id="tp-raster-c">rasterControls(layer)</button>
+        <button class="sec" id="tp-vector-c">vectorControls(layer)</button>
+      </div>
+      <div id="custom-tools"></div>
+    </div>
+    <pre class="grow" id="log4">—</pre>
+  </div>
+</section>
+
+<!-- read models -->
+<section>
+  <h2>readModels.js <span class="pill">renderLegend · renderStats</span> <span class="pill" id="p5">idle</span></h2>
+  <div class="body">
+    <div class="col">
+      <div class="row">
+        <button class="sec" id="rl-json">renderLegend(l)</button>
+        <button class="sec" id="rl-html">renderLegend(l,{html})</button>
+        <button class="sec" id="rl-null">renderLegend(null)</button>
+        <button class="sec" id="rl-plain">plain object → fallback</button>
+      </div>
+      <div class="row">
+        <button class="sec" id="rs-json">renderStats(s)</button>
+        <button class="sec" id="rs-html">renderStats(s,{html})</button>
+        <button class="sec" id="rs-null">renderStats(null)</button>
+      </div>
+    </div>
+    <div class="col grow"><div id="rm-out"></div><pre id="log5">—</pre></div>
+  </div>
+</section>
+
+<!-- region draw -->
+<section>
+  <h2>regionDraw.js <span class="pill">createRegionDraw</span> <span class="pill" id="p6">idle</span></h2>
+  <div class="body">
+    <div class="col">
+      <p class="hint">Modal — while active, layer hover/click is suppressed. Click ≥3 vertices.</p>
+      <div class="row">
+        <button id="rg-start">start()</button>
+        <button class="sec" id="rg-finish">finish()</button>
+        <button class="sec" id="rg-cancel">cancel()</button>
+      </div>
+      <div class="row">
+        <button class="prop" id="rg-points">.points</button>
+        <button class="prop" id="rg-active">.active</button>
+      </div>
+      <p class="hint">callbacks fire into the log: <code>onPoint</code>, <code>onComplete</code>,
+         <code>onCancel</code></p>
+      <div class="row"><button class="sec" id="rg-stats">use it → scoped stats</button></div>
+    </div>
+    <pre class="grow" id="log6">—</pre>
+  </div>
+</section>
+
+<!-- operations panel -->
+<section>
+  <h2>operationsPanel.js <span class="pill">createOperationsPanel</span> <span class="pill" id="p7">idle</span></h2>
+  <div class="body">
+    <div class="col"><div id="ras-ops"></div></div>
+    <div class="col">
+      <p class="hint">Its three controls are the panel's whole surface. <code>region</code> feeds
+         "Mask" from §regionDraw; <code>onApply</code> reports into the log.</p>
+      <div class="row">
+        <button class="sec" id="op-remount">remount (pretty:false)</button>
+        <button class="sec" id="op-destroy">destroy()</button>
+        <button class="prop" id="op-el">.el</button>
+      </div>
+    </div>
+    <pre class="grow" id="log7">—</pre>
+  </div>
+</section>
+
+</div>
+
+<aside>
+  <h2>Surface coverage <span class="pill" id="cover-pill">0 / 0</span></h2>
+  <div id="cover"></div>
+</aside>
 </main>
 
 <script type="importmap">
@@ -116,185 +295,379 @@
 </script>
 
 <script type="module">
-import { FimViz, RasterLayer, VectorLayer, ColorScale } from "fimviz";
-// The headless UI module has one home — its own subpath, not the engine barrel.
-import {
-  createToast, connectToast, createTooltip, bindHoverValue,
-  createInfoWindow, bindFeatureInfo, createToolsPanel, renderLegend, renderStats, createRegionDraw,
-  createOperationsPanel,
-} from "fimviz/ui";
+import { FimViz, Legend } from "fimviz";
+import * as UI from "fimviz/ui";
 
 const $ = (s) => document.querySelector(s);
-const pill = (id, t, c = "") => { const e = $("#" + id); if (e) { e.textContent = t; e.className = "pill " + c; } };
+const pill = (id, text, cls = "") => { const p = $("#" + id); p.textContent = text; p.className = `pill ${cls}`; };
+const logs = {};
+const log = (n, msg) => {
+  logs[n] = [`${new Date().toLocaleTimeString()}  ${msg}`, ...(logs[n] || [])].slice(0, 30);
+  $("#log" + n).textContent = logs[n].join("\n");
+};
+const show = (n, o) => log(n, typeof o === "string" ? o : JSON.stringify(o, null, 1));
+const oops = (n, id, e) => { console.error(e); pill(id, "error", "bad"); log(n, `✖ ${e.message}`); };
 
-// ── provider selection (Leaflet default = keyless real map; Google = needs a key) ──────────────────
-const params = new URLSearchParams(location.search);
-const provider = params.get("provider") === "google" ? "google" : "leaflet";
-const KEY = "fim_gmaps_key";
-const center = { lat: 41.9779, lng: -91.6656 }, zoom = 11;   // Cedar Rapids (matches SampleFiles)
-
-$("#switch").innerHTML =
-  `<a href="?provider=leaflet" class="${provider === "leaflet" ? "on" : ""}">Leaflet</a> ` +
-  `<a href="?provider=google" class="${provider === "google" ? "on" : ""}">Google</a>`;
-$("#prov-note").textContent = provider === "leaflet"
-  ? "real Leaflet map — no API key needed" : "real Google map — needs an API key";
-
-// ds.reproject().grid() already works — the GDAL warp auto-registers on import of "fimviz".
-
-// Google needs a key; gate the map until one is provided (stored in localStorage, never in source).
-let apiKey = null;
-if (provider === "google") {
-  apiKey = localStorage.getItem(KEY) || "";
-  if (!apiKey) { showKeyGate(); }
+// ── coverage tracker ────────────────────────────────────────────────────────────────────
+// The whole public surface: 14 exports plus every member of the handles they return. `mark()` is
+// called from each control, so the checklist is evidence rather than a claim.
+const SURFACE = {
+  "createToast": ["createToast", "·show", "·clear", "·destroy", "·el"],
+  "connectToast": ["connectToast"],
+  "createTooltip": ["createTooltip", "·show", "·hide", "·destroy", "·el"],
+  "bindHoverValue": ["bindHoverValue", "·tooltip", "·off"],
+  "createInfoWindow": ["createInfoWindow", "·open", "·close", "·destroy", "·el"],
+  "propsTable": ["propsTable"],
+  "bindFeatureInfo": ["bindFeatureInfo", "·infoWindow", "·off"],
+  "createToolsPanel": ["createToolsPanel", "·el", "·update", "·destroy"],
+  "rasterControls": ["rasterControls"],
+  "vectorControls": ["vectorControls"],
+  "renderLegend": ["renderLegend"],
+  "renderStats": ["renderStats"],
+  "createRegionDraw": ["createRegionDraw", "·start", "·finish", "·cancel", "·points", "·active"],
+  "createOperationsPanel": ["createOperationsPanel", "·el", "·destroy"],
+};
+const ALL = Object.entries(SURFACE).flatMap(([g, ms]) => ms.map((m) => (m.startsWith("·") ? `${g}${m}` : m)));
+const done = new Set();
+function renderCover() {
+  const html = Object.entries(SURFACE).map(([g, ms]) =>
+    `<div class="grp">${g}</div>` + ms.map((m) => {
+      const key = m.startsWith("·") ? `${g}${m}` : m;
+      return `<div class="i${done.has(key) ? " done" : ""}"><b>${done.has(key) ? "✓" : "·"}</b>${m}</div>`;
+    }).join("")).join("");
+  $("#cover").innerHTML = html;
+  pill("cover-pill", `${done.size} / ${ALL.length}`, done.size === ALL.length ? "ok" : "");
 }
-function showKeyGate() {
-  const gate = $("#keygate"); gate.style.display = "flex";
-  gate.innerHTML = `<p class="muted">Enter a Google Maps JS API key to run the Google provider (stored only in your browser's localStorage):</p>`;
-  const input = document.createElement("input"); input.type = "text"; input.placeholder = "AIza…"; input.style.width = "min(420px,80%)";
-  const btn = document.createElement("button"); btn.textContent = "Save & load";
-  btn.addEventListener("click", () => { if (input.value.trim()) { localStorage.setItem(KEY, input.value.trim()); location.reload(); } });
-  const use = document.createElement("a"); use.href = "?provider=leaflet"; use.textContent = "…or use Leaflet (no key)"; use.style.cssText = "color:var(--accent);font-size:12px";
-  gate.append(input, btn, use);
-}
+const mark = (...names) => { for (const n of names) done.add(n); renderCover(); };
+renderCover();
 
-// shared widgets + state
-let fim = null, toast = null, tooltip = null, infoWindow = null;
-let rasterLayer = null, rasterTools = null, hoverBinding = null, opsPanel = null;
-let vectorLayer = null, vectorTools = null, infoBinding = null;
-async function refreshRasterReadModels() {
-  if (!rasterLayer) return;
-  $("#ras-legend").innerHTML = renderLegend(rasterLayer.getLegend(), { html: true });
-  $("#ras-stats").innerHTML = renderStats(await rasterLayer.getStats(), { html: true });
-}
+// ── fixture ─────────────────────────────────────────────────────────────────────────────
+const RASTER = "../assets/SampleFiles/Compare_0-0-DEP-12840.tif";
+const VECTOR = "../assets/SampleFiles/iowa_lakes_meta.geojson";
+let fim, rasterLayer, vectorLayer, rasterDs, vectorDs;
 
-async function boot() {
-  fim = await FimViz.mount("map", { provider, apiKey, center, zoom });
+try {
+  fim = await FimViz.mount("#map", { provider: "leaflet" });
+  rasterDs = await fim.addDataset(RASTER);
+  vectorDs = await fim.addDataset(VECTOR);
+  rasterLayer = await fim.addLayer(rasterDs);
+  vectorLayer = await fim.addLayer(vectorDs);
   fim.enableMapEvents(["click", "hover"]);
-  toast = connectToast(fim, createToast());
-  tooltip = createTooltip(fim);
-  infoWindow = createInfoWindow(fim);
+  rasterLayer.fit();
+  pill("p0", "ready", "ok");
+  show(0, { raster: rasterDs.name, crs: rasterDs.crs, vector: vectorDs.name,
+            features: vectorDs.meta.featureCount });
+} catch (e) { oops(0, "p0", e); }
 
-  document.querySelectorAll("[data-toast]").forEach((b) =>
-    b.addEventListener("click", () => fim.emit("notify", { message: `A ${b.dataset.toast} message on ${provider}`, level: b.dataset.toast })));
+// ── toast.js ────────────────────────────────────────────────────────────────────────────
+let toast = UI.createToast(document.body, { corner: "br" });
+mark("createToast");
 
-  wireRaster(); wireVector(); wireMultiLayer(); wireRegion();
-  window.FIM = { fim, toast, tooltip, infoWindow, get rasterLayer() { return rasterLayer; }, get vectorLayer() { return vectorLayer; } };
-  console.log(`[fimviz] ui-tools ready on ${provider} — window.FIM`);
-}
-if (!(provider === "google" && !apiKey)) boot().catch((e) => { $("#prov-note").textContent = "boot failed: " + e.message; console.error(e); });
+document.querySelectorAll("[data-mk-toast]").forEach((b) => b.addEventListener("click", () => {
+  const corner = b.dataset.mkToast;
+  toast.destroy();
+  toast = corner ? UI.createToast(document.body, { corner }) : UI.createToast();
+  toast.show(corner ? `corner ${corner}` : "root defaulted to document.body");
+  mark("createToast", "createToast·show", "createToast·destroy");
+  log(1, corner ? `createToast(body, { corner: "${corner}" })` : "createToast() — no args");
+}));
+document.querySelectorAll("[data-toast]").forEach((b) => b.addEventListener("click", () => {
+  const level = b.dataset.toast;
+  const el = toast.show(`a ${level} message`, { level });
+  mark("createToast·show");
+  pill("p1", `show(${level})`, "ok");
+  log(1, `show(…, { level: "${level}" }) → <div class="${el.className}">`);
+}));
+$("#toast-persist").addEventListener("click", () => {
+  toast.show("persists — timeout:0", { level: "warn", timeout: 0 });
+  mark("createToast·show"); log(1, "show(…, { timeout: 0 })");
+});
+$("#toast-clear").addEventListener("click", () => { toast.clear(); mark("createToast·clear"); log(1, "clear()"); });
+$("#toast-destroy").addEventListener("click", () => {
+  toast.destroy(); toast = UI.createToast(document.body);
+  mark("createToast·destroy"); log(1, "destroy() → re-created");
+});
+$("#toast-el").addEventListener("click", () => {
+  mark("createToast·el");
+  show(1, { el: toast.el.tagName, class: toast.el.className, children: toast.el.children.length,
+            corner: { bottom: toast.el.style.bottom, right: toast.el.style.right } });
+});
+document.querySelectorAll("[data-notify]").forEach((b) => b.addEventListener("click", () => {
+  fim.emit("notify", { message: `notify → ${b.dataset.notify}`, level: b.dataset.notify });
+  log(1, `fim.emit("notify", { level: "${b.dataset.notify}" })`);
+}));
+UI.connectToast(fim, toast); mark("connectToast");
+$("#ct-default").addEventListener("click", () => {
+  const made = UI.connectToast(fim);            // omitting the toast makes one on document.body
+  mark("connectToast");
+  log(1, `connectToast(fim) → created its own toast (${made.el.className})`);
+});
 
-// ── 2 · Raster ──────────────────────────────────────────────────────────────────────────────────
-function wireRaster() {
-  $("#ras-file").addEventListener("change", async (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    pill("p-ras", "parsing…");
-    try {
-      let ds = await FimViz.parseFile(file);
-      if ($("#ras-warp").checked) ds = ds.reproject("EPSG:4326");
-      rasterLayer?.remove(); rasterTools?.destroy(); hoverBinding?.off();
-      rasterLayer = new RasterLayer({ map: fim, type: "userRaster", sources: [ds] });
-      await rasterLayer.render(); rasterLayer.fit();
-      const s0 = await rasterLayer.getStats();
-      const cs = new ColorScale({ palette: "viridis", min: s0.min, max: s0.max, continuous: true, unit: rasterLayer.meta?.unit || "" });
-      rasterLayer.set({ colorScale: cs });
-      rasterTools = createToolsPanel("#ras-tools", { layer: rasterLayer, pretty: true });
-      hoverBinding = bindHoverValue(rasterLayer, { tooltip, format: (v) => `${v.toFixed(2)} ${cs.unit}` });
-      opsPanel?.destroy();
-      opsPanel = createOperationsPanel("#ras-ops", { layer: rasterLayer, region: () => lastRegionFilter, pretty: true, onApply: (_l, err) => { refreshRasterReadModels(); pill("p-ops", err ? "error" : "applied", err ? "bad" : "ok"); } });
-      rasterLayer.on("restyle", refreshRasterReadModels); rasterLayer.on("recomputed", refreshRasterReadModels);
-      await refreshRasterReadModels();
-      pill("p-ras", "rendered · hover the raster", "ok");
-    } catch (err) { pill("p-ras", "error", "bad"); console.error(err); $("#ras-legend").textContent = String(err?.message || err); }
+// ── tooltip.js ──────────────────────────────────────────────────────────────────────────
+let tooltip = UI.createTooltip(fim); mark("createTooltip");
+let hoverBinding = null;
+const fakeEvt = (x, y) => ({ originalEvent: { clientX: x, clientY: y } });
+
+$("#tt-new").addEventListener("click", () => {
+  tooltip.destroy(); tooltip = UI.createTooltip(fim);
+  mark("createTooltip", "createTooltip·destroy"); log(2, "createTooltip(fim)");
+});
+$("#tt-styled").addEventListener("click", () => {
+  tooltip.destroy();
+  tooltip = UI.createTooltip(fim, { style: { background: "#3fb950", color: "#08111f", fontSize: "14px" } });
+  mark("createTooltip", "createTooltip·destroy");
+  log(2, "createTooltip(fim, { style }) — merged over the defaults");
+});
+$("#tt-show").addEventListener("click", () => {
+  tooltip.show(fakeEvt(260, 260), "<b>show()</b> called by hand");
+  mark("createTooltip·show"); log(2, "show(evt, html) → positioned at pointer+12px");
+});
+$("#tt-hide").addEventListener("click", () => { tooltip.hide(); mark("createTooltip·hide"); log(2, "hide()"); });
+$("#tt-destroy").addEventListener("click", () => {
+  tooltip.destroy(); tooltip = UI.createTooltip(fim);
+  mark("createTooltip·destroy"); log(2, "destroy() → re-created");
+});
+$("#tt-el").addEventListener("click", () => {
+  mark("createTooltip·el");
+  show(2, { el: tooltip.el.tagName, class: tooltip.el.className, display: tooltip.el.style.display,
+            left: tooltip.el.style.left, top: tooltip.el.style.top });
+});
+
+const bindHover = (opts, label) => {
+  hoverBinding?.off();
+  hoverBinding = UI.bindHoverValue(rasterLayer, opts);
+  mark("bindHoverValue"); pill("p2", "hover bound", "ok");
+  log(2, `bindHoverValue(layer, ${label}) → { tooltip, off }`);
+};
+$("#hv-default").addEventListener("click", () => bindHover({ tooltip }, "{ tooltip }"));
+$("#hv-custom").addEventListener("click", () =>
+  bindHover({ tooltip, format: (v) => `<b>${v.toFixed(1)}</b> m` }, "{ tooltip, format }"));
+$("#hv-own").addEventListener("click", () => bindHover(undefined, "no opts — makes its own tooltip"));
+$("#hv-off").addEventListener("click", () => {
+  hoverBinding?.off(); hoverBinding = null;
+  mark("bindHoverValue·off"); log(2, "off() — unsubscribed from map:hover");
+});
+$("#hv-tooltip").addEventListener("click", () => {
+  mark("bindHoverValue·tooltip");
+  log(2, hoverBinding ? `.tooltip is the same object we passed: ${hoverBinding.tooltip === tooltip}`
+                      : "bind one first");
+});
+$("#hover-toggle").addEventListener("change", (e) => {
+  rasterLayer.set({ hover: e.target.checked });
+  log(2, `layer.set({ hover: ${e.target.checked} }) — suppresses without unbinding`);
+});
+bindHover({ tooltip }, "{ tooltip }");
+
+// ── infoWindow.js ───────────────────────────────────────────────────────────────────────
+let infoWindow = UI.createInfoWindow(fim); mark("createInfoWindow");
+let featureBinding = null;
+
+$("#iw-new").addEventListener("click", () => {
+  infoWindow.destroy(); infoWindow = UI.createInfoWindow(fim);
+  mark("createInfoWindow", "createInfoWindow·destroy"); log(3, "createInfoWindow(fim)");
+});
+$("#iw-styled").addEventListener("click", () => {
+  infoWindow.destroy();
+  infoWindow = UI.createInfoWindow(fim, { style: { background: "#161b22", color: "#e6edf3" } });
+  mark("createInfoWindow", "createInfoWindow·destroy"); log(3, "createInfoWindow(fim, { style })");
+});
+$("#iw-open-html").addEventListener("click", () => {
+  infoWindow.open(fakeEvt(300, 300), "<b>open()</b> with an HTML string");
+  mark("createInfoWindow·open"); log(3, "open(evt, html)");
+});
+$("#iw-open-node").addEventListener("click", () => {
+  const node = document.createElement("div");
+  node.innerHTML = "<em>open()</em> with a real Node";
+  infoWindow.open(fakeEvt(320, 320), node);
+  mark("createInfoWindow·open"); log(3, "open(evt, Node) — replaceChildren, not innerHTML");
+});
+$("#iw-close").addEventListener("click", () => { infoWindow.close(); mark("createInfoWindow·close"); log(3, "close()"); });
+$("#iw-destroy").addEventListener("click", () => {
+  infoWindow.destroy(); infoWindow = UI.createInfoWindow(fim);
+  mark("createInfoWindow·destroy"); log(3, "destroy() → re-created");
+});
+$("#iw-el").addEventListener("click", () => {
+  mark("createInfoWindow·el");
+  show(3, { el: infoWindow.el.tagName, class: infoWindow.el.className,
+            display: infoWindow.el.style.display,
+            closeButton: !!infoWindow.el.querySelector("button[aria-label=Close]") });
+});
+$("#pt-obj").addEventListener("click", () => {
+  mark("propsTable"); show(3, UI.propsTable({ name: "Clear Lake", area_km2: 14.6, county: "Cerro Gordo" }));
+});
+$("#pt-empty").addEventListener("click", () => { mark("propsTable"); show(3, `propsTable({}) → ${JSON.stringify(UI.propsTable({}))}`); });
+$("#pt-none").addEventListener("click", () => { mark("propsTable"); show(3, `propsTable() → ${JSON.stringify(UI.propsTable())}`); });
+$("#pt-xss").addEventListener("click", () => {
+  mark("propsTable");
+  // The slash is escaped so this string cannot terminate the enclosing script element. An unescaped
+  // closing tag anywhere in JS source — string OR comment — ends the element there and silently
+  // kills the whole module, since the HTML parser never looks at JS syntax.
+  const html = UI.propsTable({ evil: "<script>alert(1)<\/script>" });
+  show(3, `escaped: ${!html.includes("<script>")}\n${html}`);
+});
+
+const bindFeature = (opts, label) => {
+  featureBinding?.off();
+  featureBinding = UI.bindFeatureInfo(vectorLayer, opts);
+  mark("bindFeatureInfo"); pill("p3", "features bound", "ok");
+  log(3, `bindFeatureInfo(layer, ${label}) → { infoWindow, off }`);
+};
+$("#fi-default").addEventListener("click", () => bindFeature({ infoWindow }, "{ infoWindow }"));
+$("#fi-custom").addEventListener("click", () => bindFeature({
+  infoWindow,
+  render: (f) => `<h4 style="margin:0 0 4px">${f.properties?.NAME ?? "feature"}</h4>${UI.propsTable(f.properties)}`,
+}, "{ infoWindow, render }"));
+$("#fi-own").addEventListener("click", () => bindFeature(undefined, "no opts — makes its own window"));
+$("#fi-off").addEventListener("click", () => {
+  featureBinding?.off(); featureBinding = null;
+  mark("bindFeatureInfo·off"); log(3, "off() — unsubscribed from the layer's click");
+});
+$("#fi-iw").addEventListener("click", () => {
+  mark("bindFeatureInfo·infoWindow");
+  log(3, featureBinding ? `.infoWindow === the one we passed: ${featureBinding.infoWindow === infoWindow}`
+                        : "bind one first");
+});
+bindFeature({ infoWindow }, "{ infoWindow }");
+
+// ── toolsPanel.js ───────────────────────────────────────────────────────────────────────
+UI.createToolsPanel("#ras-tools", { layer: rasterLayer, pretty: true });
+UI.createToolsPanel("#vec-tools", { layer: vectorLayer, pretty: true });
+mark("createToolsPanel"); pill("p4", "mounted", "ok");
+
+let customTools = null, renderN = 0, prettyFlag = true, currentControls;
+const ALL_TYPES = [
+  { type: "select", key: "palette", label: "select", value: "viridis",
+    options: ["viridis", "plasma", "blues", "heat"].map((v) => ({ value: v, label: v })) },
+  { type: "checkbox", key: "hover", label: "checkbox", value: true },
+  { type: "range", key: "opacity", label: "range", min: 0, max: 1, step: 0.05, value: 1 },
+  { type: "color", key: "color", label: "color", value: "#58a6ff" },
+  { type: "mystery", key: "note", label: "unknown → text", value: "fallback" },
+];
+const remountTools = (label) => {
+  customTools?.destroy();
+  customTools = UI.createToolsPanel("#custom-tools",
+    { layer: rasterLayer, controls: currentControls, pretty: prettyFlag });
+  mark("createToolsPanel"); log(4, `createToolsPanel(root, { controls: ${label}, pretty: ${prettyFlag} })`);
+};
+$("#tp-array").addEventListener("click", () => { currentControls = ALL_TYPES; remountTools("array — all 5 types"); });
+$("#tp-fn").addEventListener("click", () => {
+  currentControls = (layer) => { renderN++; return [{ type: "text", key: "n", label: `render #${renderN} · ${layer.id}`, value: "" }]; };
+  remountTools("function");
+});
+$("#tp-preset").addEventListener("click", () => { currentControls = undefined; remountTools("omitted → preset"); });
+$("#tp-pretty").addEventListener("click", () => { prettyFlag = true; remountTools("unchanged"); });
+$("#tp-bare").addEventListener("click", () => { prettyFlag = false; remountTools("unchanged"); });
+$("#tp-update").addEventListener("click", () => {
+  if (!customTools) return log(4, "mount one first");
+  customTools.update(); mark("createToolsPanel·update"); log(4, "update() — re-runs the spec");
+});
+$("#tp-destroy").addEventListener("click", () => {
+  customTools?.destroy(); customTools = null;
+  mark("createToolsPanel·destroy"); log(4, "destroy()");
+});
+$("#tp-el").addEventListener("click", () => {
+  if (!customTools) return log(4, "mount one first");
+  mark("createToolsPanel·el");
+  show(4, { class: customTools.el.className, controls: customTools.el.children.length,
+            labels: [...customTools.el.querySelectorAll("span")].map((s) => s.textContent) });
+});
+$("#tp-raster-c").addEventListener("click", () => {
+  mark("rasterControls"); show(4, UI.rasterControls(rasterLayer).map((c) => ({ type: c.type, key: c.key, label: c.label })));
+});
+$("#tp-vector-c").addEventListener("click", () => {
+  mark("vectorControls"); show(4, UI.vectorControls(vectorLayer).map((c) => ({ type: c.type, key: c.key, label: c.label })));
+});
+
+// ── readModels.js ───────────────────────────────────────────────────────────────────────
+const legendNow = () => (rasterLayer.colorScale ? Legend.fromColorScale(rasterLayer.colorScale) : null);
+$("#rl-json").addEventListener("click", () => { mark("renderLegend"); show(5, UI.renderLegend(legendNow())); });
+$("#rl-html").addEventListener("click", () => {
+  mark("renderLegend");
+  $("#rm-out").innerHTML = UI.renderLegend(legendNow(), { html: true });
+  log(5, "renderLegend(legend, { html: true }) → rendered above");
+});
+$("#rl-null").addEventListener("click", () => {
+  mark("renderLegend");
+  log(5, `renderLegend(null) → ${UI.renderLegend(null)} · with html → ${JSON.stringify(UI.renderLegend(null, { html: true }))}`);
+});
+$("#rl-plain").addEventListener("click", () => {
+  mark("renderLegend");
+  $("#rm-out").innerHTML = UI.renderLegend({ stops: [{ color: "#f85149", label: "high" }, { color: "#3fb950", label: "low" }] }, { html: true });
+  log(5, "a plain {stops} object has no toHtml(), so the built-in fallback renders it");
+});
+$("#rs-json").addEventListener("click", async () => { mark("renderStats"); show(5, UI.renderStats(await rasterLayer.getStats())); });
+$("#rs-html").addEventListener("click", async () => {
+  mark("renderStats");
+  $("#rm-out").innerHTML = UI.renderStats(await rasterLayer.getStats(), { html: true });
+  log(5, "renderStats(stats, { html: true }) → rendered above");
+});
+$("#rs-null").addEventListener("click", () => {
+  mark("renderStats");
+  log(5, `renderStats(null) → ${UI.renderStats(null)} · with html → ${JSON.stringify(UI.renderStats(null, { html: true }))}`);
+});
+pill("p5", "ready", "ok");
+
+// ── regionDraw.js ───────────────────────────────────────────────────────────────────────
+let regionFilter = null;
+const regionDraw = UI.createRegionDraw(fim, {
+  onPoint: (pts, e) => log(6, `onPoint → vertex ${pts.length} @ ${e.lat.toFixed(4)}, ${e.lng.toFixed(4)}`),
+  onComplete: (f, pts) => {
+    regionFilter = f;
+    pill("p6", f ? `${pts.length} vertices` : "need ≥3", f ? "ok" : "warn");
+    log(6, f ? `onComplete → SpatialFilter (${pts.length} vertices)` : `onComplete → null (${pts.length} points)`);
+  },
+  onCancel: () => { pill("p6", "cancelled", "warn"); log(6, "onCancel → points discarded"); },
+});
+mark("createRegionDraw");
+$("#rg-start").addEventListener("click", () => {
+  regionDraw.start(); mark("createRegionDraw·start");
+  pill("p6", "drawing…", "warn"); log(6, "start() — modal capture on");
+});
+$("#rg-finish").addEventListener("click", () => { regionDraw.finish(); mark("createRegionDraw·finish"); });
+$("#rg-cancel").addEventListener("click", () => { regionDraw.cancel(); mark("createRegionDraw·cancel"); });
+$("#rg-points").addEventListener("click", () => {
+  mark("createRegionDraw·points");
+  show(6, { count: regionDraw.points.length, points: regionDraw.points });
+});
+$("#rg-active").addEventListener("click", () => {
+  mark("createRegionDraw·active"); log(6, `.active → ${regionDraw.active}`);
+});
+$("#rg-stats").addEventListener("click", async () => {
+  try {
+    const s = await rasterLayer.getStats({ filter: regionFilter ?? undefined });
+    show(6, { scoped: !!regionFilter, ...(s.toJSON?.() ?? s) });
+  } catch (e) { oops(6, "p6", e); }
+});
+
+// ── operationsPanel.js ──────────────────────────────────────────────────────────────────
+let opsPanel = null;
+const mountOps = (pretty) => {
+  opsPanel?.destroy();
+  opsPanel = UI.createOperationsPanel("#ras-ops", {
+    layer: rasterLayer, pretty, region: () => regionFilter,
+    onApply: (l, e) => {
+      if (e) return oops(7, "p7", e);
+      pill("p7", "applied", "ok");
+      log(7, `onApply → sources[0] is now ${l.sources[0].id}`);
+    },
   });
-}
+  mark("createOperationsPanel"); log(7, `createOperationsPanel(root, { layer, region, onApply, pretty: ${pretty} })`);
+};
+try { mountOps(true); } catch (e) { oops(7, "p7", e); }
+$("#op-remount").addEventListener("click", () => mountOps(false));
+$("#op-destroy").addEventListener("click", () => {
+  opsPanel?.destroy(); opsPanel = null;
+  mark("createOperationsPanel·destroy"); log(7, "destroy()");
+});
+$("#op-el").addEventListener("click", () => {
+  if (!opsPanel) return log(7, "mount one first");
+  mark("createOperationsPanel·el");
+  show(7, { class: opsPanel.el.className,
+            titles: [...opsPanel.el.querySelectorAll(".op-title")].map((s) => s.textContent),
+            buttons: [...opsPanel.el.querySelectorAll("button")].map((b) => b.textContent) });
+});
 
-// ── 3 · Vector ──────────────────────────────────────────────────────────────────────────────────
-function wireVector() {
-  $("#vec-file").addEventListener("change", async (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    pill("p-vec", "parsing…");
-    try {
-      const ds = await FimViz.parseFile(file);
-      vectorLayer?.remove(); vectorTools?.destroy(); infoBinding?.off();
-      vectorLayer = new VectorLayer({ map: fim, type: ds.format, sources: [ds] });
-      vectorLayer.render({ style: { fillColor: "#58a6ff", fillOpacity: 0.4, strokeColor: "#1f6feb", strokeWidth: 2 } });
-      vectorLayer.fit();
-      vectorTools = createToolsPanel("#vec-tools", { layer: vectorLayer, pretty: true });
-      infoBinding = bindFeatureInfo(vectorLayer, { infoWindow });
-      pill("p-vec", "rendered · click a feature", "ok");
-    } catch (err) { pill("p-vec", "error", "bad"); console.error(err); }
-  });
-}
-
-// ── 4 · Multi-layer dispatch (real overlays via the provider seam) ─────────────────────────────────
-const ML_COLORS = ["#f85149", "#3fb950", "#58a6ff"];   // z=0 bottom … z=2 top
-let mlLayers = [], mlLog = [];
-function mapCenter() { const c = fim.map.getCenter(); return provider === "leaflet" ? { lat: c.lat, lng: c.lng } : { lat: c.lat(), lng: c.lng() }; }
-function testBounds() {
-  if (rasterLayer?._bounds?.()) return rasterLayer._bounds();
-  const c = mapCenter(), d = 0.03;
-  return { north: c.lat + d, south: c.lat - d, east: c.lng + d, west: c.lng - d };
-}
-async function makeTestLayer(z, b) {
-  const layer = new RasterLayer({ map: fim, type: `test${z}` });
-  layer.result = { kind: "raster", pixels: [1, 1, 1, 1], width: 2, height: 2, bounds: b, noData: null, meta: {} };
-  layer.set({ colorScale: new ColorScale({ stops: [{ value: 1, color: ML_COLORS[z] }] }) });   // solid colour
-  await layer.render();                 // real overlay via provider.addRasterImage
-  await layer.settings.set({ opacity: 0.3 });
-  fim.layers.push(layer);
-  layer.on("click", (e) => {
-    mlLog.push(`  z=${z} received`);
-    if (z === mlLayers.length - 1 && $("#ml-absorb").checked) { e.stopPropagation(); mlLog.push(`    z=${z} ABSORBED — dispatch stops`); }
-  });
-  return layer;
-}
-function wireMultiLayer() {
-  $("#ml-stack").addEventListener("click", async () => {
-    mlLayers.forEach((l) => l.remove()); mlLayers = [];
-    const b = testBounds();
-    mlLayers = []; for (let z = 0; z < 3; z++) mlLayers.push(await makeTestLayer(z, b));
-    $("#ml-log").textContent = "3 overlays stacked (red=bottom, blue=top). Click them.";
-    pill("p-ml", "stacked · click the overlay", "ok");
-  });
-  $("#ml-clear").addEventListener("click", () => { mlLayers.forEach((l) => l.remove()); mlLayers = []; $("#ml-log").textContent = "cleared."; pill("p-ml", "idle"); });
-  $("#ml-simul").addEventListener("change", (e) => { fim.simultaneousLayerEvents = e.target.checked; });
-  fim.on("map:click", () => { if (!mlLayers.length) return; mlLog = ["click:"]; setTimeout(() => { $("#ml-log").textContent = mlLog.join("\n"); }, 0); });
-}
-
-// ── 5 · Region draw → scoped stats (modal capture) ────────────────────────────────────────────────
-// The drawn region is rendered on the real map as a VectorLayer (a LineString while drawing, a
-// Polygon on finish) — provider-neutral, so it shows on Google AND Leaflet.
-let regionDraw = null, regionLayer = null, lastRegionFilter = null;
-function drawRegionOnMap(points, closed) {
-  regionLayer?.remove(); regionLayer = null;
-  if (points.length < 2) return;                          // need at least a segment to draw
-  const coords = points.map((p) => [p.lng, p.lat]);
-  const geometry = closed && points.length >= 3
-    ? { type: "Polygon", coordinates: [[...coords, coords[0]]] }
-    : { type: "LineString", coordinates: coords };
-  regionLayer = new VectorLayer({ map: fim, type: "region", sources: [{ data: { type: "Feature", geometry, properties: {} }, bounds: {} }] });
-  regionLayer.render({ style: { strokeColor: "#f85149", strokeWidth: 2, fillColor: "#f85149", fillOpacity: 0.2 } });
-}
-function wireRegion() {
-  $("#rg-draw").addEventListener("click", () => {
-    if (!rasterLayer) { pill("p-rg", "load a raster first", "bad"); return; }
-    regionDraw = createRegionDraw(fim, {
-      onPoint: (pts) => { drawRegionOnMap(pts, false); $("#rg-out").textContent = `${pts.length} point(s) — click more, then Finish`; },
-      onComplete: async (filter, pts) => {
-        drawRegionOnMap(pts, true);
-        if (!filter) { $("#rg-out").textContent = "need ≥3 points"; pill("p-rg", "too few", "bad"); return; }
-        lastRegionFilter = filter;                       // §6 Mask uses this
-        const stats = await rasterLayer.getStats({ filter });
-        $("#rg-out").innerHTML = `<p class="muted" style="margin:0 0 4px">scoped to a ${pts.length}-point region:</p>` + renderStats(stats, { html: true });
-        pill("p-rg", "scoped", "ok");
-      },
-    });
-    regionDraw.start();
-    $("#rg-out").textContent = "click ≥3 points on the map, then Finish"; pill("p-rg", "drawing… (dispatch suspended)", "ok");
-  });
-  $("#rg-finish").addEventListener("click", () => regionDraw?.finish());
-  $("#rg-clear").addEventListener("click", () => { regionDraw?.cancel(); regionLayer?.remove(); regionLayer = null; $("#rg-out").textContent = "—"; pill("p-rg", "idle"); });
-}
+console.log(`[fimviz] ui bench ready — ${ALL.length} surface members to exercise`);
 </script>
 </body>
 </html>
