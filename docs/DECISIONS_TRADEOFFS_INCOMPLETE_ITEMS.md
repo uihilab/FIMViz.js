@@ -270,7 +270,7 @@ is the *why*, those are the *what*.
   uses — is what actually holds across the seam, and it is what the rest of the engine already does
   (nothing does `instanceof Dataset`). Arrays are checked first, since a polygon is an object too.
   **Rejected:** externalizing `fimviz` from the `ui` bundle. It would give one shared class, but
-  `fimviz/ui` exists precisely so a host can take a toast or a tools panel for ~46 KB instead of pulling
+  `fimviz/ui` exists precisely so a host can take a toast or a tools panel for ~51 KB instead of pulling
   the whole engine; duck-typing fixes the identity problem without giving that up, and generalizes to a
   host passing its own filter object.
 
@@ -296,7 +296,7 @@ is the *why*, those are the *what*.
   edge line at two points, a closed ring at three. `onPreview` had to start carrying `points` as well
   as `rings` for the same reason — a host given only rings has nothing to show until the third click.
   **Rejected:** letting the tool draw directly. It would have to name a map SDK, or `fimviz/ui` would
-  have to import the provider registry — pulling Leaflet into the ~46 KB bundle whose whole point is
+  have to import the provider registry — pulling Leaflet into the ~51 KB bundle whose whole point is
   not to. The seam is `fim.addScratchVector` instead: engine-side, provider-neutral, and deliberately
   **not a Layer** (never hit-tested, reordered, listed, or saved — scaffolding, not data).
 
@@ -351,6 +351,23 @@ is the *why*, those are the *what*.
   explicit with zero bands — nothing painted. A separate "mode" control was **rejected** for the same
   reason: it would be a second, weaker copy of a rule the engine already enforces, and the two could
   disagree.
+
+- **The axis slider is not a time slider.** Scrubbing is `layer.setSources([ds.select(coord)])`, which
+  says nothing about time — so `createAxisSlider` takes an axis by index or name and drives stage,
+  level, band, ensemble member or variable equally. Naming it after the temporal case would have been
+  the same mistake the axes model was built to avoid: the model already refuses to special-case time,
+  and a `createTimeSlider` would have re-introduced the special case at the UI layer.
+
+  It exists as an export, rather than as fifteen lines in each page, for two properties the hand-rolled
+  version in `temporal-netcdf.html` had to get right and every other host would have had to rediscover.
+  **A stale frame must never win:** dragging fires far faster than a grid decodes, several swaps are in
+  flight, and they do not resolve in order — without a token the last frame to *resolve* wins rather
+  than the last one asked for, and the map shows a step nobody selected with nothing to trigger a
+  correction. **Playback must be paced by the decode:** each frame is queued only once the previous one
+  lands, because a fixed `setInterval` on a slow source queues frames faster than they can be drawn and
+  the playhead runs away from the map. Writing the widget also surfaced a third: the range's value has
+  to be read *before* the repaint that writes the position back into it, or every drag snaps the thumb
+  back to where it started.
 
 - **The host bus had seven events nobody consumed, and only five of them deserved a widget.**
   `busy` → `createBusyIndicator`, the `raster:metadata`/`-hidden` pair → `bindRasterMetadata`, and the

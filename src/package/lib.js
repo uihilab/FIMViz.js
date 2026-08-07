@@ -128,7 +128,7 @@ export { EnsembleAggregationLayer } from "./ensembleAggregationLayer.js";
 
 // The headless UI module (docs/PACKAGE_ROADMAP.md §5) is NOT re-exported here. It has exactly one
 // home — the `fimviz/ui` subpath (dist/ui.js) — for two reasons. Payload: that entry pulls only the
-// small pure deps it names, so a consumer who wants a toast or a tools panel downloads ~46 KB
+// small pure deps it names, so a consumer who wants a toast or a tools panel downloads ~51 KB
 // instead of the engine. Identity: re-exporting the same modules from both entries meant an app
 // importing from both shipped TWO copies, with two separate registries and two sets of DOM nodes
 // that each believed they were the only one. One import path, one instance:

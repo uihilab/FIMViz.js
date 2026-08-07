@@ -250,6 +250,11 @@ Contents by coupling:
   ✅ `rasterControls` now emits **every** key `RasterSettings.SCALE_KEYS` accepts — palette, continuous,
   min, max, unit, plus editors for the two mode-switching ones (`stops` discrete bands, `colorStops`
   gradient control points) — so no knob the change-model honours is unreachable from the preset.
+- **Axis slider** — ✅ `createAxisSlider(root, { layer, axis })`, a view over the selection-axis model
+  (§8): scrubbing is `layer.setSources([ds.select(coord)])`, so it drives stage/level/band/member as
+  readily as time and is deliberately NOT named after the temporal case. It owns the two things that
+  are easy to get wrong — dropping a stale frame, and pacing playback by the decode rather than by a
+  timer — so `temporal-netcdf.html` no longer hand-rolls either.
 - **Read-model renderers** — `renderLegend(legend, {html})`/`renderStats(stats, {html})`, thin over
   `Legend.toHtml()` / a stats table. Ensemble & comparison "legends" are just `getLegend().toJSON()`/
   `.toHtml()`. ✅ `bindLegend`/`bindStats` add the LIVE half: the same renderers mounted and kept

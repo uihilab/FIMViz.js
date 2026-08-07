@@ -110,11 +110,11 @@
       <div class="row" style="justify-content:space-between">
         <span class="stamp" id="stamp">—</span>
         <span class="row">
-          <button id="btn-play" class="ghost" disabled>▶ Play</button>
           <button id="btn-fit" class="ghost" disabled>Fit map</button>
         </span>
       </div>
-      <input type="range" id="slider" min="0" max="0" value="0" disabled />
+      <!-- createAxisSlider mounts here once a file is scanned. -->
+      <div id="scrub"></div>
       <div class="row" style="justify-content:space-between">
         <span class="dim" id="t-first">—</span><span class="dim" id="t-last">—</span>
       </div>
@@ -152,6 +152,7 @@
 <script type="importmap">
 { "imports": {
     "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js",
     "sciwrid-toolkit": "../node_modules/sciwrid-toolkit/dist/index.js"
 } }
 </script>
@@ -166,6 +167,11 @@
 // marks it external (webpack.config.cjs) and the consumer resolves it. Any page opening .nc/.grib2/
 // .zarr needs this entry; nothing else does.
 import { FimViz, ColorScale, Stats } from "fimviz";
+// The scrubber is a `fimviz/ui` export, not page code: scrubbing an axis is
+// `layer.setSources([ds.select(coord)])`, and the two things that are easy to get wrong about it —
+// dropping a stale frame, and pacing playback by the decode rather than by a timer — belong in the
+// library once rather than in every page that wants a slider.
+import { createAxisSlider } from "fimviz/ui";
 
 const $ = (s) => document.querySelector(s);
 const log = (msg, cls = "") => {
@@ -182,8 +188,7 @@ log("map ready (leaflet)", "ok");
 let ds = null;        // the axis Dataset — a lazy series, never forced directly
 let layer = null;     // the one RasterLayer we keep swapping sources on
 let scale = null;     // one ColorScale for every frame, so the animation is comparable
-let seq = 0;          // monotonic guard: a slow frame must never overwrite a newer one
-let playing = null;
+let scrub = null;     // the createAxisSlider handle — it owns the position, the guard and the playback
 
 // The extent override, when the box is filled. `grid` is a PARTIAL override — supplying bbox alone
 // keeps the file's own pixel dimensions.
@@ -238,12 +243,9 @@ async function open(source, name) {
 
   if (!entries.length) { log("no time axis in this file — nothing to scrub", "warn"); return; }
 
-  $("#slider").max = String(entries.length - 1);
-  $("#slider").value = "0";
-  $("#slider").disabled = false;
   $("#t-first").textContent = entries[0].meta.time;
   $("#t-last").textContent = entries.at(-1).meta.time;
-  for (const id of ["#btn-play", "#btn-fit", "#btn-mean", "#btn-max"]) $(id).disabled = false;
+  for (const id of ["#btn-fit", "#btn-mean", "#btn-max"]) $(id).disabled = false;
 
   // One scale for every frame. Ranged off the FIRST frame's own statistics rather than a guess; the
   // reduce('max') button below re-ranges it to the true storm peak.
@@ -260,6 +262,16 @@ async function open(source, name) {
   layer.fit();
   showFrame(0, g0);
   log(`rendered frame 0 — ${g0.width}×${g0.height} ${g0.crs}`, "ok");
+
+  // The scrubber. It owns the stale-frame guard and the play loop; this page only says what to do
+  // once a frame has LANDED, which is the part that is genuinely page-specific.
+  scrub?.destroy();
+  scrub = createAxisSlider("#scrub", {
+    layer, dataset: ds, interval: 400,
+    label: (e) => e.meta.time,
+    onChange: async (entry, i, child) => showFrame(i, await child.grid()),   // memoized by now — free
+    onError: (err, i) => log(`frame ${i} failed — ${err.message}`, "bad"),
+  });
 }
 
 function statsOf(grid) {
@@ -305,32 +317,15 @@ function paintLegend() {
   $("#legend-unit").textContent = ds?.meta.unit ?? "";
 }
 
-// Scrubbing = swapping the layer's source to a different axis entry. setSources re-renders a live
-// layer atomically (it rolls back on failure), so this is the whole interaction.
-async function goto(i) {
-  const mine = ++seq;
-  const entry = ds.axis.entries[i];
-  showFrame(i, null);
-  try {
-    const child = ds.select(entry.coord);     // lazy — no decode yet, no second fetch
-    await layer.setSources([child]);
-    if (mine !== seq) return;                  // a newer frame won while we were decoding — drop this one
-    showFrame(i, await child.grid());          // memoized by now, so this is free
-  } catch (e) {
-    if (mine === seq) log(`frame ${i} failed — ${e.message}`, "bad");
-  }
-}
-
 async function reduceTo(op) {
-  const btns = ["#btn-mean", "#btn-max", "#btn-back", "#slider", "#btn-play"];
+  const btns = ["#btn-mean", "#btn-max", "#btn-back"];
   btns.forEach((b) => ($(b).disabled = true));
-  stop();
+  scrub?.pause();
   pill("#pill-r", `reducing ${ds.axis.entries.length} steps…`, "warn");
   const t0 = performance.now();
   try {
     const reduced = ds.reduce(op);             // lazy — select() every entry, then combine() per pixel
     const grid = await reduced.grid();          // this is where all 120 decodes happen
-    ++seq;                                      // any in-flight slider frame is now stale
     await layer.setSources([reduced]);
     const s = statsOf(grid);
     scale.set({ min: 0, max: Math.max(s.max, 1e-6) });   // one write, one repaint
@@ -352,24 +347,15 @@ async function reduceTo(op) {
   }
 }
 
-function stop() {
-  if (playing) { clearInterval(playing); playing = null; $("#btn-play").textContent = "▶ Play"; }
-}
+// Pausing before a reload/reduce is all this page has left to do about playback — the scrubber owns
+// the timer, the position and the stale-frame guard.
+const stop = () => scrub?.pause();
 
-$("#slider").addEventListener("input", (e) => { stop(); goto(+e.target.value); });
 $("#btn-fit").addEventListener("click", () => layer?.fit());
 $("#btn-mean").addEventListener("click", () => reduceTo("mean"));
 $("#btn-max").addEventListener("click", () => reduceTo("max"));
-$("#btn-back").addEventListener("click", () => { pill("#pill-r", "—"); goto(+$("#slider").value); });
-$("#btn-play").addEventListener("click", () => {
-  if (playing) return stop();
-  $("#btn-play").textContent = "⏸ Pause";
-  playing = setInterval(async () => {
-    const next = (+$("#slider").value + 1) % ds.axis.entries.length;
-    $("#slider").value = String(next);
-    await goto(next);
-  }, 400);
-});
+// "Back to the slider" re-applies whatever step the scrubber is still sitting on, undoing the reduce.
+$("#btn-back").addEventListener("click", () => { pill("#pill-r", "—"); scrub?.goto(scrub.index); });
 
 $("#file").addEventListener("change", (e) => {
   const f = e.target.files[0];

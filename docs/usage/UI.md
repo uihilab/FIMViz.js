@@ -5,7 +5,7 @@ functions (never at import time), and calls no `window.foo()` — the engine emi
 Mount whichever pieces you want; none of them are required for the engine to work.
 
 Everything below imports from **`fimviz/ui`**, its only home — the engine barrel does not re-export
-it. That entry carries just the small pure deps these need (~46 KB, no geotiff/Maps loader/GDAL), and
+it. That entry carries just the small pure deps these need (~51 KB, no geotiff/Maps loader/GDAL), and
 having exactly one entry means an app can never load two copies with two sets of state:
 
 ```js
@@ -18,7 +18,8 @@ import { createToast, connectToast, createToolsPanel } from 'fimviz/ui';
 [Tooltip (raster hover)](#tooltip-raster-hover) ·
 [Info window (vector click)](#info-window-vector-click) · [Tools panel](#tools-panel) ·
 [Legend/Stats renderers](#legendstats-renderers) · [Live panels](#live-panels--bindlegend--bindstats) ·
-[Selection tools](#selection-tools-region-draw) · [Region overlay](#showing-the-shape--createregionoverlay) ·
+[Axis slider](#axis-slider) · [Selection tools](#selection-tools-region-draw) ·
+[Region overlay](#showing-the-shape--createregionoverlay) ·
 [Operations panel](#operations-panel) · [Layer panel](#layer-panel) ·
 [Click-to-select](#click-to-select)
 
@@ -242,6 +243,42 @@ Four things they handle that hand-rolled re-reading usually doesn't:
 - **`filter` may be a getter**, because the usual filter is a drawn region that changes independently
   of the layer. The layer emits nothing when you draw one, so that is the one case needing `update()`
   — everything the *layer* can know about is already automatic.
+
+## Axis slider
+
+```js
+createAxisSlider(root, { layer, dataset?, axis?, index?, label?,
+                          play?, interval?, loop?, pretty?, onChange?, onError? })
+// axis   : index (default 0) or name — a Dataset may carry several
+// label  : (entry, i, axis) => string, default axisEntryLabel
+// → { el, index, entry, axis, length, playing,
+//     goto(i), next(), prev(), play(), pause(), update(), destroy() }
+
+axisOf(dataset, indexOrName)   // PURE — the axis, or null if there isn't one (or it is empty)
+axisEntryLabel(entry)           // PURE — meta.label → meta.time → meta.name → coord
+```
+
+Scrubbing is `layer.setSources([ds.select(coord)])` and nothing else — so **this is not time-specific**.
+It drives any selection axis the model can express: stage, level, band, ensemble member, variable.
+
+```js
+createAxisSlider('#time', { layer, onChange: (entry, i, child) => showStats(child) });
+createAxisSlider('#member', { layer, axis: 'member', play: false });
+```
+
+Two properties are the reason this is a library export rather than fifteen lines in a page:
+
+- **A stale frame never wins.** Dragging fires far faster than a grid decodes, so several swaps are in
+  flight at once and they do *not* resolve in order. Without a guard the last frame to **resolve**
+  wins rather than the last one asked for, and the map ends up showing a step nobody selected — with
+  nothing to trigger a correction. `onChange` fires only for the frame that is still current.
+- **Playback is paced by the decode, not by a timer.** Each frame is queued only once the previous one
+  has landed. A fixed `setInterval` on a source slower than the interval queues frames faster than
+  they can be drawn, and the playhead runs away from the map.
+
+The readout moves immediately while the pixels catch up, scrubbing pauses playback (the user has taken
+over), and a dataset with **no** axis renders a note rather than throwing — a host mounting this
+against "whatever the user loaded" should not have to pre-check.
 
 ## Selection tools (region draw)
 

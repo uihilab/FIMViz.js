@@ -1483,12 +1483,12 @@ describe("ui: every handle member", () => {
 describe("ui: the barrel", () => {
   test("exports exactly the documented names", () => {
     assert.deepEqual(Object.keys(UI).sort(), [
-      "REGION_MODES", "bindFeatureInfo", "bindHoverValue", "bindLegend", "bindRasterMetadata",
-      "bindStats", "connectToast", "createBusyIndicator", "createInfoWindow", "createLayerPanel",
-      "createLayerSelect", "createOperationsPanel", "createRegionDraw", "createRegionOverlay",
-      "createToast", "createToolsPanel", "createTooltip", "layerLabel", "propsTable",
-      "rasterControls", "regionGeoJSON", "renderLegend", "renderRasterMetadata", "renderStats",
-      "vectorControls",
+      "REGION_MODES", "axisEntryLabel", "axisOf", "bindFeatureInfo", "bindHoverValue", "bindLegend",
+      "bindRasterMetadata", "bindStats", "connectToast", "createAxisSlider", "createBusyIndicator",
+      "createInfoWindow", "createLayerPanel", "createLayerSelect", "createOperationsPanel",
+      "createRegionDraw", "createRegionOverlay", "createToast", "createToolsPanel", "createTooltip",
+      "layerLabel", "propsTable", "rasterControls", "regionGeoJSON", "renderLegend",
+      "renderRasterMetadata", "renderStats", "vectorControls",
     ]);
   });
 });
