@@ -274,6 +274,50 @@ is the *why*, those are the *what*.
   the whole engine; duck-typing fixes the identity problem without giving that up, and generalizes to a
   host passing its own filter object.
 
+- **Four selection tools, one geometry.** `createRegionDraw` grew from a click-per-vertex polygon into
+  polygon / rectangle / freehand / brush, and the thing that made it cheap is that all four already had a
+  shared output: **rings of `{lat,lng}`**, which is what `SpatialFilter`, `dataset.mask()` and
+  `layer.getStats({ filter })` have always taken. So the modes differ only in how they *fill* the ring
+  list, and every consumer downstream — the operations panel, the stats call, a host's own code — is
+  untouched and cannot tell which tool drew the shape. The brush exploits the same seam a second time:
+  a stamp per stroke sample makes it a *multi*-polygon, which `SpatialFilter` already unions
+  ("inside ANY ring") without a line of new code. **Rejected:** a per-tool factory
+  (`createRectangleSelect`, `createBrushSelect`, …). Four objects would each need their own capture
+  lifecycle, key handling, camera-freeze and trailing-click discipline — the ~15 lines that differ per
+  tool are dwarfed by the ~80 that do not, and a host wanting a toolbar would have had to tear one tool
+  down and build another on every mode switch rather than call `setMode()`.
+
+- **The trailing click after a drag is eaten, not ignored.** A press-drag-release emits `mousedown`,
+  `mouseup`, *and then* `click`. Freehand and brush auto-finish on `mouseup` — which releases the modal
+  capture — so that final click would fall through to ordinary layer dispatch and "click" whatever sits
+  under the end of the stroke, silently changing the selected layer every time someone paints. The tool
+  therefore installs a throwaway capture that swallows exactly one click, released on arrival or on a
+  400 ms timer (touch never sends one, and a map stranded in capture is worse than a stray click). It is
+  installed *before* `onComplete` runs, so a host that starts another tool from that callback replaces it
+  and still wins. **Rejected:** finishing on the `click` instead of the `mouseup` — that defers the whole
+  completion behind an event some touch stacks never deliver.
+
+- **The operations panel is a table, not a form per op.** Going from two ops to the engine's full raster
+  set (clip · mask · reclassify · slope · aspect · hillshade · resample · reproject · combine · reduce ·
+  zonal stats · group by, plus rasterize on the vector side) is a table entry apiece — `{ id, group,
+  kind, fields, enabled, fill, run }` — because the only thing that genuinely differs between ops is
+  which controls they need and the one line that calls the Dataset. The shape earns three properties
+  that hand-written forms would each have to re-implement: an op's controls **cannot** disagree with
+  what it passes (both come from `fields`); ops are filtered by `kind`, so a vector layer is never
+  offered `clip` — an op that could only ever throw is not shown at all; and an op whose requirement is
+  missing (no region wired up, no second raster layer, no selection axis, no `fim`) is **disabled with
+  the reason printed** rather than failing when pressed. **Rejected:** auto-generating the form from the
+  method signatures. `slope(opts)` and `combine(others, opts)` carry no runtime type information, and
+  the useful parts — that resample's method list is GDAL-gated, that clip should prefill from the
+  layer's own bounds — are not in the signature at all.
+
+- **Terminals stay in the same panel but report on a different channel.** `zonalStats` and `groupBy`
+  return a *table*, not a Dataset, so routing them through `onApply` would have told the host "the
+  layer changed" when it hadn't. They get `onResult(id, data)` and provably leave `layer.sources`
+  alone. **Rejected:** a separate analysis panel — the user's question ("summarise this region") arrives
+  while looking at the same layer and the same drawn region as the ops above it; splitting the view
+  would have duplicated both wires.
+
 ### 1.2 Instance-scoped DOM, event inversion, and the engine→host boundary
 
 - **The engine must never call an app function — not by import, and not through `window.*` either.** A
@@ -438,6 +482,13 @@ specific tiers they were first decided for are done:
   listener removal vs. Leaflet's instance-call-needing-name+handler. *Rejected:* returning
   `{provider, handle}` and having each caller branch on which provider it got — the exact per-call-site
   branching the seam exists to avoid.
+- **Drag lock (`setDraggable`)** — one line per provider (`map.setOptions({draggable})` vs.
+  `map.dragging.enable()/disable()`), added because a freehand or brush stroke is *the same gesture as a
+  map pan*: without it the stroke is traced against a moving projection and lands nowhere near where it
+  was drawn. Optional in the contract and a no-op when absent, so a third-party provider is not forced to
+  implement it — the drag tools then merely feel bad rather than break. *Rejected:* having the selection
+  tool call `preventDefault()` on the original DOM event — the tool is headless by design and receives
+  only normalized `{type, lat, lng}`, and both SDKs handle dragging above where that event surfaces.
 
 **Why the remaining four tiers aren't a mechanical swap:** *Velocity's animated canvas* is a full-viewport
 canvas repainted every frame by its own rAF loop, driven by five Google-specific listeners

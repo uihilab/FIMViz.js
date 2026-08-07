@@ -130,11 +130,76 @@ describe("google provider: applyLayerOrder", () => {
   });
 });
 
-describe("the contract is OPTIONAL — a provider may declare neither", () => {
-  test("both built-ins implement both methods", () => {
+// The drag lock the freehand/brush selection tools need: tracing a stroke and panning the map are
+// the same gesture, so one has to be suppressed for the length of the stroke.
+describe("provider: setDraggable", () => {
+  test("leaflet toggles the dragging handler", () => {
+    const calls = [];
+    const map = { dragging: { enable: () => calls.push("enable"), disable: () => calls.push("disable") } };
+    leaflet.setDraggable(map, false);
+    leaflet.setDraggable(map, true);
+    assert.deepEqual(calls, ["disable", "enable"]);
+  });
+
+  test("google sets the draggable map option", () => {
+    const seen = [];
+    const map = { setOptions: (o) => seen.push(o) };
+    google.setDraggable(map, false);
+    google.setDraggable(map, true);
+    assert.deepEqual(seen, [{ draggable: false }, { draggable: true }]);
+  });
+
+  test("both coerce, so a truthy non-boolean cannot leak into the SDK", () => {
+    const seen = [];
+    google.setDraggable({ setOptions: (o) => seen.push(o) }, 1);
+    assert.deepEqual(seen, [{ draggable: true }]);
+  });
+
+  // A map torn down mid-stroke would otherwise throw from the restore path, which runs on the
+  // failure route — exactly where an exception is least welcome.
+  test("neither throws on a missing map or a map without the capability", () => {
+    assert.doesNotThrow(() => { leaflet.setDraggable(null, true); google.setDraggable(null, true); });
+    assert.doesNotThrow(() => { leaflet.setDraggable({}, false); google.setDraggable({}, false); });
+  });
+});
+
+describe("FimMap.setMapDraggable", () => {
+  const fimWith = async (provider) => {
+    registerMapProvider("drag-spy", provider);
+    const { FimMap } = await import("../src/package/fimMap.js");
+    const fim = new FimMap({ app: { config: { provider: "drag-spy" }, emit() {}, on() {} } });
+    fim._adoptMap({ MAP: true });
+    return fim;
+  };
+
+  test("forwards to the provider and returns itself for chaining", async () => {
+    const seen = [];
+    const fim = await fimWith({ create: async () => ({}), setDraggable: (m, on) => seen.push([m.MAP, on]) });
+    assert.equal(fim.setMapDraggable(false), fim);
+    fim.setMapDraggable(true);
+    assert.deepEqual(seen, [[true, false], [true, true]]);
+  });
+
+  test("a provider without setDraggable is a silent no-op, not a crash", async () => {
+    const fim = await fimWith({ create: async () => ({}) });
+    assert.doesNotThrow(() => fim.setMapDraggable(false));
+  });
+
+  test("an unmounted map is a no-op too — nothing to make draggable yet", async () => {
+    let called = false;
+    const fim = await fimWith({ create: async () => ({}), setDraggable: () => { called = true; } });
+    fim._adoptMap(null);
+    fim.setMapDraggable(false);
+    assert.equal(called, false);
+  });
+});
+
+describe("the contract is OPTIONAL — a provider may declare none of them", () => {
+  test("both built-ins implement all three methods", () => {
     for (const [name, p] of [["leaflet", leaflet], ["google", google]]) {
       assert.equal(typeof p.whenIdle, "function", `${name}.whenIdle`);
       assert.equal(typeof p.applyLayerOrder, "function", `${name}.applyLayerOrder`);
+      assert.equal(typeof p.setDraggable, "function", `${name}.setDraggable`);
     }
   });
 
@@ -143,5 +208,6 @@ describe("the contract is OPTIONAL — a provider may declare neither", () => {
     const p = getMapProvider("minimal-order-test");
     assert.equal(p.whenIdle, undefined);
     assert.equal(p.applyLayerOrder, undefined);
+    assert.equal(p.setDraggable, undefined);
   });
 });

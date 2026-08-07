@@ -61,6 +61,9 @@ const _providers = new Map();
  *   camera has settled. Safe to await unconditionally: it resolves on a timeout when the map is
  *   already still, so it can never hang. Anything that reads the projection right after a `fitBounds`
  *   must await this first — a click resolved mid-animation lands at the wrong coordinates.
+ * @property {(map: any, on: boolean) => void} [setDraggable] - turn pan-by-drag on or off. Drag-based
+ *   selection tools suppress it while drawing, because tracing a stroke and panning the map are the
+ *   same gesture.
  * @property {(map: any, handles: any[]) => any[]} [applyLayerOrder] - restack overlays to match
  *   `handles`, ordered bottom → top, and RETURN the handles: a provider may have replaced some (the
  *   Google raster path recreates them), so callers must adopt the returned array.
@@ -415,6 +418,14 @@ registerMapProvider("google", {
     return () => google.maps.event.removeListener(listener);
   },
 
+  /**
+   * Turn pan-by-drag on or off. Drag-based selection (freehand, brush) is otherwise unusable: the
+   * same gesture that traces the stroke also pans the map, so the stroke is drawn against a moving
+   * projection and lands nowhere near where it was drawn.
+   * @param {any} map @param {boolean} on
+   */
+  setDraggable(map, on) { map?.setOptions?.({ draggable: !!on }); },
+
   /** @returns {Promise<void>} resolves once the camera has settled. */
   whenIdle(map, { timeout = 400 } = {}) {
     return new Promise((resolve) => {
@@ -651,6 +662,13 @@ registerMapProvider("leaflet", {
     map.on("mousemove", handler);
     return () => map.off("mousemove", handler);
   },
+
+  /**
+   * Turn pan-by-drag on or off — the same contract the google provider implements, for the same
+   * reason: a freehand stroke and a map pan are the same gesture, so one must be suppressed.
+   * @param {any} map @param {boolean} on
+   */
+  setDraggable(map, on) { if (on) map?.dragging?.enable?.(); else map?.dragging?.disable?.(); },
 
   /** @returns {Promise<void>} resolves once the camera has settled. */
   whenIdle(map, { timeout = 400 } = {}) {

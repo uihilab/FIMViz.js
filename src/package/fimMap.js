@@ -14,7 +14,7 @@
 import { parseSource } from "../io/parse.js";
 import { proxiedUrl } from "./config.js";
 import { createLayer, dispatchMapEventToLayers } from "./layer.js";
-import { getMapProvider } from "./mapProvider.js";
+import { getMapProvider, DEFAULT_PROVIDER } from "./mapProvider.js";
 import { ColorScale } from "./colorScale.js";
 
 // `#foo` -> `[id="foo"]` for the exact-id case only. See $() below for why.
@@ -538,6 +538,23 @@ export class FimMap {
    * @param {{ timeout?: number }} [opts]
    * @returns {Promise<void>}
    */
+  /**
+   * Turn pan-by-drag on or off.
+   *
+   * Exists for drag-based selection: a freehand or brush stroke is the SAME gesture as a map pan, so
+   * one of the two has to give. The tool suppresses dragging for the length of the stroke and
+   * restores it on finish/cancel — which is why restoring is in a `finally`, not on the happy path.
+   *
+   * A no-op when the provider declares no `setDraggable`, so a caller never has to feature-detect.
+   * @param {boolean} on
+   * @returns {FimMap}
+   */
+  setMapDraggable(on) {
+    const provider = getMapProvider(this.config?.provider || DEFAULT_PROVIDER);
+    if (this.map && typeof provider?.setDraggable === "function") provider.setDraggable(this.map, !!on);
+    return this;
+  }
+
   async whenIdle(opts = {}) {
     const provider = getMapProvider(this.config?.provider || DEFAULT_PROVIDER);
     const map = this.map;

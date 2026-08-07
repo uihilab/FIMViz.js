@@ -12,6 +12,6 @@ export { createTooltip, bindHoverValue } from "./tooltip.js";
 export { createInfoWindow, propsTable, bindFeatureInfo } from "./infoWindow.js";
 export { createToolsPanel, rasterControls, vectorControls } from "./toolsPanel.js";
 export { renderLegend, renderStats } from "./readModels.js";
-export { createRegionDraw } from "./regionDraw.js";
+export { createRegionDraw, REGION_MODES } from "./regionDraw.js";
 export { createOperationsPanel } from "./operationsPanel.js";
 export { createLayerPanel, createLayerSelect, layerLabel } from "./layerPanel.js";

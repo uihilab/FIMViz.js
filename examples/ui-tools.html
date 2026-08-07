@@ -47,12 +47,16 @@
     </div>
 
     <div>
-      <h2>Selection</h2>
-      <div class="row">
-        <button id="draw">Draw region</button>
+      <h2>Selection <span id="hint-mode"></span></h2>
+      <div class="row" id="modes"></div>
+      <div class="row" style="margin-top:6px">
+        <button id="draw">Draw</button>
         <button id="finish">Finish</button>
         <button id="clear">Clear</button>
       </div>
+      <p class="none" style="margin:6px 0 0">
+        <kbd>Enter</kbd> finish · <kbd>Esc</kbd> cancel · <kbd>Backspace</kbd> undo
+      </p>
     </div>
 
     <div>
@@ -88,7 +92,7 @@ import { FimViz, Legend } from "fimviz";
 import {
   createToast, connectToast, createToolsPanel, createOperationsPanel,
   createTooltip, bindHoverValue, createInfoWindow, bindFeatureInfo,
-  createRegionDraw, createLayerPanel, createLayerSelect,
+  createRegionDraw, REGION_MODES, createLayerPanel, createLayerSelect,
   renderLegend, renderStats, layerLabel,
 } from "fimviz/ui";
 
@@ -150,7 +154,9 @@ for (const [source, name] of SOURCES) {
 }
 if (!layers.length) throw new Error("no layers loaded — is the server rooted at the repo, not examples/?");
 
-fim.enableMapEvents(["click", "hover"]);
+// mousedown/mouseup are what the freehand and brush tools trace with. Without them those two fall
+// back to click-to-start / click-to-stop, which works but is not the gesture anyone expects.
+fim.enableMapEvents(["click", "hover", "mousedown", "mouseup"]);
 
 // Hover values on every raster, feature properties on every vector. Both are passive bindings on
 // the ordinary event bus, so they coexist with each other and with selection.
@@ -178,12 +184,20 @@ function refresh() {
   opsPanel?.destroy();
   toolsPanel = createToolsPanel("#tools", { layer: selected, pretty: true });
   opsPanel = createOperationsPanel("#ops", {
-    layer: selected, pretty: true,
+    layer: selected, pretty: true, fim,
     region: () => regionFilter,
+    layers: () => fim.layers,          // the operand pool for Combine / Group by
     onApply: (l, err) => {
       toast.show(err ? `Operation failed — ${err.message}` : "Applied",
         { level: err ? "error" : "success" });
       if (!err) readModels();
+    },
+    // Terminals (zonal stats, group by) return a table, not a layer — so they go to the console
+    // rather than the map. A real app would render them; this bench only has to prove they ran.
+    onResult: (id, data) => {
+      console.log(`[fimviz] ${id}`, data);
+      toast.show(`${id}: ${Array.isArray(data) ? data.length : 1} row(s) — see the console`,
+        { level: "success", timeout: 6000 });
     },
   });
   $("#hint-layers").textContent = `· ${layerLabel(selected)}`;
@@ -218,29 +232,63 @@ const layerPanel = createLayerPanel("#layers", {
 // there, which is the only way to reach a layer buried under another.
 createLayerSelect(fim, { fit: false, onSelect: (l) => layerPanel.select(l) });
 
-// ── region draw ─────────────────────────────────────────────────────────────────────────
-let regionDraw = null;
+// ── selection ───────────────────────────────────────────────────────────────────────────
+// One tool, four modes, one output: rings of {lat,lng} wrapped in a SpatialFilter. Nothing below
+// branches on which mode drew the shape — the statistics call and the Mask operation take the same
+// object either way. That is the whole point of the generalization.
+//
+// There is no on-map outline here on purpose: the engine names no map SDK, so drawing the shape is
+// the host's job. Applying "Mask to region" is the visual confirmation, and a better one — it shows
+// the geometry as the raster ops actually see it.
+const HOWTO = {
+  polygon: "Click each corner, then Finish (or Enter).",
+  rectangle: "Click two opposite corners — the second one finishes it.",
+  freehand: "Press and drag to trace an outline; release to finish.",
+  brush: "Press and drag to paint over the area; release to finish.",
+};
 
-$("#draw").addEventListener("click", () => {
-  $("#draw").classList.add("on");
-  regionDraw = createRegionDraw(fim, {
-    onPoint: (pts) => toast.show(`${pts.length} point${pts.length === 1 ? "" : "s"}`, { timeout: 900 }),
-    onComplete: (filter, pts) => {
-      $("#draw").classList.remove("on");
-      regionFilter = filter;
-      if (!filter) return toast.show(`Need at least 3 points (got ${pts.length})`, { level: "warn" });
-      toast.show(`Region of ${pts.length} points — statistics are scoped to it`, { level: "success" });
-      readModels();
-    },
-    onCancel: () => $("#draw").classList.remove("on"),
-  });
-  regionDraw.start();
-  toast.show("Click at least 3 points on the map, then Finish");
+let regionDraw = createRegionDraw(fim, {
+  mode: "polygon",
+  brushRadius: 400,
+  minSampleMetres: 25,          // a slow drag should not become ten thousand vertices
+  onPoint: (pts) => { $("#hint-mode").textContent = `· ${pts.length}`; },
+  onComplete: (filter, pts, rings) => {
+    $("#draw").classList.remove("on");
+    regionFilter = filter;
+    if (!filter) return toast.show(`Not enough of a shape yet (${pts.length} points)`, { level: "warn" });
+    toast.show(`${rings.length} ring${rings.length === 1 ? "" : "s"} from ${pts.length} points — `
+      + "statistics are scoped to it; try Mask to region", { level: "success", timeout: 6000 });
+    readModels();
+  },
+  onCancel: () => { $("#draw").classList.remove("on"); $("#hint-mode").textContent = ""; },
 });
-$("#finish").addEventListener("click", () => regionDraw?.finish());
+
+for (const mode of REGION_MODES) {
+  const b = document.createElement("button");
+  b.textContent = mode;
+  b.classList.toggle("on", mode === regionDraw.mode);
+  b.addEventListener("click", () => {
+    regionDraw.setMode(mode);
+    for (const other of $("#modes").children) other.classList.toggle("on", other === b);
+    $("#hint-mode").textContent = "";
+    toast.show(HOWTO[mode], { timeout: 5000 });
+  });
+  $("#modes").append(b);
+}
+
+$("#draw").addEventListener("click", async () => {
+  $("#draw").classList.add("on");
+  // The camera must be still before the first click: a click resolved mid-animation is projected
+  // against the pre-animation view and lands somewhere else entirely.
+  await fim.whenIdle();
+  regionDraw.start();
+  toast.show(HOWTO[regionDraw.mode]);
+});
+$("#finish").addEventListener("click", () => regionDraw.finish());
 $("#clear").addEventListener("click", () => {
-  regionDraw?.cancel();
+  regionDraw.cancel();
   regionFilter = null;
+  $("#hint-mode").textContent = "";
   readModels();
   toast.show("Region cleared");
 });

@@ -61,14 +61,19 @@ seam (keeping GDAL out of Dataset's import graph). N-ary ops use the `#inputs[]`
 ✅ **Landed as pure-JS lazy ops on the decoded grid** (`package/rasterOps.js`; need no GDAL, node-tested;
 masked/unmatched pixels → NaN, which colorize/Stats treat as transparent): `ds.clip(bbox)`,
 `ds.mask(polygon,{invert})`, `ds.reclassify(rules,{unmatched})` build lazy nodes forced at terminal and
-round-trip through `toRecord`/`fromRecord`. A UI — `ui/operationsPanel.js` `createOperationsPanel`
-(threshold/mask-to-region/reset, styled like the tools panel) — drives the single-layer ops on a live layer
-via `deriveSources`. Also **band math** — `ds.combine([b,…], { op })`/`ds.difference(b)` (difference/ratio
-binary, sum/mean/min/max N-ary), the first real N-ary op: LHS-conform (others resampled onto THIS grid via
-`geo/resample`), forcing the multi-input `#inputs` node, round-tripping through records — and
-**`ds.zonalStats(zones)`** (a terminal returning per-zone min/max/mean/sum/count/area). Both pure-JS +
-node-tested; the pure grid forms (`combineGrids`/`zonalStats`) are on the barrel. Being multi-input /
-table-returning, they're API-level rather than in `createOperationsPanel`.
+round-trip through `toRecord`/`fromRecord`. A UI — `ui/operationsPanel.js` `createOperationsPanel`,
+styled like the tools panel — drives them on a live layer via `deriveSources`. Also **band math** —
+`ds.combine([b,…], { op })`/`ds.difference(b)` (difference/ratio binary, sum/mean/min/max N-ary), the
+first real N-ary op: LHS-conform (others resampled onto THIS grid via `geo/resample`), forcing the
+multi-input `#inputs` node, round-tripping through records — and **`ds.zonalStats(zones)`** (a terminal
+returning per-zone min/max/mean/sum/count/area). Both pure-JS + node-tested; the pure grid forms
+(`combineGrids`/`zonalStats`) are on the barrel.
+
+✅ **The panel now covers the whole set**, driven by an op TABLE rather than a form per op: clip · mask ·
+reclassify · slope · aspect · hillshade · resample · reproject · combine · reduce · zonal stats · group by,
+plus rasterize on the vector side, grouped and filtered by the layer's kind. Multi-input ops take an
+operand pool (`layers`); the two table-returning terminals report through `onResult` instead of `onApply`,
+so a read is never mistaken for a change to the layer. See DECISIONS §1.1.
 
 ✅ **Landed: terrain, as pure JS** (`slopeGrid`/`aspectGrid`/`hillshadeGrid` in `rasterOps.js`, node-tested) —
 Horn's 1981 3×3-window gradient, the same algorithm `gdaldem slope`/`aspect`/`hillshade` use, run directly
@@ -289,6 +294,17 @@ the layer stack under the pointer with cycling through overlaps. Four decisions 
 
 `FimMap` also emits **`layers:changed`** now (add/remove): `layers` is a plain public array, so a view
 over it could otherwise only poll.
+
+✅ **Landed: the selection tier.** `createRegionDraw` grew from a click-per-vertex polygon into four
+tools — **polygon · rectangle · freehand · brush** (`REGION_MODES`, `setMode()`) — with
+<kbd>Enter</kbd>/<kbd>Esc</kbd>/<kbd>Backspace</kbd> keys, `undo()`, and a live `onPreview`. The reason
+it was cheap: all four already shared an output — **rings of `{lat,lng}`**, which `SpatialFilter`,
+`dataset.mask()` and `layer.getStats({ filter })` have always taken — so the modes differ only in how
+they fill the ring list, and the brush's per-sample stamps are just a multi-polygon, which
+`SpatialFilter` already unions. Two supporting decisions, both in DECISIONS §1.1/§2.1: the drag modes
+take pan-by-drag away for the length of a stroke via a new optional provider method
+**`setDraggable`** (tracing and panning are the same gesture), and the trailing `click` that follows
+every press-drag-release is **swallowed** rather than allowed to fall through to layer dispatch.
 
 **Deferred, with a finding:** `damage`/`velocity` **control presets** are deliberately NOT shipped.
 `VelocityLayer` is a Google-only animated canvas driven by positional params (particle density, colour

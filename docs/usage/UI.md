@@ -16,7 +16,7 @@ import { createToast, connectToast, createToolsPanel } from 'fimviz/ui';
 
 [Toast](#toast) · [Tooltip (raster hover)](#tooltip-raster-hover) ·
 [Info window (vector click)](#info-window-vector-click) · [Tools panel](#tools-panel) ·
-[Legend/Stats renderers](#legendstats-renderers) · [Region draw](#region-draw) ·
+[Legend/Stats renderers](#legendstats-renderers) · [Selection tools](#selection-tools-region-draw) ·
 [Operations panel](#operations-panel) · [Layer panel](#layer-panel) ·
 [Click-to-select](#click-to-select)
 
@@ -111,50 +111,118 @@ renderLegend(legend, { html? })   // html:false (default) → legend.toJSON(); h
 renderStats(stats, { html? })      // html:false → stats.toJSON(); html:true → an HTML table of scalar fields
 ```
 
-## Region draw
+## Selection tools (region draw)
 
 A **modal** interaction — while active, `fim.captureInteraction` routes ALL map events to the tool
 (layer hover/click dispatch is suppressed).
 
+Four modes, **one output**: rings of `{lat,lng}` wrapped in a `SpatialFilter`, which is exactly what
+`dataset.mask()` and `layer.getStats({ filter })` already take. Nothing downstream branches on which
+tool drew the shape.
+
 ```js
-createRegionDraw(fim, { onPoint?, onComplete?, onCancel? })
-// onPoint(points, evt) — called per vertex added (a click)
-// onComplete(filter, points) — called by finish(); filter is a SpatialFilter (>=3 points) or null
-// onCancel() — called by cancel()
-// → { start(), finish(), cancel(), points (getter), active (getter) }
+createRegionDraw(fim, {
+  mode?,             // 'polygon' (default) | 'rectangle' | 'freehand' | 'brush'
+  brushRadius?,      // brush: stamp radius in METRES (default 250)
+  brushSides?,       // brush: vertices per stamp (default 16)
+  minSampleMetres?,  // freehand/brush: drop samples closer than this (default 0 = keep all)
+  keys?, keyTarget?, // Esc cancel · Enter finish · Backspace undo (default on, on `document`)
+  freezeCamera?,     // drag modes suppress map panning while tracing (default true)
+  onPoint?, onPreview?, onComplete?, onCancel?,
+})
+// onPoint(points, evt)        — per vertex / stroke sample added
+// onPreview(rings)            — the live shape, incl. the rectangle rubber band on hover
+// onComplete(filter, points, rings) — filter is a SpatialFilter or null if the shape has no area
+// onCancel()
+// → { start(), finish(), cancel(), undo(), setMode(m), mode, points, rings, active }
 ```
+
+| Mode | Gesture | Ring(s) |
+|---|---|---|
+| `polygon` | one click per vertex, then Finish / <kbd>Enter</kbd> | one, from the vertices |
+| `rectangle` | two clicks on opposite corners — **the second finishes it** | one, axis-aligned and corner-normalized |
+| `freehand` | press · drag · release | one, from the traced samples |
+| `brush` | press · drag · release | **many** — a circular stamp per sample, unioned |
+
+`REGION_MODES` is exported as the list, in toolbar order.
 
 ```js
 const draw = createRegionDraw(fim, {
   onComplete: (filter) => { if (filter) layer.getStats({ filter }).then(console.log); },
 });
-draw.start();    // clicks now add vertices instead of hitting layers
-// ... user clicks a few points ...
-draw.finish();   // builds the SpatialFilter, releases the modal capture, fires onComplete
+draw.setMode('brush');
+draw.start();    // map events now go to the tool instead of hitting layers
 ```
 
-The drawn geometry is **data** (`{lat,lng}` points) — this module names no map SDK; you render the
-in-progress polygon yourself if you want a visual (e.g. via `onPoint`).
+Three things a host has to know:
+
+- **Enable the events the drag modes need.** `fim.enableMapEvents(['click','hover','mousedown','mouseup'])`.
+  Without `mousedown`/`mouseup`, freehand and brush fall back to click-to-start / click-to-stop rather
+  than silently doing nothing — which is also how they behave on touch.
+- **Wait for the camera.** `layer.fit(); await fim.whenIdle(); draw.start();` — a click resolved
+  mid-animation is projected against the pre-animation view.
+- **The drawn geometry is data.** This module names no map SDK, so rendering the in-progress shape is
+  yours to do, via `onPreview`.
+
+Drag modes take pan-by-drag away for the length of the stroke (`fim.setMapDraggable`), because tracing
+and panning are the same gesture; it is restored on finish *and* on cancel. Polygon does not — moving
+the map between vertices is legitimate. A press-drag-release also emits a trailing `click`, which the
+tool eats so the end of a stroke does not also select whatever is under the cursor.
+
+`setMode()` mid-draw discards the current shape and does **not** fire `onCancel` — the host asked for
+the switch, and reporting it as a cancellation makes toolbars un-toggle themselves.
 
 ## Operations panel
 
-Turns `Dataset` ops into buttons that `deriveSources` onto a live layer (memoized ancestors are
+Turns `Dataset` ops into a form that `deriveSources` onto a live layer (memoized ancestors are
 reused — cheap).
 
 ```js
-createOperationsPanel(root, { layer, region?, pretty?, onApply? })
-// layer: a RasterLayer · region: () => SpatialFilter|Array|null (feeds "Mask to region")
-// onApply(layer, err?) — called after each op attempt, err set on failure
-// → { el, destroy() }
+createOperationsPanel(root, { layer, region?, layers?, fim?, open?, pretty?, onApply?, onResult? })
+// layer   : the layer the ops apply to
+// region  : () => SpatialFilter|Array|null — feeds Mask and Zonal stats
+// layers  : () => Layer[] — the operand pool for Combine and Group by (this layer is excluded)
+// fim     : needed only by Rasterize, which adds a NEW layer rather than replacing this one
+// open    : which groups start expanded (default ['Extent','Values'])
+// onApply (layer, err?)  — after each attempt, err set on failure
+// onResult(id, data)     — a TERMINAL's table (zonal stats, group by); these return data, not a layer
+// → { el, ops, destroy() }   // `ops` = the op ids actually offered for this layer's kind
 ```
 
-Ships two ops out of the box — **Threshold** (`ds.reclassify([{min,max}], {unmatched:'nodata'})`,
-keeps values in `[min,max)`) and **Mask to region** (`ds.mask(region())`) — plus a **Reset** button
-that calls `layer.setSources([layer.dataset])` to restore the original, pristine source.
+| Group | Ops |
+|---|---|
+| Extent | **Clip** (bbox, prefilled from the layer's footprint) · **Mask** (the drawn region, `invert`) |
+| Values | **Reclassify** (`min`/`max`/`→ value`, `others: nodata|keep`) |
+| Terrain | **Slope** (unit, z) · **Aspect** · **Hillshade** (azimuth, altitude, z) |
+| Grid | **Resample** (w×h, method) · **Reproject** (CRS — GDAL, at render) |
+| Multi-layer | **Combine** (another raster layer × difference/ratio/sum/mean/min/max) |
+| Axis | **Reduce** (mean/sum/min/max over a selection axis) |
+| Vector | **Rasterize** (w×h, field, burn value) |
+| Analysis | **Zonal stats** (the region) · **Group by** (another layer's values, optional bins) |
+
+Plus a **Reset** that points the layer back at the sources it was built from.
+
+Three things worth knowing:
+
+- **Ops are filtered by kind.** A vector layer is offered `rasterize` and nothing else — the raster
+  ops would only ever throw on it. Read `ops` to see what a given layer actually got.
+- **An op whose requirement is missing is disabled and says why**, rather than failing when pressed:
+  no `region` wired up, no second raster layer, no selection axis on the dataset, no `fim`.
+- **Reclassify covers both threshold and remap.** Leaving `→ value` blank is the engine's documented
+  "keep the matched pixel's value" band, so a range with no value is exactly a threshold.
+
+`rasterize` is the one op that does not derive in place: it changes the Dataset's *kind*, and a
+`VectorLayer` cannot draw a raster (`Layer.rasterize()` throws saying so). With `fim` it adds the
+result as its own layer; without it, it is disabled.
 
 ```js
 const draw = createRegionDraw(fim, { onComplete: (f) => { lastRegion = f; } });
-createOperationsPanel('#ops', { layer: rasterLayer, region: () => lastRegion, pretty: true });
+createOperationsPanel('#ops', {
+  layer: rasterLayer, fim, pretty: true,
+  region: () => lastRegion,
+  layers: () => fim.layers,
+  onResult: (id, rows) => console.table(rows),
+});
 ```
 
 ## Layer panel

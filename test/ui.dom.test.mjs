@@ -206,16 +206,45 @@ describe("ui: createOperationsPanel", () => {
     return { layer, ds };
   }
 
+  /** A vector layer, for the ops that only exist on the other side of the kind split. */
+  function vectorOpsLayer() {
+    const bounds = { north: 3, south: 0, east: 3, west: 0 };
+    const ds = new Dataset({
+      name: "shapes", kind: "vector", format: "geojson", crs: "EPSG:4326", bounds,
+      data: { type: "FeatureCollection", features: [] },
+    });
+    const layer = new VectorLayer({ id: "vops" });
+    layer.sources = [ds];
+    layer._draw = () => {};
+    layer._checkProviderCRS = () => {};
+    return { layer, ds };
+  }
+
   const buttons = (el) => [...el.querySelectorAll("button")];
   const byText = (el, t) => buttons(el).find((b) => b.textContent === t);
+  // Ops are addressed by id, not by position: the panel now has a dozen of them, and an index-based
+  // selector would silently retarget the moment one is added above another.
+  const opEl = (el, id) => el.querySelector(`[data-op="${id}"]`);
+  const fieldEl = (el, id, k) => opEl(el, id).querySelector(`[data-field="${k}"]`);
+  const setField = (el, id, k, v) => { fieldEl(el, id, k).value = v; };
+  const apply = (el, id) => opEl(el, id).querySelector("button").click();
+  const settle = () => new Promise((r) => setTimeout(r, 0));
 
-  test("renders the three operations it claims: threshold, mask, reset", () => {
+  test("offers the raster ops, grouped, plus reset", () => {
     const { layer } = opsLayer();
-    const { el } = UI.createOperationsPanel(host(), { layer });
+    const { el, ops } = UI.createOperationsPanel(host(), { layer });
     assert.equal(el.getAttribute("data-fim-ui"), "operations-panel");
-    assert.deepEqual(buttons(el).map((b) => b.textContent), ["Apply", "Mask to region", "Reset to original"]);
-    const titles = [...el.querySelectorAll(".op-title")].map((s) => s.textContent);
-    assert.deepEqual(titles, ["Threshold — keep values in range", "Mask — clip to the drawn region"]);
+    assert.deepEqual(ops, ["clip", "mask", "reclassify", "slope", "aspect", "hillshade",
+      "resample", "reproject", "combine", "reduce", "zonalStats", "groupBy"]);
+    assert.deepEqual([...el.querySelectorAll("[data-group]")].map((g) => g.getAttribute("data-group")),
+      ["Extent", "Values", "Terrain", "Grid", "Multi-layer", "Axis", "Analysis"]);
+    assert.ok(opEl(el, "reset"), "and a reset");
+  });
+
+  test("a VECTOR layer is offered rasterize and NONE of the raster ops", () => {
+    const { layer } = vectorOpsLayer();
+    const { ops } = UI.createOperationsPanel(host(), { layer });
+    assert.deepEqual(ops, ["rasterize"], "offering clip on a vector would only ever throw");
   });
 
   test("rejects a missing layer and a bad target", () => {
@@ -223,14 +252,14 @@ describe("ui: createOperationsPanel", () => {
     assert.throws(() => UI.createOperationsPanel("#nope", { layer: opsLayer().layer }), /not found/);
   });
 
-  test("Threshold derives a reclassify and calls onApply", async () => {
+  test("Reclassify derives from the range and calls onApply", async () => {
     const { layer, ds } = opsLayer();
     let applied = null;
     const { el } = UI.createOperationsPanel(host(), { layer, onApply: (l, e) => { applied = { l, e }; } });
-    el.querySelectorAll("input[type=number]")[0].value = "3";
-    el.querySelectorAll("input[type=number]")[1].value = "7";
-    byText(el, "Apply").click();
-    await new Promise((r) => setTimeout(r, 0));
+    setField(el, "reclassify", "min", "3");
+    setField(el, "reclassify", "max", "7");
+    apply(el, "reclassify");
+    await settle();
 
     assert.equal(applied?.e, undefined, "no error");
     assert.notEqual(layer.sources[0], ds, "the layer points at a DERIVED dataset");
@@ -239,25 +268,65 @@ describe("ui: createOperationsPanel", () => {
     assert.deepEqual(kept, [3, 4, 5, 6], "values in [3,7) survive; the rest became NaN");
   });
 
-  test("Threshold with both fields empty is a no-op, not an error", async () => {
+  // Leaving `value` blank is the engine's "keep the matched pixel's value" band — which is what makes
+  // one op cover both a threshold and a remap.
+  test("Reclassify with a value REPLACES the matched pixels", async () => {
+    const { layer } = opsLayer();
+    const { el } = UI.createOperationsPanel(host(), { layer });
+    setField(el, "reclassify", "min", "3");
+    setField(el, "reclassify", "max", "7");
+    setField(el, "reclassify", "value", "99");
+    apply(el, "reclassify");
+    await settle();
+    const g = await layer.sources[0].grid();
+    assert.deepEqual([...g.pixels].filter((v) => !Number.isNaN(v)), [99, 99, 99, 99]);
+  });
+
+  test("Reclassify with unmatched=keep leaves the rest alone", async () => {
+    const { layer } = opsLayer();
+    const { el } = UI.createOperationsPanel(host(), { layer });
+    setField(el, "reclassify", "min", "3");
+    setField(el, "reclassify", "max", "7");
+    setField(el, "reclassify", "value", "0");
+    fieldEl(el, "reclassify", "unmatched").value = "keep";
+    apply(el, "reclassify");
+    await settle();
+    const g = await layer.sources[0].grid();
+    assert.deepEqual([...g.pixels], [1, 2, 0, 0, 0, 0, 7, 8, 9]);
+  });
+
+  test("Reclassify with both range fields empty is a no-op, not an error", async () => {
     const { layer, ds } = opsLayer();
     const { el } = UI.createOperationsPanel(host(), { layer });
-    byText(el, "Apply").click();
-    await new Promise((r) => setTimeout(r, 0));
+    apply(el, "reclassify");
+    await settle();
     assert.equal(layer.sources[0], ds, "nothing was derived");
   });
 
-  test("Threshold accepts an open-ended range (min only, max only)", async () => {
+  test("Reclassify accepts an open-ended range (min only, max only)", async () => {
     for (const [minV, maxV, expect] of [["6", "", [6, 7, 8, 9]], ["", "4", [1, 2, 3]]]) {
       const { layer } = opsLayer();
       const { el } = UI.createOperationsPanel(host(), { layer });
-      el.querySelectorAll("input[type=number]")[0].value = minV;
-      el.querySelectorAll("input[type=number]")[1].value = maxV;
-      byText(el, "Apply").click();
-      await new Promise((r) => setTimeout(r, 0));
+      setField(el, "reclassify", "min", minV);
+      setField(el, "reclassify", "max", maxV);
+      apply(el, "reclassify");
+      await settle();
       const g = await layer.sources[0].grid();
       assert.deepEqual([...g.pixels].filter((v) => !Number.isNaN(v)), expect);
     }
+  });
+
+  test("Clip prefills from the layer's own footprint and crops to what you type", async () => {
+    const { layer } = opsLayer();
+    const { el } = UI.createOperationsPanel(host(), { layer });
+    assert.equal(fieldEl(el, "clip", "north").value, "3", "four empty boxes would be a guessing game");
+    assert.equal(fieldEl(el, "clip", "west").value, "0");
+    setField(el, "clip", "north", "2");
+    apply(el, "clip");
+    await settle();
+    const g = await layer.sources[0].grid();
+    assert.equal(g.height, 2, "the top row was cropped away");
+    assert.equal(g.bounds.north, 2);
   });
 
   test("Mask uses the region callback, and does nothing when it returns null", async () => {
@@ -265,29 +334,142 @@ describe("ui: createOperationsPanel", () => {
     let current = null;
     const { el } = UI.createOperationsPanel(host(), { layer, region: () => current });
 
-    byText(el, "Mask to region").click();
-    await new Promise((r) => setTimeout(r, 0));
+    apply(el, "mask");
+    await settle();
     assert.equal(layer.sources[0], ds, "no region drawn yet → no-op");
 
     current = new SpatialFilter([{ lat: 0, lng: 0 }, { lat: 0, lng: 1.5 }, { lat: 1.5, lng: 1.5 }, { lat: 1.5, lng: 0 }]);
-    byText(el, "Mask to region").click();
-    await new Promise((r) => setTimeout(r, 0));
+    apply(el, "mask");
+    await settle();
     assert.notEqual(layer.sources[0], ds, "a region was applied");
     const g = await layer.sources[0].grid();
     assert.ok([...g.pixels].some((v) => Number.isNaN(v)), "pixels outside the polygon became NaN");
     assert.ok([...g.pixels].some((v) => !Number.isNaN(v)), "and pixels inside survived");
   });
 
+  test("Mask invert keeps the OTHER side", async () => {
+    const ring = [{ lat: 0, lng: 0 }, { lat: 0, lng: 1.5 }, { lat: 1.5, lng: 1.5 }, { lat: 1.5, lng: 0 }];
+    const survivors = async (invert) => {
+      const { layer } = opsLayer();
+      const { el } = UI.createOperationsPanel(host(), { layer, region: () => new SpatialFilter(ring) });
+      if (invert) fieldEl(el, "mask", "invert").checked = true;
+      apply(el, "mask");
+      await settle();
+      const g = await layer.sources[0].grid();
+      return [...g.pixels].filter((v) => !Number.isNaN(v));
+    };
+    const inside = await survivors(false), outside = await survivors(true);
+    assert.ok(inside.length && outside.length);
+    assert.deepEqual(inside.filter((v) => outside.includes(v)), [], "the two halves must not overlap");
+  });
+
+  test("an op with no fields still runs — Aspect derives a new dataset", async () => {
+    const { layer, ds } = opsLayer();
+    const { el } = UI.createOperationsPanel(host(), { layer });
+    apply(el, "aspect");
+    await settle();
+    assert.notEqual(layer.sources[0], ds);
+    const g = await layer.sources[0].grid();
+    assert.equal(g.width, 3, "same footprint, new values");
+  });
+
+  test("Resample rewrites the pixel grid at the same footprint", async () => {
+    const { layer } = opsLayer();
+    const { el } = UI.createOperationsPanel(host(), { layer });
+    setField(el, "resample", "width", "6");
+    setField(el, "resample", "height", "6");
+    apply(el, "resample");
+    await settle();
+    const g = await layer.sources[0].grid();
+    assert.equal(g.width, 6);
+    assert.equal(g.height, 6);
+    assert.equal(g.bounds.north, 3, "resample is not reprojection — the footprint is untouched");
+  });
+
+  test("Reproject validates eagerly, and the failure reaches onApply", async () => {
+    const { layer } = opsLayer();
+    let err = null;
+    const { el } = UI.createOperationsPanel(host(), { layer, onApply: (_l, e) => { err = e; } });
+    setField(el, "reproject", "crs", "not-a-crs");
+    apply(el, "reproject");
+    await settle();
+    assert.match(err?.message ?? "", /not a recognized CRS/);
+  });
+
+  // Ops that need something the host did not supply say so, rather than failing when pressed.
+  test("ops with an unmet requirement are disabled and explain why", () => {
+    const { layer } = opsLayer();
+    const { el } = UI.createOperationsPanel(host(), { layer });          // no region, no layers, no fim
+    for (const id of ["mask", "combine", "zonalStats", "groupBy", "reduce"]) {
+      assert.equal(opEl(el, id).querySelector("button").disabled, true, `${id} should be disabled`);
+      assert.ok(opEl(el, id).querySelector(".op-note")?.textContent, `${id} should explain itself`);
+    }
+    assert.equal(opEl(el, "clip").querySelector("button").disabled, false, "…but the rest are usable");
+  });
+
+  test("Combine offers the OTHER raster layers and applies band math", async () => {
+    const { layer, ds } = opsLayer();
+    const other = opsLayer().layer;
+    other.id = "other";
+    const { el } = UI.createOperationsPanel(host(), { layer, layers: () => [layer, other] });
+    const select = fieldEl(el, "combine", "other");
+    assert.deepEqual([...select.options].map((o) => o.value), ["other"], "never itself");
+    apply(el, "combine");
+    await settle();
+    assert.notEqual(layer.sources[0], ds);
+    const g = await layer.sources[0].grid();
+    assert.deepEqual([...g.pixels], [0, 0, 0, 0, 0, 0, 0, 0, 0], "identical grids differenced to zero");
+  });
+
+  test("Reduce is offered only when the dataset actually has an axis", () => {
+    const { layer } = opsLayer();
+    const withAxis = opsLayer().layer;
+    withAxis.sources[0].axes = [{ name: "time", entries: [] }];
+    assert.equal(UI.createOperationsPanel(host(), { layer })
+      .el.querySelector('[data-op=reduce] button').disabled, true);
+    assert.equal(UI.createOperationsPanel(host(), { layer: withAxis })
+      .el.querySelector('[data-op=reduce] button').disabled, false);
+  });
+
+  test("a terminal reports through onResult and leaves the layer's sources alone", async () => {
+    const { layer, ds } = opsLayer();
+    let result = null;
+    const region = new SpatialFilter([{ lat: 0, lng: 0 }, { lat: 0, lng: 3 }, { lat: 3, lng: 3 }, { lat: 3, lng: 0 }]);
+    const { el } = UI.createOperationsPanel(host(), {
+      layer, region: () => region, onResult: (id, data) => { result = { id, data }; },
+    });
+    apply(el, "zonalStats");
+    await settle();
+    assert.equal(result?.id, "zonalStats");
+    assert.ok(Array.isArray(result.data), "zonal stats are a table, not a layer");
+    assert.equal(layer.sources[0], ds, "a terminal reads; it must not rewrite the layer");
+  });
+
+  test("Rasterize needs a map, because it cannot replace the layer it came from", async () => {
+    const { layer } = vectorOpsLayer();
+    const noFim = UI.createOperationsPanel(host(), { layer });
+    assert.equal(noFim.el.querySelector("[data-op=rasterize] button").disabled, true);
+    assert.match(noFim.el.querySelector("[data-op=rasterize] .op-note").textContent, /adds a new layer/);
+
+    const added = [];
+    const { el } = UI.createOperationsPanel(host(), { layer, fim: { addLayer: (d) => added.push(d) } });
+    apply(el, "rasterize");
+    await settle();
+    assert.equal(added.length, 1);
+    assert.equal(added[0].kind, "raster", "vector in, raster out — a NEW layer, not this one");
+    assert.equal(layer.sources[0].kind, "vector", "and the vector layer is untouched");
+  });
+
   test("Reset points the layer back at the ORIGINAL dataset", async () => {
     const { layer, ds } = opsLayer();
     const { el } = UI.createOperationsPanel(host(), { layer });
-    el.querySelectorAll("input[type=number]")[0].value = "5";
-    byText(el, "Apply").click();
-    await new Promise((r) => setTimeout(r, 0));
+    setField(el, "reclassify", "min", "5");
+    apply(el, "reclassify");
+    await settle();
     assert.notEqual(layer.sources[0], ds);
 
     byText(el, "Reset to original").click();
-    await new Promise((r) => setTimeout(r, 0));
+    await settle();
     assert.equal(layer.sources[0], ds, "back to the pristine source");
   });
 
@@ -296,9 +478,9 @@ describe("ui: createOperationsPanel", () => {
     let err = null;
     const { el } = UI.createOperationsPanel(host(), { layer, onApply: (_l, e) => { err = e; } });
     layer.deriveSources = () => { throw new Error("boom"); };
-    el.querySelectorAll("input[type=number]")[0].value = "1";
-    byText(el, "Apply").click();
-    await new Promise((r) => setTimeout(r, 0));
+    setField(el, "reclassify", "min", "1");
+    apply(el, "reclassify");
+    await settle();
     assert.match(err?.message ?? "", /boom/);
   });
 
@@ -747,7 +929,7 @@ describe("ui: every handle member", () => {
       infoWindow: [UI.createInfoWindow({ root: host() }), ["open", "close", "destroy", "el"]],
       toolsPanel: [UI.createToolsPanel(host(), { layer }), ["el", "update", "destroy"]],
       regionDraw: [UI.createRegionDraw({ captureInteraction: () => () => {} }),
-        ["start", "finish", "cancel", "points", "active"]],
+        ["start", "finish", "cancel", "undo", "setMode", "mode", "points", "rings", "active"]],
     };
     for (const [name, [handle, members]] of Object.entries(shapes)) {
       for (const m of members) {
@@ -760,10 +942,10 @@ describe("ui: every handle member", () => {
 describe("ui: the barrel", () => {
   test("exports exactly the documented names", () => {
     assert.deepEqual(Object.keys(UI).sort(), [
-      "bindFeatureInfo", "bindHoverValue", "connectToast", "createInfoWindow", "createLayerPanel",
-      "createLayerSelect", "createOperationsPanel", "createRegionDraw", "createToast",
-      "createToolsPanel", "createTooltip", "layerLabel", "propsTable", "rasterControls",
-      "renderLegend", "renderStats", "vectorControls",
+      "REGION_MODES", "bindFeatureInfo", "bindHoverValue", "connectToast", "createInfoWindow",
+      "createLayerPanel", "createLayerSelect", "createOperationsPanel", "createRegionDraw",
+      "createToast", "createToolsPanel", "createTooltip", "layerLabel", "propsTable",
+      "rasterControls", "renderLegend", "renderStats", "vectorControls",
     ]);
   });
 });

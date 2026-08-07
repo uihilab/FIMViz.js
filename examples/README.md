@@ -37,7 +37,7 @@ Leaflet pages need nothing. Google pages need a Maps JS API key that you supply 
 | Page | What it is for |
 |---|---|
 | **`verify.html`** | **Guided manual verification.** Ten numbered steps, each with instructions, expected results, and Pass/Fail capture. Start here when checking a change. |
-| `ui-tools.html` | Every `fimviz/ui` component mounted the way an app would mount them — layer panel, click-to-select, tools + operations panels, legend/stats, hover, feature info, region draw. Exhaustive per-method coverage lives in `test/ui.dom.test.mjs` instead. |
+| `ui-tools.html` | Every `fimviz/ui` component mounted the way an app would mount them — layer panel, click-to-select, tools + operations panels, legend/stats, hover, feature info, and all four selection tools (polygon / rectangle / freehand / brush). Exhaustive per-method coverage lives in `test/ui.dom.test.mjs` instead. |
 | `temporal-netcdf.html` | NetCDF4 / Zarr / GRIB2 through the ordinary `addDataset`: a time axis you can scrub, and `reduce()` over the whole axis. |
 | `dataset-layer.html` | The `Dataset → Layer` pipeline against a tiny in-page demo provider (no real map). |
 | `method-playground.html` | Every public method called once with sample parameters. A scratch bench, not a test. |
@@ -62,7 +62,7 @@ Work top to bottom: step 8 needs the raster from step 3, and step 9 needs the re
 
 ## Automated coverage, and where it stops
 
-`npm test` runs 765 Node tests over the pure modules (including jsdom coverage of every
+`npm test` runs 820 Node tests over the pure modules (including jsdom coverage of every
 `fimviz/ui` export). It cannot see a browser: no `google.maps`, no
 Leaflet, no canvas, no GDAL WASM. Everything provider-shaped or pixel-shaped is verified by opening
 these pages. That gap is why `verify.html` exists, and why it is worth running on both providers
