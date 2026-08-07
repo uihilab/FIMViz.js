@@ -250,6 +250,11 @@ Contents by coupling:
   ✅ `rasterControls` now emits **every** key `RasterSettings.SCALE_KEYS` accepts — palette, continuous,
   min, max, unit, plus editors for the two mode-switching ones (`stops` discrete bands, `colorStops`
   gradient control points) — so no knob the change-model honours is unreachable from the preset.
+- **Dropzone** — ✅ `createDropzone(root, { fim })`: drop or browse for files, loaded through the
+  ordinary `addDataset`. The value is the drag contract (cancelling `dragover`, counting
+  enter/leave, filtering `dataTransfer.items` by kind), not the loading — every one of those fails
+  silently otherwise. Sequential and per-file, so stacking order matches drop order and one bad file
+  does not take the rest down.
 - **Axis slider** — ✅ `createAxisSlider(root, { layer, axis })`, a view over the selection-axis model
   (§8): scrubbing is `layer.setSources([ds.select(coord)])`, so it drives stage/level/band/member as
   readily as time and is deliberately NOT named after the temporal case. It owns the two things that

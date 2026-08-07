@@ -15,9 +15,10 @@
 <body>
 <div id="gmap">Google Map Here</div>
 <div id="lmap">Leaflet Map Here</div>
-<div id="dropzone">Drop files here</div>
-<p>Empty scratch bench. Open DevTools console — <code>window.FimViz</code> and <code>window.FIM.*</code>
-(every named export from the barrel) are ready to call directly. Nothing else runs on this page.
+<div id="dropzone"></div>
+<p>Open DevTools console — <code>window.FimViz</code> and <code>window.FIM.*</code>
+(every named export from the barrel) are ready to call directly. The drop target above is
+<code>createDropzone</code>; anything it loads lands in <code>window.FIM.dropped</code>.
 <code>addDataset</code> handles <code>.nc</code>/<code>.grib2</code>/<code>.zarr</code> too — that
 reader is <em>external</em> to the bundle, which is the one import-map entry below that is not ours.</p>
 <p>Loads from <code>dist/fimviz.js</code> — run <code>npm run build</code> after editing
@@ -46,6 +47,22 @@ window.FimViz = FIM.FimViz;
 // Every export is ALSO a bare global, so console snippets can call `mount(...)` etc. without the
 // FIM. prefix. A scratch bench, not a pattern to copy into an app.
 Object.assign(window, FIM);
+
+// The drop target. `add:'none'` because this bench mounts no map — it parses each file to a Dataset
+// and parks it on window.FIM.dropped for the console to poke at, which is the whole point of a bench.
+FIM.dropped = [];
+UI.createDropzone("#dropzone", {
+  add: "none",
+  label: "Drop a file — it lands in FIM.dropped",
+  onDrop: (files) => console.log("[fimviz] dropped", files.map((f) => f.name)),
+  onLoad: async (file) => {
+    const ds = await ENGINE.FimViz.parseFile(file);
+    FIM.dropped.push(ds);
+    console.log(`[fimviz] FIM.dropped[${FIM.dropped.length - 1}] =`, ds);
+  },
+  onError: (err, file) => console.error(`[fimviz] ${file.name}`, err),
+});
+
 console.log("[fimviz] scratch bench ready — FIM.* (and bare globals) are live.",
             `${Object.keys(ENGINE).length} engine + ${Object.keys(UI).length} ui exports`);
 </script>

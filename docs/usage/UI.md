@@ -5,7 +5,7 @@ functions (never at import time), and calls no `window.foo()` — the engine emi
 Mount whichever pieces you want; none of them are required for the engine to work.
 
 Everything below imports from **`fimviz/ui`**, its only home — the engine barrel does not re-export
-it. That entry carries just the small pure deps these need (~51 KB, no geotiff/Maps loader/GDAL), and
+it. That entry carries just the small pure deps these need (~56 KB, no geotiff/Maps loader/GDAL), and
 having exactly one entry means an app can never load two copies with two sets of state:
 
 ```js
@@ -18,7 +18,7 @@ import { createToast, connectToast, createToolsPanel } from 'fimviz/ui';
 [Tooltip (raster hover)](#tooltip-raster-hover) ·
 [Info window (vector click)](#info-window-vector-click) · [Tools panel](#tools-panel) ·
 [Legend/Stats renderers](#legendstats-renderers) · [Live panels](#live-panels--bindlegend--bindstats) ·
-[Axis slider](#axis-slider) · [Selection tools](#selection-tools-region-draw) ·
+[Dropzone](#dropzone) · [Axis slider](#axis-slider) · [Selection tools](#selection-tools-region-draw) ·
 [Region overlay](#showing-the-shape--createregionoverlay) ·
 [Operations panel](#operations-panel) · [Layer panel](#layer-panel) ·
 [Click-to-select](#click-to-select)
@@ -243,6 +243,40 @@ Four things they handle that hand-rolled re-reading usually doesn't:
 - **`filter` may be a getter**, because the usual filter is a drawn region that changes independently
   of the layer. The layer emits nothing when you draw one, so that is the one case needing `update()`
   — everything the *layer* can know about is already automatic.
+
+## Dropzone
+
+```js
+createDropzone(root, { fim, add?, accept?, multiple?, browse?, label?, pretty?,
+                        onDrop?, onLoad?, onError?, onDone? })
+// add    : 'layer' (default) → addDataset + addLayer · 'dataset' → stop at the Dataset ·
+//          'none' → report the File and load nothing (no `fim` needed)
+// accept : an extension array (default DROP_EXTENSIONS) or a (file) => boolean; [] accepts everything
+// onLoad (result, file, i) · onError (err, file) · onDone (results)
+// → { el, open(), load(files), busy, destroy() }
+
+DROP_EXTENSIONS   // every extension parseSource can detect
+```
+
+```js
+createDropzone('#drop', { fim, onLoad: (layer) => layer.fit() });
+```
+
+Also click- and keyboard-openable (a hidden `<input type=file>`), so it is not drag-only.
+
+Three things it gets right that a hand-rolled zone usually doesn't:
+
+- **`dragover` is cancelled.** Without `preventDefault` there the browser takes its default action for
+  a dropped file — navigating away to display it — and the `drop` handler never runs at all. This is
+  the single most common way a dropzone silently does nothing.
+- **`dragenter`/`dragleave` are counted.** Both fire for every *descendant* crossed, so a naive
+  highlight-on-enter/clear-on-leave flickers as the pointer moves over the label.
+- **`dataTransfer.items` is filtered by `kind`.** It also carries dragged text and links, which have
+  no file behind them and otherwise arrive as `null`.
+
+Loading is **sequential and per-file**: one bad file reports through `onError` and the rest still
+land, and the layer stacking order matches the order dropped rather than whichever decoded first.
+Pair it with `createBusyIndicator` — `parseSource` emits `busy`, so the indicator lights up on its own.
 
 ## Axis slider
 

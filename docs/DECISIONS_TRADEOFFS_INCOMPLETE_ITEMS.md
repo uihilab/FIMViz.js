@@ -270,7 +270,7 @@ is the *why*, those are the *what*.
   uses — is what actually holds across the seam, and it is what the rest of the engine already does
   (nothing does `instanceof Dataset`). Arrays are checked first, since a polygon is an object too.
   **Rejected:** externalizing `fimviz` from the `ui` bundle. It would give one shared class, but
-  `fimviz/ui` exists precisely so a host can take a toast or a tools panel for ~51 KB instead of pulling
+  `fimviz/ui` exists precisely so a host can take a toast or a tools panel for ~56 KB instead of pulling
   the whole engine; duck-typing fixes the identity problem without giving that up, and generalizes to a
   host passing its own filter object.
 
@@ -296,7 +296,7 @@ is the *why*, those are the *what*.
   edge line at two points, a closed ring at three. `onPreview` had to start carrying `points` as well
   as `rings` for the same reason — a host given only rings has nothing to show until the third click.
   **Rejected:** letting the tool draw directly. It would have to name a map SDK, or `fimviz/ui` would
-  have to import the provider registry — pulling Leaflet into the ~51 KB bundle whose whole point is
+  have to import the provider registry — pulling Leaflet into the ~56 KB bundle whose whole point is
   not to. The seam is `fim.addScratchVector` instead: engine-side, provider-neutral, and deliberately
   **not a Layer** (never hit-tested, reordered, listed, or saved — scaffolding, not data).
 
@@ -351,6 +351,22 @@ is the *why*, those are the *what*.
   explicit with zero bands — nothing painted. A separate "mode" control was **rejected** for the same
   reason: it would be a second, weaker copy of a rule the engine already enforces, and the two could
   disagree.
+
+- **The dropzone is a DOM contract, not a loader.** `fim.addDataset(file)` already takes a `File`, so
+  the widget adds nothing to loading — it exists because the *drag* half is where the mistakes are, and
+  each one fails silently. `dragover` must be cancelled or the browser navigates away to display the
+  file and `drop` never fires at all; `dragenter`/`dragleave` fire for every descendant crossed, so an
+  uncounted pair flickers the highlight; `dataTransfer.items` carries dragged text and links whose
+  `getAsFile()` is `null`. All three are pinned by tests, because none of them is visible in code
+  review and all of them are invisible until someone drags a file.
+
+  Loading is **sequential**, not parallel: several large GeoTIFFs decoding at once compete for the same
+  budget and make each other slower, and the resulting layer stacking order becomes whichever finished
+  first rather than the order they were dropped in. It is also **per-file** — one bad file reports and
+  the rest still land, because dropping five and getting nothing because the third was a text file is a
+  worse outcome than four layers and one message. **Not handled:** a dropped *directory*, which is what
+  an unzipped `.zarr` store is. That needs `webkitGetAsEntry` and a recursive walk, and the supported
+  Zarr paths today are a `.zarr.zip` or a URL.
 
 - **The axis slider is not a time slider.** Scrubbing is `layer.setSources([ds.select(coord)])`, which
   says nothing about time — so `createAxisSlider` takes an axis by index or name and drives stage,

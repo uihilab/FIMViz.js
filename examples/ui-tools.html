@@ -48,7 +48,8 @@
   <div id="side">
     <div>
       <h2>Layers <span id="hint-layers"></span></h2>
-      <div id="layers"></div>
+      <div id="drop"></div>
+      <div id="layers" style="margin-top:8px"></div>
     </div>
 
     <div>
@@ -103,7 +104,7 @@
 <script type="module">
 import { FimViz } from "fimviz";
 import {
-  createToast, connectToast, createBusyIndicator, bindRasterMetadata,
+  createToast, connectToast, createBusyIndicator, bindRasterMetadata, createDropzone,
   createToolsPanel, createOperationsPanel, bindLegend, bindStats,
   createTooltip, bindHoverValue, createInfoWindow, bindFeatureInfo,
   createRegionDraw, REGION_MODES, createRegionOverlay, createLayerPanel, createLayerSelect,
@@ -256,6 +257,20 @@ const layerPanel = createLayerPanel("#layers", {
 // Clicking the map selects too — and clicking the SAME spot again cycles through whatever overlaps
 // there, which is the only way to reach a layer buried under another.
 createLayerSelect(fim, { fit: false, onSelect: (l) => layerPanel.select(l) });
+
+// Drop a file of your own on top of the bundled six. The layer panel redraws itself off
+// `layers:changed`, so nothing here has to tell it that the stack grew.
+createDropzone("#drop", {
+  fim,
+  label: "Drop a raster or vector here",
+  onLoad: (layer, file) => {
+    toast.show(`Loaded ${file.name}`, { level: "success" });
+    layer.fit();
+    layerPanel.select(layer);
+    select(layer);
+  },
+  onError: (err, file) => toast.show(`${file.name} — ${err.message}`, { level: "error", timeout: 8000 }),
+});
 
 // ── selection ───────────────────────────────────────────────────────────────────────────
 // One tool, four modes, one output: rings of {lat,lng} wrapped in a SpatialFilter. Nothing below

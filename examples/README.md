@@ -43,6 +43,7 @@ Leaflet pages need nothing. Google pages need a Maps JS API key that you supply 
 | `method-playground.html` | Every public method called once with sample parameters. A scratch bench, not a test. |
 | `reproject.html` | `Dataset.reproject(crs)` — the GDAL WASM warp, forced only at a terminal. No map. |
 | `scenario.html`, `test2.html` | The same `Dataset` rendered on Google and Leaflet, side by side. |
+| `console-test.html` | A console scratch bench: every export as a global, plus a `createDropzone` that parks parsed Datasets on `FIM.dropped`. |
 | `api-test.esm.html`, `esm.html`, `test.html` | Import-surface and boot smoke pages. |
 | `depth-events.html` | The engine→host `busy` event seam from a host with none of FIMViz's markup. |
 
@@ -67,7 +68,7 @@ Work top to bottom: step 8 needs the raster from step 3, and step 9 needs the re
 
 ## Automated coverage, and where it stops
 
-`npm test` runs 920 Node tests over the pure modules (including jsdom coverage of every
+`npm test` runs 948 Node tests over the pure modules (including jsdom coverage of every
 `fimviz/ui` export). It cannot see a browser: no `google.maps`, no
 Leaflet, no canvas, no GDAL WASM. Everything provider-shaped or pixel-shaped is verified by opening
 these pages. That gap is why `verify.html` exists, and why it is worth running on both providers

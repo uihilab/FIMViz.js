@@ -18,3 +18,4 @@ export { createRegionOverlay, regionGeoJSON } from "./regionOverlay.js";
 export { createOperationsPanel } from "./operationsPanel.js";
 export { createLayerPanel, createLayerSelect, layerLabel } from "./layerPanel.js";
 export { createAxisSlider, axisOf, axisEntryLabel } from "./axisSlider.js";
+export { createDropzone, DROP_EXTENSIONS } from "./dropzone.js";
