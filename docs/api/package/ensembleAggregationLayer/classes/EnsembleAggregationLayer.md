@@ -6,7 +6,7 @@
 
 # Class: EnsembleAggregationLayer
 
-Defined in: [package/ensembleAggregationLayer.js:35](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/ensembleAggregationLayer.js#L35)
+Defined in: [package/ensembleAggregationLayer.js:35](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/ensembleAggregationLayer.js#L35)
 
 ## Extends
 
@@ -18,7 +18,7 @@ Defined in: [package/ensembleAggregationLayer.js:35](https://github.com/uihilab/
 
 > **new EnsembleAggregationLayer**(`opts?`): `EnsembleAggregationLayer`
 
-Defined in: [package/ensembleAggregationLayer.js:39](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/ensembleAggregationLayer.js#L39)
+Defined in: [package/ensembleAggregationLayer.js:39](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/ensembleAggregationLayer.js#L39)
 
 #### Parameters
 
@@ -42,7 +42,7 @@ see `Layer`'s constructor; `sources` here are `{pixels, meta}` or `RasterLayer`
 
 > **\_aligned**: `any`
 
-Defined in: [package/ensembleAggregationLayer.js:42](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/ensembleAggregationLayer.js#L42)
+Defined in: [package/ensembleAggregationLayer.js:42](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/ensembleAggregationLayer.js#L42)
 
 ***
 
@@ -50,7 +50,7 @@ Defined in: [package/ensembleAggregationLayer.js:42](https://github.com/uihilab/
 
 > **\_dirty**: `boolean`
 
-Defined in: [package/layer.js:203](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L203)
+Defined in: [package/layer.js:203](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L203)
 
 #### Inherited from
 
@@ -62,7 +62,7 @@ Defined in: [package/layer.js:203](https://github.com/uihilab/FIMViz.js/blob/5f5
 
 > **\_emitter**: `any`
 
-Defined in: [package/layer.js:69](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L69)
+Defined in: [package/layer.js:69](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L69)
 
 #### Inherited from
 
@@ -74,7 +74,7 @@ Defined in: [package/layer.js:69](https://github.com/uihilab/FIMViz.js/blob/5f5e
 
 > **\_grid**: `object`
 
-Defined in: [package/ensembleAggregationLayer.js:43](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/ensembleAggregationLayer.js#L43)
+Defined in: [package/ensembleAggregationLayer.js:43](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/ensembleAggregationLayer.js#L43)
 
 #### be
 
@@ -106,7 +106,7 @@ Defined in: [package/ensembleAggregationLayer.js:43](https://github.com/uihilab/
 
 > **\_map**: [`FimMap`](../../fimMap/classes/FimMap.md)
 
-Defined in: [package/layer.js:61](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L61)
+Defined in: [package/layer.js:61](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L61)
 
 #### Inherited from
 
@@ -118,7 +118,7 @@ Defined in: [package/layer.js:61](https://github.com/uihilab/FIMViz.js/blob/5f5e
 
 > **\_name**: `any`
 
-Defined in: [package/layer.js:67](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L67)
+Defined in: [package/layer.js:67](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L67)
 
 #### Inherited from
 
@@ -130,7 +130,7 @@ Defined in: [package/layer.js:67](https://github.com/uihilab/FIMViz.js/blob/5f5e
 
 > **\_origin**: [`Dataset`](../../dataset/classes/Dataset.md)[]
 
-Defined in: [package/layer.js:296](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L296)
+Defined in: [package/layer.js:296](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L296)
 
 #### Inherited from
 
@@ -142,7 +142,7 @@ Defined in: [package/layer.js:296](https://github.com/uihilab/FIMViz.js/blob/5f5
 
 > **\_removed**: `boolean`
 
-Defined in: [package/layer.js:408](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L408)
+Defined in: [package/layer.js:408](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L408)
 
 #### Inherited from
 
@@ -154,7 +154,7 @@ Defined in: [package/layer.js:408](https://github.com/uihilab/FIMViz.js/blob/5f5
 
 > **\_teardown**: `any`
 
-Defined in: [package/layer.js:68](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L68)
+Defined in: [package/layer.js:68](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L68)
 
 #### Inherited from
 
@@ -166,7 +166,7 @@ Defined in: [package/layer.js:68](https://github.com/uihilab/FIMViz.js/blob/5f5e
 
 > **exclusive**: `any`
 
-Defined in: [package/layer.js:66](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L66)
+Defined in: [package/layer.js:66](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L66)
 
 #### Inherited from
 
@@ -178,7 +178,7 @@ Defined in: [package/layer.js:66](https://github.com/uihilab/FIMViz.js/blob/5f5e
 
 > **id**: `string`
 
-Defined in: [package/layer.js:58](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L58)
+Defined in: [package/layer.js:58](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L58)
 
 #### Inherited from
 
@@ -190,7 +190,7 @@ Defined in: [package/layer.js:58](https://github.com/uihilab/FIMViz.js/blob/5f5e
 
 > **result**: `any`
 
-Defined in: [package/ensembleAggregationLayer.js:41](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/ensembleAggregationLayer.js#L41)
+Defined in: [package/ensembleAggregationLayer.js:41](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/ensembleAggregationLayer.js#L41)
 
 #### Inherited from
 
@@ -202,7 +202,7 @@ Defined in: [package/ensembleAggregationLayer.js:41](https://github.com/uihilab/
 
 > **sources**: [`Dataset`](../../dataset/classes/Dataset.md)[]
 
-Defined in: [package/layer.js:60](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L60)
+Defined in: [package/layer.js:60](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L60)
 
 #### Inherited from
 
@@ -214,7 +214,7 @@ Defined in: [package/layer.js:60](https://github.com/uihilab/FIMViz.js/blob/5f5e
 
 > **type**: `string`
 
-Defined in: [package/layer.js:59](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L59)
+Defined in: [package/layer.js:59](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L59)
 
 #### Inherited from
 
@@ -226,7 +226,7 @@ Defined in: [package/layer.js:59](https://github.com/uihilab/FIMViz.js/blob/5f5e
 
 > **visible**: `boolean`
 
-Defined in: [package/layer.js:62](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L62)
+Defined in: [package/layer.js:62](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L62)
 
 #### Inherited from
 
@@ -234,13 +234,37 @@ Defined in: [package/layer.js:62](https://github.com/uihilab/FIMViz.js/blob/5f5e
 
 ## Accessors
 
+### \_providerHandle
+
+#### Get Signature
+
+> **get** **\_providerHandle**(): `any`
+
+Defined in: [package/layer.js:508](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L508)
+
+The ONE opaque provider handle this layer currently owns, or null when it is not on the map.
+
+Subclasses keep their handle under a name that reads well for them (`overlay` for a raster,
+`dataLayer` for a vector); this pair is the type-agnostic view of it, so `FimMap.applyLayerOrder`
+can restack a mixed stack without knowing what kind of layer each one is.
+
+##### Returns
+
+`any`
+
+#### Inherited from
+
+[`Layer`](../../layer/classes/Layer.md).[`_providerHandle`](../../layer/classes/Layer.md#_providerhandle)
+
+***
+
 ### dataset
 
 #### Get Signature
 
 > **get** **dataset**(): [`Dataset`](../../dataset/classes/Dataset.md)
 
-Defined in: [package/layer.js:100](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L100)
+Defined in: [package/layer.js:100](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L100)
 
 Convenience = sources[0].
 
@@ -260,7 +284,7 @@ Convenience = sources[0].
 
 > **get** **dirty**(): `boolean`
 
-Defined in: [package/layer.js:306](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L306)
+Defined in: [package/layer.js:306](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L306)
 
 Has an op been applied that the last render() has not drawn yet?
 
@@ -280,7 +304,7 @@ Has an op been applied that the last render() has not drawn yet?
 
 > **get** **map**(): [`FimMap`](../../fimMap/classes/FimMap.md)
 
-Defined in: [package/layer.js:98](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L98)
+Defined in: [package/layer.js:98](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L98)
 
 The owning FimMap.
 
@@ -300,7 +324,7 @@ The owning FimMap.
 
 > **get** **settings**(): [`LayerSettings`](../../layerSettings/classes/LayerSettings.md)
 
-Defined in: [package/layer.js:468](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L468)
+Defined in: [package/layer.js:468](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L468)
 
 This layer's settings knobs. Lazily built; subclasses override
 _makeSettings() to supply Raster/Vector knobs. Mutating a knob (`layer.set({...})`)
@@ -316,11 +340,35 @@ emits the effect event (restyle/recomputed) and re-renders when live.
 
 ## Methods
 
+### \_adoptProviderHandle()
+
+> **\_adoptProviderHandle**(`handle`): `void`
+
+Defined in: [package/layer.js:511](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L511)
+
+Adopt a handle the provider REPLACED (Google recreates ground overlays to restack them).
+
+#### Parameters
+
+##### handle
+
+`any`
+
+#### Returns
+
+`void`
+
+#### Inherited from
+
+[`Layer`](../../layer/classes/Layer.md).[`_adoptProviderHandle`](../../layer/classes/Layer.md#_adoptproviderhandle)
+
+***
+
 ### \_checkProviderCRS()
 
 > **\_checkProviderCRS**(): `void`
 
-Defined in: [package/layer.js:384](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L384)
+Defined in: [package/layer.js:384](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L384)
 
 Strict CRS precondition: every source Dataset whose native CRS the active provider CANNOT render
 blocks the render with an actionable error, AND emits a host event so the app can react (toast, or
@@ -341,7 +389,7 @@ silently reprojects.
 
 > **\_draw**(`opts?`): `void` \| `Promise`\<`void`\>
 
-Defined in: [package/layer.js:375](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L375)
+Defined in: [package/layer.js:375](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L375)
 
 The provider-specific draw step. Base is a no-op (headless layers render via a binder).
 
@@ -367,7 +415,7 @@ carries the resolved `mode`.
 
 > **\_hasListeners**(`evt`): `boolean`
 
-Defined in: [package/layer.js:116](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L116)
+Defined in: [package/layer.js:116](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L116)
 
 Does this layer have at least one listener for `evt`? Lets the map dispatch skip uninterested layers.
 
@@ -391,7 +439,7 @@ Does this layer have at least one listener for `evt`? Lets the map dispatch skip
 
 > **\_makeSettings**(): [`LayerSettings`](../../layerSettings/classes/LayerSettings.md)
 
-Defined in: [package/layer.js:470](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L470)
+Defined in: [package/layer.js:470](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L470)
 
 #### Returns
 
@@ -407,7 +455,7 @@ Defined in: [package/layer.js:470](https://github.com/uihilab/FIMViz.js/blob/5f5
 
 > **\_op**(`name`, `fn`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layer.js:285](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L285)
+Defined in: [package/layer.js:285](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L285)
 
 Apply one Dataset op across every source, immediately. Invalidates the memoized compute and
 marks the layer dirty; draws nothing until `render()`.
@@ -438,7 +486,7 @@ the op, for error messages
 
 > **\_resolveRenderMode**(`requested`): `"in-place"` \| `"recreate"`
 
-Defined in: [package/layer.js:363](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L363)
+Defined in: [package/layer.js:363](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L363)
 
 Resolve the render update mode. An explicit 'in-place'/'recreate' wins; 'auto' asks provider
 CAPABILITY (does it expose setRasterImageUrl?) + layer TYPE (does this layer render a swappable
@@ -464,7 +512,7 @@ raster image?). Vector layers and providers without in-place swap fall back to r
 
 > **\_usesRasterImage**(): `boolean`
 
-Defined in: [package/layer.js:372](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L372)
+Defined in: [package/layer.js:372](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L372)
 
 Does this layer render a swappable raster image (the in-place-capable case)? RasterLayer overrides.
 
@@ -482,7 +530,7 @@ Does this layer render a swappable raster image (the in-place-capable case)? Ras
 
 > **aspect**(): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layer.js:335](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L335)
+Defined in: [package/layer.js:335](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L335)
 
 Downslope compass bearing.
 
@@ -500,7 +548,7 @@ Downslope compass bearing.
 
 > **clip**(`bbox`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layer.js:323](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L323)
+Defined in: [package/layer.js:323](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L323)
 
 Crop to a bbox.
 
@@ -538,7 +586,7 @@ Crop to a bbox.
 
 > **compute**(`o?`): `object`
 
-Defined in: [package/ensembleAggregationLayer.js:60](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/ensembleAggregationLayer.js#L60)
+Defined in: [package/ensembleAggregationLayer.js:60](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/ensembleAggregationLayer.js#L60)
 
 Align the members → agreement count → N-colour ramp. Emits `computed` with
 { grid, rgba, perPixel, histogram, nLayers, policy, method, warnings } and returns it.
@@ -613,7 +661,7 @@ resampling + colour — are merged so the host surfaces one list.
 
 > **deriveSources**(`fn`, `opts?`): `Promise`\<[`Layer`](../../layer/classes/Layer.md)\>
 
-Defined in: [package/layer.js:254](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L254)
+Defined in: [package/layer.js:254](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L254)
 
 "Hot-modify": derive new sources FROM the current ones and swap them in. Because the derived
 Dataset shares memoized ancestors with the old, only the changed tail recomputes — a cheap live
@@ -643,7 +691,7 @@ tweak (e.g. re-classify with a new threshold) versus a cold source swap. Sugar o
 
 > **emit**(`evt`, `payload?`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layer.js:140](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L140)
+Defined in: [package/layer.js:140](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L140)
 
 Fire `evt`. Listeners receive `{ ...payload, layer: this }`.
 
@@ -683,7 +731,7 @@ Subsystems that emit on the map bus directly (velocity/ensemble/depth emit their
 
 > **fit**(): `void`
 
-Defined in: [package/layer.js:153](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L153)
+Defined in: [package/layer.js:153](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L153)
 
 Fit the map to this layer's bounds.
 
@@ -701,7 +749,7 @@ Fit the map to this layer's bounds.
 
 > **get**(): `any`
 
-Defined in: [package/layer.js:489](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L489)
+Defined in: [package/layer.js:489](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L489)
 
 Read current settings.
 
@@ -719,7 +767,7 @@ Read current settings.
 
 > **getAligned**(): `any`[]
 
-Defined in: [package/ensembleAggregationLayer.js:93](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/ensembleAggregationLayer.js#L93)
+Defined in: [package/ensembleAggregationLayer.js:93](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/ensembleAggregationLayer.js#L93)
 
 The aligned per-member pixel arrays from the last compute() (all on `result.grid`).
 
@@ -733,7 +781,7 @@ The aligned per-member pixel arrays from the last compute() (all on `result.grid
 
 > **getLegend**(): [`Legend`](../../legend/classes/Legend.md)
 
-Defined in: [package/layer.js:457](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L457)
+Defined in: [package/layer.js:457](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L457)
 
 #### Returns
 
@@ -749,7 +797,7 @@ Defined in: [package/layer.js:457](https://github.com/uihilab/FIMViz.js/blob/5f5
 
 > **getStats**(): `Promise`\<[`Stats`](../../stats/classes/Stats.md)\>
 
-Defined in: [package/layer.js:459](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L459)
+Defined in: [package/layer.js:459](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L459)
 
 #### Returns
 
@@ -765,7 +813,7 @@ Defined in: [package/layer.js:459](https://github.com/uihilab/FIMViz.js/blob/5f5
 
 > **hide**(): `void`
 
-Defined in: [package/layer.js:151](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L151)
+Defined in: [package/layer.js:151](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L151)
 
 #### Returns
 
@@ -781,7 +829,7 @@ Defined in: [package/layer.js:151](https://github.com/uihilab/FIMViz.js/blob/5f5
 
 > **hillshade**(`opts?`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layer.js:337](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L337)
+Defined in: [package/layer.js:337](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L337)
 
 Shaded relief.
 
@@ -805,7 +853,7 @@ Shaded relief.
 
 > **hitTest**(`lat`, `lng`): `boolean`
 
-Defined in: [package/layer.js:498](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L498)
+Defined in: [package/layer.js:498](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L498)
 
 Does the point fall on this layer? Base: no geometry → false. RasterLayer tests its footprint;
 VectorLayer tests feature geometry. The map event dispatch uses this to route hover/click.
@@ -834,7 +882,7 @@ VectorLayer tests feature geometry. The map event dispatch uses this to route ho
 
 > **mask**(`polygon`, `opts?`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layer.js:325](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L325)
+Defined in: [package/layer.js:325](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L325)
 
 Pixels outside `polygon` (or inside, with `{invert:true}`) become noData.
 
@@ -862,7 +910,7 @@ Pixels outside `polygon` (or inside, with `{invert:true}`) become noData.
 
 > **off**(`evt`, `fn`): `void`
 
-Defined in: [package/layer.js:110](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L110)
+Defined in: [package/layer.js:110](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L110)
 
 #### Parameters
 
@@ -888,7 +936,7 @@ Defined in: [package/layer.js:110](https://github.com/uihilab/FIMViz.js/blob/5f5
 
 > **on**(`evt`, `fn`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layer.js:104](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L104)
+Defined in: [package/layer.js:104](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L104)
 
 #### Parameters
 
@@ -914,7 +962,7 @@ Defined in: [package/layer.js:104](https://github.com/uihilab/FIMViz.js/blob/5f5
 
 > **once**(`evt`, `fn`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layer.js:118](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L118)
+Defined in: [package/layer.js:118](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L118)
 
 #### Parameters
 
@@ -940,7 +988,7 @@ Defined in: [package/layer.js:118](https://github.com/uihilab/FIMViz.js/blob/5f5
 
 > **prepare**(): `Promise`\<`EnsembleAggregationLayer`\>
 
-Defined in: [package/ensembleAggregationLayer.js:86](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/ensembleAggregationLayer.js#L86)
+Defined in: [package/ensembleAggregationLayer.js:86](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/ensembleAggregationLayer.js#L86)
 
 Materialize any Dataset members into RasterGrids so the synchronous compute() can consume them
 (`await layer.prepare(); layer.compute(opts)`). Non-Dataset members pass through untouched.
@@ -955,7 +1003,7 @@ Materialize any Dataset members into RasterGrids so the synchronous compute() ca
 
 > **rasterize**(): `never`
 
-Defined in: [package/layer.js:349](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L349)
+Defined in: [package/layer.js:349](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L349)
 
 NOT chainable, on purpose. `rasterize` changes a Dataset's kind (vector → raster), and this
 layer draws the kind it was built for — returning `this` would leave a VectorLayer pointing at a
@@ -975,7 +1023,7 @@ raster it cannot draw. Do it on the Dataset and add the result as its own layer.
 
 > **reclassify**(`rules`, `opts?`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layer.js:327](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L327)
+Defined in: [package/layer.js:327](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L327)
 
 Remap pixel values by rules or a callback.
 
@@ -1003,7 +1051,7 @@ Remap pixel values by rules or a callback.
 
 > **reduce**(`op?`, `opts?`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layer.js:341](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L341)
+Defined in: [package/layer.js:341](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L341)
 
 Collapse a selection axis to one grid.
 
@@ -1031,7 +1079,7 @@ Collapse a selection axis to one grid.
 
 > **remove**(`__namedParameters?`): `void`
 
-Defined in: [package/layer.js:406](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L406)
+Defined in: [package/layer.js:406](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L406)
 
 Tear down render, emit 'removed', then unregister from the owning FimMap. Subclasses
 super.remove() last. If a `_teardown` hook was assigned (transitional: user-file Layers built
@@ -1062,7 +1110,7 @@ layer switches deterministic instead of racing.
 
 > **render**(`opts?`): `Promise`\<[`Layer`](../../layer/classes/Layer.md)\>
 
-Defined in: [package/layer.js:188](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L188)
+Defined in: [package/layer.js:188](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L188)
 
 Render this layer: compute if needed, enforce the provider CRS precondition, then draw. `opts.render`
 picks the update mechanism — `'in-place'` (swap the overlay's image, no flicker, keeps z-order/
@@ -1092,7 +1140,7 @@ display slot on success when `this.exclusive`.
 
 > **reproject**(`toCrs`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layer.js:331](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L331)
+Defined in: [package/layer.js:331](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L331)
 
 Warp to `toCrs` — forced at render, GDAL loaded then.
 
@@ -1116,7 +1164,7 @@ Warp to `toCrs` — forced at render, GDAL loaded then.
 
 > **resampleTo**(`target`, `opts?`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layer.js:329](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L329)
+Defined in: [package/layer.js:329](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L329)
 
 Resample onto an explicit target grid (does not reproject).
 
@@ -1144,7 +1192,7 @@ Resample onto an explicit target grid (does not reproject).
 
 > **reset**(`opts?`): `Promise`\<[`Layer`](../../layer/classes/Layer.md)\>
 
-Defined in: [package/layer.js:314](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L314)
+Defined in: [package/layer.js:314](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L314)
 
 Point the layer back at the sources it held before its first op. Async and atomic, like any
 source swap — a live layer re-renders. A no-op if nothing has been applied.
@@ -1171,7 +1219,7 @@ source swap — a live layer re-renders. A no-op if nothing has been applied.
 
 > **select**(`coord`, `opts?`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layer.js:339](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L339)
+Defined in: [package/layer.js:339](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L339)
 
 Resolve one selection-axis entry (the scenario-slider op).
 
@@ -1199,7 +1247,7 @@ Resolve one selection-axis entry (the scenario-slider op).
 
 > **set**(`partial`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layer.js:487](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L487)
+Defined in: [package/layer.js:487](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L487)
 
 THE way to change how this layer looks. Sync and chainable — returns the layer.
 
@@ -1234,7 +1282,7 @@ it finished.
 
 > **setSources**(`sources`, `opts?`): `Promise`\<[`Layer`](../../layer/classes/Layer.md)\>
 
-Defined in: [package/layer.js:224](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L224)
+Defined in: [package/layer.js:224](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L224)
 
 Replace this layer's source Datasets and, if the layer is already live, re-render. Immutable data
 means "the data changed" == "point at a new Dataset" — never mutate. Drives the FimMap's Dataset
@@ -1274,7 +1322,7 @@ the call — never pointing at broken new sources with the working old ones alre
 
 > **settled**(): `Promise`\<[`Layer`](../../layer/classes/Layer.md)\>
 
-Defined in: [package/layer.js:491](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L491)
+Defined in: [package/layer.js:491](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L491)
 
 Resolves once any redraw kicked off by `set()` has finished.
 
@@ -1292,7 +1340,7 @@ Resolves once any redraw kicked off by `set()` has finished.
 
 > **show**(): `void`
 
-Defined in: [package/layer.js:149](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L149)
+Defined in: [package/layer.js:149](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L149)
 
 #### Returns
 
@@ -1308,7 +1356,7 @@ Defined in: [package/layer.js:149](https://github.com/uihilab/FIMViz.js/blob/5f5
 
 > **slope**(`opts?`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layer.js:333](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L333)
+Defined in: [package/layer.js:333](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L333)
 
 Slope (Horn's method).
 
@@ -1332,7 +1380,7 @@ Slope (Horn's method).
 
 > **toJSON**(): `object`
 
-Defined in: [package/layer.js:501](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L501)
+Defined in: [package/layer.js:514](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L514)
 
 #### Returns
 
@@ -1364,7 +1412,7 @@ Defined in: [package/layer.js:501](https://github.com/uihilab/FIMViz.js/blob/5f5
 
 > **toSpec**(): `object`
 
-Defined in: [package/layer.js:445](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L445)
+Defined in: [package/layer.js:445](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L445)
 
 A plain, structured-cloneable DESCRIPTION of this layer — its type, its sources, and the
 display state needed to rebuild an equivalent one, e.g. on a different map or provider:
@@ -1413,7 +1461,7 @@ persist a spec instead of transferring it in-page, swap them for `ds.toRecord()`
 
 > `static` **registerType**(`type`, `factory`): `void`
 
-Defined in: [package/layer.js:88](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L88)
+Defined in: [package/layer.js:88](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L88)
 
 Register the factory `fim.addLayer('<type>')` dispatches to.
 
@@ -1441,7 +1489,7 @@ Register the factory `fim.addLayer('<type>')` dispatches to.
 
 > `static` **types**(): `string`[]
 
-Defined in: [package/layer.js:95](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/layer.js#L95)
+Defined in: [package/layer.js:95](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L95)
 
 Every type `addLayer` can currently construct — built-ins plus anything a host registered.
 REGISTRY KEYS, not `layer.type` values (see `getLayerTypes`).

@@ -375,6 +375,7 @@ export class FimMap {
     }
     const layer = await createLayer(this, type, opts);
     this.layers.push(layer);
+    this.#layersChanged("added", layer);
     return layer;
   }
 
@@ -396,7 +397,7 @@ export class FimMap {
     layer._map = this;
     layer._name = name;
     this.#layersByName.set(name, layer);
-    if (!this.layers.includes(layer)) this.layers.push(layer);
+    if (!this.layers.includes(layer)) { this.layers.push(layer); this.#layersChanged("added", layer); }
     return layer;
   }
 
@@ -412,10 +413,24 @@ export class FimMap {
     if (layer) layer.remove();   // remove() calls back into _unregisterLayer
   }
 
+  /**
+   * Announce that the layer SET changed — added, removed, or reordered.
+   *
+   * `layers` is a plain public array with no change signal of its own, so anything rendering a view
+   * of it (ui/layerPanel.js) had no way to stay in sync short of polling. One event covers all three
+   * mutations because a panel redraws the whole list either way; `reason` is there for a consumer
+   * that wants to animate only insertions.
+   * @param {'added'|'removed'|'reordered'} reason
+   * @param {import('./layer.js').Layer|null} [layer]
+   */
+  #layersChanged(reason, layer = null) {
+    this.emit("layers:changed", { reason, layer, layers: this.layers.slice() });
+  }
+
   /** Internal: drop a Layer from the registry (called by Layer.remove()). @internal @param {import('./layer.js').Layer} layer @returns {void} */
   _unregisterLayer(layer) {
     const i = this.layers.indexOf(layer);
-    if (i >= 0) this.layers.splice(i, 1);
+    if (i >= 0) { this.layers.splice(i, 1); this.#layersChanged("removed", layer); }
     if (layer?._name && this.#layersByName.get(layer._name) === layer) {
       this.#layersByName.delete(layer._name);
     }

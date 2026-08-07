@@ -265,6 +265,31 @@ pulling only the small pure deps — no geotiff/Maps-loader/GDAL — so a headle
 downloads only that). Also `createInfoWindow`/`bindFeatureInfo`/`propsTable`, `bindHoverValue`, and
 `createOperationsPanel` (§2).
 
+✅ **Landed: the layer tier** (`ui/layerPanel.js` — `createLayerPanel`/`createLayerSelect`/`layerLabel`,
+plus `FimMap.applyLayerOrder()`, `FimMap.whenIdle()` and the `applyLayerOrder`/`whenIdle` provider
+methods). A list of `fim.layers` with show/hide, reorder, fit and remove, and map clicks resolved to
+the layer stack under the pointer with cycling through overlaps. Four decisions worth keeping:
+
+- **The array is now authoritative for BOTH hit-testing and drawing.** `dispatchMapEventToLayers` had
+  always walked `layers` top-down as if it were z-order, while visual stacking was whatever order the
+  provider inserted overlays in — so the layer that received a click was not necessarily the one drawn
+  on top. `applyLayerOrder()` reconciles them; this was a latent bug, not a new feature.
+- **Google restacks rasters by remove-and-re-add.** `GroundOverlay` exposes no z-index of any kind, so
+  the overlay is recreated in position — which is why the provider method RETURNS handles and callers
+  must adopt them. Rejected for now: replacing `GroundOverlay` with a custom `OverlayView` we own the
+  DOM of. Cleaner and permanent, but it rewrites the working raster path on the provider half with the
+  least test coverage, and both live behind one method so the upgrade needs no caller changes.
+  **Known limit:** `google.maps.Data` vectors always draw above ground overlays in Google's own
+  stacking, so raster-over-vector is not honoured there.
+- **Selection is passive, not modal.** It rides `map:click` rather than `captureInteraction`, because
+  capture would suppress hover, tooltips and feature clicks for as long as selection was on.
+- **`whenIdle` exists because `fit()` is animated.** Anything reading the projection mid-animation gets
+  the pre-animation one — off by exactly 2× when the fit changed zoom by one level. It resolves on a
+  timeout when the map is already still, so it is safe to await unconditionally.
+
+`FimMap` also emits **`layers:changed`** now (add/remove): `layers` is a plain public array, so a view
+over it could otherwise only poll.
+
 **Deferred, with a finding:** `damage`/`velocity` **control presets** are deliberately NOT shipped.
 `VelocityLayer` is a Google-only animated canvas driven by positional params (particle density, colour
 stops, fade alphas — no simple settings hook), and `DamageLayer` is app-tier, so a `velocityControls`/

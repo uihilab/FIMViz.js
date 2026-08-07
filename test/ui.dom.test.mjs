@@ -758,11 +758,12 @@ describe("ui: every handle member", () => {
 });
 
 describe("ui: the barrel", () => {
-  test("exports exactly the 14 documented names", () => {
+  test("exports exactly the documented names", () => {
     assert.deepEqual(Object.keys(UI).sort(), [
-      "bindFeatureInfo", "bindHoverValue", "connectToast", "createInfoWindow", "createOperationsPanel",
-      "createRegionDraw", "createToast", "createToolsPanel", "createTooltip", "propsTable",
-      "rasterControls", "renderLegend", "renderStats", "vectorControls",
+      "bindFeatureInfo", "bindHoverValue", "connectToast", "createInfoWindow", "createLayerPanel",
+      "createLayerSelect", "createOperationsPanel", "createRegionDraw", "createToast",
+      "createToolsPanel", "createTooltip", "layerLabel", "propsTable", "rasterControls",
+      "renderLegend", "renderStats", "vectorControls",
     ]);
   });
 });

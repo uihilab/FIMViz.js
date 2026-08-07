@@ -8,7 +8,7 @@
 
 > **styleToGoogle**(`s?`): `any`
 
-Defined in: [package/mapProvider.js:180](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/mapProvider.js#L180)
+Defined in: [package/mapProvider.js:187](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/mapProvider.js#L187)
 
 ## Parameters
 

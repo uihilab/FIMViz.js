@@ -14,3 +14,4 @@ export { createToolsPanel, rasterControls, vectorControls } from "./toolsPanel.j
 export { renderLegend, renderStats } from "./readModels.js";
 export { createRegionDraw } from "./regionDraw.js";
 export { createOperationsPanel } from "./operationsPanel.js";
+export { createLayerPanel, createLayerSelect, layerLabel } from "./layerPanel.js";

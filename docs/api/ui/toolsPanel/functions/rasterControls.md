@@ -8,7 +8,7 @@
 
 > **rasterControls**(`layer`): [`Control`](../interfaces/Control.md)[]
 
-Defined in: [ui/toolsPanel.js:28](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/ui/toolsPanel.js#L28)
+Defined in: [ui/toolsPanel.js:28](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/ui/toolsPanel.js#L28)
 
 PURE: the control spec for a raster layer — palette + continuous (only if a ColorScale is
 attached), opacity, hover-value toggle.

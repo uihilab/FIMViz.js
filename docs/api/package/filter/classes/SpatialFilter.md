@@ -6,7 +6,7 @@
 
 # Class: SpatialFilter
 
-Defined in: [package/filter.js:118](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/filter.js#L118)
+Defined in: [package/filter.js:118](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L118)
 
 ## Extends
 
@@ -18,7 +18,7 @@ Defined in: [package/filter.js:118](https://github.com/uihilab/FIMViz.js/blob/5f
 
 > **new SpatialFilter**(`polygon`): `SpatialFilter`
 
-Defined in: [package/filter.js:120](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/filter.js#L120)
+Defined in: [package/filter.js:120](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L120)
 
 #### Parameters
 
@@ -42,7 +42,7 @@ Defined in: [package/filter.js:120](https://github.com/uihilab/FIMViz.js/blob/5f
 
 > **features**: `object`[][]
 
-Defined in: [package/filter.js:123](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/filter.js#L123)
+Defined in: [package/filter.js:123](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L123)
 
 ## Methods
 
@@ -50,7 +50,7 @@ Defined in: [package/filter.js:123](https://github.com/uihilab/FIMViz.js/blob/5f
 
 > **contains**(`lat`, `lng`): `boolean`
 
-Defined in: [package/filter.js:135](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/filter.js#L135)
+Defined in: [package/filter.js:135](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L135)
 
 Inside ANY ring (multi-polygon union).
 
@@ -74,7 +74,7 @@ Inside ANY ring (multi-polygon union).
 
 > **isEmpty**(): `boolean`
 
-Defined in: [package/filter.js:127](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/filter.js#L127)
+Defined in: [package/filter.js:127](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L127)
 
 #### Returns
 
@@ -90,7 +90,7 @@ Defined in: [package/filter.js:127](https://github.com/uihilab/FIMViz.js/blob/5f
 
 > **pixelBbox**(`meta`): `object`
 
-Defined in: [package/filter.js:151](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/filter.js#L151)
+Defined in: [package/filter.js:151](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L151)
 
 Fast-reject window in pixel space (union across rings), mirroring
 ui/rasterTools.js `polygonPixelBbox`.
@@ -149,7 +149,7 @@ ui/rasterTools.js `polygonPixelBbox`.
 
 > **test**(`unit`): `boolean`
 
-Defined in: [package/filter.js:143](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/filter.js#L143)
+Defined in: [package/filter.js:143](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L143)
 
 #### Parameters
 
@@ -171,7 +171,7 @@ Defined in: [package/filter.js:143](https://github.com/uihilab/FIMViz.js/blob/5f
 
 > `static` **all**(`filters`): [`Filter`](Filter.md)
 
-Defined in: [package/filter.js:68](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/filter.js#L68)
+Defined in: [package/filter.js:68](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L68)
 
 Combine filters as a conjunction (AND) — the semantics of chaining applyFilter().
 
@@ -195,7 +195,7 @@ Combine filters as a conjunction (AND) — the semantics of chaining applyFilter
 
 > `static` **from**(`input`): [`Filter`](Filter.md)
 
-Defined in: [package/filter.js:53](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/filter.js#L53)
+Defined in: [package/filter.js:53](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L53)
 
 Coerce any friendly input into a Filter.
   Filter-like   → returned as-is (anything with a `test(unit)` method)

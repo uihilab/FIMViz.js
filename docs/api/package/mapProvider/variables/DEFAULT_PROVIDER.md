@@ -8,7 +8,7 @@
 
 > `const` **DEFAULT\_PROVIDER**: `string` = `"leaflet"`
 
-Defined in: [package/mapProvider.js:86](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/mapProvider.js#L86)
+Defined in: [package/mapProvider.js:93](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/mapProvider.js#L93)
 
 The provider a DETACHED layer resolves against — one built without a mounted app, so there is no
 `config.provider` to read (a unit test's stub, or a Layer constructed directly). NOT a config

@@ -17,7 +17,8 @@ import { createToast, connectToast, createToolsPanel } from 'fimviz/ui';
 [Toast](#toast) · [Tooltip (raster hover)](#tooltip-raster-hover) ·
 [Info window (vector click)](#info-window-vector-click) · [Tools panel](#tools-panel) ·
 [Legend/Stats renderers](#legendstats-renderers) · [Region draw](#region-draw) ·
-[Operations panel](#operations-panel)
+[Operations panel](#operations-panel) · [Layer panel](#layer-panel) ·
+[Click-to-select](#click-to-select)
 
 ## Toast
 
@@ -154,4 +155,60 @@ that calls `layer.setSources([layer.dataset])` to restore the original, pristine
 ```js
 const draw = createRegionDraw(fim, { onComplete: (f) => { lastRegion = f; } });
 createOperationsPanel('#ops', { layer: rasterLayer, region: () => lastRegion, pretty: true });
+```
+
+## Layer panel
+
+```js
+createLayerPanel(root, { fim, pretty, selected, onSelect, onRemove })
+// → { el, update(), select(layer), selected, destroy() }
+```
+
+A view of `fim.layers`, with per-row **show/hide**, **bring forward / send backward**, **fit** and
+**remove**, and click-the-name to select.
+
+Two things worth knowing:
+
+- **Rows are top-first — the reverse of `fim.layers`, which is bottom-up.** That matches every layer
+  list a user has met, but it means "up" in the panel is *toward the end* of the array.
+- **Hidden layers stay listed**, struck through and dimmed. A layer you cannot see is exactly the one
+  you need a list to find, so filtering them out would defeat the purpose.
+
+Reordering moves the array *and* calls `fim.applyLayerOrder()`. Both halves matter: the array is what
+`dispatchMapEventToLayers` walks for hit-testing, and `applyLayerOrder` is what makes the map draw in
+the same order. Before that method existed the two could disagree — the layer receiving a click was
+not necessarily the one on top.
+
+The panel redraws itself on the map's `layers:changed` event (emitted on add and remove), and
+`destroy()` unsubscribes.
+
+```js
+const panel = createLayerPanel('#layers', { fim, pretty: true, onSelect: (l) => showSettingsFor(l) });
+```
+
+`layerLabel(layer)` is exported separately for a host building its own list: filename → dataset name
+→ type → id.
+
+## Click-to-select
+
+```js
+createLayerSelect(fim, { fit, onSelect, onEmpty })
+// → { off(), selected, stack, select(layer) }
+```
+
+Resolves a map click to the stack of visible layers under the pointer (topmost first, via each
+layer's `hitTest`). **Clicking the same spot again advances through the stack**, which is the only way
+to reach a layer buried under another. `fit` (default `true`) also fits the map to each as you cycle.
+
+Coordinates are compared to 4 decimal places, so ordinary hand-jitter between clicks still counts as
+"the same spot" — without that, cycling would reset on every click.
+
+This rides the ordinary `map:click` bus rather than `fim.captureInteraction`, deliberately: capture is
+**modal** and would suppress hover, tooltips and feature clicks for as long as selection was enabled.
+Selection is passive, so everything else keeps working. It does require
+`fim.enableMapEvents(['click'])`.
+
+```js
+const panel = createLayerPanel('#layers', { fim, pretty: true, onSelect: select });
+createLayerSelect(fim, { fit: false, onSelect: (l) => panel.select(l) });
 ```
