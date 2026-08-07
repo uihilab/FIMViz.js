@@ -270,7 +270,7 @@ is the *why*, those are the *what*.
   uses — is what actually holds across the seam, and it is what the rest of the engine already does
   (nothing does `instanceof Dataset`). Arrays are checked first, since a polygon is an object too.
   **Rejected:** externalizing `fimviz` from the `ui` bundle. It would give one shared class, but
-  `fimviz/ui` exists precisely so a host can take a toast or a tools panel for ~42 KB instead of pulling
+  `fimviz/ui` exists precisely so a host can take a toast or a tools panel for ~46 KB instead of pulling
   the whole engine; duck-typing fixes the identity problem without giving that up, and generalizes to a
   host passing its own filter object.
 
@@ -296,7 +296,7 @@ is the *why*, those are the *what*.
   edge line at two points, a closed ring at three. `onPreview` had to start carrying `points` as well
   as `rings` for the same reason — a host given only rings has nothing to show until the third click.
   **Rejected:** letting the tool draw directly. It would have to name a map SDK, or `fimviz/ui` would
-  have to import the provider registry — pulling Leaflet into the ~42 KB bundle whose whole point is
+  have to import the provider registry — pulling Leaflet into the ~46 KB bundle whose whole point is
   not to. The seam is `fim.addScratchVector` instead: engine-side, provider-neutral, and deliberately
   **not a Layer** (never hit-tested, reordered, listed, or saved — scaffolding, not data).
 
@@ -351,6 +351,32 @@ is the *why*, those are the *what*.
   explicit with zero bands — nothing painted. A separate "mode" control was **rejected** for the same
   reason: it would be a second, weaker copy of a rule the engine already enforces, and the two could
   disagree.
+
+- **The host bus had seven events nobody consumed, and only five of them deserved a widget.**
+  `busy` → `createBusyIndicator`, the `raster:metadata`/`-hidden` pair → `bindRasterMetadata`, and the
+  two layer warnings (`layer:raster-oversized`, `layer:crs-unrenderable`) → `connectToast`, since both
+  describe something visibly wrong with what was just drawn and previously reached only `console.warn`
+  — where nobody looking at the map would find them. **`storage:changed` and `upload:complete` were
+  deliberately left unbound:** each means "a host list you own is stale" / "dismiss the affordance you
+  showed", and neither the list nor the affordance is ours. Building one would repeat the
+  app-opinionated mistake the unified Layer Panel was kept out of the package to avoid, so they stay
+  ordinary `fim.on(...)` events and the doc says why.
+
+  Two design points. `createBusyIndicator` **ref-counts by `source`** — the event carries one
+  precisely because work overlaps, and a single boolean lets the first job to finish hide an indicator
+  two others still need; a stray `active:false` from a source that never started is ignored rather
+  than clearing everything. And `bindRasterMetadata` **hides without forgetting**, because the engine's
+  event is named "no longer current", not "clear" — so a host can still read the last-known values.
+
+- **`busy` was defined, documented, and never emitted by the modern path.** Only the app-tier overlay
+  layers (`depthMap`/`ensemble`/`velocity`) ever called `notifyBusy`, so a busy indicator wired to
+  `parseFile`/`addDataset` would have been decorative — the binding was worth nothing without this.
+  It is now emitted by `parseSource` (`source: 'parse'`) and by the GDAL warp inside a forced
+  `reproject` (`source: 'reproject'`), which is the longest operation in the library since the first
+  one lazily pulls ~38 MB of wasm from a CDN. Both emits are paired in a `finally`: an indicator left
+  spinning after a failure is worse than no indicator, because it reports work that is not happening.
+  Deliberately **not** added to every op — a per-pixel `mask` on a decoded grid finishes in a frame,
+  and announcing it would only make the indicator flicker.
 
 - **The read-model panels bind themselves; the tools panel does so only on request.** `bindLegend`/
   `bindStats` subscribe to the layer's own `restyle`/`recomputed`/`rendered` and repaint, so a host

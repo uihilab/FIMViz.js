@@ -60,19 +60,48 @@ export function createToast(root = null, opts = {}) {
   return { show, clear, destroy, el: container };
 }
 
+// Two engine warnings that describe something the USER can see going wrong, and that until now only
+// reached `console.warn` — where nobody looking at the map would find them. They are phrased here
+// rather than in the engine because the engine emits structured payloads, not sentences.
+const WARNINGS = {
+  "layer:raster-oversized": ({ datasetName, plan } = {}) =>
+    `${datasetName || "This raster"} is too large for one image — drawn downsampled` +
+    (plan?.reason ? ` (${plan.reason})` : ""),
+  "layer:crs-unrenderable": ({ datasetName, crs, provider } = {}) =>
+    `${datasetName || "This layer"} is ${crs || "in a CRS"}, which ${provider || "this provider"} ` +
+    "cannot draw — reproject it to EPSG:4326 first",
+};
+
 /**
- * Subscribe a toast to the engine's `notify` host event (the host wires this — the engine never
- * reaches for the UI). Maps notify levels (info/warn/error) onto toast levels.
- * @param {import('../package/fimMap.js').FimMap|{on: Function}} fim
+ * Subscribe a toast to the engine's user-facing host events (the host wires this — the engine never
+ * reaches for the UI). `notify` maps its levels (info/warn/error/success) onto toast levels;
+ * `layer:raster-oversized` and `layer:crs-unrenderable` become warnings, since both describe
+ * something visibly wrong with what was just drawn.
+ *
+ * @param {import('../package/fimMap.js').FimMap|{on: Function, off?: Function}} fim
  * @param {ReturnType<typeof createToast>} [toast]
- * @returns {ReturnType<typeof createToast>}
+ * @param {{ warnings?: boolean }} [opts] - `warnings:false` keeps this to `notify` only
+ * @returns {ReturnType<typeof createToast> & { off: () => void }} the toast, plus an unsubscribe
  */
-export function connectToast(fim, toast) {
+export function connectToast(fim, toast, { warnings = true } = {}) {
   const t = toast || createToast();
-  fim.on("notify", ({ message, level } = {}) => {
+  const subs = [];
+  const sub = (evt, fn) => { fim.on(evt, fn); subs.push([evt, fn]); };
+
+  sub("notify", ({ message, level } = {}) => {
     if (!message) return;
     const lvl = level === "warn" ? "warn" : level === "error" ? "error" : level === "success" ? "success" : "info";
     t.show(message, { level: lvl });
   });
+
+  if (warnings) {
+    for (const [evt, phrase] of Object.entries(WARNINGS)) {
+      sub(evt, (payload) => t.show(phrase(payload), { level: "warn", timeout: 8000 }));
+    }
+  }
+
+  // `off` rather than replacing the toast handle, so `connectToast(fim, createToast())` keeps
+  // returning something the caller can still call `show()` on.
+  t.off = () => { for (const [evt, fn] of subs) fim.off?.(evt, fn); subs.length = 0; };
   return t;
 }

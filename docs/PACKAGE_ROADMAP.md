@@ -234,7 +234,12 @@ UI** — a `ui/` helper may *take* the bus (`connectToast(fim)`), but the engine
 Contents by coupling:
 
 - **Standalone DOM widget** — `createToast(root?) → { show(msg, {type,timeout}), clear() }`; no map, no
-  layer. `connectToast(fim)` optionally subscribes it to `notify`.
+  layer. `connectToast(fim)` optionally subscribes it to `notify`. ✅ It now also surfaces
+  `layer:raster-oversized`/`layer:crs-unrenderable` as warnings, and `createBusyIndicator` (`busy`,
+  ref-counted per source) + `bindRasterMetadata` (`raster:metadata`/`-hidden`) cover the rest of the
+  bus a library can sensibly draw. `storage:changed`/`upload:complete` stay unbound on purpose — the
+  stale list and the upload affordance both belong to the host. `busy` is also now emitted by the
+  mainstream path (`parseSource`, and the GDAL warp inside a forced `reproject`), which it never was.
 - **Map-anchored widgets** — `createTooltip(...)` (a **hover** consumer) and a **marker info window** (a
   **click** consumer): thin views over the event-dispatch layer (§1) + the read-models — why §1's first slice
   is in the same build.

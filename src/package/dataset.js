@@ -38,6 +38,7 @@ import {
 // (the escape hatch for GDAL-only methods) and resampleGrid itself are also barrel-exported directly
 // (lib.js), so a caller can use either the Dataset op below or the raw function on pixel arrays.
 import { resampleGrid, registerResampler } from "../geo/resample.js";
+import { notifyBusy } from "./events.js";
 
 // A resample target is either resample.js's native meta shape already, or anything grid-shaped
 // (a RasterGrid, or another Dataset's already-forced .grid() result) — normalized the same way
@@ -877,11 +878,20 @@ export class Dataset {
         // decoded grid directly rather than either reprojecting a stale file or failing outright.
         const parent = this.#inputs[0];
         const rootRepresentsBase = !parent.#nonReprojectAncestorOp();
-        const out = await warp(base, this.#op.crs, {
-          source: rootRepresentsBase ? this.#rootData() : null,
-          grid: base,
-          name: this.name,
-        });
+        // By far the longest operation in the library: the first warp lazily pulls ~38 MB of GDAL
+        // wasm and data from a CDN before it computes anything. A host showing no indicator through
+        // that looks hung, so this is the one op that announces itself.
+        notifyBusy(true, "reproject");
+        let out;
+        try {
+          out = await warp(base, this.#op.crs, {
+            source: rootRepresentsBase ? this.#rootData() : null,
+            grid: base,
+            name: this.name,
+          });
+        } finally {
+          notifyBusy(false, "reproject");
+        }
         this.#warnings.push(`Reprojected "${this.name}" ${base.crs || "unknown"} → ${this.#op.crs}.`);
         return out;
       }

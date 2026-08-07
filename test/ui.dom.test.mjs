@@ -1068,6 +1068,214 @@ describe("ui: createToast", () => {
     fim.emit("notify", undefined);
     assert.equal(toast.el.children.length, 0);
   });
+
+  // Both describe something visibly wrong with what was just drawn, and both previously reached only
+  // console.warn — where nobody looking at the map would find them.
+  test("connectToast surfaces the two layer warnings, naming the dataset", () => {
+    const toast = UI.createToast(host());
+    const fim = fakeFim(host());
+    UI.connectToast(fim, toast);
+
+    fim.emit("layer:raster-oversized", { datasetName: "big.tif", plan: { reason: "34000 x 17000 px" } });
+    let t = toast.el.lastElementChild;
+    assert.equal(t.className, "fim-toast fim-toast-warn");
+    assert.match(t.textContent, /big\.tif/);
+    assert.match(t.textContent, /downsampled/);
+    assert.match(t.textContent, /34000 x 17000 px/, "the engine's own reason is carried through");
+
+    fim.emit("layer:crs-unrenderable", { datasetName: "utm.tif", crs: "EPSG:26917", provider: "leaflet" });
+    t = toast.el.lastElementChild;
+    assert.equal(t.className, "fim-toast fim-toast-warn");
+    assert.match(t.textContent, /EPSG:26917/);
+    assert.match(t.textContent, /reproject/i, "a warning that does not say what to do is noise");
+  });
+
+  test("a warning with a sparse payload still reads as a sentence", () => {
+    const toast = UI.createToast(host());
+    const fim = fakeFim(host());
+    UI.connectToast(fim, toast);
+    fim.emit("layer:crs-unrenderable", {});
+    assert.match(toast.el.lastElementChild.textContent, /^This layer is in a CRS/);
+  });
+
+  test("warnings:false keeps connectToast to notify alone", () => {
+    const toast = UI.createToast(host());
+    const fim = fakeFim(host());
+    UI.connectToast(fim, toast, { warnings: false });
+    fim.emit("layer:raster-oversized", { datasetName: "big.tif" });
+    assert.equal(toast.el.children.length, 0);
+    fim.emit("notify", { message: "still on" });
+    assert.equal(toast.el.children.length, 1);
+  });
+
+  test("off() releases every subscription connectToast made", () => {
+    const toast = UI.createToast(host());
+    const fim = fakeFim(host());
+    UI.connectToast(fim, toast);
+    assert.equal(fim.count("notify"), 1);
+    toast.off();
+    assert.equal(fim.count("notify"), 0);
+    fim.emit("notify", { message: "gone" });
+    fim.emit("layer:raster-oversized", { datasetName: "x" });
+    assert.equal(toast.el.children.length, 0);
+  });
+});
+
+// ── the rest of the engine→host bus ─────────────────────────────────────────────────────
+
+describe("ui: createBusyIndicator", () => {
+  test("hidden until work starts, shown while it runs, hidden when it ends", () => {
+    const fim = fakeFim(host());
+    const b = UI.createBusyIndicator(fim, { root: host() });
+    assert.equal(b.el.getAttribute("data-fim-ui"), "busy");
+    assert.equal(b.active, false);
+    assert.equal(b.el.hasAttribute("data-active"), false);
+
+    fim.emit("busy", { active: true, source: "depth" });
+    assert.equal(b.active, true);
+    assert.ok(b.el.hasAttribute("data-active"));
+    assert.equal(b.el.getAttribute("data-sources"), "depth");
+
+    fim.emit("busy", { active: false, source: "depth" });
+    assert.equal(b.active, false);
+    assert.equal(b.el.hasAttribute("data-active"), false);
+  });
+
+  // The event carries a `source` precisely because work overlaps. A single boolean would let the
+  // first job to finish hide an indicator two others still need.
+  test("overlapping work is ref-counted per source", () => {
+    const fim = fakeFim(host());
+    const b = UI.createBusyIndicator(fim, { root: host() });
+    fim.emit("busy", { active: true, source: "depth" });
+    fim.emit("busy", { active: true, source: "ensemble" });
+    assert.deepEqual(b.sources, ["depth", "ensemble"]);
+
+    fim.emit("busy", { active: false, source: "depth" });
+    assert.equal(b.active, true, "ensemble is still working");
+    assert.deepEqual(b.sources, ["ensemble"]);
+
+    fim.emit("busy", { active: false, source: "ensemble" });
+    assert.equal(b.active, false);
+  });
+
+  test("the same source starting twice needs two finishes", () => {
+    const fim = fakeFim(host());
+    const b = UI.createBusyIndicator(fim, { root: host() });
+    fim.emit("busy", { active: true, source: "parse" });
+    fim.emit("busy", { active: true, source: "parse" });
+    fim.emit("busy", { active: false, source: "parse" });
+    assert.equal(b.active, true, "one of the two parses is still going");
+    fim.emit("busy", { active: false, source: "parse" });
+    assert.equal(b.active, false);
+  });
+
+  test("a stray finish from a source that never started is ignored", () => {
+    const fim = fakeFim(host());
+    const b = UI.createBusyIndicator(fim, { root: host() });
+    fim.emit("busy", { active: true, source: "depth" });
+    fim.emit("busy", { active: false, source: "who?" });
+    assert.equal(b.active, true, "one stray event must not clear real work");
+  });
+
+  test("a payload with no source falls back to 'default'", () => {
+    const fim = fakeFim(host());
+    const b = UI.createBusyIndicator(fim, { root: host() });
+    fim.emit("busy", { active: true });
+    assert.deepEqual(b.sources, ["default"]);
+  });
+
+  test("the label may be a function of what is running", () => {
+    const fim = fakeFim(host());
+    const b = UI.createBusyIndicator(fim, { root: host(), label: (s) => `${s.length} job(s)` });
+    fim.emit("busy", { active: true, source: "a" });
+    fim.emit("busy", { active: true, source: "b" });
+    assert.match(b.el.textContent, /2 job\(s\)/);
+  });
+
+  test("off() unsubscribes; destroy() also removes the element", () => {
+    const fim = fakeFim(host());
+    const b = UI.createBusyIndicator(fim, { root: host() });
+    b.off();
+    fim.emit("busy", { active: true, source: "x" });
+    assert.equal(b.active, false);
+
+    const c = UI.createBusyIndicator(fim, { root: host() });
+    c.destroy();
+    assert.equal(host().querySelectorAll("[data-fim-ui=busy]").length, 1);
+  });
+
+  test("no fim is a clear error", () => {
+    assert.throws(() => UI.createBusyIndicator(null), /is required/);
+  });
+});
+
+describe("ui: bindRasterMetadata", () => {
+  const payload = {
+    title: "flood.tif", name: "flood",
+    rows: [["Dimensions", "10 × 10 px"], ["CRS", "EPSG:4326 (WGS84)"]],
+    specRows: [{ k: "File", v: "flood" }, { k: "Dimensions", v: "10 × 10 px", num: true }],
+  };
+
+  test("hidden until the engine emits, then renders the payload", () => {
+    const fim = fakeFim(host());
+    const m = UI.bindRasterMetadata(fim, { root: host() });
+    assert.equal(m.el.getAttribute("data-fim-ui"), "raster-metadata");
+    assert.equal(m.shown, false);
+
+    fim.emit("raster:metadata", payload);
+    assert.equal(m.shown, true);
+    assert.match(m.el.innerHTML, /Dimensions/);
+    assert.match(m.el.innerHTML, /10 × 10 px/);
+    assert.match(m.el.innerHTML, /<h4>flood<\/h4>/);
+    assert.equal(m.payload, payload);
+  });
+
+  // The engine says "no longer current", not "clear" — so a host can still read the last values.
+  test("the hidden event hides the panel but keeps what it had", () => {
+    const fim = fakeFim(host());
+    const m = UI.bindRasterMetadata(fim, { root: host() });
+    fim.emit("raster:metadata", payload);
+    fim.emit("raster:metadata-hidden", {});
+    assert.equal(m.shown, false);
+    assert.equal(m.payload, payload, "hidden is not forgotten");
+  });
+
+  test("specRows drive the numeric column when present, rows otherwise", () => {
+    assert.match(UI.renderRasterMetadata(payload), /class="num"/);
+    const flatOnly = UI.renderRasterMetadata({ rows: [["A", "1"]] });
+    assert.match(flatOnly, /<td class="k">A<\/td>/);
+    assert.ok(!flatOnly.includes('class="num"'), "the flat form carries no numeric flag");
+  });
+
+  test("the renderer escapes its input — this builds markup from file metadata", () => {
+    const html = UI.renderRasterMetadata({ name: "<script>x</script>", rows: [["<b>k</b>", "&v"]] });
+    assert.ok(!html.includes("<script>"));
+    assert.ok(!html.includes("<b>k</b>"));
+    assert.match(html, /&amp;v/);
+  });
+
+  test("a custom render replaces the default", () => {
+    const fim = fakeFim(host());
+    const m = UI.bindRasterMetadata(fim, { root: host(), render: (p) => `<i>${p.name}</i>` });
+    fim.emit("raster:metadata", payload);
+    assert.equal(m.el.innerHTML, "<i>flood</i>");
+  });
+
+  test("renderRasterMetadata on nothing is an empty string, not a crash", () => {
+    assert.equal(UI.renderRasterMetadata(null), "");
+    assert.equal(UI.renderRasterMetadata({}), "<table></table>");
+  });
+
+  test("off() unsubscribes both events; destroy() removes the element", () => {
+    const fim = fakeFim(host());
+    const m = UI.bindRasterMetadata(fim, { root: host() });
+    assert.equal(fim.count("raster:metadata"), 1);
+    assert.equal(fim.count("raster:metadata-hidden"), 1);
+    m.destroy();
+    assert.equal(fim.count("raster:metadata"), 0);
+    assert.equal(fim.count("raster:metadata-hidden"), 0);
+    assert.equal(host().querySelectorAll("[data-fim-ui=raster-metadata]").length, 0);
+  });
 });
 
 describe("ui: createTooltip / bindHoverValue", () => {
@@ -1275,10 +1483,11 @@ describe("ui: every handle member", () => {
 describe("ui: the barrel", () => {
   test("exports exactly the documented names", () => {
     assert.deepEqual(Object.keys(UI).sort(), [
-      "REGION_MODES", "bindFeatureInfo", "bindHoverValue", "bindLegend", "bindStats", "connectToast",
-      "createInfoWindow", "createLayerPanel", "createLayerSelect", "createOperationsPanel",
-      "createRegionDraw", "createRegionOverlay", "createToast", "createToolsPanel", "createTooltip",
-      "layerLabel", "propsTable", "rasterControls", "regionGeoJSON", "renderLegend", "renderStats",
+      "REGION_MODES", "bindFeatureInfo", "bindHoverValue", "bindLegend", "bindRasterMetadata",
+      "bindStats", "connectToast", "createBusyIndicator", "createInfoWindow", "createLayerPanel",
+      "createLayerSelect", "createOperationsPanel", "createRegionDraw", "createRegionOverlay",
+      "createToast", "createToolsPanel", "createTooltip", "layerLabel", "propsTable",
+      "rasterControls", "regionGeoJSON", "renderLegend", "renderRasterMetadata", "renderStats",
       "vectorControls",
     ]);
   });

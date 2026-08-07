@@ -19,6 +19,7 @@ import { kml } from "@tmcw/togeojson";
 import { fromArrayBuffer } from "geotiff";
 import { readCrs } from "../geo/crs.js";
 import { Dataset } from "../package/dataset.js";
+import { notifyBusy } from "../package/events.js";
 
 // jszip (~95 KB) and shpjs (~16 KB, but it drags proj4 + wkt-parser + mgrs ≈ 300 KB) are loaded
 // ON DEMAND, not at module scope: only a caller who actually opens a .kmz or a zipped shapefile
@@ -140,29 +141,37 @@ export async function parseSource(source, options = {}) {
   const name = nameOf(source, options);
   const format = options.format || detectFormat(name);
 
-  // Handed the ORIGINAL source, deliberately not the Blob toBlobAndName would produce. These files are
-  // read lazily: the adapter needs only scan() (metadata) up front, and a URL-rooted Dataset then
-  // decodes ONE timestep at force time. Normalizing to a Blob first would download an entire
-  // 120-timestep NetCDF or Zarr store to answer a question about its header — exactly the eagerness
-  // the axis model exists to avoid.
-  if (MULTIDIM_FORMATS.has(format)) {
-    const { parseSciwrid } = await loadMultidim();
-    return parseSciwrid(source, { ...options, name });
-  }
+  // Fetching and decoding is the longest thing on this path — a remote GeoTIFF, a shapefile that
+  // drags proj4 in behind it — and until now it announced nothing, so a host had no way to show that
+  // anything was happening. Paired in a `finally` so a parse that throws still clears the indicator.
+  notifyBusy(true, "parse");
+  try {
+    // Handed the ORIGINAL source, deliberately not the Blob toBlobAndName would produce. These files
+    // are read lazily: the adapter needs only scan() (metadata) up front, and a URL-rooted Dataset
+    // then decodes ONE timestep at force time. Normalizing to a Blob first would download an entire
+    // 120-timestep NetCDF or Zarr store to answer a question about its header — exactly the eagerness
+    // the axis model exists to avoid.
+    if (MULTIDIM_FORMATS.has(format)) {
+      const { parseSciwrid } = await loadMultidim();
+      return await parseSciwrid(source, { ...options, name });
+    }
 
-  const { blob } = await toBlobAndName(source, options);
-  switch (format) {
-    case "geojson": return parseGeoJSON(blob, name);
-    case "kml": return parseKML(blob, name);
-    case "kmz": return parseKMZ(blob, name);
-    case "shp": return parseShapefile(blob, name);
-    case "geotiff": return parseGeoTIFF(blob, name);
-    case "csv": return parseCSV(blob, name, options);
-    case "xyz": return parseXYZ(blob, name, options);
-    default:
-      throw new Error(`parseFile: unsupported or undetected format for '${name}'. ` +
-        "Supported: geotiff, geojson, kml, kmz, shp, csv, xyz, netcdf (.nc/.nc4/.cdf), " +
-        "grib2 (.grib/.grib2/.grb2), zarr.");
+    const { blob } = await toBlobAndName(source, options);
+    switch (format) {
+      case "geojson": return await parseGeoJSON(blob, name);
+      case "kml": return await parseKML(blob, name);
+      case "kmz": return await parseKMZ(blob, name);
+      case "shp": return await parseShapefile(blob, name);
+      case "geotiff": return await parseGeoTIFF(blob, name);
+      case "csv": return await parseCSV(blob, name, options);
+      case "xyz": return await parseXYZ(blob, name, options);
+      default:
+        throw new Error(`parseFile: unsupported or undetected format for '${name}'. ` +
+          "Supported: geotiff, geojson, kml, kmz, shp, csv, xyz, netcdf (.nc/.nc4/.cdf), " +
+          "grib2 (.grib/.grib2/.grb2), zarr.");
+    }
+  } finally {
+    notifyBusy(false, "parse");
   }
 }
 

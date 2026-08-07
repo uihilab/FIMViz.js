@@ -67,7 +67,7 @@ Work top to bottom: step 8 needs the raster from step 3, and step 9 needs the re
 
 ## Automated coverage, and where it stops
 
-`npm test` runs 873 Node tests over the pure modules (including jsdom coverage of every
+`npm test` runs 895 Node tests over the pure modules (including jsdom coverage of every
 `fimviz/ui` export). It cannot see a browser: no `google.maps`, no
 Leaflet, no canvas, no GDAL WASM. Everything provider-shaped or pixel-shaped is verified by opening
 these pages. That gap is why `verify.html` exists, and why it is worth running on both providers

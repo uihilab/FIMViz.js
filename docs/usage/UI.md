@@ -5,7 +5,7 @@ functions (never at import time), and calls no `window.foo()` — the engine emi
 Mount whichever pieces you want; none of them are required for the engine to work.
 
 Everything below imports from **`fimviz/ui`**, its only home — the engine barrel does not re-export
-it. That entry carries just the small pure deps these need (~42 KB, no geotiff/Maps loader/GDAL), and
+it. That entry carries just the small pure deps these need (~46 KB, no geotiff/Maps loader/GDAL), and
 having exactly one entry means an app can never load two copies with two sets of state:
 
 ```js
@@ -14,7 +14,8 @@ import { createToast, connectToast, createToolsPanel } from 'fimviz/ui';
 
 ## Contents
 
-[Toast](#toast) · [Tooltip (raster hover)](#tooltip-raster-hover) ·
+[Toast](#toast) · [Host bus (busy, metadata)](#the-rest-of-the-enginehost-bus) ·
+[Tooltip (raster hover)](#tooltip-raster-hover) ·
 [Info window (vector click)](#info-window-vector-click) · [Tools panel](#tools-panel) ·
 [Legend/Stats renderers](#legendstats-renderers) · [Live panels](#live-panels--bindlegend--bindstats) ·
 [Selection tools](#selection-tools-region-draw) · [Region overlay](#showing-the-shape--createregionoverlay) ·
@@ -38,6 +39,48 @@ toast.show('Saved.', { level: 'success' });
 
 connectToast(fim);   // now every fim.emit('notify', {message, level}) shows a toast automatically
 ```
+
+`connectToast` also surfaces two engine **warnings** that otherwise reach only `console.warn`, where
+nobody looking at the map would find them — `layer:raster-oversized` ("too large for one image —
+drawn downsampled") and `layer:crs-unrenderable` ("…which leaflet cannot draw — reproject it to
+EPSG:4326 first"). Both describe something visibly wrong with what was just drawn. Pass
+`{ warnings: false }` for `notify` only. The returned toast carries an `off()` that releases every
+subscription it made.
+
+## The rest of the engine→host bus
+
+```js
+createBusyIndicator(fim, { root?, label?, pretty? })
+// label: a string, or (sources: string[]) => string
+// → { el, active, sources, off(), destroy() }
+
+bindRasterMetadata(fim, { root?, render?, pretty? })
+// → { el, shown, payload, off(), destroy() }
+
+renderRasterMetadata(payload)   // PURE — the default rendering, for a host's own chrome
+```
+
+**`createBusyIndicator` ref-counts by `source`.** The `busy` event carries one precisely because work
+overlaps; a single boolean would let the first job to finish hide an indicator two others still need.
+A stray `active:false` from a source that never announced itself is ignored rather than clearing
+everything.
+
+`busy` is now emitted by the mainstream path too — `parseSource` (`source: 'parse'`) and the GDAL warp
+inside a forced `reproject` (`source: 'reproject'`), which is the longest operation in the library
+since the first one pulls ~38 MB of wasm. Both pair the emit in a `finally`, so a failure clears the
+indicator rather than leaving it spinning on work that is not happening.
+
+**`bindRasterMetadata`** renders the `raster:metadata` / `raster:metadata-hidden` pair. The engine
+computes the rows and emits them (`geo/tifMeta.js`) precisely so it never has to name a panel — this
+is the panel. Hiding does not clear `payload`, because the engine's event means "no longer current",
+not "forget it". Today only the app-tier depth/ensemble/velocity layers emit it.
+
+### Deliberately unbound
+
+`storage:changed` and `upload:complete` get **no widget**. Both mean "a host list you own is now
+stale" / "dismiss the affordance you showed", and neither the list nor the affordance is ours —
+inventing one would be the same app-opinionated mistake the unified Layer Panel was kept out of the
+package to avoid. They are ordinary events: `fim.on('storage:changed', …)`.
 
 ## Tooltip (raster hover)
 

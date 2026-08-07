@@ -36,6 +36,7 @@
 
 <header>
   <h1>FIMViz — UI components</h1>
+  <div id="busy"></div>
   <span>Everything on the left is a <code>fimviz/ui</code> export, mounted the way an app would mount
         it. Six layers in <strong>two overlapping clusters</strong> — three coincident rasters plus a
         vector over Mississippi, two overlapping vectors over Iowa. Click one spot twice to cycle
@@ -85,6 +86,11 @@
       <h2>Statistics</h2>
       <div id="stats"></div>
     </div>
+
+    <div>
+      <h2>Raster metadata</h2>
+      <div id="meta"></div>
+    </div>
   </div>
 
   <div id="map"></div>
@@ -97,7 +103,8 @@
 <script type="module">
 import { FimViz } from "fimviz";
 import {
-  createToast, connectToast, createToolsPanel, createOperationsPanel, bindLegend, bindStats,
+  createToast, connectToast, createBusyIndicator, bindRasterMetadata,
+  createToolsPanel, createOperationsPanel, bindLegend, bindStats,
   createTooltip, bindHoverValue, createInfoWindow, bindFeatureInfo,
   createRegionDraw, REGION_MODES, createRegionOverlay, createLayerPanel, createLayerSelect,
   layerLabel,
@@ -109,7 +116,19 @@ const $ = (s) => document.querySelector(s);
 const toast = createToast(document.body);
 
 const fim = await FimViz.mount("#map", { provider: "leaflet" });
+
+// connectToast also surfaces the two engine warnings that used to reach only console.warn — a raster
+// too big for one image, and a CRS this provider cannot draw. Both describe something visibly wrong
+// with what was just drawn, so the person looking at the map is the one who should hear about it.
 connectToast(fim, toast);
+
+// The busy indicator rides the `busy` event, which parseSource and the GDAL warp now emit. It
+// ref-counts by source, so six overlapping loads below leave it up until the last one lands.
+createBusyIndicator(fim, { root: $("#busy"), label: (s) => `${s.join(", ")}…` });
+
+// The engine computes raster metadata and emits it rather than naming a panel; this is the panel.
+// It stays empty on this page — only the app-tier depth/ensemble/velocity layers emit it today.
+bindRasterMetadata(fim, { root: $("#meta") });
 
 // ── the layers ──────────────────────────────────────────────────────────────────────────
 // Deliberately arranged as TWO overlapping clusters, because that is what exercises the layer

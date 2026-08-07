@@ -8,6 +8,7 @@
 // import just the UI without pulling in the engine.
 
 export { createToast, connectToast } from "./toast.js";
+export { createBusyIndicator, bindRasterMetadata, renderRasterMetadata } from "./hostBindings.js";
 export { createTooltip, bindHoverValue } from "./tooltip.js";
 export { createInfoWindow, propsTable, bindFeatureInfo } from "./infoWindow.js";
 export { createToolsPanel, rasterControls, vectorControls } from "./toolsPanel.js";
