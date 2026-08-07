@@ -57,6 +57,13 @@ const _providers = new Map();
  * @property {(map: any, handle: any) => void} removeVector - tear a vector handle down.
  * @property {(map: any, bounds: {north: number, south: number, east: number, west: number}) => void} fitBounds -
  *   fit the map's viewport to `bounds`.
+ * @property {(map: any, opts?: { timeout?: number }) => Promise<void>} [whenIdle] - resolve once the
+ *   camera has settled. Safe to await unconditionally: it resolves on a timeout when the map is
+ *   already still, so it can never hang. Anything that reads the projection right after a `fitBounds`
+ *   must await this first — a click resolved mid-animation lands at the wrong coordinates.
+ * @property {(map: any, handles: any[]) => any[]} [applyLayerOrder] - restack overlays to match
+ *   `handles`, ordered bottom → top, and RETURN the handles: a provider may have replaced some (the
+ *   Google raster path recreates them), so callers must adopt the returned array.
  * @property {(map: any, dataUrl: string, bounds: {north: number, south: number, east: number, west: number}, opts?: { opacity?: number, interactive?: boolean }) => any} addRasterImage -
  *   position a pre-rendered image (data URL or any image URL) over `bounds`; returns an opaque
  *   raster-image handle. Non-interactive (`clickable:false`) by default so map events pass through to
@@ -408,6 +415,58 @@ registerMapProvider("google", {
     return () => google.maps.event.removeListener(listener);
   },
 
+  /** @returns {Promise<void>} resolves once the camera has settled. */
+  whenIdle(map, { timeout = 400 } = {}) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        // eslint-disable-next-line no-undef
+        google.maps.event.removeListener(listener);
+        resolve();
+      };
+      // eslint-disable-next-line no-undef
+      const listener = google.maps.event.addListenerOnce(map, "idle", finish);
+      // 'idle' does not fire for a map that is ALREADY idle, so the timer is what makes this safe to
+      // await unconditionally — without it, `await whenIdle()` on a still map would hang forever.
+      const timer = setTimeout(finish, timeout);
+    });
+  },
+
+  /**
+   * Restack overlays to match `handles`, ordered bottom → top. Returns the handles, since some may
+   * have been REPLACED (see below) — callers must adopt the returned array.
+   *
+   * Google's `GroundOverlay` exposes no z-index of any kind: its constructor takes only
+   * `{ opacity, clickable, map }` and there is no public reorder. So a raster is restacked by
+   * removing it and re-adding it in the right order, which is why the handle changes. That costs a
+   * flicker and an image re-fetch per reorder — deliberate, because the alternative (replacing
+   * GroundOverlay with a custom OverlayView whose DOM node we own) rewrites the working raster path
+   * on the provider half with the least test coverage. Both live behind this one method, so that
+   * upgrade is available later without touching a single caller.
+   *
+   * KNOWN LIMIT: `google.maps.Data` vectors always draw ABOVE ground overlays in Google's own
+   * stacking, and putting a raster over a vector would mean styling every feature's `zIndex` and
+   * clobbering the host's own style function. So on Google, raster-over-vector is not honoured —
+   * rasters restack among themselves, vectors stay on top.
+   */
+  applyLayerOrder(map, handles = []) {
+    const rasters = handles.filter((h) => h && typeof h.getUrl === "function");
+    return handles.map((h) => {
+      if (!rasters.includes(h)) return h;               // vectors: nothing to do (see the limit above)
+      const url = h.getUrl(), bounds = h.getBounds();
+      const opacity = h.get?.("opacity") ?? 1;
+      const clickable = !!h.get?.("clickable");
+      h.setMap(null);
+      // eslint-disable-next-line no-undef
+      const next = new google.maps.GroundOverlay(url, bounds, { opacity, clickable });
+      next.setMap(map);
+      return next;
+    });
+  },
+
   // ---- generalized map events (the event-dispatch first slice — PACKAGE_ROADMAP §1) ----
   /**
    * Subscribe to a normalized map event. `type` ∈ click/hover/dblclick/mousedown/mouseup/rightclick;
@@ -591,6 +650,40 @@ registerMapProvider("leaflet", {
     const handler = (e) => cb({ lat: e.latlng.lat, lng: e.latlng.lng });
     map.on("mousemove", handler);
     return () => map.off("mousemove", handler);
+  },
+
+  /** @returns {Promise<void>} resolves once the camera has settled. */
+  whenIdle(map, { timeout = 400 } = {}) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        map.off("moveend", finish);
+        map.off("zoomend", finish);
+        resolve();
+      };
+      map.on("moveend", finish);
+      map.on("zoomend", finish);
+      // Neither event fires for a map that is ALREADY still, so the timer is what makes this safe to
+      // await unconditionally. It also caps the wait if an animation is interrupted mid-flight.
+      const timer = setTimeout(finish, timeout);
+    });
+  },
+
+  /**
+   * Restack overlays to match `handles`, ordered bottom → top. Returns the same handles — unlike
+   * Google, nothing has to be recreated here.
+   *
+   * `bringToFront()` exists on both handle types (`L.ImageOverlay` and `L.GeoJSON`, via
+   * `L.FeatureGroup`), and calling it over the list in order leaves the last one on top. That is
+   * simpler and more reliable than assigning z-indices: Leaflet has no z-index for vector paths at
+   * all, only pane-relative DOM order, so a `setZIndex`-shaped API would be a half-truth.
+   */
+  applyLayerOrder(map, handles = []) {
+    for (const h of handles) h?.bringToFront?.();
+    return handles;
   },
 
   // ---- generalized map events: the SAME contract the google provider implements ----

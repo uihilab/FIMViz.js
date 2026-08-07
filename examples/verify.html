@@ -668,13 +668,28 @@ $("#rg-fit").addEventListener("click", () => {
   if (rasterLayer) rasterLayer.fit(); else pill("#p8", "load the raster in step 3 first", "bad");
 });
 
-$("#rg-draw").addEventListener("click", () => {
+$("#rg-draw").addEventListener("click", async () => {
   if (!rasterLayer) { pill("#p8", "load the raster in step 3 first", "bad"); return; }
   // Steps 5–7 each fit() the map to their OWN subject, and the bundled samples are in three
   // different places (the GeoTIFF is in Mississippi, the counties in Iowa). Working top to bottom
   // therefore left the raster off-screen by the time you got here, so "click on the raster" was
   // impossible and every region came back count=0. Snap back to it before capturing.
+  //
+  // …and then WAIT. fit() is animated on both providers, and a click resolved while the camera is
+  // still moving lands at the pre-animation projection — off by exactly 2x when the fit changed zoom
+  // by one level, which is the shape of the reported defect (first vertex swallowed, ring spanning
+  // twice the expected range). The zooms logged either side of this await are what confirms or kills
+  // that: if `zoomBefore` and `zoomAfter` differ by 1, the race was real.
+  const zoomBefore = fim.map.getZoom?.();
   rasterLayer.fit();
+  pill("#p8", "settling the camera…", "warn");
+  await fim.whenIdle();
+  const zoomAfter = fim.map.getZoom?.();
+  log("region draw armed", {
+    zoomBefore, zoomAfter,
+    zoomChangedBy: (zoomBefore != null && zoomAfter != null) ? zoomAfter - zoomBefore : null,
+    note: "a difference of 1 here is exactly a 2x coordinate error if a click lands mid-animation",
+  });
   regionDraw = createRegionDraw(fim, {
     onPoint: (pts) => {
       drawRegionOnMap(pts, false);

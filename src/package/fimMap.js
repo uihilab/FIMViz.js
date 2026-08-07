@@ -509,6 +509,52 @@ export class FimMap {
     this.#capture = typeof handler === "function" ? handler : null;
     return () => { if (this.#capture === handler) this.#capture = null; };
   }
+  /**
+   * Resolve once the map's camera has settled.
+   *
+   * The reason this exists rather than a `setTimeout`: `fitBounds`/`fit()` are ANIMATED on both
+   * providers, and anything that reads the projection while one is in flight gets the pre-animation
+   * one. A click captured mid-zoom therefore lands at the wrong coordinates — off by exactly 2× when
+   * the fit changed zoom by one level. So the rule is `layer.fit(); await fim.whenIdle();` before
+   * starting any tool that converts pointer position to coordinates.
+   *
+   * Safe to await unconditionally: it resolves on a timeout when the map is already still, and
+   * resolves immediately when the provider declares no `whenIdle` at all.
+   * @param {{ timeout?: number }} [opts]
+   * @returns {Promise<void>}
+   */
+  async whenIdle(opts = {}) {
+    const provider = getMapProvider(this.config?.provider || DEFAULT_PROVIDER);
+    const map = this.map;
+    if (!map || typeof provider?.whenIdle !== "function") return;
+    await provider.whenIdle(map, opts);
+  }
+
+  /**
+   * Push this instance's layer order down to the map, so what is DRAWN on top matches what
+   * `layers` says is on top.
+   *
+   * Worth being explicit about why this is needed at all: `dispatchMapEventToLayers` already walks
+   * `layers` top-down and treats the last entry as the topmost for hit-testing, but visual stacking
+   * has only ever been whatever order the provider happened to insert overlays in. The two could
+   * therefore disagree — the layer that received a click was not necessarily the one drawn on top.
+   * This makes the array authoritative for both.
+   * @returns {FimMap}
+   */
+  applyLayerOrder() {
+    const provider = getMapProvider(this.config?.provider || DEFAULT_PROVIDER);
+    const map = this.map;
+    if (!map || typeof provider?.applyLayerOrder !== "function") return this;
+    // Bottom → top is the array's own order. Each layer exposes ONE provider handle; a layer with
+    // none yet (never rendered, or hidden by teardown) simply has no place in the stack.
+    const owners = this.layers.filter((l) => l._providerHandle);
+    const reordered = provider.applyLayerOrder(map, owners.map((l) => l._providerHandle));
+    // A provider may hand back REPLACED handles (Google recreates ground overlays), so adopt them or
+    // the next removeLayer()/opacity change would act on a handle no longer on the map.
+    owners.forEach((l, i) => { if (reordered[i] !== undefined) l._adoptProviderHandle(reordered[i]); });
+    return this;
+  }
+
   /** Release any modal interaction, restoring normal layer dispatch. @returns {FimMap} */
   releaseInteraction() { this.#capture = null; return this; }
   /** Is a modal interaction currently capturing events? @returns {boolean} */

@@ -497,6 +497,19 @@ export class Layer {
    */
   hitTest(lat, lng) { return false; }   // eslint-disable-line no-unused-vars
 
+  /**
+   * The ONE opaque provider handle this layer currently owns, or null when it is not on the map.
+   *
+   * Subclasses keep their handle under a name that reads well for them (`overlay` for a raster,
+   * `dataLayer` for a vector); this pair is the type-agnostic view of it, so `FimMap.applyLayerOrder`
+   * can restack a mixed stack without knowing what kind of layer each one is.
+   * @returns {*|null}
+   */
+  get _providerHandle() { return null; }
+
+  /** Adopt a handle the provider REPLACED (Google recreates ground overlays to restack them). */
+  _adoptProviderHandle(handle) { void handle; }
+
   /** @returns {{id: string, type: string|null, visible: boolean, sources: Array<string|null>}} */
   toJSON() {
     return {
@@ -586,6 +599,10 @@ export class RasterLayer extends Layer {
    * @param {number} lat @param {number} lng @returns {boolean}
    */
   hitTest(lat, lng) { return this.valueAt(lat, lng) != null; }
+
+  /** @returns {*|null} the raster-image overlay handle. */
+  get _providerHandle() { return this.overlay ?? null; }
+  _adoptProviderHandle(handle) { this.overlay = handle ?? null; }
 
   /**
    * The pixel value at a lat/lng (nearest cell), or null when outside the footprint / no data / no
@@ -1007,6 +1024,10 @@ export class VectorLayer extends Layer {
 
   /** True if the point falls inside any feature geometry. @param {number} lat @param {number} lng @returns {boolean} */
   hitTest(lat, lng) { return !!this.featureAt(lat, lng); }
+
+  /** @returns {*|null} the vector handle. */
+  get _providerHandle() { return this.dataLayer ?? null; }
+  _adoptProviderHandle(handle) { this.dataLayer = handle ?? null; }
 
   /**
    * The first feature whose geometry contains the point (polygons with holes; points within a small

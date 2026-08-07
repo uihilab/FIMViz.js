@@ -9,6 +9,19 @@
 import { SpatialFilter } from "../package/filter.js";
 
 /**
+ * **Do not `start()` while the camera is moving.** `fit()`/`fitBounds` are animated on both
+ * providers, and a click resolved mid-animation lands at the pre-animation projection — off by
+ * exactly 2× when the fit changed zoom by one level. Await the map first:
+ *
+ * ```js
+ * layer.fit();
+ * await fim.whenIdle();     // resolves immediately-ish when the map is already still
+ * regionDraw.start();
+ * ```
+ *
+ * This module cannot enforce that itself: it is headless by design (it knows only
+ * `fim.captureInteraction`, never a map SDK), so the wait belongs to the caller that moved the camera.
+ *
  * @param {import('../package/fimMap.js').FimMap} fim
  * @param {{ onPoint?: (points: Array<{lat,lng}>, evt: any) => void,
  *           onComplete?: (filter: SpatialFilter|null, points: Array<{lat,lng}>) => void,
