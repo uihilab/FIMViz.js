@@ -6,7 +6,7 @@
 
 # Class: PredicateFilter
 
-Defined in: [package/filter.js:82](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/filter.js#L82)
+Defined in: [package/filter.js:82](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/filter.js#L82)
 
 ## Extends
 
@@ -18,7 +18,7 @@ Defined in: [package/filter.js:82](https://github.com/uihilab/FIMViz.js/blob/132
 
 > **new PredicateFilter**(`fn`): `PredicateFilter`
 
-Defined in: [package/filter.js:84](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/filter.js#L84)
+Defined in: [package/filter.js:84](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/filter.js#L84)
 
 #### Parameters
 
@@ -40,7 +40,7 @@ Defined in: [package/filter.js:84](https://github.com/uihilab/FIMViz.js/blob/132
 
 > **fn**: (...`args`) => `boolean`
 
-Defined in: [package/filter.js:84](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/filter.js#L84)
+Defined in: [package/filter.js:84](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/filter.js#L84)
 
 #### Parameters
 
@@ -58,7 +58,7 @@ Defined in: [package/filter.js:84](https://github.com/uihilab/FIMViz.js/blob/132
 
 > **isEmpty**(): `boolean`
 
-Defined in: [package/filter.js:34](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/filter.js#L34)
+Defined in: [package/filter.js:34](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/filter.js#L34)
 
 #### Returns
 
@@ -74,7 +74,7 @@ Defined in: [package/filter.js:34](https://github.com/uihilab/FIMViz.js/blob/132
 
 > **test**(`unit`): `boolean`
 
-Defined in: [package/filter.js:86](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/filter.js#L86)
+Defined in: [package/filter.js:86](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/filter.js#L86)
 
 #### Parameters
 
@@ -96,7 +96,7 @@ Defined in: [package/filter.js:86](https://github.com/uihilab/FIMViz.js/blob/132
 
 > `static` **all**(`filters`): [`Filter`](Filter.md)
 
-Defined in: [package/filter.js:68](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/filter.js#L68)
+Defined in: [package/filter.js:68](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/filter.js#L68)
 
 Combine filters as a conjunction (AND) — the semantics of chaining applyFilter().
 
@@ -120,7 +120,7 @@ Combine filters as a conjunction (AND) — the semantics of chaining applyFilter
 
 > `static` **from**(`input`): [`Filter`](Filter.md)
 
-Defined in: [package/filter.js:53](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/filter.js#L53)
+Defined in: [package/filter.js:53](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/filter.js#L53)
 
 Coerce any friendly input into a Filter.
   Filter-like   → returned as-is (anything with a `test(unit)` method)

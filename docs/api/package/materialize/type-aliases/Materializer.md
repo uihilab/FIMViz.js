@@ -8,7 +8,7 @@
 
 > **Materializer** = (`root`, `ds`) => `Promise`\<[`RasterGrid`](../classes/RasterGrid.md) \| [`VectorFeatures`](../classes/VectorFeatures.md)\>
 
-Defined in: [package/materialize.js:90](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/materialize.js#L90)
+Defined in: [package/materialize.js:90](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/materialize.js#L90)
 
 ## Type Parameters
 

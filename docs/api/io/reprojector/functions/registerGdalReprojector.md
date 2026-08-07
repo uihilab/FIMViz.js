@@ -8,7 +8,7 @@
 
 > **registerGdalReprojector**(): `void`
 
-Defined in: [io/reprojector.js:68](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/io/reprojector.js#L68)
+Defined in: [io/reprojector.js:68](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/io/reprojector.js#L68)
 
 Wire the GDAL reprojector into the materialize seam so `ds.reproject(crs).grid()` warps in the
 browser. Idempotent. Browser-only (pulls gdal3.js). See the module header.

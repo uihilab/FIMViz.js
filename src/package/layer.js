@@ -23,6 +23,7 @@ import { getMapProvider, providerAcceptsCRS, DEFAULT_PROVIDER } from "./mapProvi
 import { Legend } from "./legend.js";
 import { Stats } from "./stats.js";
 import { gridToDataURL, rangeOf } from "./rasterImage.js";
+import { rasterRenderPlan, toMercatorRows } from "../geo/mercator.js";
 import { ColorScale } from "./colorScale.js";
 import { LayerSettings, RasterSettings, VectorSettings } from "./layerSettings.js";
 
@@ -524,6 +525,11 @@ export class RasterLayer extends Layer {
     // knows the convention (e.g. FIM's -99999) sets it explicitly.
     this.noData = opts.noData ?? null;
     this.opacity = opts.opacity ?? 1;   // overlay opacity (0..1) — a placement setting
+    // How this raster is turned into something the map can draw: the Mercator row remap and the
+    // image-vs-tiles budget. Defaults live in geo/mercator.js's RASTER_LIMITS; anything set here
+    // overrides them for this layer, and `render({ raster })` overrides again for one draw.
+    // { strategy, mercator, maxPixels, maxDimension, tileSize, resample }
+    this.raster = opts.raster ?? {};
     this.colorScale = null;     // the ColorScale that maps pixel value → colour
     this._onScaleChange = null; // bound onChange listener (so _setColorScale can detach the old one)
   }
@@ -686,10 +692,11 @@ export class RasterLayer extends Layer {
    * behind addRasterImage/setRasterImageUrl. Populates `rasterData`/`meta` (hover read-model) from
    * the grid and installs a teardown that removes the overlay. Fires `rendered` with the grid + data
    * URL.
-   * @param {Object} [opts] - { mode?: 'in-place'|'recreate' }
+   * @param {Object} [opts] - { mode?: 'in-place'|'recreate', raster?: Object } — `raster` overrides
+   *   this layer's projection/budget options for one draw (see `RasterLayer#raster`)
    * @returns {void}
    */
-  _draw({ mode = "recreate" } = {}) {
+  _draw({ mode = "recreate", raster: rasterOverride } = {}) {
     const grid = this.result;
     if (!grid || grid.kind !== "raster") return;   // compute() sets result = the decoded RasterGrid
     const originalLegend = this._resolveColorScale(grid);
@@ -700,8 +707,23 @@ export class RasterLayer extends Layer {
       throw new Error(`RasterLayer: the "${providerName}" provider has no addRasterImage`);
     }
     const noData = this.noData ?? grid.noData ?? null;
-    const dataURL = gridToDataURL(grid, { colorScale: this.colorScale, noData });
-    const bounds = grid.bounds;
+    // PROJECTION. The provider stretches the image linearly in Web Mercator, but a grid's rows are
+    // evenly spaced in latitude — so the rows are resampled before colorizing. Only the IMAGE is
+    // reprojected: `grid` (and therefore rasterData/meta below, and Stats/filters/hover everywhere
+    // else) stays the real data at real coordinates. See geo/mercator.js.
+    const rasterOpts = { ...this.raster, ...(rasterOverride || {}) };
+    const plan = rasterRenderPlan(grid, rasterOpts);
+    const display = toMercatorRows(grid, plan, { method: rasterOpts.resample ?? "nearest", noData });
+    const dataURL = gridToDataURL({ ...grid, ...display }, { colorScale: this.colorScale, noData });
+    const bounds = display.bounds;
+    // The heuristic firing means a single baked image can no longer carry this raster's detail — it is
+    // still drawn, correctly placed but downsampled, and the host is told rather than left to wonder
+    // why a zoomed-in field looks soft. Tiles are the real answer; see geo/mercator.js.
+    if (plan.mode === "tiles") {
+      console.warn(`RasterLayer: ${plan.reason}. Drawn downsampled — a tile backend is not yet ` +
+        "implemented (docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md).");
+      emitHost("layer:raster-oversized", { layer: this, plan, datasetName: this._name });
+    }
     if (mode === "in-place" && this.overlay && typeof provider.setRasterImageUrl === "function") {
       // Reassign to the RETURNED handle — Google recreates, Leaflet swaps in place (mapProvider.js).
       this.overlay = provider.setRasterImageUrl(fim.map, this.overlay, dataURL, bounds, { opacity: this.opacity }) ?? this.overlay;

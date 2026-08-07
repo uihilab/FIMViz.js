@@ -6,7 +6,7 @@
 
 # Class: Stats
 
-Defined in: [package/stats.js:23](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/stats.js#L23)
+Defined in: [package/stats.js:23](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/stats.js#L23)
 
 ## Constructors
 
@@ -14,7 +14,7 @@ Defined in: [package/stats.js:23](https://github.com/uihilab/FIMViz.js/blob/1320
 
 > **new Stats**(`fields?`): `Stats`
 
-Defined in: [package/stats.js:25](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/stats.js#L25)
+Defined in: [package/stats.js:25](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/stats.js#L25)
 
 Not usually called directly — use the `Stats.raster()`/`Stats.vector()` factories.
 
@@ -34,7 +34,7 @@ Not usually called directly — use the `Stats.raster()`/`Stats.vector()` factor
 
 > **describe**(): `string`
 
-Defined in: [package/stats.js:204](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/stats.js#L204)
+Defined in: [package/stats.js:204](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/stats.js#L204)
 
 #### Returns
 
@@ -46,7 +46,7 @@ Defined in: [package/stats.js:204](https://github.com/uihilab/FIMViz.js/blob/132
 
 > **diff**(`other`): `object`
 
-Defined in: [package/stats.js:194](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/stats.js#L194)
+Defined in: [package/stats.js:194](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/stats.js#L194)
 
 Deltas between two Stats of the same kind (this − other) over shared numeric fields.
 
@@ -66,7 +66,7 @@ Deltas between two Stats of the same kind (this − other) over shared numeric f
 
 > **download**(`name?`): `void`
 
-Defined in: [package/stats.js:241](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/stats.js#L241)
+Defined in: [package/stats.js:241](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/stats.js#L241)
 
 #### Parameters
 
@@ -84,7 +84,7 @@ Defined in: [package/stats.js:241](https://github.com/uihilab/FIMViz.js/blob/132
 
 > **percentile**(`p`): `number`
 
-Defined in: [package/stats.js:174](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/stats.js#L174)
+Defined in: [package/stats.js:174](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/stats.js#L174)
 
 Approximate percentile p (0–100) from the histogram. Raster only.
 
@@ -104,7 +104,7 @@ Approximate percentile p (0–100) from the histogram. Raster only.
 
 > **toCSV**(): `string`
 
-Defined in: [package/stats.js:221](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/stats.js#L221)
+Defined in: [package/stats.js:221](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/stats.js#L221)
 
 #### Returns
 
@@ -116,7 +116,7 @@ Defined in: [package/stats.js:221](https://github.com/uihilab/FIMViz.js/blob/132
 
 > **toJSON**(): `any`
 
-Defined in: [package/stats.js:218](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/stats.js#L218)
+Defined in: [package/stats.js:218](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/stats.js#L218)
 
 #### Returns
 
@@ -128,7 +128,7 @@ Defined in: [package/stats.js:218](https://github.com/uihilab/FIMViz.js/blob/132
 
 > `static` **raster**(`pixelData`, `meta`, `opts?`): `Stats`
 
-Defined in: [package/stats.js:38](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/stats.js#L38)
+Defined in: [package/stats.js:38](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/stats.js#L38)
 
 Raster statistics over pixelData, optionally scoped by a Filter and classified by a ColorScale.
 
@@ -200,7 +200,7 @@ Raster statistics over pixelData, optionally scoped by a Filter and classified b
 
 > `static` **vector**(`source`, `opts?`): `Stats`
 
-Defined in: [package/stats.js:118](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/stats.js#L118)
+Defined in: [package/stats.js:118](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/stats.js#L118)
 
 Vector statistics over any feature source.
 

@@ -6,7 +6,7 @@
 
 # Interface: LegendStop
 
-Defined in: [package/legend.js:8](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/legend.js#L8)
+Defined in: [package/legend.js:8](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/legend.js#L8)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [package/legend.js:8](https://github.com/uihilab/FIMViz.js/blob/1320
 
 > **color**: `string`
 
-Defined in: [package/legend.js:12](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/legend.js#L12)
+Defined in: [package/legend.js:12](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/legend.js#L12)
 
 ***
 
@@ -22,7 +22,7 @@ Defined in: [package/legend.js:12](https://github.com/uihilab/FIMViz.js/blob/132
 
 > `optional` **label?**: `string`
 
-Defined in: [package/legend.js:13](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/legend.js#L13)
+Defined in: [package/legend.js:13](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/legend.js#L13)
 
 ***
 
@@ -30,7 +30,7 @@ Defined in: [package/legend.js:13](https://github.com/uihilab/FIMViz.js/blob/132
 
 > `optional` **max?**: `number`
 
-Defined in: [package/legend.js:11](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/legend.js#L11)
+Defined in: [package/legend.js:11](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/legend.js#L11)
 
 ***
 
@@ -38,7 +38,7 @@ Defined in: [package/legend.js:11](https://github.com/uihilab/FIMViz.js/blob/132
 
 > `optional` **min?**: `number`
 
-Defined in: [package/legend.js:10](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/legend.js#L10)
+Defined in: [package/legend.js:10](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/legend.js#L10)
 
 ***
 
@@ -46,4 +46,4 @@ Defined in: [package/legend.js:10](https://github.com/uihilab/FIMViz.js/blob/132
 
 > `optional` **value?**: `number`
 
-Defined in: [package/legend.js:9](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/legend.js#L9)
+Defined in: [package/legend.js:9](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/legend.js#L9)

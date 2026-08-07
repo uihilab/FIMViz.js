@@ -675,7 +675,7 @@ read. Not yet diagnosed to engine vs. example vs. Leaflet animation timing (`#rg
 `rasterLayer.fit()` immediately before `start()`, so an in-flight zoom animation is a live suspect for
 both symptoms).
 
-**Open — raster overlays are plate carrée content drawn into a Mercator viewport.**
+**Fixed (interim) — raster overlays were plate carrée content drawn into a Mercator viewport.**
 `RasterLayer._draw` colorizes a grid to a data URL and hands it to `addRasterImage`, which is
 `L.imageOverlay(url, [[s,w],[n,e]])` on Leaflet and a `GroundOverlay` on Google. Both stretch that
 image **linearly in Web Mercator screen space**, while our grid rows are evenly spaced in **latitude**.
@@ -700,17 +700,41 @@ providers declare `acceptsCRS` as the WGS84 family only, so `Layer._checkProvide
 message advising `ds.reproject('EPSG:4326')`, which walks the caller straight back into the bug. Even
 with that guard lifted, `addRasterImage` takes lat/lng bounds while a 3857 grid's are metres.
 
-**Two routes, and the smaller one is preferred.** (A) Resample rows to Mercator before colorizing —
-for each output row take its Mercator-even *y*, convert to latitude, read the nearest source row. Pure
-arithmetic, ~25 lines beside `resampleGrid`, no GDAL, node-testable, and the bounds stay lat/lng so
-nothing else in the render path changes; clamp to ±85.05°. Mechanically it is the same shape as
-`io/sciwrid.js`'s longitude roll. (B) Teach the stack about projected content properly — extend
-`acceptsCRS`, derive lat/lng corners from projected bounds in `addRasterImage`, warp through GDAL. (B)
-is the architecturally general answer and the one to reach for if genuinely projected grids (polar
-stereographic, rotated pole) ever need to reach the map, but it makes every global raster depend on a
-~38 MB wasm download to do four lines of trigonometry. Not yet implemented either way: the fix changes
-how every raster renders on every provider, including shifting the existing regional maps by ~21 km,
-which is a correction but a visible one.
+**Landed: the row remap** (`geo/mercator.js`, wired into `RasterLayer._draw`). Rows are resampled onto
+Mercator-even spacing before colorizing; columns are untouched because longitude is linear in Mercator.
+Only the **image** is reprojected — the source grid is left alone, so `rasterData`/`meta`, hover, Stats
+and the filters keep reading real values at real coordinates, which is what kept the change contained.
+
+- **The row count is derived, not guessed, and the intuition runs the opposite way to expectation.**
+  Mercator's row spacing in latitude is `dy·cos φ`, so it is **sparsest at the equator** — that is
+  where source detail would be lost, and it fixes the requirement at `height × (Δy / Δφ_radians)`.
+  An early estimate of ~11× came from reading the *pole* as the binding constraint; at the pole the
+  output oversamples, which costs nothing. The real factor is **1.94×** for a −80…85 global field and
+  **1.17×** for the Idalia regional fixture. A single image handles global data comfortably, which is
+  the opposite of what motivated looking at tiles in the first place.
+- **Latitude beyond ±85.0511° is clipped, and the overlay box shrinks with it.** Not clamped — leaving
+  the box at ±90 while dropping the rows would reintroduce exactly the misplacement being fixed.
+- **`nearest` is the default resampling**, matching `resampleGrid`'s reasoning: interpolating a
+  classified raster invents values between the classes. `resample: 'linear'` is available and falls
+  back to nearest beside any NaN/nodata.
+
+**Still open: tiles, and the decision point now exists ahead of the backend.** `rasterRenderPlan`
+returns `mode: 'tiles'` when the ideal image exceeds a pixel budget (16 Mpx) or a side limit (8192 px),
+both overridable per layer along with `tileSize`, `strategy` (`auto`/`image`/`tiles`), `mercator` and
+`resample`. Until a tile backend exists, that verdict means the image is drawn **capped** — correctly
+placed, aspect preserved, downsampled — plus a `console.warn` and a `layer:raster-oversized` host
+event. A baked image is fixed in resolution: zoom past what it was sized for and you are magnifying
+pixels, which no static heuristic can detect. Tiles (`L.GridLayer#createTile` / `ImageMapType`)
+resample per viewport and are the real answer; the plan is to build them alongside ArcGIS server data
+viewing, where the same tile plumbing is needed anyway. Reusable when that happens: `resample.js`'s
+`nearestAt`/`bilinearAt` already take `(pixels, meta, lng, lat, noData)` — exactly the per-pixel query
+a tile needs — though they are module-private today.
+
+**Rejected: warping to EPSG:3857 through the existing `reproject()`.** Architecturally the general
+answer, and the one to reach for if genuinely projected grids (polar stereographic, rotated pole) ever
+need to reach the map. But it is refused before it draws (`acceptsCRS` is WGS84-only on both
+providers), `addRasterImage` takes lat/lng bounds while a 3857 grid's are metres, and it would make
+every global raster depend on a ~38 MB wasm download to do four lines of trigonometry.
 
 **Still owed:** everything Google-side — vector rendering and neutral-style translation on
 `google.maps.Data` (including the new point symbol), and raster overlay colorize/opacity/hit-test. Also

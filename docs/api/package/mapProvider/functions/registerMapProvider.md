@@ -8,7 +8,7 @@
 
 > **registerMapProvider**(`name`, `provider`): `void`
 
-Defined in: [package/mapProvider.js:93](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/package/mapProvider.js#L93)
+Defined in: [package/mapProvider.js:93](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/package/mapProvider.js#L93)
 
 Register a map backend.
 

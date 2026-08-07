@@ -8,7 +8,7 @@
 
 > **bindHoverValue**(`layer`, `opts?`): `object`
 
-Defined in: [ui/tooltip.js:48](https://github.com/uihilab/FIMViz.js/blob/132070e57c5fba6497cf50686eaa685279f6b6d6/src/ui/tooltip.js#L48)
+Defined in: [ui/tooltip.js:48](https://github.com/uihilab/FIMViz.js/blob/5f5ed4f732be60806d6924da01ee6b33fffc9ff0/src/ui/tooltip.js#L48)
 
 Wire a RasterLayer's hover value to a tooltip. Uses the UNFILTERED `map:hover` bus event so the
 tooltip hides the moment the cursor leaves the raster footprint (valueAt → null). Requires

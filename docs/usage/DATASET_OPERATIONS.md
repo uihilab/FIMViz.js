@@ -218,14 +218,29 @@ await fim.addDataset(file, { grid: { bbox: [0, -80, 360, 90] }, lon: '-180..180'
 // bounds → { west: -180, east: 180, … }, and every decoded timestep is rolled to match
 ```
 
-> **A global raster will still look wrong on the map, and that is a separate, open defect.** `lon`
-> fixes *where* the grid claims to be; it does not fix how the provider draws it. Raster overlays are
-> plate-carrée images placed in a lat/lng box, which Leaflet and Google both stretch linearly in Web
-> Mercator — an error of ~21 km on a regional flood map but ~2850 km on a −80…90 global field, and
-> latitude 90 is not representable in Mercator at all. Neither `reproject()` nor `resampleGrid` helps;
-> see [DECISIONS → raster overlays are plate carrée content in a Mercator viewport](../DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md)
-> for why, and for the two candidate fixes. Until then, clip a global field to a modest latitude band
-> before rendering it.
+`lon` fixes *where* the grid claims to be. How it is **drawn** is a separate concern handled by
+`geo/mercator.js`: raster overlays are images placed in a lat/lng box, which Leaflet and Google both
+stretch linearly in Web Mercator, so the rows are resampled onto Mercator spacing before colorizing.
+That is automatic — a global field renders correctly with no options — and latitude beyond ±85.0511°
+is clipped away (it is not representable in Mercator) with the overlay box shrinking to match. Only
+the image is reprojected; hover, `Stats` and the filters keep reading the source grid.
+
+The knobs, on `addLayer(ds, { raster })` or `layer.render({ raster })`:
+
+| Key | Default | Notes |
+|---|---|---|
+| `strategy` | `'auto'` | `'image'` or `'tiles'` to force. `auto` picks by output size. |
+| `maxPixels` | `16e6` | Above this the plan asks for tiles. |
+| `maxDimension` | `8192` | Per-side limit; the largest safe canvas edge everywhere. |
+| `tileSize` | `256` | Carried on the plan for the tile backend. |
+| `mercator` | `true` | `false` for a provider that already draws plate carrée. |
+| `resample` | `'nearest'` | `'linear'` interpolates; nearest keeps classified values intact. |
+
+> **Tiles are not implemented yet.** When the plan says `tiles`, the image is still drawn — correctly
+> placed and aspect-preserved, but downsampled to fit the budget — with a `console.warn` and a
+> `layer:raster-oversized` host event. A baked image is also fixed in resolution, so zooming far past
+> what it was sized for magnifies pixels. See
+> [DECISIONS → raster overlays](../DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md).
 
 **Axis coordinates are epoch milliseconds**, not ISO strings — `select()`'s nearest-match is
 numeric-only, and that is what a time slider needs. The ISO timestamp is on each entry's `meta.time`,
