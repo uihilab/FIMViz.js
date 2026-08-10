@@ -5,18 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>FIMViz.js — a headless flood-inundation-map visualization engine</title>
 <meta name="description" content="A headless flood-inundation-map visualization engine for the browser: lazy Datasets, real spatial operations, colour scales and read-models, Google Maps or Leaflet — and no UI at all." />
+<link rel="icon" href="assets/brand/favicon.png" />
 <link rel="stylesheet" href="site.css" />
 </head>
 <body>
 
 <header class="topbar">
   <div class="wrap">
+    <a class="lab" href="https://hydroinformatics.tulane.edu" title="Hydroinformatics Lab">
+      <img src="assets/brand/hilab-logo.png" alt="Hydroinformatics Lab" />
+    </a>
     <a class="brand" href="index.html">FIM<span>Viz</span>.js</a>
     <nav>
       <a href="#examples">Examples</a>
       <a href="#guides">Guides</a>
       <a href="#api">API</a>
-      <a href="#design">Design</a>
       <a href="https://github.com/uihilab/FIMViz.js">GitHub</a>
     </nav>
   </div>
@@ -26,11 +29,11 @@
   <div class="wrap">
     <div>
       <span class="pill">● Not yet on npm — clone and build</span>
-      <h1>A flood-inundation-map engine<br /><span class="dim">that ships no user interface.</span></h1>
+      <h1>FIMViz.js: A flood-inundation-map engine<br /></h1>
       <p class="tagline">
-        Parse GeoTIFF, GeoJSON, shapefiles, NetCDF, GRIB2 or Zarr into a <b>lazy Dataset</b>; clip, mask,
+        Parse Vector, Raster, NetCDF, GRIB2 or Zarr into a <b>lazy Dataset</b>; clip, mask,
         reclassify, reproject and reduce it with real spatial operations; render it through Google Maps
-        or Leaflet. Every widget is yours to build — or to take, one at a time, from an opt-in toolkit.
+        or Leaflet. Quickly set up visualization and analysis elements for your web application.
       </p>
       <div class="cta">
         <a class="btn primary" href="examples/01-quickstart.html">Get started</a>
@@ -57,38 +60,30 @@
       <div>
 <pre><code>import { FimViz } from 'fimviz';
 
-// `provider` is required and has no default — the two
-// backends differ in credentials *and* in capability,
-// so the engine never picks one for you.
+// Mount the engine with your preferred map provider.
 const fim = await FimViz.mount('#map', { provider: 'leaflet' });
 
-// Header only. Nothing is decoded, and parsing never
-// reprojects: ds.crs is whatever the file itself declares.
+// Parse, transform and store your data in the application state
 const ds = await fim.addDataset(file);
 
-// This is the call that forces the chain — decode,
-// colorize, draw — and infers the layer type from ds.kind.
+// This is the call, decode, colorize and draw the layer.
 const layer = await fim.addLayer(ds);
 layer.fit();</code></pre>
       </div>
       <div>
         <div class="card" style="margin-bottom:14px">
-          <h3>Dataset — a lazy, immutable op chain</h3>
+          <h3>Dataset: a lazy, immutable op chain</h3>
           <p>A root wraps a source; every operation returns a <em>new</em> node. Nothing is fetched,
-             decoded or warped until a terminal forces it, and the result is memoized per node. That is
-             why an op is cheap, an original is never damaged, and one parse can feed a dozen
-             derivations.</p>
+             decoded or warped until it is rendered or accessed allowing increased efficiency in the browser.</p>
         </div>
         <div class="card" style="margin-bottom:14px">
-          <h3>Layer — one rendering of one or more Datasets</h3>
-          <p>Evented, provider-neutral, and it never names an element of yours. It emits; your UI
-             subscribes.</p>
+          <h3>Layer: one rendering of one or more Datasets</h3>
+          <p>Evented, map provider-neutral signature, and it never names an element of yours.</p>
         </div>
         <div class="card">
-          <h3>ColorScale — value to colour, and the read-models</h3>
-          <p>One mutable scale with three exclusive modes, from which <code>Legend</code> and
-             <code>Stats</code> are derived — so the legend, the histogram buckets and the pixels on
-             screen can never disagree.</p>
+          <h3>Scale, color palettes and Stats</h3>
+          <p>Each Layer is associated with <code>ColorScale</code>, <code>Legend</code> and
+             <code>Stats</code> objects for analyzing and modifying visuals of the data.</p>
         </div>
       </div>
     </div>
@@ -97,26 +92,21 @@ layer.fit();</code></pre>
 
 <section class="band">
   <div class="wrap">
-    <h2>What it is, and what it deliberately isn't</h2>
-    <p class="intro">Three decisions you will feel within ten minutes of using it.</p>
+    <h2>Library design principles</h2>
     <div class="grid c3">
       <div class="card">
         <h3>Headless, and enforced</h3>
-        <p>No widget markup, no CSS, no panels, and not one <code>window.foo()</code> call into your
-           app. The engine's only outbound channel is an event bus, and a source-scan test fails the
-           build if a core module reaches for the DOM or names a database.</p>
+        <p>Shipped free from UI dependencies with output you can build in your own web application.
+           Use the engine's event bus, to build reactive widgets. </p>
       </div>
       <div class="card">
         <h3>Lazy and immutable</h3>
-        <p><code>ds.clip(bbox).mask(poly).reclassify(rules)</code> does no work at all. The terminals —
-           <code>grid()</code>, <code>features()</code>, <code>load()</code>, or a Layer rendering it —
-           are what run the chain, once, and memoize it.</p>
+        <p>Chain functions like: <code>ds.clip(bbox).mask(poly).reclassify(rules)</code>. Functions return new Datasets, evaluated at render time
+           Results are chained, and memoized for efficient reuse.</p>
       </div>
       <div class="card">
-        <h3>It never guesses</h3>
-        <p>Parsing never reprojects. A raster in a CRS the provider cannot draw throws instead of
-           landing in the wrong place. A file with no usable extent throws instead of being placed
-           confidently and wrongly. An unknown palette throws with the list of real ones.</p>
+        <h3>Geospatial file controls</h3>
+        <p>With easy to reach and highly modifiable display operations for reprojection, reclassification,  resampling, recoloring and more.</p>
       </div>
     </div>
   </div>
@@ -125,7 +115,6 @@ layer.fit();</code></pre>
 <section class="band">
   <div class="wrap">
     <h2>The object model</h2>
-    <p class="intro">Small on purpose: two decoded value types, one rendering object, three read-models.</p>
     <div class="split">
       <figure class="model">
         <svg viewBox="0 0 560 260" role="img" aria-label="Source bytes become a Dataset, which forces to a grid or features, which a Layer renders through a map provider; a ColorScale derives a Legend and Stats.">
@@ -135,7 +124,8 @@ layer.fit();</code></pre>
             </marker>
           </defs>
           <g fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55" marker-end="url(#a)">
-            <path d="M104,44 H168" /><path d="M266,44 H330" /><path d="M428,44 V96" />
+            <path d="M104,44 H168" />
+            <path d="M266,44 H330" /><path d="M266,44 L330,114" />
             <path d="M104,150 H168" /><path d="M266,150 H330" /><path d="M266,150 L330,206" />
             <path d="M212,68 V126" />
           </g>
@@ -159,6 +149,8 @@ layer.fit();</code></pre>
             <g fill="currentColor" opacity=".6" font-size="10.5">
               <text x="136" y="38">parse</text>
               <text x="298" y="38">force</text>
+              <text x="296" y="66">or</text>
+              <text x="205" y="102" text-anchor="end">sources</text>
               <text x="136" y="144">attach</text>
               <text x="298" y="144">draw</text>
               <text x="317" y="196" text-anchor="end">derive</text>
@@ -251,8 +243,7 @@ layer.fit();</code></pre>
 <section class="band" id="examples">
   <div class="wrap">
     <h2>Examples</h2>
-    <p class="intro">Six runnable pages. Each explains what it is doing beside the code that does it,
-       and the code runs on the page as you read.</p>
+    <p class="intro">Runnable example pages with code and markup with explanation of operations and outputs.</p>
     <div class="grid c3">
       <a class="card" href="examples/01-quickstart.html">
         <h3><span class="num">01</span>Quickstart</h3>
@@ -317,8 +308,6 @@ layer.fit();</code></pre>
 <section class="band" id="api">
   <div class="wrap">
     <h2>API reference</h2>
-    <p class="intro">Generated from the library's own JSDoc — every parameter, every return type,
-       with search.</p>
     <div class="split">
       <div>
         <p class="muted" style="margin-top:0">
@@ -340,44 +329,23 @@ layer.fit();</code></pre>
   </div>
 </section>
 
-<section class="band" id="design">
-  <div class="wrap">
-    <h2>Design &amp; direction</h2>
-    <p class="intro">Why the library has the shape it has, what was rejected, and what is still open.</p>
-    <div class="grid c2">
-      <a class="card" href="guides/class-diagram.html">
-        <h3>Class diagram</h3>
-        <p>The object model as UML — what owns what, what derives from what, and the build status of
-           every class.</p>
-      </a>
-      <a class="card" href="guides/decisions.html">
-        <h3>Decisions &amp; tradeoffs</h3>
-        <p>The consolidated history: what was decided and why, what was considered and rejected, what
-           is built, and what is knowingly incomplete.</p>
-      </a>
-      <a class="card" href="guides/roadmap.html">
-        <h3>Package roadmap</h3>
-        <p>Forward design for capabilities we want — each hanging off an existing seam, with the landed
-           slices marked.</p>
-      </a>
-      <a class="card" href="guides/case-studies.html">
-        <h3>Case studies</h3>
-        <p>Ten end-to-end demos against real public data, each scored against what actually ships
-           today rather than what is designed for.</p>
-      </a>
-    </div>
-  </div>
-</section>
-
 <footer class="site">
   <div class="wrap">
-    <span>ISC licensed</span>
-    <span>·</span>
-    <a href="https://github.com/uihilab/FIMViz.js">github.com/uihilab/FIMViz.js</a>
-    <span>·</span>
-    <span>University of Iowa Hydroinformatics Lab</span>
-    <span class="sep"><a href="https://github.com/uihilab/SciWrid-Toolkit">SciWrid Toolkit</a> reads the
-      multi-dimensional formats</span>
+    <a class="lab" href="https://hydroinformatics.tulane.edu" title="Hydroinformatics Lab">
+      <img src="assets/brand/hilab-logo.png" alt="Hydroinformatics Lab" />
+    </a>
+    <div class="colophon">
+      <b>FIMViz.js</b> — a headless flood-inundation-map visualization engine, built by the
+      <a href="https://hydroinformatics.tulane.edu">Hydroinformatics Lab</a>.
+      ISC licensed · <a href="https://github.com/uihilab/FIMViz.js">source on GitHub</a> ·
+      the multi-dimensional formats are read by
+      <a href="https://github.com/uihilab/SciWrid-Toolkit">SciWrid Toolkit</a>.
+    </div>
+    <nav>
+      <a href="examples/01-quickstart.html">Examples</a>
+      <a href="guides/usage.html">Guides</a>
+      <a href="api/index.html">API reference</a>
+    </nav>
   </div>
 </footer>
 

@@ -4,22 +4,17 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>FIMViz — 2. Datasets &amp; operations</title>
+<link rel="icon" href="../assets/brand/favicon.png" />
+<link rel="stylesheet" href="../site.css" />
 <style>
-  :root { --bg:#0f1216; --panel:#161b22; --code:#0b0e13; --line:#2b3440; --fg:#e6edf3; --dim:#8b949e;
-          --accent:#58a6ff; --ok:#3fb950; --bad:#f85149; --warn:#d29922; }
-  @media (prefers-color-scheme:light) {
-    :root { --bg:#fff; --panel:#f6f8fa; --code:#f6f8fa; --line:#d0d7de; --fg:#1f2328; --dim:#59636e; }
-  }
-  * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--fg);
          font:15px/1.65 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-  header { border-bottom:1px solid var(--line); padding:28px 24px 22px; }
-  .wrap { max-width:1180px; margin:0 auto; }
+  header.pagehead { border-bottom:1px solid var(--line); padding:26px 0 22px; }
   h1 { margin:0 0 6px; font-size:23px; letter-spacing:-.01em; }
   .lead { margin:0; color:var(--dim); max-width:82ch; }
   .setup { margin:14px 0 0; padding:9px 13px; border:1px solid var(--line); border-left:3px solid var(--accent);
            border-radius:6px; background:var(--panel); font-size:13px; color:var(--dim); max-width:82ch; }
-  main { display:grid; grid-template-columns:minmax(0,1fr) 440px; gap:30px; padding:22px 24px 80px; }
+  main { display:grid; grid-template-columns:minmax(0,1fr) 440px; gap:30px; padding:22px 0 80px; }
   @media (max-width:1000px) { main { grid-template-columns:1fr; } }
   section { padding:22px 0 4px; border-top:1px solid var(--line); }
   section:first-child { border-top:0; padding-top:8px; }
@@ -45,7 +40,7 @@
   label.ctl { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--dim); }
   input[type=number] { width:74px; background:var(--bg); color:var(--fg); border:1px solid var(--line);
                        border-radius:6px; padding:4px 6px; font:inherit; font-size:13px; }
-  aside { position:sticky; top:22px; align-self:start; }
+  aside { position:sticky; top:76px; align-self:start; }
   .maptitle { font:600 10.5px/1 ui-sans-serif,system-ui; letter-spacing:.09em; text-transform:uppercase;
               color:var(--dim); margin:0 0 6px; display:flex; justify-content:space-between; }
   .mapbox { height:236px; border:1px solid var(--line); border-radius:10px; overflow:hidden;
@@ -56,13 +51,28 @@
   th, td { border:1px solid var(--line); padding:4px 8px; text-align:right; }
   th { color:var(--dim); font-weight:600; text-align:right; background:var(--panel); }
   th:first-child, td:first-child { text-align:left; }
-  nav.more { border-top:1px solid var(--line); padding:18px 24px 40px; font-size:13px; color:var(--dim); }
+  nav.more { border-top:1px solid var(--line); padding:18px 0 30px; font-size:13px; color:var(--dim); }
   nav.more a { color:var(--accent); }
 </style>
 </head>
 <body>
 
-<header class="wrap">
+<header class="topbar">
+  <div class="wrap">
+    <a class="lab" href="https://hydroinformatics.tulane.edu" title="Hydroinformatics Lab">
+      <img src="../assets/brand/hilab-logo.png" alt="Hydroinformatics Lab" />
+    </a>
+    <a class="brand" href="../index.html">FIM<span>Viz</span>.js</a>
+    <nav>
+      <a href="01-quickstart.html">Examples</a>
+      <a href="../guides/usage.html">Guides</a>
+      <a href="../api/index.html">API</a>
+      <a href="https://github.com/uihilab/FIMViz.js">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<header class="wrap pagehead">
   <h1>2 · Datasets &amp; operations</h1>
   <p class="lead">
     A <code>Dataset</code> is not a decoded raster — it is a <b>lazy, immutable node in an op chain</b>.
@@ -799,5 +809,22 @@ $("#btn-pure").addEventListener("click", async () => {
   busy(false);
 });
 </script>
+<footer class="site">
+  <div class="wrap">
+    <a class="lab" href="https://hydroinformatics.tulane.edu" title="Hydroinformatics Lab">
+      <img src="../assets/brand/hilab-logo.png" alt="Hydroinformatics Lab" />
+    </a>
+    <div class="colophon">
+      <b>FIMViz.js</b> — a headless flood-inundation-map visualization engine, built by the
+      <a href="https://hydroinformatics.tulane.edu">Hydroinformatics Lab</a>.
+      ISC licensed · <a href="https://github.com/uihilab/FIMViz.js">source on GitHub</a>.
+    </div>
+    <nav>
+      <a href="01-quickstart.html">Examples</a>
+      <a href="../guides/usage.html">Guides</a>
+      <a href="../api/index.html">API reference</a>
+    </nav>
+  </div>
+</footer>
 </body>
 </html>

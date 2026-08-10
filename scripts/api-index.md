@@ -1,10 +1,16 @@
 # FIMViz.js — API reference
 
 Generated from the library's own JSDoc: every parameter, every return type, for the public surface and
-for the seams a host implements. The narrative counterpart is the
-[usage guides](../guides/usage.html); the runnable one is the
-[examples](../examples/01-quickstart.html), and the
-[home page](../index.html#api) links the classes most people arrive looking for.
+for the seams a host implements. The narrative counterpart is the **usage guides**, the runnable one is
+the **examples**, and the **home page** links the classes most people arrive looking for — all three
+are in the header above.
+
+<!-- Those three are deliberately NOT links here. typedoc treats a relative href in a document as an
+     asset to resolve: a path that exists gets COPIED into api/media/ (a stale duplicate of the page),
+     and one that does not gets a warning. The header's navigationLinks are depth-rewritten by
+     scripts/build-site.mjs instead, which is the only way these resolve correctly from a nested
+     class page. -->
+
 
 ## Reading the modules below
 

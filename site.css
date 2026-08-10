@@ -18,7 +18,9 @@
 
 * { box-sizing:border-box; }
 html { scroll-behavior:smooth; }
-body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.65 var(--sans);
+/* A column, so the footer sits at the bottom of a short page instead of floating mid-screen. */
+body { margin:0; min-height:100vh; display:flex; flex-direction:column;
+       background:var(--bg); color:var(--fg); font:16px/1.65 var(--sans);
        -webkit-font-smoothing:antialiased; }
 a { color:var(--accent); text-decoration:none; }
 a:hover { text-decoration:underline; }
@@ -33,15 +35,40 @@ hr { border:0; border-top:1px solid var(--line); margin:34px 0; }
 .muted { color:var(--dim); }
 .mono { font-family:var(--mono); }
 
-/* ── top bar ─────────────────────────────────────────────────────────────────────────────── */
+/* ── shared chrome: the same top bar and footer on every page ────────────────────────────────
+ *
+ * The lab mark sits on a white chip in BOTH themes. Its wordmark is black artwork on transparency,
+ * so on the dark theme it would otherwise disappear entirely, and an `invert()` filter would take the
+ * red/blue molecule with it. A chip is what the lab's own lockup does anyway. */
 .topbar { position:sticky; top:0; z-index:20; background:color-mix(in srgb, var(--bg) 88%, transparent);
           backdrop-filter:blur(8px); border-bottom:1px solid var(--line); }
-.topbar .wrap { display:flex; align-items:center; gap:20px; height:56px; }
-.brand { font:600 15px/1 var(--mono); color:var(--fg); letter-spacing:-.01em; }
+.topbar .wrap { display:flex; align-items:center; gap:14px; height:60px; }
+.lab { display:inline-flex; align-items:center; background:#fff; border-radius:6px;
+       padding:5px 8px; line-height:0; flex-shrink:0; }
+.lab img { height:20px; width:auto; display:block; }
+.lab:hover { box-shadow:0 0 0 1px var(--accent); }
+.topbar .brand { font:600 15px/1 var(--mono); color:var(--fg); letter-spacing:-.01em;
+                 padding-left:14px; border-left:1px solid var(--line); }
 .brand span { color:var(--accent); }
 .topbar nav { margin-left:auto; display:flex; gap:18px; font-size:14px; }
 .topbar nav a { color:var(--dim); }
 .topbar nav a:hover { color:var(--fg); text-decoration:none; }
+@media (max-width:620px) {
+  .topbar .wrap { gap:10px; }
+  .topbar .brand { padding-left:10px; }
+  .topbar nav { gap:12px; font-size:13px; }
+}
+
+footer.site { border-top:1px solid var(--line); margin-top:auto; padding:30px 0 44px;
+              font-size:13.5px; color:var(--dim); }
+footer.site .wrap { display:flex; gap:22px; align-items:flex-start; flex-wrap:wrap; }
+footer.site .colophon { max-width:52ch; }
+footer.site .colophon b { color:var(--fg); }
+footer.site nav { margin-left:auto; display:flex; flex-direction:column; gap:6px; text-align:right; }
+@media (max-width:620px) { footer.site nav { margin-left:0; text-align:left; } }
+
+/* Anchored headings must clear the sticky bar. */
+:target { scroll-margin-top:76px; }
 
 /* ── hero ────────────────────────────────────────────────────────────────────────────────── */
 .hero { padding:56px 0 44px; border-bottom:1px solid var(--line); }
@@ -107,10 +134,6 @@ figure.model { margin:0; border:1px solid var(--line); border-radius:var(--radiu
                background:var(--panel); }
 figure.model svg { width:100%; height:auto; display:block; }
 figure.model figcaption { margin-top:14px; font-size:13.5px; color:var(--dim); }
-
-footer.site { padding:34px 0 60px; font-size:13.5px; color:var(--dim); }
-footer.site .wrap { display:flex; gap:22px; flex-wrap:wrap; align-items:center; }
-footer.site .sep { margin-left:auto; }
 
 /* ── generated guide pages ───────────────────────────────────────────────────────────────── */
 .guide { display:grid; grid-template-columns:250px minmax(0,1fr); gap:44px; padding:34px 0 90px; }
