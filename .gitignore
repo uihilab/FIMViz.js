@@ -2,3 +2,11 @@ node_modules
 
 # Build output — regenerate with `npm run build`
 dist
+
+# The site — regenerate with `npm run site`. `api/` and `guides/` are generated INTO the repo root,
+# because the root is the site: that is what lets `npx serve .` serve every link, the API reference
+# and the guides included. `.site/` is the publishable subset the Pages workflow uploads.
+# (docs/api/ is different — that one is committed markdown, read in the repository.)
+/api/
+/guides/
+.site

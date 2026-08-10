@@ -21,15 +21,18 @@ The package is a **headless flood-visualization engine**. Two ways to use it:
 > [UI.md](./UI.md) (the opt-in headless UI module — toast/tooltip/info-window/tools-panel/
 > region-draw/operations-panel).
 
-**Try it:** serve the repo root (`npx serve .`) and open [`examples/test.html`](../../examples/test.html) for a
-smoke test, [`examples/api-test.esm.html`](../../examples/api-test.esm.html) for the full bench, or
-[`examples/method-playground.html`](../../examples/method-playground.html) for every public method with sample
-parameters.
+**Try it:** serve the repo root (`npx serve .`) and open
+[`examples/01-quickstart.html`](../../examples/01-quickstart.html). Six runnable pages cover the
+package end to end — quickstart, [Dataset operations](../../examples/02-datasets-and-ops.html),
+[colour and the read-models](../../examples/03-color-and-read-models.html),
+[temporal data](../../examples/04-temporal.html), [the UI module](../../examples/05-ui-toolkit.html)
+and [storage](../../examples/06-storage-and-records.html) — each explaining what it is doing beside
+the code that does it. See [examples/README.md](../../examples/README.md).
 
 ## Contents
 
 [Install](#install--import) · [Booting the widget](#booting-the-widget) · [`FimViz`](#fimviz-namespace) ·
-[`FimMap`](#fimmap-instance) · [Configuration](#configuration) · [Events](#events) · [`Dataset`](#dataset) ·
+[`FimMap`](#fimmap-instance-from-mountcreate) · [Configuration](#configuration) · [Events](#events) · [`Dataset`](#dataset) ·
 [`warp`](#warp) · [`Storage`](#storage) · [`ColorScale`](#colorscale) · [Palettes](#palettes) ·
 [`Legend`](#legend) · [`Stats`](#stats) · [Filters](#filters) · [`Layer`](#layer) ·
 [From file to rendered layer](#from-file-to-rendered-layer) ·
@@ -216,12 +219,12 @@ level or ensemble member. NetCDF3 needs none of these in practice: its extent an
 from the file's own CF coordinate variables by `io/netcdf3.js`, the one container format FIMViz parses
 itself (header only, and only for files it fully recognises). See
 [DATASET_OPERATIONS.md → Reading NetCDF / GRIB2 / Zarr](./DATASET_OPERATIONS.md#reading-netcdf--grib2--zarr)
-and the live page at `examples/temporal-netcdf.html`.
+and the live page at `examples/04-temporal.html`.
 
 > **One packaging caveat.** The reader for these four formats is a ~193 KB-wasm dependency that is
 > **external** to `dist/fimviz.js`: nothing is downloaded unless one of these files is actually
 > opened, and nothing at all is bundled. A bundler consumer needs `sciwrid-toolkit` installed; a raw
-> `<script type="module">` page needs an import-map entry for it (see `examples/temporal-netcdf.html`).
+> `<script type="module">` page needs an import-map entry for it (see `examples/04-temporal.html`).
 > Without either, only these formats fail, and the thrown error says exactly this.
 
 ### `FimVizInstance` (via `FimViz.current()` or `fim.app`)
@@ -339,8 +342,8 @@ conventions the reference app uses.
 **The engine names no element of yours.** It never looks up an id, sets a `style`, or writes text into
 your page — it reports *what happened* and you decide what that looks like. `busy` is the clearest case:
 the engine says it is working, and whether that means a spinner, a cursor or nothing is entirely yours.
-`examples/depth-events.html` is a host with none of the reference app's markup, driving its own spinner,
-hover readout and legend from these events alone.
+`examples/05-ui-toolkit.html` drives a spinner, a hover readout, a legend and a stats panel from these
+events alone, using nothing but the widgets in `fimviz/ui`.
 
 ---
 

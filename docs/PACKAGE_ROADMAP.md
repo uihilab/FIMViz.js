@@ -259,7 +259,7 @@ Contents by coupling:
   (§8): scrubbing is `layer.setSources([ds.select(coord)])`, so it drives stage/level/band/member as
   readily as time and is deliberately NOT named after the temporal case. It owns the two things that
   are easy to get wrong — dropping a stale frame, and pacing playback by the decode rather than by a
-  timer — so `temporal-netcdf.html` no longer hand-rolls either.
+  timer — so `examples/04-temporal.html` no longer hand-rolls either.
 - **Read-model renderers** — `renderLegend(legend, {html})`/`renderStats(stats, {html})`, thin over
   `Legend.toHtml()` / a stats table. Ensemble & comparison "legends" are just `getLegend().toJSON()`/
   `.toHtml()`. ✅ `bindLegend`/`bindStats` add the LIVE half: the same renderers mounted and kept
@@ -282,7 +282,7 @@ default `false`** (mechanism stays, imposition goes).
 3. **UI module** — `createToast`, `createTooltip`, marker info window, `createToolsPanel` +
    `rasterControls`/`vectorControls`, `renderLegend`/`renderStats`.
 4. **Exclusivity → opt-in** — `Layer.exclusive` defaults `false`.
-5. **Example** — `examples/ui-tools.html`: the manual acceptance check for the browser-only paths.
+5. **Example** — `examples/05-ui-toolkit.html`: the manual acceptance check for the browser-only paths.
 
 ✅ **Landed:** all of the above, plus **simultaneous mode** (§1), **modal capture / region-draw**
 (`captureInteraction`/`releaseInteraction` + `ui/regionDraw.js` → a `SpatialFilter` scoping
@@ -624,7 +624,7 @@ things, and separating them costs nothing:
   `await import(c)` on a **variable**, which a bundler compiles into a build-time lookup that can never
   reach the CDN, and its wasm/worker resolve against its own `import.meta.url`. Marking it external
   emits a bare `import("sciwrid-toolkit")` that the consumer's import map or bundler resolves to the
-  package's own browser build — the arrangement `examples/temporal-netcdf.html` already used by hand.
+  package's own browser build — the arrangement `examples/04-temporal.html` already used by hand.
   The cost is a resolution requirement on consumers, isolated to these four formats and named by the
   error thrown when it isn't met.
 - **The vendor name is gone from every user-facing string.** Which reader decodes a NetCDF is our

@@ -816,6 +816,14 @@ own runtime from its own composition root.
 Recorded because it's easy to lose track of what's been confirmed by hand vs. only by `npm test`, which
 does not cover `google.maps` rendering, Leaflet, canvas, or the GDAL WASM warp.
 
+> **Note on the page names below.** `examples/` was rebuilt as six explanatory notebooks
+> (`01-quickstart` … `06-storage-and-records`), replacing the fourteen ad-hoc pages and the guided
+> `verify.html` checklist this section was written against. The findings stand; the page names are
+> historical. `05-ui-toolkit.html` now covers what `ui-tools.html` and `verify.html` covered between
+> them, and `04-temporal.html` replaces `temporal-netcdf.html` — but the **Pass/Fail capture and the
+> Markdown report are gone**, so a release pass is now "open the six pages and look", with no
+> recorded verdicts.
+
 **Discharged on Leaflet** by a headless-Chrome pass over every page in `examples/` — all 14 load with a
 clean console, and `ui-tools.html` + `temporal-netcdf.html` were driven end to end (file load → tools
 panel → legend/stats → hover → dispatch → region draw → scoped stats; and scan → scrub → `reduce`
@@ -847,7 +855,8 @@ headless by design.
   separate "Draw" button was the wrong shape; picking a tool now arms it. `UI.md` states the rule
   explicitly, because any host can build the same trap.
 
-**Open — region draw drops its first vertex.** Driving step 8 of `verify.html` with four clicks records
+**Open — region draw drops its first vertex.** Driving the selection step of the (now removed)
+`verify.html` with four clicks records
 only three, and the recorded ring is the *last three* corners: the first click after
 `createRegionDraw().start()` never reaches the capture handler. A user clicking the minimum three
 points therefore gets two and is told "need ≥3 points", which reads as the tool being broken. A second
@@ -925,9 +934,12 @@ every global raster depend on a ~38 MB wasm download to do four lines of trigono
 the GDAL WASM reproject forced at a real terminal, and the `http://[::1]:PORT` loopback fix (confirm
 data actually fetches over IPv6 loopback, not just `localhost`).
 
-`examples/verify.html` is the guided pass for the parts that need a human eye — legibility, tooltip
-tracking, gradient rendering, dispatch order, modal capture. It carries its own instructions and emits
-a Markdown report; see [examples/README.md](../examples/README.md).
+The parts that need a human eye — legibility, tooltip tracking, gradient rendering, dispatch order,
+modal capture — are exercised by `examples/05-ui-toolkit.html`, which mounts every `fimviz/ui` widget
+on one map. **There is no longer a guided checklist**: `verify.html`, which numbered those checks and
+captured Pass/Fail into a Markdown report, was removed with the example rebuild. Its checks now have
+to be remembered rather than read, which is a real regression in release discipline and worth
+restoring if browser passes become routine. See [examples/README.md](../examples/README.md).
 
 ### 5.4 Bigger, further-out additions
 

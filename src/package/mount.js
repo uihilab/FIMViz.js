@@ -130,7 +130,7 @@ export function create(target, options = {}) {
     // A container that IS the map div already provides it. Injecting another `<div id="map">` inside
     // it put TWO nodes with the same id in the document, so `document.getElementById("map")` and
     // `container.querySelector('#map')` disagreed about which one the map lived in — a real
-    // collision, since `mount("map", …)` is the obvious thing to write (examples/ui-tools.html does).
+    // collision, since `mount("map", …)` is the obvious thing to write.
     // Only for the bare-engine path: with a runtime there is a real widget to inject, and the host
     // owns its own container naming.
     const containerIsMapDiv = !hasRuntime && container.id === "map";

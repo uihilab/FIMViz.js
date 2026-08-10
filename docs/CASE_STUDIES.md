@@ -284,7 +284,7 @@ through a CORS proxy.
 `ds.reduce('sum')` collapses it with no new grid math — verified against a real
 120-step NLDAS-2 file (roadmap §8). A rolling 7-day window is expressible without
 `selectRange`: select the seven entries and `a.combine([...six], { op: 'sum' })`.
-[examples/temporal-netcdf.html](../examples/temporal-netcdf.html) is the working
+[examples/04-temporal.html](../examples/04-temporal.html) is the working
 time-slider pattern.
 
 **Missing:**

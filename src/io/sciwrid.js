@@ -53,7 +53,7 @@ async function sciwrid() {
       throw new Error("parseFile: this format needs the 'sciwrid-toolkit' reader, which could not be " +
         "loaded. Under Node/a bundler it is vendored as vendor/sciwrid-toolkit-<version>.tgz and " +
         "installed by `npm install`; in a raw browser page it needs an import map entry pointing at " +
-        "node_modules/sciwrid-toolkit/dist/index.js (see examples/temporal-netcdf.html). " +
+        "node_modules/sciwrid-toolkit/dist/index.js (see examples/04-temporal.html). " +
         `Underlying error: ${e.message}`);
     }
   }

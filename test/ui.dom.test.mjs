@@ -1422,7 +1422,7 @@ describe("ui: createInfoWindow / propsTable / bindFeatureInfo", () => {
 });
 
 // The handle members that are easy to leave untested because nothing else exercises them: the
-// destroy()s and the passthrough properties. examples/ui-tools.html tracks the same list.
+// destroy()s and the passthrough properties. examples/05-ui-toolkit.html tracks the same list.
 describe("ui: every handle member", () => {
   test("createTooltip and createInfoWindow both destroy()", () => {
     const tip = UI.createTooltip({ root: host() });

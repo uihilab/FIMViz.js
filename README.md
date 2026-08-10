@@ -126,15 +126,18 @@ declared leading dimension, with `axis.unit === 'index'` so a UI can tell it apa
 Their decoder carries a ~193 KB wasm, so it is **external to the bundle and loaded on demand**: a
 consumer who never opens one of these files downloads nothing for them, and a page that does needs
 `sciwrid-toolkit` resolvable (an npm dependency under a bundler, an import-map entry in a raw browser
-page — see `examples/temporal-netcdf.html`).
+page — see `examples/04-temporal.html`).
 
 Every `Dataset` op, `Stats`, `ColorScale` and `Legend` work on the result unchanged. Scope and the
 grid geometries that need a manual extent are in
 [PACKAGE_ROADMAP.md §8.1](docs/PACKAGE_ROADMAP.md#81-which-grids-we-actually-support-scope-and-the-silent-failure-guard);
-`examples/temporal-netcdf.html` is a live page (scrub, play, reduce) with NetCDF4/Zarr/GRIB2 samples.
+`examples/04-temporal.html` is a live page (scrub, play, reduce) with NetCDF4/Zarr/GRIB2 samples.
 
 ## Docs
 
+- **Examples** — six runnable pages that explain what they are doing beside the code that does it:
+  [examples/](examples/), starting at
+  [examples/01-quickstart.html](examples/01-quickstart.html).
 - **API reference** (generated): [docs/api/](docs/api/) — run `npm run docs:api` to regenerate.
 - **Usage guides**: [docs/usage/USAGE.md](docs/usage/USAGE.md) and the rest of
   [docs/usage/](docs/usage/) — configuration, events, layers, storage, color scales, and more.
@@ -142,6 +145,27 @@ grid geometries that need a manual extent are in
   [docs/CLASS_DIAGRAM.md](docs/CLASS_DIAGRAM.md),
   [docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md](docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md),
   and [docs/PACKAGE_ROADMAP.md](docs/PACKAGE_ROADMAP.md).
+
+### The site
+
+`index.html` + `site.css` are the project's GitHub Pages home page, and the repository root *is* the
+site: `examples/`, `dist/`, `assets/`, plus the generated `api/` and `guides/`, all sit where the
+pages expect them.
+
+```bash
+npm run site       # build → typedoc → assemble
+npx serve .        # the whole site, every link live, at http://localhost:3000
+```
+
+`npm run site` builds the bundles, writes the HTML API reference to `api/`, renders the markdown docs
+to `guides/`, and assembles `.site/` — the publishable subset (the landing page, examples, guides,
+API, `dist/`, and only the sample files the pages actually name; no `src/`, `docs/`, `test/` or
+`vendor/`). `api/`, `guides/`, `dist/` and `.site/` are all gitignored build output; the committed
+markdown under `docs/` is the source they are generated from.
+
+`.github/workflows/pages.yml` runs the same command on a push to `main` and publishes `.site/`. A
+build step is required because `dist/` is gitignored — a site served straight from the repository
+would have no bundle for the examples to load.
 
 ## License
 

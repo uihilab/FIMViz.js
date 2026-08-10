@@ -13,7 +13,7 @@ on the wrong kind.
 [Raster — unary](#raster--unary) · [Raster — binary / N-ary](#raster--binary--n-ary) ·
 [Vector](#vector--the-one-kind-changing-op) · [Notes](#notes) ·
 [Standalone grid functions](#standalone-grid-functions-no-dataset-needed) ·
-[Standalone reproject()](#standalone-reproject-distinct-from-datasetreproject) ·
+[Standalone warp()](#standalone-warp-the-eager-twin-of-datasetreproject) ·
 [Vendored primitives](#vendored-primitives) ·
 [GDAL escape hatch (callGdal)](#gdal-escape-hatch-callgdal)
 
@@ -121,7 +121,7 @@ Under it is [SciWrid Toolkit](https://github.com/uihilab/SciWrid-Toolkit), reach
 import and left **external to the bundle**, so its ~193 KB wasm is downloaded only by a page that
 actually opens one of these files, and is never bundled into `dist/fimviz.js`. The consequence for a
 consumer is that `sciwrid-toolkit` must be *resolvable* — an npm dependency under a bundler, an
-import-map entry in a raw browser page (`examples/temporal-netcdf.html` shows one). Only these four
+import-map entry in a raw browser page (`examples/04-temporal.html` shows one). Only these four
 formats depend on it, and the thrown error says so.
 
 One call covers every format — the differences live inside the adapter (GRIB2 reports `nx`/`ny`
@@ -282,7 +282,7 @@ await fim.addDataset(file, { grid: { bbox: [-180, -90, 180, 90] } });   // width
 ```
 
 The thrown error names the variable, its shape, and the variables present, so you can tell which case
-you are in. `examples/temporal-netcdf.html` has an "extent override" box that does exactly this.
+you are in. `examples/04-temporal.html` has an "extent override" box that does exactly this.
 
 ## Terminals (force the chain — nothing exists until one of these runs)
 

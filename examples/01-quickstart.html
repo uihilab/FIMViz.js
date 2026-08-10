@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — 1. Quickstart: a file on a map</title>
+<style>
+  :root { --bg:#0f1216; --panel:#161b22; --code:#0b0e13; --line:#2b3440; --fg:#e6edf3; --dim:#8b949e;
+          --accent:#58a6ff; --ok:#3fb950; --bad:#f85149; --warn:#d29922; }
+  @media (prefers-color-scheme:light) {
+    :root { --bg:#fff; --panel:#f6f8fa; --code:#f6f8fa; --line:#d0d7de; --fg:#1f2328; --dim:#59636e; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:15px/1.65 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { border-bottom:1px solid var(--line); padding:28px 24px 22px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  h1 { margin:0 0 6px; font-size:23px; letter-spacing:-.01em; }
+  .lead { margin:0; color:var(--dim); max-width:82ch; }
+  .setup { margin:14px 0 0; padding:9px 13px; border:1px solid var(--line); border-left:3px solid var(--accent);
+           border-radius:6px; background:var(--panel); font-size:13px; color:var(--dim); max-width:82ch; }
+  main { display:grid; grid-template-columns:minmax(0,1fr) 440px; gap:30px; padding:22px 24px 80px; }
+  @media (max-width:1000px) { main { grid-template-columns:1fr; } }
+  section { padding:22px 0 4px; border-top:1px solid var(--line); }
+  section:first-child { border-top:0; padding-top:8px; }
+  h2 { font-size:16px; margin:0 0 8px; }
+  h2 .n { color:var(--accent); font:600 13px/1 ui-monospace,Menlo,monospace; margin-right:8px;
+          border:1px solid var(--line); border-radius:5px; padding:3px 6px; }
+  p { margin:0 0 12px; max-width:78ch; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.9em;
+         background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:0 4px; }
+  pre { margin:0 0 12px; padding:12px 14px; border:1px solid var(--line); border-radius:8px;
+        background:var(--code); overflow:auto; font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  pre.out { background:var(--panel); color:var(--dim); max-height:280px; white-space:pre-wrap; }
+  pre.out.bad { color:var(--bad); border-color:var(--bad); }
+  .k { color:var(--dim); }           /* comment            */
+  .s { color:var(--ok); }            /* string             */
+  .f { color:var(--accent); }        /* call / identifier  */
+  .label { font:600 10.5px/1 ui-sans-serif,system-ui; letter-spacing:.09em; text-transform:uppercase;
+           color:var(--dim); margin:0 0 6px; }
+  .controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 12px; }
+  button { background:transparent; color:var(--accent); border:1px solid var(--line); border-radius:6px;
+           padding:5px 11px; font:inherit; font-size:13px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  select, input[type=number] { background:var(--bg); color:var(--fg); border:1px solid var(--line);
+           border-radius:6px; padding:4px 7px; font:inherit; font-size:13px; }
+  label.ctl { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--dim); }
+  input[type=range] { accent-color:var(--accent); }
+  aside { position:sticky; top:22px; align-self:start; }
+  #map { height:420px; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .readout { margin-top:10px; padding:10px 12px; border:1px solid var(--line); border-radius:8px;
+             background:var(--panel); font:12.5px/1.6 ui-monospace,Menlo,monospace; color:var(--dim); }
+  .readout b { color:var(--fg); font-weight:600; }
+  .legend-host { margin-top:10px; padding:0 2px; }
+  .pill { font-size:11px; border:1px solid var(--line); border-radius:999px; padding:2px 9px; color:var(--dim); }
+  .pill.ok { color:var(--ok); border-color:var(--ok); }
+  .pill.bad { color:var(--bad); border-color:var(--bad); }
+  nav.more { border-top:1px solid var(--line); padding:18px 24px 40px; font-size:13px; color:var(--dim); }
+  nav.more a { color:var(--accent); }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <h1>1 · Quickstart — from a file to a map</h1>
+  <p class="lead">
+    Four calls get a flood raster on screen: <code>mount</code>, <code>addDataset</code>,
+    <code>addLayer</code>, <code>fit</code>. Everything after that — recolouring, the legend, statistics,
+    a hover readout, a second vector layer — is built on the same three objects: a <b>Dataset</b> (the
+    parsed source), a <b>Layer</b> (one rendering of it) and a <b>ColorScale</b> (value → colour).
+  </p>
+  <p class="setup">
+    Run <code>npm run build</code>, serve the <em>repo root</em> (<code>npx serve .</code>) and open
+    <code>/examples/01-quickstart.html</code>. This page runs on Leaflet and needs no credentials; add
+    <code>?provider=google</code> to the URL to run the identical code on Google Maps (it asks once for a
+    key and keeps it in <code>localStorage</code>).
+  </p>
+</header>
+
+<main class="wrap">
+<div>
+
+  <section>
+    <h2><span class="n">1</span>Boot a map</h2>
+    <p>
+      <code>mount()</code> takes a container and a config, and resolves to a <code>FimMap</code> — the
+      per-map handle everything else hangs off. <code>provider</code> is <b>required and has no
+      default</b>: the two built-in backends differ in credentials <em>and</em> in capability, so the
+      engine refuses to pick one for you. Leaflet needs nothing; Google needs an <code>apiKey</code>.
+    </p>
+    <pre><span class="k">// The engine ships no UI. This mounts a real, working, empty map — nothing else.</span>
+<span class="f">import</span> { FimViz, ColorScale, Stats } <span class="f">from</span> <span class="s">"fimviz"</span>;
+
+<span class="k">// Omit `provider` and this throws `config-invalid` naming both backends.</span>
+<span class="k">// Omit the `apiKey` that 'google' requires and it throws the same error.</span>
+<span class="f">const</span> fim = <span class="f">await</span> FimViz.<span class="f">mount</span>(<span class="s">"#map"</span>, { provider: <span class="s">"leaflet"</span> });
+
+fim.map;      <span class="k">// the real L.Map (or google.maps.Map) — advisory, read-mostly</span>
+fim.config;   <span class="k">// this instance's config; the engine never reads an ambient one</span></pre>
+    <p class="label">Output</p>
+    <pre class="out" id="o-mount">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>Parse a file into a <code>Dataset</code></h2>
+    <p>
+      <code>addDataset()</code> takes a <code>File</code>, <code>Blob</code>, <code>ArrayBuffer</code> or
+      URL string, detects the format from the name, and returns a <b>lazy</b> <code>Dataset</code>. It
+      reads the header and stops there: <code>isMaterialized</code> is <code>false</code> and no pixel has
+      been decoded. Note also that <b>parsing never reprojects</b> — <code>ds.crs</code> is whatever the
+      file itself declares. This sample happens to be EPSG:4326, so it can be drawn as-is; a raster in
+      any other CRS has to be warped first (notebook 2).
+    </p>
+    <pre><span class="k">// A user upload would arrive as a File from an &lt;input&gt; or a drop; a fetched sample</span>
+<span class="k">// is the same thing, so this page wraps the bytes in a File to keep the shape honest.</span>
+<span class="f">const</span> res  = <span class="f">await</span> <span class="f">fetch</span>(<span class="s">"../assets/SampleFiles/4326.tif"</span>);
+<span class="f">const</span> file = <span class="f">new</span> <span class="f">File</span>([<span class="f">await</span> res.<span class="f">blob</span>()], <span class="s">"4326.tif"</span>);
+
+<span class="f">const</span> ds = <span class="f">await</span> fim.<span class="f">addDataset</span>(file);   <span class="k">// → Dataset, pushed onto fim.datasets</span>
+
+ds.<span class="f">toJSON</span>();          <span class="k">// the metadata view — no heavy `data` payload</span>
+ds.isMaterialized;   <span class="k">// false — the header was read, nothing was decoded</span></pre>
+    <p class="label">Output</p>
+    <pre class="out" id="o-parse">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>Render it, and fit the map to it</h2>
+    <p>
+      <code>addLayer()</code> constructs a layer and draws it. Passing the Dataset alone is enough — the
+      registry infers <code>'raster'</code> or <code>'vector'</code> from <code>ds.kind</code>. This is the
+      call that actually forces the chain: the file is decoded here, not in step 2.
+    </p>
+    <p>
+      Nothing said which colours to use, yet it draws. When a <code>RasterLayer</code> has no
+      <code>ColorScale</code> attached it resolves one and <b>keeps</b> it, so
+      <code>layer.colorScale</code>, <code>getLegend()</code> and <code>getStats()</code> always describe
+      what is actually on screen. The order is: an explicit scale you attached → a GDAL legend embedded in
+      the file → a continuous default ramp over the grid's own min/max. This file has no embedded legend,
+      so it lands on the default.
+    </p>
+    <pre><span class="f">const</span> layer = <span class="f">await</span> fim.<span class="f">addLayer</span>(ds);   <span class="k">// kind-inferred; decodes, colorizes, draws</span>
+layer.<span class="f">fit</span>();                            <span class="k">// move the camera to this layer's bounds</span>
+
+layer.colorScale.<span class="f">toJSON</span>();   <span class="k">// the auto-resolved default, ranged to the data</span>
+fim.layers;                    <span class="k">// [layer] — the per-map registry, bottom-up</span></pre>
+    <p class="label">Output</p>
+    <pre class="out" id="o-render">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span>Recolour it live</h2>
+    <p>
+      <code>layer.set()</code> is the one knob writer. Scale keys (<code>palette</code>,
+      <code>continuous</code>, <code>min</code>, <code>max</code>, <code>unit</code>) route to the attached
+      <code>ColorScale</code>; layer keys (<code>opacity</code>, <code>noData</code>, <code>hover</code>)
+      apply to the layer. A batch is <b>one</b> write and <b>one</b> repaint, not one per key — and an
+      unknown palette name throws with the list of real ones rather than silently falling back.
+    </p>
+    <pre>ColorScale.<span class="f">palettes</span>();   <span class="k">// → every ramp available: built-ins + anything registered</span>
+
+<span class="k">// One call, one repaint. `set` is partial/best-effort: if one key fails the</span>
+<span class="k">// others still apply, and a single aggregate error names which failed.</span>
+<span class="f">await</span> layer.<span class="f">set</span>({ palette: <span class="s">"viridis"</span>, continuous: <span class="f">true</span>, min: <span class="s">0</span>, max: <span class="s">10</span>, opacity: <span class="s">0.85</span> });
+
+<span class="k">// Registering your own ramp is two arguments — the library owns the mechanism,</span>
+<span class="k">// the host owns the specifics.</span>
+ColorScale.<span class="f">registerPalette</span>(<span class="s">"flood"</span>, [<span class="s">"#f7fbff"</span>, <span class="s">"#4292c6"</span>, <span class="s">"#08306b"</span>]);</pre>
+    <div class="controls">
+      <label class="ctl">palette <select id="pal"></select></label>
+      <label class="ctl"><input type="checkbox" id="cont" checked /> continuous</label>
+      <label class="ctl">opacity <input type="range" id="op" min="0" max="1" step="0.05" value="0.85" /></label>
+      <button id="btn-bad">try an unknown palette</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-color">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">5</span>The two read-models: <code>Legend</code> and <code>Stats</code></h2>
+    <p>
+      Both are derived, not stored. <code>getLegend()</code> is a view of the colour scale —
+      data-complete (<code>toJSON()</code>) with <code>toHtml()</code> as a convenience renderer.
+      <code>getStats()</code> is a single pass over the decoded pixels: min/max/mean/median/stddev, a
+      histogram, real ground area, and <code>byClass</code> counts bucketed by the same scale the map is
+      drawn with. Both re-derive after a recolour, which is why the panel below changes when you touch the
+      controls above.
+    </p>
+    <pre><span class="f">const</span> legend = layer.<span class="f">getLegend</span>();     <span class="k">// Legend — { unit, kind, source, stops }</span>
+legend.<span class="f">toHtml</span>();                       <span class="k">// a ready-made swatch list / gradient bar</span>
+
+<span class="f">const</span> stats = <span class="f">await</span> layer.<span class="f">getStats</span>();   <span class="k">// Stats — pure, terminal, serializable</span>
+stats.<span class="f">describe</span>();                     <span class="k">// a one-line human summary</span>
+stats.<span class="f">percentile</span>(<span class="s">95</span>);                 <span class="k">// p95 depth</span>
+stats.<span class="f">toCSV</span>();                        <span class="k">// …or hand it straight to a download</span></pre>
+    <div class="controls"><button id="btn-stats">recompute stats</button></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-read">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">6</span>Read a pixel under the cursor</h2>
+    <p>
+      <code>valueAt(lat, lng)</code> is the lookup; <code>enableHover()</code> wires it to the provider's
+      mousemove and emits a ready-to-display <code>hover</code> event. The engine names no element of
+      yours — it reports <em>what happened</em> and the page decides what that looks like, which is why
+      the readout below is three lines of page code.
+    </p>
+    <p>
+      Hit-testing is <b>pixel-level</b>, not bounding-box: <code>hitTest()</code> is true only over a real
+      non-noData pixel, so a click on a transparent part of the footprint falls through to whatever is
+      underneath. <b>Move the pointer over the raster</b> to see it.
+    </p>
+    <pre>layer.<span class="f">enableHover</span>({
+  <span class="k">// A domain rule, not a noData rule: zero depth means "not flooded here".</span>
+  isEmpty: (v) =&gt; v === <span class="s">0</span>,
+  formatValue: (v) =&gt; <span class="s">`${v.toFixed(2)} m`</span>,
+});
+
+layer.<span class="f">on</span>(<span class="s">"hover"</span>, ({ lat, lng, value, text }) =&gt; {
+  readout.textContent = <span class="s">`${text}  @ ${lat.toFixed(4)}, ${lng.toFixed(4)}`</span>;
+});</pre>
+    <div class="readout" id="hover-out">move the pointer over the raster…</div>
+  </section>
+
+  <section>
+    <h2><span class="n">7</span>A vector layer on the same map</h2>
+    <p>
+      Same two calls, different <code>kind</code>. Vector styling uses a <b>neutral vocabulary</b> —
+      <code>fillColor</code>, <code>fillOpacity</code>, <code>strokeColor</code>,
+      <code>strokeWidth</code>, <code>pointRadius</code> — that each provider translates into its own SDK
+      names, so one style object works on Google and Leaflet alike. Any key the vocabulary doesn't name
+      passes through untouched to the provider.
+    </p>
+    <p>
+      This sample is 99 Iowa counties, and the raster is in Mississippi, so the two layers do not overlap
+      — which makes <code>fit()</code> worth having. Click a county to resolve the feature under the
+      pointer with <code>featureAt()</code>.
+    </p>
+    <pre><span class="f">const</span> counties = <span class="f">await</span> fim.<span class="f">addDataset</span>(countyFile);   <span class="k">// GeoJSON → a vector Dataset</span>
+
+<span class="f">const</span> vec = <span class="f">await</span> fim.<span class="f">addLayer</span>(<span class="s">"vector"</span>, {
+  source: counties,
+  style: { fillColor: <span class="s">"#58a6ff"</span>, fillOpacity: <span class="s">0.15</span>,
+           strokeColor: <span class="s">"#58a6ff"</span>, strokeWidth: <span class="s">1</span> },
+});
+
+<span class="k">// Layer dispatch has to be turned on: hover/click are routed to layers by</span>
+<span class="k">// hit-test and z-order, and a layer nobody listens to shouldn't pay for it.</span>
+fim.<span class="f">enableMapEvents</span>([<span class="s">"click"</span>, <span class="s">"hover"</span>]);
+fim.<span class="f">on</span>(<span class="s">"map:click"</span>, ({ lat, lng }) =&gt; vec.<span class="f">featureAt</span>(lat, lng));</pre>
+    <div class="controls">
+      <button id="btn-vec">add the county layer</button>
+      <button id="btn-fit-r">fit the raster</button>
+      <button id="btn-fit-v">fit the counties</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-vec">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">8</span>Teardown</h2>
+    <p>
+      <code>layer.remove()</code> tears the overlay down, fires <code>removed</code> synchronously and
+      drops the layer from <code>fim.layers</code>. The <b>Dataset survives</b>: the registry records what
+      was parsed, the reference count records what is rendered, and only the latter is affected. Re-adding
+      a layer for the same Dataset re-forces it from bytes it already holds.
+    </p>
+    <pre>fim.<span class="f">on</span>(<span class="s">"layers:changed"</span>, ({ reason, layer }) =&gt; refreshMyList());
+
+layer.<span class="f">remove</span>();                       <span class="k">// teardown + 'removed' + drop from fim.layers</span>
+layer.<span class="f">remove</span>({ purgeSource: <span class="f">true</span> });   <span class="k">// …and unregister sources nothing else holds</span>
+
+fim.<span class="f">removeDataset</span>(ds);               <span class="k">// throws while a layer still renders it</span>
+fim.<span class="f">removeDataset</span>(ds, { force: <span class="f">true</span> });
+
+fim.<span class="f">destroy</span>();                       <span class="k">// detach the map, release it from its app</span></pre>
+    <div class="controls">
+      <button id="btn-rm">remove the raster layer</button>
+      <button id="btn-readd">add it back</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-teardown">…</pre>
+  </section>
+
+</div>
+
+<aside>
+  <div id="map"></div>
+  <div class="readout" id="side-note">
+    <b id="prov-name">…</b> · <span id="layer-count">0 layers</span>
+  </div>
+  <div class="legend-host" id="legend-host"></div>
+</aside>
+</main>
+
+<nav class="more wrap">
+  Next: <a href="02-datasets-and-ops.html">2 · Datasets &amp; operations</a> —
+  the lazy op chain, clip/mask/reclassify, terrain, band math, zonal statistics and the GDAL warp.
+</nav>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js"
+} }
+</script>
+
+<script type="module">
+import { FimViz, ColorScale, Layer } from "fimviz";
+
+const $ = (s) => document.querySelector(s);
+const show = (sel, v, bad = false) => {
+  const el = $(sel);
+  el.className = "out" + (bad ? " bad" : "");
+  el.textContent = typeof v === "string" ? v : JSON.stringify(v, null, 2);
+};
+const round = (n, d = 3) => (typeof n === "number" && Number.isFinite(n) ? +n.toFixed(d) : n);
+
+// A user's file would arrive from an <input> or a drop; fetching a bundled sample and wrapping it in
+// a File keeps the shape identical, so nothing on this page is a special case.
+async function sample(name) {
+  const res = await fetch(`../assets/SampleFiles/${name}`);
+  if (!res.ok) throw new Error(`${name}: HTTP ${res.status} — serve the REPO ROOT, not /examples`);
+  return new File([await res.blob()], name);
+}
+
+// ---------------------------------------------------------------- 1 · mount
+// `provider` is required and has no default: 'leaflet' needs no credentials, 'google' needs a key and
+// is the only backend carrying the velocity / damage-marker / ArcGIS-depth tiers.
+const useGoogle = new URLSearchParams(location.search).get("provider") === "google";
+let apiKey = "";
+if (useGoogle) {
+  apiKey = localStorage.getItem("fimviz.googleKey") || prompt("Google Maps JS API key") || "";
+  localStorage.setItem("fimviz.googleKey", apiKey);
+}
+
+const fim = await FimViz.mount("#map", useGoogle
+  ? { provider: "google", apiKey }
+  : { provider: "leaflet" });
+
+$("#prov-name").textContent = fim.config.provider;
+show("#o-mount", {
+  provider: fim.config.provider,
+  mapClass: fim.map?.constructor?.name ?? "(none)",
+  datasets: fim.datasets.length,
+  layers: fim.layers.length,
+  note: "mount() resolves to a FimMap. Reading a FimMap member off the un-awaited promise throws.",
+});
+
+// ---------------------------------------------------------------- 2 · parse
+const ds = await fim.addDataset(await sample("4326.tif"));
+show("#o-parse", {
+  ...ds.toJSON(),
+  isMaterialized: ds.isMaterialized,
+  note: "crs is the file's own. Header only — no pixel decoded yet.",
+});
+
+// ---------------------------------------------------------------- 3 · render
+const layer = await fim.addLayer(ds);
+layer.fit();
+show("#o-render", {
+  id: layer.id,
+  type: layer.type,
+  materializedNow: ds.isMaterialized,
+  grid: `${layer.meta.width}×${layer.meta.height}`,
+  colorScale: layer.colorScale.toJSON(),
+  colorScaleSource: "default — this file carries no GDAL legend, so case 3 of the precedence chain won",
+  registeredLayerTypes: Layer.types(),
+});
+
+// ---------------------------------------------------------------- 4 · recolour
+ColorScale.registerPalette("flood", ["#f7fbff", "#9ecae1", "#4292c6", "#08306b"]);
+for (const name of ColorScale.palettes()) {
+  const opt = document.createElement("option");
+  opt.value = opt.textContent = name;
+  $("#pal").append(opt);
+}
+$("#pal").value = layer.colorScale.toJSON().palette ?? "blues";
+
+async function restyle() {
+  try {
+    // One batched write → one repaint, and one `restyle` event for anything bound to this layer.
+    await layer.set({
+      palette: $("#pal").value,
+      continuous: $("#cont").checked,
+      opacity: Number($("#op").value),
+    });
+    show("#o-color", {
+      applied: { palette: $("#pal").value, continuous: $("#cont").checked, opacity: Number($("#op").value) },
+      scale: layer.colorScale.toJSON(),
+      domain: layer.colorScale.getValues().map((v) => round(v, 2)),
+      available: ColorScale.palettes(),
+    });
+    paintLegend();
+    await readModels();
+  } catch (e) {
+    show("#o-color", `${e.name}: ${e.message}`, true);
+  }
+}
+$("#pal").addEventListener("change", restyle);
+$("#cont").addEventListener("change", restyle);
+$("#op").addEventListener("input", restyle);
+$("#btn-bad").addEventListener("click", async () => {
+  try {
+    await layer.set({ palette: "not-a-real-palette" });
+  } catch (e) {
+    // The point of the demo: an unknown palette throws WITH the list, instead of silently
+    // falling back to a default nobody asked for.
+    show("#o-color", `${e.name}: ${e.message}`, true);
+  }
+});
+
+// ---------------------------------------------------------------- 5 · read-models
+function paintLegend() {
+  $("#legend-host").innerHTML = layer.getLegend()?.toHtml() ?? "";
+}
+
+async function readModels() {
+  const legend = layer.getLegend();
+  const stats = await layer.getStats();
+  show("#o-read", {
+    legend: { unit: legend.unit, kind: legend.kind, source: legend.source, stops: legend.stops.length },
+    describe: stats.describe(),
+    min: round(stats.min), max: round(stats.max), mean: round(stats.mean),
+    median: round(stats.median), stddev: round(stats.stddev),
+    validPixels: stats.count,
+    p95: round(stats.percentile(95)),
+    areaKm2: round(stats.area / 1e6, 2),
+    byClass: stats.byClass?.map((c) => ({ label: c.label, count: c.count })) ?? null,
+    csvFirstLines: stats.toCSV().split("\n").slice(0, 3).join("\n"),
+  });
+}
+$("#btn-stats").addEventListener("click", readModels);
+paintLegend();
+await readModels();
+
+// ---------------------------------------------------------------- 6 · hover
+layer.enableHover({
+  isEmpty: (v) => v === 0,                       // depth 0 reads as "not flooded", not as a reading
+  formatValue: (v) => `${v.toFixed(2)} m`,
+});
+layer.on("hover", ({ lat, lng, value, text }) => {
+  $("#hover-out").innerHTML = value == null
+    ? `<b>—</b> outside the wet footprint · ${lat.toFixed(4)}, ${lng.toFixed(4)}`
+    : `<b>${text}</b> · ${lat.toFixed(4)}, ${lng.toFixed(4)} · hitTest ${layer.hitTest(lat, lng)}`;
+});
+
+// ---------------------------------------------------------------- 7 · a vector layer
+let vec = null;
+$("#btn-vec").addEventListener("click", async () => {
+  if (vec) return;
+  $("#btn-vec").disabled = true;
+  try {
+    const counties = await fim.addDataset(await sample("Iowa_County_Boundaries.json"));
+    vec = await fim.addLayer("vector", {
+      source: counties,
+      style: { fillColor: "#58a6ff", fillOpacity: 0.15, strokeColor: "#58a6ff", strokeWidth: 1 },
+    });
+    vec.fit();
+    const vs = await vec.getStats();
+    show("#o-vec", {
+      dataset: { name: counties.name, kind: counties.kind, format: counties.format, crs: counties.crs },
+      features: vs.featureCount,
+      byType: vs.byType,
+      areaKm2: round(vs.area / 1e6, 1),
+      hint: "now click a county on the map",
+    });
+    // Dispatch is opt-in: this routes click/hover to layers by hit-test and z-order.
+    fim.enableMapEvents(["click", "hover"]);
+    fim.on("map:click", ({ lat, lng }) => {
+      const f = vec.featureAt(lat, lng);
+      show("#o-vec", f
+        ? { clicked: { lat: round(lat, 4), lng: round(lng, 4) }, county: f.properties.CountyName,
+            fips: f.properties.FIPS, properties: Object.keys(f.properties) }
+        : { clicked: { lat: round(lat, 4), lng: round(lng, 4) }, county: null,
+            note: "no feature here — hit-testing is real geometry, not the bounding box" });
+    });
+  } catch (e) {
+    show("#o-vec", `${e.name}: ${e.message}`, true);
+    $("#btn-vec").disabled = false;
+  }
+  refreshCount();
+});
+$("#btn-fit-r").addEventListener("click", () => layer.fit());
+$("#btn-fit-v").addEventListener("click", () => vec?.fit());
+
+// ---------------------------------------------------------------- 8 · teardown
+function refreshCount() {
+  $("#layer-count").textContent = `${fim.layers.length} layer${fim.layers.length === 1 ? "" : "s"}`;
+}
+fim.on("layers:changed", ({ reason }) => {
+  refreshCount();
+  show("#o-teardown", {
+    event: `layers:changed (${reason})`,
+    layers: fim.layers.map((l) => ({ id: l.id, type: l.type, visible: l.visible })),
+    datasetsStillRegistered: fim.datasets.map((d) => d.name),
+    note: "removing a layer never unregisters its Dataset — registry ≠ reference count",
+  });
+});
+
+let removed = null;
+$("#btn-rm").addEventListener("click", () => {
+  if (!fim.layers.includes(layer)) return;
+  removed = layer.dataset;
+  layer.remove();
+});
+$("#btn-readd").addEventListener("click", async () => {
+  if (!removed || fim.layers.includes(layer)) return;
+  const again = await fim.addLayer(removed);   // same Dataset, a brand-new Layer
+  again.fit();
+  removed = null;
+});
+refreshCount();
+</script>
+</body>
+</html>

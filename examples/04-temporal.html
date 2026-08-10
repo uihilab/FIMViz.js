@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — 4. Temporal &amp; multi-dimensional data</title>
+<style>
+  :root { --bg:#0f1216; --panel:#161b22; --code:#0b0e13; --line:#2b3440; --fg:#e6edf3; --dim:#8b949e;
+          --accent:#58a6ff; --ok:#3fb950; --bad:#f85149; --warn:#d29922; }
+  @media (prefers-color-scheme:light) {
+    :root { --bg:#fff; --panel:#f6f8fa; --code:#f6f8fa; --line:#d0d7de; --fg:#1f2328; --dim:#59636e; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:15px/1.65 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { border-bottom:1px solid var(--line); padding:28px 24px 22px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  h1 { margin:0 0 6px; font-size:23px; letter-spacing:-.01em; }
+  .lead { margin:0; color:var(--dim); max-width:82ch; }
+  .setup { margin:14px 0 0; padding:9px 13px; border:1px solid var(--line); border-left:3px solid var(--accent);
+           border-radius:6px; background:var(--panel); font-size:13px; color:var(--dim); max-width:82ch; }
+  main { display:grid; grid-template-columns:minmax(0,1fr) 440px; gap:30px; padding:22px 24px 80px; }
+  @media (max-width:1000px) { main { grid-template-columns:1fr; } }
+  section { padding:22px 0 4px; border-top:1px solid var(--line); }
+  section:first-child { border-top:0; padding-top:8px; }
+  h2 { font-size:16px; margin:0 0 8px; }
+  h2 .n { color:var(--accent); font:600 13px/1 ui-monospace,Menlo,monospace; margin-right:8px;
+          border:1px solid var(--line); border-radius:5px; padding:3px 6px; }
+  p { margin:0 0 12px; max-width:78ch; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.9em;
+         background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:0 4px; }
+  pre { margin:0 0 12px; padding:12px 14px; border:1px solid var(--line); border-radius:8px;
+        background:var(--code); overflow:auto; font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  pre.out { background:var(--panel); color:var(--dim); max-height:300px; white-space:pre-wrap; }
+  pre.out.bad { color:var(--bad); border-color:var(--bad); }
+  .k { color:var(--dim); } .s { color:var(--ok); } .f { color:var(--accent); }
+  .label { font:600 10.5px/1 ui-sans-serif,system-ui; letter-spacing:.09em; text-transform:uppercase;
+           color:var(--dim); margin:0 0 6px; }
+  .controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 12px; }
+  button { background:transparent; color:var(--accent); border:1px solid var(--line); border-radius:6px;
+           padding:5px 11px; font:inherit; font-size:13px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button.on { background:var(--accent); color:#08111f; font-weight:600; }
+  input[type=text] { background:var(--bg); color:var(--fg); border:1px solid var(--line);
+                     border-radius:6px; padding:4px 7px; font:inherit; font-size:12.5px; min-width:280px; }
+  label.ctl { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--dim); }
+  aside { position:sticky; top:22px; align-self:start; display:flex; flex-direction:column; gap:12px; }
+  #map { height:330px; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .card { border:1px solid var(--line); border-radius:10px; background:var(--panel); padding:12px 13px;
+          font-size:12.5px; color:var(--dim); }
+  .card h3 { margin:0 0 8px; font:600 10.5px/1 ui-sans-serif,system-ui; letter-spacing:.09em;
+             text-transform:uppercase; }
+  .stamp { font:600 14px ui-monospace,Menlo,monospace; color:var(--fg); }
+  table { border-collapse:collapse; font-size:12.5px; margin:0 0 12px; width:100%; }
+  th, td { border:1px solid var(--line); padding:5px 8px; text-align:left; vertical-align:top; }
+  th { color:var(--dim); font-weight:600; background:var(--panel); }
+  nav.more { border-top:1px solid var(--line); padding:18px 24px 40px; font-size:13px; color:var(--dim); }
+  nav.more a { color:var(--accent); }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <h1>4 · Temporal &amp; multi-dimensional data</h1>
+  <p class="lead">
+    A NetCDF, GRIB2 or Zarr file holds many timesteps in one payload. FIMViz models that as a
+    <b>selection axis</b> on an ordinary <code>Dataset</code>: one entry per step, each an
+    <em>in-file selector</em> rather than a separate download. <code>select()</code> resolves one,
+    <code>selectRange()</code> narrows the series, <code>reduce()</code> collapses it — and because
+    <code>reduce</code> is sugar over <code>select</code> + <code>combine</code>, temporal aggregation
+    needed no new grid maths at all.
+  </p>
+  <p class="setup">
+    The decoder (<a href="https://github.com/uihilab/SciWrid-Toolkit">SciWrid Toolkit</a>) carries a
+    ~193 KB wasm and is deliberately <b>not bundled</b>, so this page's import map points
+    <code>sciwrid-toolkit</code> at its own browser build. Only these four formats need that entry.
+    First NetCDF4 decode also pulls <code>h5wasm</code> from a CDN.
+  </p>
+</header>
+
+<main class="wrap">
+<div>
+
+  <section>
+    <h2><span class="n">1</span>One call opens all four</h2>
+    <p>
+      There is no separate "open a NetCDF" entry point — <code>addDataset</code> routes on the
+      extension, and then the <b>file's own header decides which format it is</b>. That is why
+      <code>ds.format</code> below says <code>netcdf4</code> rather than "nc": <code>.nc</code> cannot
+      distinguish NetCDF3 from NetCDF4, so the extension only routes and the concrete name comes from
+      the scan.
+    </p>
+    <p>
+      What comes back is a lazy Dataset with an axis and <b>nothing decoded</b> — a 120-step file costs
+      one header read. Try the four samples; each is a different format of the same storm.
+    </p>
+    <pre><span class="k">// The same call a GeoTIFF takes.</span>
+<span class="f">const</span> ds = <span class="f">await</span> fim.<span class="f">addDataset</span>(file);
+
+ds.format;              <span class="k">// 'netcdf4' — from the header, not the filename</span>
+ds.axis.entries.length; <span class="k">// 120 timesteps</span>
+ds.meta.grid;           <span class="k">// { width, height, bbox, bounds } — the file's NATIVE grid</span>
+ds.meta.variable;       <span class="k">// the variable this Dataset is; one variable per Dataset</span>
+ds.meta.axisSource;     <span class="k">// where the axis came from: scan | header | caller | index</span>
+ds.isMaterialized;      <span class="k">// false</span>
+
+<span class="k">// A .zarr.zip needs the format said out loud: the extension names the CONTAINER,</span>
+<span class="k">// and '.zip' already means "a zipped shapefile" to the detector.</span>
+<span class="f">await</span> fim.<span class="f">addDataset</span>(zipped, { format: <span class="s">"zarr"</span> });
+
+<span class="k">// GRIB2 and NetCDF3 report no extent through scan(), so GRIB2 needs one supplied.</span>
+<span class="f">await</span> fim.<span class="f">addDataset</span>(grib, { grid: { bbox: [<span class="s">-87.98</span>, <span class="s">24.02</span>, <span class="s">-75.01</span>, <span class="s">36.99</span>] } });</pre>
+    <div class="controls">
+      <button class="sample on" data-file="idalia-nldas2.nc">NetCDF4 · NLDAS-2</button>
+      <button class="sample" data-file="idalia-aorc.zarr.zip" data-format="zarr">Zarr v2 · AORC</button>
+      <button class="sample" data-file="idalia-stage4-4h.grb2"
+              data-bbox="-87.98,24.02,-75.01,36.99">GRIB2 · Stage IV</button>
+      <button class="sample" data-file="sample.nc3">NetCDF3 · tiny</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-scan">loading the NetCDF4 sample…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span><code>select()</code> — one step out of the file</h2>
+    <p>
+      An axis entry's <code>ref</code> says <em>how to get</em> that entry, and it has three forms: a
+      URL (one file per step — the flood-scenario shape), named URL variants, or
+      <code>{ select: {…} }</code> — an <b>in-file selector</b>. The last is what a multi-dimensional
+      file produces: the child Dataset is rooted on its parent's own bytes, so selecting a timestep
+      costs no second fetch and the selection simply reaches the decoder.
+    </p>
+    <p>
+      Coordinates are <b>epoch milliseconds</b>, not ISO strings, because <code>select()</code>'s
+      nearest match is numeric — the readable timestamp lives on <code>entry.meta.time</code>. Selecting
+      <em>peels</em> one axis: on a <code>(time × member)</code> series you would be left with a member
+      series, and a second <code>select()</code> would finish the job.
+    </p>
+    <pre><span class="f">const</span> t = ds.<span class="f">select</span>(<span class="f">Date</span>.<span class="f">parse</span>(<span class="s">"2023-08-28T06:00:00Z"</span>));   <span class="k">// nearest match by default</span>
+
+t.selector;   <span class="k">// { variable: 'APCP', t: 6 } — what reaches the decoder</span>
+t.axes;       <span class="k">// null — a child is ONE payload, so it forces like any Dataset</span>
+<span class="f">await</span> t.<span class="f">grid</span>();   <span class="k">// decodes that slice, off the parent's bytes</span>
+
+ds.<span class="f">selectAxisEntry</span>(coord);   <span class="k">// the entry itself, without resolving it</span>
+<span class="f">await</span> fim.<span class="f">addLayer</span>(t);       <span class="k">// already EPSG:4326 — the reader resamples onto a geographic bbox</span>
+
+<span class="k">// The series itself is NOT forceable — ds.grid() on it throws, naming select()/reduce().</span></pre>
+    <div class="controls">
+      <button id="btn-first">first step</button>
+      <button id="btn-mid">middle step</button>
+      <button id="btn-force-series">force the series (throws)</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-select">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>Scrubbing it — <code>createAxisSlider</code></h2>
+    <p>
+      Scrubbing is <code>layer.setSources([ds.select(coord)])</code> and nothing more, which is why the
+      widget is <b>not called a time slider</b>: it drives stage, level, band, ensemble member or
+      variable just as readily. It is a library export rather than fifteen lines in this page for two
+      reasons that are easy to get wrong and invisible when you do.
+    </p>
+    <p>
+      <b>A stale frame must never win.</b> Dragging fires far faster than a grid decodes, so several
+      swaps are in flight and they do not resolve in order — without a guard the last frame to
+      <em>resolve</em> wins rather than the last one asked for, and the map ends up showing a step nobody
+      selected. <b>Playback is paced by the decode</b>, not by a timer: each frame is queued only once
+      the previous one lands, or the playhead runs away from the map.
+    </p>
+    <pre><span class="f">import</span> { createAxisSlider, axisOf, axisEntryLabel } <span class="f">from</span> <span class="s">"fimviz/ui"</span>;
+
+<span class="f">const</span> scrub = <span class="f">createAxisSlider</span>(<span class="s">"#scrub"</span>, {
+  layer, dataset: ds,
+  axis: <span class="s">0</span>,                        <span class="k">// index or name — a Dataset may carry several</span>
+  interval: <span class="s">400</span>,                  <span class="k">// playback pacing floor, in ms</span>
+  label: (entry) =&gt; entry.meta.time,
+  onChange: (entry, i, child) =&gt; readFrame(child),   <span class="k">// only for the CURRENT frame</span>
+});
+
+scrub.<span class="f">play</span>(); scrub.<span class="f">pause</span>(); scrub.<span class="f">goto</span>(<span class="s">12</span>); scrub.<span class="f">next</span>();
+<span class="f">axisOf</span>(ds, <span class="s">0</span>);   <span class="k">// pure — the axis, or null if there isn't one</span></pre>
+    <div id="scrub"></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-scrub">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span><code>selectRange()</code> — series in, series out</h2>
+    <p>
+      A window over the axis returns <b>another series</b>, not a payload — so everything that works on a
+      full axis works on the window unchanged. "The peak of these six hours" is
+      <code>selectRange(a, b).reduce('max')</code>, needing nothing new on either side.
+    </p>
+    <p>
+      Bounds are inclusive and compared with plain <code>&gt;=</code>/<code>&lt;=</code>, which is
+      type-agnostic: numbers compare numerically and ISO strings lexicographically, i.e.
+      chronologically. Reversed bounds swap. There is deliberately <b>no nearest match</b> — a window
+      narrower than the sampling interval returns <code>null</code> rather than silently widening to
+      something bigger than you asked for.
+    </p>
+    <pre><span class="f">const</span> storm = ds.<span class="f">selectRange</span>(t0, t1);        <span class="k">// → a narrower series, still lazy</span>
+
+storm.axis.entries.length;                <span class="k">// fewer entries</span>
+<span class="f">await</span> storm.<span class="f">reduce</span>(<span class="s">"max"</span>).<span class="f">grid</span>();          <span class="k">// the peak within the window</span>
+storm.<span class="f">select</span>(coord);                       <span class="k">// …or one step out of it</span></pre>
+    <div class="controls"><button id="btn-range">take the middle third</button></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-range">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">5</span><code>reduce()</code> — collapse the whole axis</h2>
+    <p>
+      Every entry is resolved and reduced per pixel. It is <b>sugar over <code>select()</code> +
+      <code>combine()</code></b> — the same N-ary reducer band maths uses in notebook 2 — so the
+      temporal case brought no new grid code with it. That also means the LHS-conform rule applies: the
+      result lands on the first entry's grid.
+    </p>
+    <p>
+      This is the expensive one: 120 steps is 120 decodes, a few seconds. <code>max</code> must exceed
+      <code>mean</code>, which is the cheapest proof the axis was really traversed.
+    </p>
+    <pre><span class="f">await</span> ds.<span class="f">reduce</span>(<span class="s">"mean"</span>).<span class="f">grid</span>();   <span class="k">// 'sum' | 'mean' | 'min' | 'max'</span>
+<span class="f">await</span> ds.<span class="f">reduce</span>(<span class="s">"max"</span>).<span class="f">grid</span>();
+
+<span class="k">// Reducing a WINDOW is the same call on a narrower series:</span>
+<span class="f">await</span> ds.<span class="f">selectRange</span>(t0, t1).<span class="f">reduce</span>(<span class="s">"max"</span>).<span class="f">grid</span>();</pre>
+    <div class="controls">
+      <button id="btn-mean">reduce('mean')</button>
+      <button id="btn-max">reduce('max')</button>
+      <button id="btn-back">back to the slider</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-reduce">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">6</span>What actually differs between the four formats</h2>
+    <p>
+      Not the API — the same call opens all four. What differs is how much the reader can tell us about
+      a file, and it is worth knowing which gap you are looking at, because they send you to completely
+      different places.
+    </p>
+    <table>
+      <thead><tr><th>Format</th><th>Extent</th><th>Series axis</th><th>So you get</th></tr></thead>
+      <tbody>
+        <tr><td>NetCDF4</td><td>from <code>scan()</code>, via 1-D coordinates</td><td>CF timestamps</td><td>the full temporal path</td></tr>
+        <tr><td>Zarr v2</td><td>from <code>scan()</code>, when the store has CF coordinates</td><td>CF timestamps</td><td>the full temporal path</td></tr>
+        <tr><td>GRIB2</td><td><b>never</b> — supply <code>grid.bbox</code></td><td>CF timestamps</td><td>scrub + reduce, once an extent is given</td></tr>
+        <tr><td>NetCDF3</td><td>the file's own header</td><td>the file's own header</td><td>the full temporal path, no options</td></tr>
+      </tbody>
+    </table>
+    <p>
+      GRIB2 and NetCDF3 get no extent from <code>scan()</code> <em>whatever their grid looks like</em> —
+      that is a property of the reader's WASM path, not of your file, so a rectilinear GRIB2 is as
+      extent-less as a polar-stereographic one. NetCDF3 escapes it because FIMViz reads that one header
+      itself: <code>io/netcdf3.js</code> is the single container format the library parses directly, it
+      reads the header only, and it declines any bytes it does not fully recognise. Watch
+      <code>meta.axisSource</code> change between the samples.
+    </p>
+    <p>
+      A missing extent <b>throws</b> rather than being guessed, because a wrong extent puts every pixel
+      confidently in the wrong place. The message distinguishes the three causes: the format never
+      reports one, no bbox could be derived (curvilinear coordinates, a CF-less Zarr store), or one was
+      derived and <em>rejected</em> as non-geographic — a projected file reports metres, which is
+      range-checked as degrees and refused.
+    </p>
+    <pre><span class="k">// The recoverable failure, and its fix:</span>
+<span class="f">await</span> fim.<span class="f">addDataset</span>(grib);
+<span class="k">// ✗ Error: … has no usable geographic extent …</span>
+
+<span class="f">await</span> fim.<span class="f">addDataset</span>(grib, { grid: { bbox: [minLon, minLat, maxLon, maxLat] } });
+<span class="k">// ✓ `grid` is a PARTIAL override — width/height still come from the variable's own shape.</span></pre>
+    <div class="controls">
+      <button id="btn-noextent">open the GRIB2 without an extent</button>
+      <label class="ctl">bbox <input type="text" id="bbox" value="-87.98,24.02,-75.01,36.99" /></label>
+      <button id="btn-extent">…and with one</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-extent">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">7</span>Everything the reader assumes is an option you can override</h2>
+    <p>
+      A file that does not match CF's overwhelming majority should be a configuration problem, not an
+      unsupported one. Each default below has an override sitting beside it.
+    </p>
+    <pre><span class="f">await</span> fim.<span class="f">addDataset</span>(file, {
+  variable: <span class="s">"APCP"</span>,        <span class="k">// which variable — one per Dataset; defaults to the first supported</span>
+  grid: { bbox, width, height },   <span class="k">// PARTIAL: anything omitted stays native</span>
+  series: { coords: (i) =&gt; <span class="f">Date</span>.<span class="f">UTC</span>(<span class="s">2001</span>, i, <span class="s">16</span>) },   <span class="k">// label an axis the format cannot</span>
+  series: <span class="f">false</span>,             <span class="k">// …or collapse to a single grid</span>
+  dims: { order: <span class="s">"yx"</span> },      <span class="k">// which trailing pair of the shape is (lat, lon). 'yx' is CF.</span>
+  lon: <span class="s">"-180..180"</span>,          <span class="k">// re-express the extent; a global grid is genuinely rolled</span>
+  allowExtraDims: <span class="f">true</span>,     <span class="k">// accept a level/member dimension the reader will collapse</span>
+  header: <span class="f">false</span>,             <span class="k">// diagnostic: switch off the NetCDF3 header supplement</span>
+  workers: <span class="s">0</span>,                <span class="k">// decoder worker count (0 under Node, where the pool never resolves)</span>
+});</pre>
+    <p>
+      Two of those deserve a note. <b><code>lon</code> is applied by us, not by the reader</b> — asking
+      the decoder for a <code>[-180…180]</code> window on a <code>0..360</code> file returns the file's
+      own pixels with the requested bbox echoed back, which would draw the Pacific where the Atlantic
+      belongs; so it is implemented as a column roll on the decoded grid, and a regional window that
+      would cross the antimeridian throws instead. And <b>a fourth dimension throws</b>:
+      <code>T(time, level, lat, lon)</code> is ordinary output, the decoder exposes no level selector,
+      and silently handing you whichever slice it chose is the worst available outcome —
+      <code>allowExtraDims: true</code> is the caller acknowledging it, recorded on
+      <code>meta.extraDims</code>.
+    </p>
+    <p>
+      <b>What is deliberately not an option:</b> <em>which</em> dimension is the series axis. The scan
+      reports a variable's shape as bare numbers with no dimension names, and the decoder exposes
+      exactly one index knob — so an option to pick a different dimension would be a promise the library
+      could not keep. You can say how long the axis is, what its coordinates mean and what to call it.
+    </p>
+    <div class="controls">
+      <button id="btn-nolabels">re-open with synthesized index coords</button>
+      <button id="btn-single">re-open with series: false</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-opts">…</pre>
+  </section>
+
+</div>
+
+<aside>
+  <div id="map"></div>
+  <div class="card">
+    <h3>Current frame</h3>
+    <div class="stamp" id="stamp">—</div>
+    <div id="frame-note">load a sample to begin</div>
+  </div>
+  <div class="card">
+    <h3>Why the import map has a third entry</h3>
+    The reader loads its own wasm and workers relative to its own URL, and reaches h5wasm through a
+    dynamic import on a <em>variable</em> — which a bundler would compile into a build-time lookup that
+    can never reach the CDN. So the library marks it external and the page resolves it.
+  </div>
+</aside>
+</main>
+
+<nav class="more wrap">
+  Next: <a href="05-ui-toolkit.html">5 · The UI toolkit</a> ·
+  back to <a href="03-color-and-read-models.html">3 · Colour &amp; read-models</a>
+</nav>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js",
+    "sciwrid-toolkit": "../node_modules/sciwrid-toolkit/dist/index.js"
+} }
+</script>
+
+<script type="module">
+import { FimViz, ColorScale, Stats } from "fimviz";
+import { createAxisSlider, axisOf, axisEntryLabel } from "fimviz/ui";
+
+const $ = (s) => document.querySelector(s);
+const show = (sel, v, bad = false) => {
+  const el = $(sel);
+  el.className = "out" + (bad ? " bad" : "");
+  el.textContent = typeof v === "string" ? v : JSON.stringify(v, null, 2);
+};
+const round = (n, d = 3) => (typeof n === "number" && Number.isFinite(n) ? +n.toFixed(d) : n);
+
+async function sampleBytes(name) {
+  const res = await fetch(`../assets/SampleFiles/${name}`);
+  if (!res.ok) throw new Error(`${name}: HTTP ${res.status} — serve the REPO ROOT, not /examples`);
+  return res.arrayBuffer();
+}
+
+const fim = await FimViz.mount("#map", { provider: "leaflet" });
+
+let ds = null;       // the series Dataset — lazy, never forced directly
+let layer = null;    // one RasterLayer, re-pointed at whatever step is current
+let scale = null;    // one ColorScale for every frame, so frames are comparable
+let scrub = null;    // the createAxisSlider handle: position, stale-frame guard, playback
+
+const gridMeta = (g) => ({
+  bw: g.bounds.west, bs: g.bounds.south, be: g.bounds.east, bn: g.bounds.north,
+  width: g.width, height: g.height, noData: g.noData, unit: ds?.meta?.unit,
+});
+
+// ---------------------------------------------------------------- 1 · open a file
+async function open(name, { format, bbox } = {}) {
+  show("#o-scan", `opening ${name}…`);
+  scrub?.destroy(); scrub = null;
+  try {
+    const opts = {};
+    if (format) opts.format = format;          // '.zarr.zip' — the extension names the container
+    if (bbox) opts.grid = { bbox };            // GRIB2 always needs this
+    ds = await fim.addDataset(await sampleBytes(name), { name, ...opts });
+
+    const entries = ds.axis?.entries ?? [];
+    show("#o-scan", {
+      name: ds.name,
+      format: `${ds.format}  ← from the header, not the extension`,
+      kind: ds.kind, crs: ds.crs,
+      variable: ds.meta.variable, unit: ds.meta.unit ?? null,
+      nativeGrid: `${ds.meta.grid.width}×${ds.meta.grid.height}`,
+      bounds: ds.bounds,
+      timesteps: entries.length,
+      axisUnit: ds.axis?.unit ?? null,
+      axisSource: ds.meta.axisSource ?? "(not reported)",
+      synthesizedAxis: ds.meta.synthesizedAxis ?? false,
+      firstEntry: entries[0] && { coord: entries[0].coord, ref: entries[0].ref, meta: entries[0].meta },
+      isMaterialized: ds.isMaterialized,
+      note: "nothing decoded yet — one header read, however many steps the file holds",
+    });
+
+    if (!entries.length) { show("#o-scrub", "this file has no series axis — nothing to scrub"); return; }
+
+    // One scale for every frame, ranged off the first frame's own statistics.
+    const first = ds.select(entries[0].coord);
+    const g0 = await first.grid();
+    const s0 = Stats.raster(g0.pixels, gridMeta(g0));
+    scale = new ColorScale({
+      palette: "blues", min: 0, max: Math.max(s0.max, 1e-6), continuous: true, unit: ds.meta.unit ?? "",
+    });
+
+    layer?.remove();
+    layer = await fim.addLayer(first);
+    await layer.set({ colorScale: scale, opacity: 0.85 });
+    layer.fit();
+    frameNote(0, g0);
+
+    // The scrubber owns the position, the stale-frame guard and the play loop; this page only says
+    // what to do once a frame has LANDED.
+    scrub = createAxisSlider("#scrub", {
+      layer, dataset: ds, interval: 350,
+      label: (entry) => entry.meta?.time ?? axisEntryLabel(entry),
+      onChange: async (entry, i, child) => {
+        frameNote(i, await child.grid());
+        show("#o-scrub", {
+          index: i, of: ds.axis.entries.length,
+          coord: entry.coord,
+          label: entry.meta?.time ?? axisEntryLabel(entry),
+          selector: child.selector,
+          playing: scrub?.playing ?? false,
+          guarantee: "onChange fires only for the frame that is still current",
+        });
+      },
+      onError: (err, i) => show("#o-scrub", `frame ${i}: ${err.message}`, true),
+    });
+    show("#o-scrub", { axis: axisOf(ds, 0)?.name ?? "(unnamed)", steps: scrub.length,
+      hint: "drag the slider, or press play" });
+  } catch (e) {
+    show("#o-scan", `${e.name}: ${e.message}`, true);
+  }
+}
+
+function frameNote(i, grid) {
+  const e = ds.axis?.entries?.[i];
+  $("#stamp").textContent = e?.meta?.time ?? `step ${i + 1}`;
+  if (!grid) return;
+  const s = Stats.raster(grid.pixels, gridMeta(grid));
+  $("#frame-note").textContent =
+    `${grid.width}×${grid.height} · ${s.count.toLocaleString()} valid · mean ${round(s.mean, 4)} · max ${round(s.max, 3)} ${ds.meta.unit ?? ""}`;
+}
+
+document.querySelectorAll("button.sample").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("button.sample").forEach((x) => x.classList.toggle("on", x === b));
+  const bbox = b.dataset.bbox ? b.dataset.bbox.split(",").map(Number) : null;
+  open(b.dataset.file, { format: b.dataset.format, bbox });
+}));
+
+// ---------------------------------------------------------------- 2 · select
+async function selectStep(which) {
+  try {
+    const entries = ds.axis.entries;
+    const i = which === "first" ? 0 : Math.floor(entries.length / 2);
+    const t0 = performance.now();
+    const child = ds.select(entries[i].coord);        // lazy — no work yet
+    const grid = await child.grid();                   // decodes this slice off the parent's bytes
+    await layer.setSources([child]);
+    frameNote(i, grid);
+    show("#o-select", {
+      askedFor: entries[i].coord,
+      readableTime: entries[i].meta?.time ?? null,
+      ref: entries[i].ref,
+      childSelector: child.selector,
+      childAxes: child.axes,
+      childFormat: child.format,
+      grid: `${grid.width}×${grid.height} ${grid.crs}`,
+      decodeMs: round(performance.now() - t0, 1),
+      note: "no second fetch — the child is rooted on the parent's own bytes",
+    });
+  } catch (e) { show("#o-select", `${e.name}: ${e.message}`, true); }
+}
+$("#btn-first").addEventListener("click", () => selectStep("first"));
+$("#btn-mid").addEventListener("click", () => selectStep("mid"));
+$("#btn-force-series").addEventListener("click", async () => {
+  try {
+    await ds.grid();
+    show("#o-select", "unexpected — a series should not be forceable", true);
+  } catch (e) {
+    show("#o-select", {
+      attempted: "await ds.grid() on the SERIES itself",
+      thrown: `${e.name}: ${e.message}`,
+      why: "a series is many payloads; the error names select()/reduce() as the way forward",
+    });
+  }
+});
+
+// ---------------------------------------------------------------- 4 · selectRange
+$("#btn-range").addEventListener("click", async () => {
+  try {
+    const entries = ds.axis.entries;
+    const a = entries[Math.floor(entries.length / 3)].coord;
+    const b = entries[Math.floor((2 * entries.length) / 3)].coord;
+    const window = ds.selectRange(a, b);
+    const peak = await window.reduce("max").grid();
+    await layer.setSources([window.reduce("max")]);
+    const s = Stats.raster(peak.pixels, gridMeta(peak));
+    $("#stamp").textContent = "max over the middle third";
+    show("#o-range", {
+      fullSeries: entries.length,
+      windowFrom: entries[Math.floor(entries.length / 3)].meta?.time ?? a,
+      windowTo: entries[Math.floor((2 * entries.length) / 3)].meta?.time ?? b,
+      windowSteps: window.axis.entries.length,
+      stillASeries: window.axis != null,
+      reducedMax: round(s.max),
+      narrowerThanSampling: "a window with no entries returns null — never silently widened",
+    });
+  } catch (e) { show("#o-range", `${e.name}: ${e.message}`, true); }
+});
+
+// ---------------------------------------------------------------- 5 · reduce
+async function reduceTo(op) {
+  scrub?.pause();
+  show("#o-reduce", `reducing ${ds.axis.entries.length} steps — every one is decoded…`);
+  const t0 = performance.now();
+  try {
+    const reduced = ds.reduce(op);            // lazy: select() every entry, then combine() per pixel
+    const grid = await reduced.grid();         // ← all the decodes happen here
+    await layer.setSources([reduced]);
+    const s = Stats.raster(grid.pixels, gridMeta(grid));
+    scale.set({ min: 0, max: Math.max(s.max, 1e-6) });   // one write, one repaint
+    $("#stamp").textContent = `${op} over the whole axis`;
+    $("#frame-note").textContent = `${grid.width}×${grid.height} · max ${round(s.max)} ${ds.meta.unit ?? ""}`;
+    show("#o-reduce", {
+      op, steps: ds.axis.entries.length,
+      min: round(s.min), max: round(s.max), mean: round(s.mean),
+      seconds: round((performance.now() - t0) / 1000, 1),
+      implementation: "sugar over select() + combine() — no bespoke temporal machinery",
+      sanity: "max must exceed mean, which is the cheapest proof the axis was traversed",
+    });
+  } catch (e) { show("#o-reduce", `${e.name}: ${e.message}`, true); }
+}
+$("#btn-mean").addEventListener("click", () => reduceTo("mean"));
+$("#btn-max").addEventListener("click", () => reduceTo("max"));
+$("#btn-back").addEventListener("click", () => scrub?.goto(scrub.index));
+
+// ---------------------------------------------------------------- 6 · the extent gap
+$("#btn-noextent").addEventListener("click", async () => {
+  try {
+    await FimViz.parseFile(await sampleBytes("idalia-stage4-4h.grb2"), { name: "idalia-stage4-4h.grb2" });
+    show("#o-extent", "unexpected: GRIB2 without an extent should have thrown", true);
+  } catch (e) {
+    show("#o-extent", {
+      thrown: `${e.name}: ${e.message}`,
+      cause: "the reader populates a bbox only on its netcdf4/zarr/parquet paths",
+      soThisIsNotAboutYourFile: "every GRIB2 and NetCDF3 file needs one, whatever its grid geometry",
+    });
+  }
+});
+$("#btn-extent").addEventListener("click", async () => {
+  try {
+    const bbox = $("#bbox").value.split(",").map(Number);
+    if (bbox.length !== 4 || !bbox.every(Number.isFinite)) throw new Error("need four numbers: minLon, minLat, maxLon, maxLat");
+    const grib = await FimViz.parseFile(await sampleBytes("idalia-stage4-4h.grb2"),
+      { name: "idalia-stage4-4h.grb2", grid: { bbox } });
+    show("#o-extent", {
+      format: grib.format,
+      bounds: grib.bounds,
+      nativeGrid: `${grib.meta.grid.width}×${grib.meta.grid.height}`,
+      pixelDimsCameFrom: "the variable's own shape — `grid` is a PARTIAL override",
+      steps: grib.axis?.entries.length ?? 0,
+      note: "same file, same call, one option — this is a configuration problem, not an unsupported file",
+    });
+  } catch (e) { show("#o-extent", `${e.name}: ${e.message}`, true); }
+});
+
+// ---------------------------------------------------------------- 7 · overrides
+$("#btn-nolabels").addEventListener("click", async () => {
+  try {
+    const bytes = await sampleBytes("sample.nc3");
+    const labelled = await FimViz.parseFile(bytes, { name: "sample.nc3" });
+    // Force the weakest of the four axis sources: integer positions over the leading dimension.
+    const indexed = await FimViz.parseFile(bytes, { name: "sample.nc3", header: false });
+    show("#o-opts", {
+      withHeaderSupplement: {
+        axisSource: labelled.meta.axisSource, unit: labelled.axis?.unit,
+        coords: labelled.axis?.entries.map((e) => e.meta?.time ?? e.coord),
+      },
+      withoutIt: {
+        axisSource: indexed.meta.axisSource, unit: indexed.axis?.unit,
+        synthesized: indexed.meta.synthesizedAxis ?? false,
+        coords: indexed.axis?.entries.map((e) => e.coord),
+      },
+      why: "an axis of positions is a weaker thing than one the file labelled — axis.unit says which",
+      caller: "series: { coords } overrides both, and turns ISO strings or Dates into epoch ms",
+    });
+  } catch (e) { show("#o-opts", `${e.name}: ${e.message}`, true); }
+});
+$("#btn-single").addEventListener("click", async () => {
+  try {
+    const one = await FimViz.parseFile(await sampleBytes("sample.nc3"), { name: "sample.nc3", series: false });
+    show("#o-opts", {
+      series: false,
+      axes: one.axes,
+      isForceable: true,
+      grid: `${one.meta.grid.width}×${one.meta.grid.height}`,
+      note: "no axis at all — one grid, forced like any other raster Dataset",
+    });
+  } catch (e) { show("#o-opts", `${e.name}: ${e.message}`, true); }
+});
+
+// ---------------------------------------------------------------- go
+await open("idalia-nldas2.nc");
+</script>
+</body>
+</html>

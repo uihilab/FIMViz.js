@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — 5. The UI toolkit (fimviz/ui)</title>
+<style>
+  :root { --bg:#0f1216; --panel:#161b22; --code:#0b0e13; --line:#2b3440; --fg:#e6edf3; --dim:#8b949e;
+          --accent:#58a6ff; --ok:#3fb950; --bad:#f85149; --warn:#d29922; }
+  @media (prefers-color-scheme:light) {
+    :root { --bg:#fff; --panel:#f6f8fa; --code:#f6f8fa; --line:#d0d7de; --fg:#1f2328; --dim:#59636e; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:15px/1.65 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { border-bottom:1px solid var(--line); padding:28px 24px 22px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  h1 { margin:0 0 6px; font-size:23px; letter-spacing:-.01em; }
+  .lead { margin:0; color:var(--dim); max-width:82ch; }
+  .setup { margin:14px 0 0; padding:9px 13px; border:1px solid var(--line); border-left:3px solid var(--accent);
+           border-radius:6px; background:var(--panel); font-size:13px; color:var(--dim); max-width:82ch; }
+  main { display:grid; grid-template-columns:minmax(0,1fr) 420px; gap:30px; padding:22px 24px 80px; }
+  @media (max-width:1000px) { main { grid-template-columns:1fr; } }
+  section { padding:22px 0 4px; border-top:1px solid var(--line); }
+  section:first-child { border-top:0; padding-top:8px; }
+  h2 { font-size:16px; margin:0 0 8px; }
+  h2 .n { color:var(--accent); font:600 13px/1 ui-monospace,Menlo,monospace; margin-right:8px;
+          border:1px solid var(--line); border-radius:5px; padding:3px 6px; }
+  p { margin:0 0 12px; max-width:78ch; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.9em;
+         background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:0 4px; }
+  pre { margin:0 0 12px; padding:12px 14px; border:1px solid var(--line); border-radius:8px;
+        background:var(--code); overflow:auto; font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  pre.out { background:var(--panel); color:var(--dim); max-height:260px; white-space:pre-wrap; }
+  pre.out.bad { color:var(--bad); border-color:var(--bad); }
+  .k { color:var(--dim); } .s { color:var(--ok); } .f { color:var(--accent); }
+  .label { font:600 10.5px/1 ui-sans-serif,system-ui; letter-spacing:.09em; text-transform:uppercase;
+           color:var(--dim); margin:0 0 6px; }
+  .controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 12px; }
+  button { background:transparent; color:var(--accent); border:1px solid var(--line); border-radius:6px;
+           padding:5px 11px; font:inherit; font-size:13px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button.on { background:var(--accent); color:#08111f; font-weight:600; }
+  select { background:var(--bg); color:var(--fg); border:1px solid var(--line); border-radius:6px;
+           padding:4px 7px; font:inherit; font-size:13px; }
+  label.ctl { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--dim); }
+  .mount { border:1px dashed var(--line); border-radius:8px; padding:10px; margin:0 0 12px;
+           background:var(--panel); }
+  .mount.plain { border-style:solid; }
+  aside { position:sticky; top:22px; align-self:start; display:flex; flex-direction:column; gap:12px; }
+  #map { height:400px; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .card { border:1px solid var(--line); border-radius:10px; background:var(--panel); padding:11px 12px;
+          font-size:12.5px; color:var(--dim); }
+  .card h3 { margin:0 0 8px; font:600 10.5px/1 ui-sans-serif,system-ui; letter-spacing:.09em;
+             text-transform:uppercase; }
+  kbd { border:1px solid var(--line); border-radius:3px; padding:0 4px; font-size:11px; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:700px) { .two { grid-template-columns:1fr; } }
+  nav.more { border-top:1px solid var(--line); padding:18px 24px 40px; font-size:13px; color:var(--dim); }
+  nav.more a { color:var(--accent); }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <h1>5 · The UI toolkit — <code>fimviz/ui</code></h1>
+  <p class="lead">
+    A separate, opt-in module the engine core never imports. Every widget here touches the DOM only
+    inside a function call, and none of them is required for the engine to work: <b>the engine emits and
+    the UI subscribes</b>, never the reverse. Each section below mounts the real widget next to the code
+    that mounts it — so this page is also the manual check for the things a headless test cannot judge.
+  </p>
+  <p class="setup">
+    It has exactly one home — <code>import … from "fimviz/ui"</code>, its own bundle (~56 KB, no
+    geotiff, no Maps loader, no GDAL). The engine barrel deliberately does not re-export it, so an app
+    can never end up running two copies with two sets of state.
+  </p>
+</header>
+
+<main class="wrap">
+<div>
+
+  <section>
+    <h2><span class="n">1</span>Toast, busy, and the engine→host bus</h2>
+    <p>
+      The engine's only outbound channel is its event bus. <code>connectToast</code> subscribes a toast
+      to <code>notify</code>, and also surfaces two <b>warnings</b> that otherwise reach only
+      <code>console.warn</code> — an oversized raster drawn downsampled, and a layer whose CRS the
+      provider cannot draw. Both describe something visibly wrong with what was just drawn, which is
+      exactly the thing nobody finds in a console.
+    </p>
+    <p>
+      <code>createBusyIndicator</code> <b>ref-counts by source</b>. The <code>busy</code> event carries
+      one precisely because work overlaps, and a single boolean would let the first job to finish hide an
+      indicator two others still need. Parsing emits <code>source: 'parse'</code> and a forced warp emits
+      <code>'reproject'</code>, both paired in a <code>finally</code> so a failure clears the spinner
+      rather than leaving it running on work that is not happening.
+    </p>
+    <p>
+      Two bus events are deliberately left <b>unbound</b>: <code>storage:changed</code> and
+      <code>upload:complete</code> each mean "a list you own is stale" or "dismiss the affordance you
+      showed" — and neither the list nor the affordance belongs to this library.
+    </p>
+    <pre><span class="f">import</span> { createToast, connectToast, createBusyIndicator } <span class="f">from</span> <span class="s">"fimviz/ui"</span>;
+
+<span class="f">const</span> toast = <span class="f">connectToast</span>(fim);            <span class="k">// creates one if you don't pass it</span>
+toast.<span class="f">show</span>(<span class="s">"Saved."</span>, { level: <span class="s">"success"</span>, timeout: <span class="s">4000</span> });
+
+<span class="f">connectToast</span>(fim, toast, { warnings: <span class="f">false</span> });   <span class="k">// `notify` only</span>
+
+<span class="f">const</span> busy = <span class="f">createBusyIndicator</span>(fim, {
+  root: <span class="s">"#busy"</span>,
+  label: (sources) =&gt; <span class="s">`working: ${sources.join(", ")}`</span>,   <span class="k">// a string, or a function of the sources</span>
+});
+busy.active; busy.sources; busy.<span class="f">off</span>();</pre>
+    <div class="controls">
+      <button data-notify="info">notify info</button>
+      <button data-notify="success">success</button>
+      <button data-notify="warn">warn</button>
+      <button data-notify="error">error</button>
+      <button id="btn-busy">emit two overlapping busy sources</button>
+    </div>
+    <div class="mount" id="busy"></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-bus">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span><code>createDropzone</code> — a DOM contract, not a loader</h2>
+    <p>
+      <code>fim.addDataset(file)</code> already takes a <code>File</code>, so this widget adds nothing to
+      the loading. It exists because the <em>drag</em> half is where the mistakes are, and every one of
+      them fails silently: <code>dragover</code> must be cancelled or the browser navigates away to
+      display the file and <code>drop</code> never fires at all; <code>dragenter</code>/
+      <code>dragleave</code> fire for every descendant crossed, so an uncounted pair flickers;
+      <code>dataTransfer.items</code> also carries dragged text and links, whose
+      <code>getAsFile()</code> is <code>null</code>.
+    </p>
+    <p>
+      Loading is <b>sequential and per-file</b>: one bad file reports through <code>onError</code> and the
+      rest still land, and the stacking order matches the order dropped rather than whichever decoded
+      first. Drop a GeoTIFF or a GeoJSON below — or click it, since it is not drag-only.
+    </p>
+    <pre><span class="f">import</span> { createDropzone, DROP_EXTENSIONS } <span class="f">from</span> <span class="s">"fimviz/ui"</span>;
+
+<span class="f">const</span> zone = <span class="f">createDropzone</span>(<span class="s">"#drop"</span>, {
+  fim,
+  add: <span class="s">"layer"</span>,          <span class="k">// 'layer' → addDataset + addLayer · 'dataset' → stop at the Dataset</span>
+                          <span class="k">// 'none'  → just report the File (no `fim` needed)</span>
+  accept: DROP_EXTENSIONS, <span class="k">// or your own array, or a (file) => boolean; [] accepts everything</span>
+  onLoad: (layer, file, i) =&gt; layer.<span class="f">fit</span>(),
+  onError: (err, file) =&gt; console.warn(file.name, err),
+  onDone: (results) =&gt; console.log(<span class="s">`${results.length} loaded`</span>),
+});
+zone.<span class="f">open</span>();   <span class="k">// the file picker, programmatically</span></pre>
+    <div class="mount plain" id="drop"></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-drop">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span><code>createLayerPanel</code> and click-to-select</h2>
+    <p>
+      A view of <code>fim.layers</code> with show/hide, reorder, fit and remove. Two things worth
+      knowing: rows are <b>top-first</b>, the reverse of <code>fim.layers</code>, which is bottom-up —
+      that matches every layer list a user has met, but it means "up" in the panel is toward the
+      <em>end</em> of the array. And <b>hidden layers stay listed</b>, struck through: a layer you cannot
+      see is exactly the one you need a list to find.
+    </p>
+    <p>
+      Reordering moves the array <em>and</em> calls <code>fim.applyLayerOrder()</code>. Both halves
+      matter — the array is what hit-testing walks, and <code>applyLayerOrder</code> is what makes the
+      map draw in the same order. Before that method existed the two could disagree, and the layer
+      receiving a click was not necessarily the one on top.
+    </p>
+    <p>
+      <code>createLayerSelect</code> resolves a map click to the stack of layers under the pointer, and
+      <b>clicking the same spot again advances through it</b> — the only way to reach a layer buried
+      under another. It rides the ordinary click bus rather than modal capture, so hover and feature
+      clicks keep working while it is on.
+    </p>
+    <pre><span class="f">import</span> { createLayerPanel, createLayerSelect, layerLabel } <span class="f">from</span> <span class="s">"fimviz/ui"</span>;
+
+<span class="f">const</span> panel = <span class="f">createLayerPanel</span>(<span class="s">"#layers"</span>, {
+  fim, pretty: <span class="f">true</span>,
+  onSelect: (layer) =&gt; showSettingsFor(layer),
+  onRemove: (layer) =&gt; console.log(<span class="s">"removed"</span>, <span class="f">layerLabel</span>(layer)),
+});
+
+<span class="f">createLayerSelect</span>(fim, { fit: <span class="f">false</span>, onSelect: (l) =&gt; panel.<span class="f">select</span>(l) });
+<span class="f">layerLabel</span>(layer);   <span class="k">// filename → dataset name → type → id</span></pre>
+    <div class="mount plain" id="layers"></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-layers">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span><code>createToolsPanel</code> — a view over <code>layer.settings</code></h2>
+    <p>
+      Every control writes <code>layer.settings.set({ [key]: value })</code> and nothing else. The preset
+      is picked from the layer's shape: <code>rasterControls</code> offers <b>every key</b>
+      <code>RasterSettings</code> accepts — palette, continuous, min, max, unit, plus row editors for the
+      two mode-switching ones (<code>stops</code> for discrete bands, <code>colorStops</code> for
+      gradient control points) — because a knob the settings layer honours but no preset exposes is a
+      knob nobody can reach. <code>vectorControls</code> offers opacity plus either a flat colour or, when
+      the layer grades features, the same palette controls.
+    </p>
+    <p>
+      The panel <b>does not police</b> the three mutually exclusive colouring modes — it inherits the
+      exclusion from the engine, where each setter clears the others. So adding a band leaves palette
+      mode, and picking a palette is how you get back. Neither editor has a "clear", because emptying
+      <code>stops</code> does not restore palette mode: it leaves an explicit scale with no bands, and
+      nothing painted.
+    </p>
+    <p>
+      <code>reactive: true</code> re-reads the layer when something else changes it — opt-in, because
+      this panel is made of live inputs and a restyle arrives on every keystroke-driven commit. The rule
+      it follows is: <b>if focus is inside the panel, defer the redraw to <code>focusout</code></b>. The
+      user's own edits are exactly the ones that need no repaint.
+    </p>
+    <pre><span class="f">import</span> { createToolsPanel, rasterControls, vectorControls } <span class="f">from</span> <span class="s">"fimviz/ui"</span>;
+
+<span class="f">const</span> tools = <span class="f">createToolsPanel</span>(<span class="s">"#tools"</span>, {
+  layer, pretty: <span class="f">true</span>, reactive: <span class="f">true</span>,
+  <span class="k">// controls: rasterControls(layer),        ← the preset, if you want to inspect it</span>
+  <span class="k">// controls: (l) => [...rasterControls(l), { type:'range', key:'myKnob', label:'Mine' }],</span>
+});
+tools.<span class="f">update</span>();   <span class="k">// re-read on demand</span>
+
+<span class="f">rasterControls</span>(layer);   <span class="k">// PURE — the control spec, node-testable</span></pre>
+    <div class="controls">
+      <label class="ctl">bind to <select id="tools-target"></select></label>
+      <button id="btn-spec">show the control spec</button>
+    </div>
+    <div class="mount plain" id="tools"></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-tools">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">5</span><code>bindLegend</code> / <code>bindStats</code> — read-models that keep up</h2>
+    <p>
+      The same renderers as notebook 3, mounted and kept current, so a host never has to remember to
+      re-read after a repaint. They subscribe to three of the layer's own events and only these three:
+      <code>restyle</code> (the colours changed), <code>recomputed</code> (the pixels changed) and
+      <code>rendered</code> (a draw completed — which is when a legend derived <em>from</em> the grid
+      first exists at all). <code>settings</code> is excluded on purpose: it also fires for knobs that
+      change neither.
+    </p>
+    <p>
+      Four things they handle that hand-rolled re-reading usually does not. <b>Coalescing</b>: one
+      logical change can emit two of those events, so reads batch to one per microtask.
+      <b>Ordering</b>: <code>getStats()</code> is async and a fast sequence of edits can resolve out of
+      order — a stale result is dropped rather than painted over a newer one, because a lagging panel is
+      recoverable and a wrong one is not. <b><code>removed</code></b>: the panel clears rather than
+      showing a legend for a layer that is gone. And <b><code>filter</code> may be a getter</b>, because
+      the usual filter is a drawn region that changes independently of the layer.
+    </p>
+    <pre><span class="f">import</span> { bindLegend, bindStats } <span class="f">from</span> <span class="s">"fimviz/ui"</span>;
+
+<span class="f">const</span> legend = <span class="f">bindLegend</span>(layer, { root: <span class="s">"#legend"</span>, html: <span class="f">true</span>, empty: <span class="s">"no colour scale"</span> });
+<span class="f">const</span> stats  = <span class="f">bindStats</span>(layer,  { root: <span class="s">"#stats"</span>, html: <span class="f">true</span>,
+                              filter: () =&gt; lastRegion });   <span class="k">// a GETTER — see the note above</span>
+
+<span class="f">await</span> layer.<span class="f">set</span>({ palette: <span class="s">"plasma"</span> });   <span class="k">// both repaint themselves</span>
+stats.<span class="f">update</span>();                          <span class="k">// only needed when the FILTER changed</span></pre>
+    <div class="two">
+      <div class="mount plain" id="legend"></div>
+      <div class="mount plain" id="stats"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">6</span>Hover tooltip and feature info window</h2>
+    <p>
+      Both are thin views over the layer-dispatch tier, so <code>fim.enableMapEvents()</code> has to be on
+      — a layer nobody listens to should not pay for a mousemove listener.
+      <code>bindHoverValue</code> reads <code>layer.settings.get('hover')</code> on every move, so a host
+      can suppress the readout with a settings write instead of unbinding.
+      <code>bindFeatureInfo</code> opens on a feature click and closes on a miss;
+      <code>propsTable</code> is the default renderer and is exported separately.
+    </p>
+    <pre><span class="f">import</span> { createTooltip, bindHoverValue,
+         createInfoWindow, bindFeatureInfo, propsTable } <span class="f">from</span> <span class="s">"fimviz/ui"</span>;
+
+fim.<span class="f">enableMapEvents</span>([<span class="s">"click"</span>, <span class="s">"hover"</span>]);
+
+<span class="f">bindHoverValue</span>(rasterLayer, { format: (v) =&gt; <span class="s">`${v.toFixed(2)} m`</span> });
+
+<span class="f">bindFeatureInfo</span>(vectorLayer, {
+  render: (feature) =&gt; <span class="s">`&lt;b&gt;${feature.properties.CountyName}&lt;/b&gt;`</span> + <span class="f">propsTable</span>(feature.properties),
+});
+
+<span class="f">await</span> rasterLayer.<span class="f">set</span>({ hover: <span class="f">false</span> });   <span class="k">// suppress without unbinding</span></pre>
+    <div class="controls">
+      <button id="btn-hover" class="on">hover readout: on</button>
+      <button id="btn-fit-r">fit the raster</button>
+      <button id="btn-fit-v">fit the counties</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-hover">hover the raster, or click a county…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">7</span>Selection — four tools, one geometry</h2>
+    <p>
+      <code>createRegionDraw</code> is <b>modal</b>: while it is active <code>fim.captureInteraction</code>
+      routes every map event to the tool and layer hover/click dispatch is suppressed. Four modes produce
+      <b>one output</b> — rings of <code>{lat,lng}</code> wrapped in a <code>SpatialFilter</code>, which
+      is exactly what <code>dataset.mask()</code> and <code>layer.getStats({ filter })</code> already
+      take, so nothing downstream can tell which tool drew the shape. The brush exploits that a second
+      time: a stamp per stroke sample is just a multi-polygon, which <code>SpatialFilter</code> already
+      unions.
+    </p>
+    <p>
+      Three things a host has to get right, all of them learned in a browser rather than in a test.
+      <b>Enable the events the drag modes need</b> (<code>mousedown</code>/<code>mouseup</code>, or
+      freehand and brush fall back to click-to-start). <b>Wait for the camera</b> — a click resolved
+      mid-animation is projected against the pre-animation view, so <code>await fim.whenIdle()</code>
+      after a <code>fit()</code>. And <b><code>start()</code> is what arms the tool</b>: a UI where
+      picking "brush" does not call it will pan the map under the user's stroke, because for the drag
+      modes <code>start()</code> is also what takes pan-by-drag away.
+    </p>
+    <p>
+      The tool is headless — it names no map SDK, which is what lets it run on Google, Leaflet and a
+      test's fake map alike. <code>createRegionOverlay</code> is the other half, and it draws three
+      feature kinds because <b>a selection is visible long before it is a polygon</b>: a vertex marker
+      from the first click, an open edge at two points, a closed ring at three. It draws through
+      <code>fim.addScratchVector</code> — deliberately <em>not</em> a Layer, so the shape is never
+      hit-tested, reordered, listed or saved.
+    </p>
+    <pre><span class="f">import</span> { createRegionDraw, createRegionOverlay, regionGeoJSON, REGION_MODES } <span class="f">from</span> <span class="s">"fimviz/ui"</span>;
+
+fim.<span class="f">enableMapEvents</span>([<span class="s">"click"</span>, <span class="s">"hover"</span>, <span class="s">"mousedown"</span>, <span class="s">"mouseup"</span>]);
+
+<span class="f">const</span> overlay = <span class="f">createRegionOverlay</span>(fim);
+<span class="f">const</span> draw = <span class="f">createRegionDraw</span>(fim, {
+  mode: <span class="s">"polygon"</span>,        <span class="k">// polygon | rectangle | freehand | brush</span>
+  brushRadius: <span class="s">"2vw"</span>,     <span class="k">// metres as a number, or a SCREEN size re-resolved per stamp</span>
+  onPreview:  (rings, points) =&gt; overlay.<span class="f">show</span>(rings, points),
+  onComplete: (filter, points, rings) =&gt; {
+    overlay.<span class="f">show</span>(rings, points);
+    <span class="f">if</span> (filter) layer.<span class="f">getStats</span>({ filter }).<span class="f">then</span>(report);   <span class="k">// null if the shape has no area</span>
+  },
+  onCancel: () =&gt; overlay.<span class="f">clear</span>(),
+});
+
+draw.<span class="f">setMode</span>(<span class="s">"brush"</span>);   <span class="k">// mid-draw: discards the shape, and does NOT fire onCancel</span>
+draw.<span class="f">start</span>();            <span class="k">// ← arms it. Esc cancels, Enter finishes, Backspace undoes.</span></pre>
+    <div class="controls" id="modes"></div>
+    <div class="controls">
+      <button id="btn-finish">finish</button>
+      <button id="btn-undo">undo</button>
+      <button id="btn-cancel">cancel</button>
+      <button id="btn-clearregion">clear the region</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-region">pick a tool — it arms itself — then draw on the map</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">8</span><code>createOperationsPanel</code> — the ops as a form</h2>
+    <p>
+      Every Dataset operation from notebook 2, driven onto the live layer through
+      <code>deriveSources</code> so memoized ancestors are reused. It is a <b>table, not a form per
+      op</b>: the only thing that genuinely differs between operations is which controls they need and
+      the one line that calls the Dataset, which buys three properties. An op's controls cannot disagree
+      with what it passes. Ops are <b>filtered by kind</b>, so a vector layer is offered
+      <code>rasterize</code> and nothing else — an op that could only ever throw is not shown at all.
+      And an op whose requirement is missing is <b>disabled with the reason printed</b> rather than
+      failing when pressed.
+    </p>
+    <p>
+      The two table-returning terminals — zonal statistics and group-by — report through
+      <code>onResult</code> instead of <code>onApply</code>, because they return data and provably leave
+      <code>layer.sources</code> alone: telling the host "the layer changed" when it had not would be a
+      lie the panel can easily avoid. Draw a region in the previous section first and Mask and Zonal
+      stats light up.
+    </p>
+    <pre><span class="f">import</span> { createOperationsPanel } <span class="f">from</span> <span class="s">"fimviz/ui"</span>;
+
+<span class="f">const</span> ops = <span class="f">createOperationsPanel</span>(<span class="s">"#ops"</span>, {
+  layer, fim, pretty: <span class="f">true</span>,
+  region: () =&gt; lastRegion,      <span class="k">// feeds Mask and Zonal stats</span>
+  layers: () =&gt; fim.layers,      <span class="k">// the operand pool for Combine and Group by</span>
+  open: [<span class="s">"Extent"</span>, <span class="s">"Values"</span>],     <span class="k">// which groups start expanded</span>
+  onApply:  (layer, err) =&gt; err ? report(err) : report(layer),
+  onResult: (id, rows) =&gt; console.table(rows),   <span class="k">// a TERMINAL's table, not a layer change</span>
+});
+ops.ops;   <span class="k">// the op ids actually offered for this layer's kind</span></pre>
+    <div class="mount plain" id="ops"></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-ops">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">9</span><code>bindRasterMetadata</code> — the last of the bus</h2>
+    <p>
+      Renders the <code>raster:metadata</code> / <code>raster:metadata-hidden</code> pair. The engine
+      computes the rows and emits them precisely so it never has to name a panel — this is the panel.
+      Hiding does not clear the payload, because the engine's event means "no longer current", not
+      "forget it". <code>renderRasterMetadata</code> is the pure default renderer, for a host that wants
+      its own chrome. In this bundle only app-tier layers emit the event, so the button below emits one
+      by hand.
+    </p>
+    <pre><span class="f">import</span> { bindRasterMetadata, renderRasterMetadata } <span class="f">from</span> <span class="s">"fimviz/ui"</span>;
+
+<span class="f">const</span> meta = <span class="f">bindRasterMetadata</span>(fim, { root: <span class="s">"#meta"</span> });
+meta.shown; meta.payload; meta.<span class="f">off</span>();
+
+<span class="f">renderRasterMetadata</span>(payload);   <span class="k">// PURE — the same rows, as HTML</span></pre>
+    <div class="controls">
+      <button id="btn-meta">emit raster:metadata</button>
+      <button id="btn-meta-hide">emit raster:metadata-hidden</button>
+    </div>
+    <div class="mount plain" id="meta"></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-meta">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">10</span>The one widget that lives elsewhere</h2>
+    <p>
+      <code>createAxisSlider</code> — plus <code>axisOf</code> and <code>axisEntryLabel</code> — belongs
+      to the selection-axis model, so it is demonstrated where that model is:
+      <a href="04-temporal.html">notebook 4</a>. It is not a time slider; scrubbing is
+      <code>layer.setSources([ds.select(coord)])</code>, which says nothing about time.
+    </p>
+  </section>
+
+</div>
+
+<aside>
+  <div id="map"></div>
+  <div class="card">
+    <h3>Keys, while a selection tool is armed</h3>
+    <kbd>Enter</kbd> finish · <kbd>Esc</kbd> cancel · <kbd>Backspace</kbd> undo the last vertex.
+    Drag modes suppress map panning for the length of the stroke, and the trailing click a
+    press-drag-release emits is swallowed so the end of a stroke does not also select what is under it.
+  </div>
+  <div class="card">
+    <h3>Provider</h3>
+    <span id="prov">…</span> — add <code>?provider=google</code> to run the same page on Google Maps.
+  </div>
+</aside>
+</main>
+
+<nav class="more wrap">
+  Next: <a href="06-storage-and-records.html">6 · Storage &amp; records</a> ·
+  back to <a href="04-temporal.html">4 · Temporal data</a>
+</nav>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js"
+} }
+</script>
+
+<script type="module">
+import { FimViz, ColorScale } from "fimviz";
+import {
+  createToast, connectToast, createBusyIndicator, bindRasterMetadata, renderRasterMetadata,
+  createTooltip, bindHoverValue, createInfoWindow, bindFeatureInfo, propsTable,
+  createToolsPanel, rasterControls, vectorControls,
+  bindLegend, bindStats,
+  createRegionDraw, createRegionOverlay, regionGeoJSON, REGION_MODES,
+  createOperationsPanel, createLayerPanel, createLayerSelect, layerLabel,
+  createDropzone, DROP_EXTENSIONS,
+} from "fimviz/ui";
+
+const $ = (s) => document.querySelector(s);
+const show = (sel, v, bad = false) => {
+  const el = $(sel);
+  el.className = "out" + (bad ? " bad" : "");
+  el.textContent = typeof v === "string" ? v : JSON.stringify(v, null, 2);
+};
+const round = (n, d = 3) => (typeof n === "number" && Number.isFinite(n) ? +n.toFixed(d) : n);
+
+async function sample(name) {
+  const res = await fetch(`../assets/SampleFiles/${name}`);
+  if (!res.ok) throw new Error(`${name}: HTTP ${res.status} — serve the REPO ROOT, not /examples`);
+  return new File([await res.blob()], name);
+}
+
+const useGoogle = new URLSearchParams(location.search).get("provider") === "google";
+let apiKey = "";
+if (useGoogle) {
+  apiKey = localStorage.getItem("fimviz.googleKey") || prompt("Google Maps JS API key") || "";
+  localStorage.setItem("fimviz.googleKey", apiKey);
+}
+const fim = await FimViz.mount("#map", useGoogle ? { provider: "google", apiKey } : { provider: "leaflet" });
+$("#prov").textContent = fim.config.provider;
+
+// Two layers in two places, so "fit" is worth having and the layer list has something to reorder.
+const raster = await fim.addLayer(await fim.addDataset(await sample("4326.tif")));
+await raster.set({ palette: "viridis", continuous: true, min: 0, max: 10, unit: "m" });
+raster.fit();
+
+const counties = await fim.addLayer("vector", {
+  source: await fim.addDataset(await sample("Iowa_County_Boundaries.json")),
+  style: { fillColor: "#3fb950", fillOpacity: 0.12, strokeColor: "#3fb950", strokeWidth: 1 },
+});
+// A vector layer can grade features by a property with the SAME ColorScale class a raster uses.
+await counties.set({
+  colorScale: new ColorScale({ palette: "plasma", min: 0, max: 4e9, continuous: false }),
+  colorBy: "SHAPE_Area",
+});
+
+// Layer dispatch: hover/click routed to layers by hit-test and z-order. The two drag modes of the
+// selection tier also need mousedown/mouseup, so they are enabled up front.
+fim.enableMapEvents(["click", "hover", "mousedown", "mouseup"]);
+
+// ---------------------------------------------------------------- 1 · toast + busy
+// connectToast creates a toast if you don't pass one; passing it is how you choose the corner.
+const toast = connectToast(fim, createToast(document.body, { corner: "br" }));
+const busy = createBusyIndicator(fim, {
+  root: "#busy",
+  label: (sources) => `working: ${sources.join(", ")}`,
+});
+document.querySelectorAll("[data-notify]").forEach((b) => b.addEventListener("click", () => {
+  const level = b.dataset.notify;
+  fim.emit("notify", { message: `a ${level} message from the engine bus`, level });
+  show("#o-bus", {
+    emitted: { event: "notify", level },
+    subscriber: "connectToast — the engine names no element of yours; it reports what happened",
+    alsoSurfaced: ["layer:raster-oversized", "layer:crs-unrenderable"],
+    deliberatelyUnbound: ["storage:changed", "upload:complete"],
+  });
+}));
+$("#btn-busy").addEventListener("click", async () => {
+  // Two overlapping sources: the indicator must survive the first one finishing.
+  fim.emit("busy", { active: true, source: "parse" });
+  fim.emit("busy", { active: true, source: "reproject" });
+  show("#o-bus", { active: busy.active, sources: busy.sources, note: "two sources in flight" });
+  setTimeout(() => {
+    fim.emit("busy", { active: false, source: "parse" });
+    show("#o-bus", {
+      active: busy.active, sources: busy.sources,
+      note: "one finished, the indicator stays — a single boolean would have hidden it here",
+    });
+  }, 1200);
+  setTimeout(() => {
+    fim.emit("busy", { active: false, source: "reproject" });
+    show("#o-bus", { active: busy.active, sources: busy.sources, note: "both done — cleared" });
+  }, 2400);
+});
+
+// ---------------------------------------------------------------- 2 · dropzone
+createDropzone("#drop", {
+  fim,
+  add: "layer",
+  label: "Drop a GeoTIFF / GeoJSON / KMZ here, or click to browse",
+  onLoad: (layer, file, i) => {
+    layer.fit();
+    show("#o-drop", { loaded: file.name, index: i, layerId: layer.id, layers: fim.layers.length });
+  },
+  onError: (err, file) => show("#o-drop", `${file.name}: ${err.message}`, true),
+  onDone: (results) => show("#o-drop", {
+    files: results.length,
+    accepted: DROP_EXTENSIONS,
+    order: "sequential — stacking order matches drop order, and one bad file doesn't take the rest down",
+  }),
+});
+show("#o-drop", { accepts: DROP_EXTENSIONS });
+
+// ---------------------------------------------------------------- 3 · layer panel + select
+const panel = createLayerPanel("#layers", {
+  fim, pretty: true,
+  onSelect: (layer) => { bindTools(layer); reportLayers(`selected ${layerLabel(layer)}`); },
+  onRemove: (layer) => reportLayers(`removed ${layerLabel(layer)}`),
+});
+createLayerSelect(fim, { fit: false, onSelect: (l) => { panel.select(l); bindTools(l); } });
+function reportLayers(note) {
+  show("#o-layers", {
+    note,
+    "fim.layers (bottom-up)": fim.layers.map((l) => layerLabel(l)),
+    panelOrder: "top-first — the reverse of the array",
+    selected: panel.selected ? layerLabel(panel.selected) : null,
+  });
+}
+fim.on("layers:changed", ({ reason }) => reportLayers(`layers:changed (${reason})`));
+reportLayers("click a layer name, or click the map twice in one spot to cycle the stack");
+
+// ---------------------------------------------------------------- 4 · tools panel
+let tools = null, toolsLayer = raster;
+for (const l of [raster, counties]) {
+  const o = document.createElement("option");
+  o.value = l.id;
+  o.textContent = layerLabel(l);
+  $("#tools-target").append(o);
+}
+function bindTools(layer) {
+  if (!layer || layer === toolsLayer && tools) return;
+  toolsLayer = layer;
+  $("#tools-target").value = layer.id;
+  tools?.destroy();
+  // The preset is auto-picked from the layer's shape: valueAt → raster, featureAt → vector.
+  tools = createToolsPanel("#tools", { layer, pretty: true, reactive: true });
+  bindReadModels(layer);
+  show("#o-tools", {
+    boundTo: layerLabel(layer),
+    preset: layer.valueAt ? "rasterControls" : "vectorControls",
+    controls: (layer.valueAt ? rasterControls(layer) : vectorControls(layer)).map((c) => c.key),
+    reactive: "true — but a redraw is deferred while focus is inside the panel",
+  });
+}
+$("#tools-target").addEventListener("change", (e) => {
+  bindTools(fim.getLayer(e.target.value));
+});
+$("#btn-spec").addEventListener("click", () => {
+  const spec = toolsLayer.valueAt ? rasterControls(toolsLayer) : vectorControls(toolsLayer);
+  show("#o-tools", { layer: layerLabel(toolsLayer), spec });
+});
+
+// ---------------------------------------------------------------- 5 · live read-models
+let legendBinding = null, statsBinding = null;
+let lastRegion = null;
+function bindReadModels(layer) {
+  legendBinding?.destroy();
+  statsBinding?.destroy();
+  legendBinding = bindLegend(layer, { root: "#legend", html: true, empty: "no colour scale yet" });
+  // `filter` is a GETTER because the region changes independently of the layer — the layer emits
+  // nothing when you draw one, so this is the single case that needs an explicit update().
+  statsBinding = bindStats(layer, { root: "#stats", html: true, filter: () => lastRegion,
+    empty: "nothing computed yet" });
+}
+
+// ---------------------------------------------------------------- 6 · tooltip + info window
+const tooltip = createTooltip(fim);
+bindHoverValue(raster, { tooltip, format: (v) => `${v.toFixed(2)} m` });
+// bindHoverValue rides the map's own `map:hover` bus and draws the tooltip; it does not make the
+// LAYER emit anything. The readout below therefore reads the same bus — `layer.enableHover()` is the
+// engine-side alternative that emits a `hover` event on the layer itself (notebook 1 uses that one).
+fim.on("map:hover", ({ lat, lng }) => {
+  const value = raster.valueAt(lat, lng);
+  show("#o-hover", {
+    layer: "4326.tif",
+    value: value == null ? null : round(value, 3),
+    at: { lat: round(lat, 4), lng: round(lng, 4) },
+    tooltipSuppressedWhen: `layer.settings.get('hover') === false (currently ${raster.settings.get("hover")})`,
+  });
+});
+const info = createInfoWindow(fim);
+bindFeatureInfo(counties, {
+  infoWindow: info,
+  render: (f) => `<b>${f.properties.CountyName} County</b>${propsTable(f.properties)}`,
+});
+$("#btn-hover").addEventListener("click", async (e) => {
+  const on = !raster.settings.get("hover");
+  await raster.set({ hover: on });
+  e.target.textContent = `hover readout: ${on ? "on" : "off"}`;
+  e.target.classList.toggle("on", on);
+});
+$("#btn-fit-r").addEventListener("click", () => raster.fit());
+$("#btn-fit-v").addEventListener("click", () => counties.fit());
+
+// ---------------------------------------------------------------- 7 · selection tools
+const overlay = createRegionOverlay(fim);
+const draw = createRegionDraw(fim, {
+  mode: "polygon",
+  brushRadius: "2vw",     // a SCREEN size, re-resolved per stamp, so the brush holds its apparent width
+  onPoint: (points) => show("#o-region", { mode: draw.mode, points: points.length,
+    hint: "Enter finishes · Esc cancels · Backspace undoes" }),
+  onPreview: (rings, points) => overlay.show(rings, points),
+  onComplete: async (filter, points, rings) => {
+    overlay.show(rings, points);
+    lastRegion = filter;                    // ← what bindStats and the ops panel read
+    if (!filter) return show("#o-region", { completed: true, filter: null, why: "the shape has no area" });
+    const scoped = await raster.getStats({ filter });
+    const all = await raster.getStats();
+    statsBinding?.update();                 // the layer emitted nothing — the region is not its business
+    show("#o-region", {
+      mode: draw.mode,
+      rings: rings.length,
+      vertices: points.length,
+      geojsonFeatures: regionGeoJSON(rings, points).features.length,
+      scopedStats: { count: scoped.count, mean: round(scoped.mean), max: round(scoped.max) },
+      wholeLayer: { count: all.count, mean: round(all.mean) },
+      oneOutput: "every mode produced the same thing: rings → SpatialFilter → getStats({ filter })",
+    });
+  },
+  onCancel: () => { overlay.clear(); show("#o-region", { cancelled: true }); },
+});
+for (const mode of REGION_MODES) {
+  const b = document.createElement("button");
+  b.textContent = mode;
+  b.addEventListener("click", async () => {
+    document.querySelectorAll("#modes button").forEach((x) => x.classList.toggle("on", x === b));
+    draw.setMode(mode);
+    await fim.whenIdle();   // a click resolved mid-animation is projected against the old view
+    draw.start();           // ← picking a tool ARMS it; without this the map pans under the stroke
+    show("#o-region", { mode, armed: draw.active, brushRadius: draw.brushRadius,
+      note: "map events are captured — hover and layer clicks are suppressed until you finish" });
+  });
+  $("#modes").append(b);
+}
+$("#btn-finish").addEventListener("click", () => draw.finish());
+$("#btn-undo").addEventListener("click", () => draw.undo());
+$("#btn-cancel").addEventListener("click", () => draw.cancel());
+$("#btn-clearregion").addEventListener("click", () => {
+  lastRegion = null; overlay.clear(); statsBinding?.update();
+  show("#o-region", { region: null, note: "ops needing a region are disabled again" });
+});
+
+// ---------------------------------------------------------------- 8 · operations panel
+const ops = createOperationsPanel("#ops", {
+  layer: raster, fim, pretty: true,
+  region: () => lastRegion,
+  layers: () => fim.layers,
+  onApply: (layer, err) => show("#o-ops", err
+    ? { failed: err.message }
+    : { applied: true, sources: layer.sources.length, dirty: layer.dirty,
+        note: "derived in place — memoized ancestors were reused" }, !!err),
+  onResult: (id, data) => show("#o-ops", {
+    terminal: id,
+    rows: Array.isArray(data) ? data.slice(0, 8) : data,
+    channel: "onResult, not onApply — this returned a table and left layer.sources alone",
+  }),
+});
+show("#o-ops", {
+  offeredForThisLayer: ops.ops,
+  filteredByKind: "a vector layer would be offered `rasterize` and nothing else",
+  disabledWithReason: "ops needing a region, a second raster or an axis say so instead of failing when pressed",
+});
+
+// ---------------------------------------------------------------- 9 · raster metadata
+const metaPanel = bindRasterMetadata(fim, { root: "#meta" });
+const samplePayload = {
+  name: "4326.tif",
+  // Two shapes are accepted: flat `rows` pairs, or `specRows` objects carrying a `num` flag —
+  // which is what makes numeric fields line up in a monospace column.
+  specRows: [
+    { k: "Size", v: "1250 × 769" },
+    { k: "CRS", v: "EPSG:4326" },
+    { k: "No-data", v: -99999, num: true },
+    { k: "Max depth", v: 9.6, num: true },
+  ],
+  showSupp: true,
+};
+$("#btn-meta").addEventListener("click", () => {
+  fim.emit("raster:metadata", samplePayload);
+  show("#o-meta", { shown: metaPanel.shown, payload: metaPanel.payload,
+    pure: renderRasterMetadata(samplePayload).slice(0, 120) + "…" });
+});
+$("#btn-meta-hide").addEventListener("click", () => {
+  fim.emit("raster:metadata-hidden", {});
+  show("#o-meta", {
+    shown: metaPanel.shown,
+    payloadStillThere: metaPanel.payload != null,
+    why: "the engine's event means 'no longer current', not 'forget it'",
+  });
+});
+
+// ---------------------------------------------------------------- go
+bindTools(raster);
+// The button label reflects the real setting rather than assuming its default.
+$("#btn-hover").textContent = `hover readout: ${raster.settings.get("hover") ? "on" : "off"}`;
+$("#btn-hover").classList.toggle("on", !!raster.settings.get("hover"));
+</script>
+</body>
+</html>

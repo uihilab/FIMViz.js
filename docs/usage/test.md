@@ -7,7 +7,7 @@ A companion to the docs in this folder ([USAGE.md](./USAGE.md), [APP_STARTUP.md]
 [DATASET_OPERATIONS.md](./DATASET_OPERATIONS.md)) — one runnable snippet per documented method, in the
 same order as the doc that names it, so you can walk a doc top-to-bottom and paste the matching block
 into the console to check it still behaves as written. Not a test suite (no assertions) — read the
-printed value yourself, same spirit as `examples/method-playground.html`.
+printed value yourself.
 
 ## Contents
 
@@ -25,8 +25,9 @@ These snippets assume a page that has booted a `FimMap` and exposed the package 
 booted `FimMap` as `window.fim` plus every export these snippets use callable directly. Any host page
 that does `import * as FIM from 'fimviz'; import * as UI from 'fimviz/ui';
 Object.assign(window, FIM, UI)` and mounts a map will do — the UI module is a separate entry, so both
-imports are needed. `examples/console-test.html` and `examples/method-playground.html` are two such
-pages you can open in a browser.
+imports are needed. No page in `examples/` does that any more; the quickest bench is to open
+[`examples/01-quickstart.html`](../../examples/01-quickstart.html), which already has a booted map,
+and paste the two imports plus the `Object.assign` into its console.
 
 Registries are reached through the type that owns them (`Layer.registerType`,
 `ColorScale.registerPalette`, `Dataset.registerMaterializer`, `FimViz.registerMapProvider`, …), so
@@ -393,10 +394,9 @@ FimViz.providerAcceptsCRS('google', 'EPSG:26915');// false — needs reprojectin
 FimViz.providerAcceptsCRS('leaflet', null);       // true — unknown CRS treated permissively
 ```
 
-`providerRequiresApiKey(name)` is documented in this doc's seam table but is **not** re-exported from
-the barrel (only `mount.js` uses it internally) — see
-[Doc/reality gaps](#docreality-gaps-found-while-writing-this) below. Exercise the same behavior
-black-box instead, via the error it produces:
+`providerRequiresApiKey(name)` is **not** re-exported from the barrel — only `mount.js` uses it
+internally, and `mount()` already throws `config-invalid` naming the missing key, so nothing was left
+for a caller to do with it. Exercise the same behaviour black-box instead, via the error it produces:
 
 ```js
 try { await mount(document.createElement('div'), { provider: 'google', isolated: true, apiKey: '' }); }

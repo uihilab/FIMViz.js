@@ -1,7 +1,7 @@
 // The event-dispatch first slice + hit-testing + the tools-panel/read-model helpers.
 //
 // Pure parts only (the geometry, z-order dispatch, control specs, renderers). The provider
-// onMapEvent wiring + the DOM widgets are browser-verified in examples/ui-tools.html. Headless.
+// onMapEvent wiring + the DOM widgets are browser-verified in examples/05-ui-toolkit.html. Headless.
 // See docs/PACKAGE_ROADMAP.md §1/§5 and docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1 "Settings vs. Operations".
 
 import { test, describe } from "node:test";

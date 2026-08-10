@@ -1,0 +1,17 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "extends": ["./typedoc.json"],
+
+  "plugin": [],
+  "out": "api",
+  "readme": "scripts/api-index.md",
+  "githubPages": false,
+  "name": "FIMViz.js API",
+  "titleLink": "../index.html",
+  "hideGenerator": true,
+  "navigationLinks": {
+    "Home": "../index.html",
+    "Examples": "../examples/01-quickstart.html",
+    "Guides": "../guides/usage.html"
+  }
+}

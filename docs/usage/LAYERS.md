@@ -14,7 +14,7 @@ specific methods (RasterLayer/VectorLayer/ComparisonLayer/EnsembleAggregationLay
 [Read-models](#read-models) · [Hit-testing](#hit-testing) ·
 [The type registry](#the-type-registry-how-fimaddlayer-dispatches) ·
 [FimMap-side layer registry](#fimmap-side-layer-registry) ·
-[Map-event dispatch](#map-event-dispatch-pure-function-used-by-fimmap)
+[Map-event dispatch](#map-event-dispatch-internal--driven-by-fimenablemapevents)
 
 
 ## Moving a layer to another map

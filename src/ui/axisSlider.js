@@ -6,7 +6,7 @@
 // widget works on any axis the model can express, not just time.
 //
 // Two things it exists to get right, both learned from the hand-rolled version in
-// examples/temporal-netcdf.html: a stale frame must never win, and a play loop must wait for the
+// examples/04-temporal.html: a stale frame must never win, and a play loop must wait for the
 // frame it asked for. Headless rule: DOM only inside functions; no `window.foo()`.
 
 const PRETTY_CSS = `
