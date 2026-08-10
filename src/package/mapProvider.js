@@ -57,6 +57,19 @@ const _providers = new Map();
  * @property {(map: any, handle: any) => void} removeVector - tear a vector handle down.
  * @property {(map: any, bounds: {north: number, south: number, east: number, west: number}) => void} fitBounds -
  *   fit the map's viewport to `bounds`.
+ * @property {(map: any, opts?: { timeout?: number }) => Promise<void>} [whenIdle] - resolve once the
+ *   camera has settled. Safe to await unconditionally: it resolves on a timeout when the map is
+ *   already still, so it can never hang. Anything that reads the projection right after a `fitBounds`
+ *   must await this first — a click resolved mid-animation lands at the wrong coordinates.
+ * @property {(map: any, on: boolean) => void} [setDraggable] - turn pan-by-drag on or off. Drag-based
+ *   selection tools suppress it while drawing, because tracing a stroke and panning the map are the
+ *   same gesture.
+ * @property {(map: any) => ({metresPerPixel: number, width: number, height: number}|null)} [viewMetrics] -
+ *   ground metres per screen pixel, plus the map's pixel size. What lets a tool be sized in SCREEN
+ *   units (a brush that stays the same width as you zoom) without ever touching a map SDK.
+ * @property {(map: any, handles: any[]) => any[]} [applyLayerOrder] - restack overlays to match
+ *   `handles`, ordered bottom → top, and RETURN the handles: a provider may have replaced some (the
+ *   Google raster path recreates them), so callers must adopt the returned array.
  * @property {(map: any, dataUrl: string, bounds: {north: number, south: number, east: number, west: number}, opts?: { opacity?: number, interactive?: boolean }) => any} addRasterImage -
  *   position a pre-rendered image (data URL or any image URL) over `bounds`; returns an opaque
  *   raster-image handle. Non-interactive (`clickable:false`) by default so map events pass through to
@@ -84,6 +97,14 @@ const _providers = new Map();
  * @type {string}
  */
 export const DEFAULT_PROVIDER = "leaflet";
+
+// Ground metres per screen pixel in Web Mercator: the equator is one 256 px tile at zoom 0, and a
+// degree of longitude shortens by cos(lat). Both providers tile the same way, so both compute it the
+// same way — the only difference is how each spells "give me the zoom and the centre".
+const EQUATOR_M = 40075016.686;
+function metresPerPixelAt(lat, zoom) {
+  return (EQUATOR_M * Math.cos((lat * Math.PI) / 180)) / (256 * Math.pow(2, zoom));
+}
 
 /**
  * Register a map backend.
@@ -130,6 +151,12 @@ export function mapProviderNames() {
 // bare colour STRING — the "graded colour" shorthand, expanded to `{ fillColor, strokeColor }`. The
 // callback sees the ORIGINAL GeoJSON feature and the same 0-based index on EVERY provider; each
 // adapter maps its own SDK feature back to that (see addVector below). See resolveFeatureStyle.
+// POINT GEOMETRY is the one case the path vocabulary above cannot express on either provider: a
+// google.maps.Data point draws an `icon`, not a filled path, and Leaflet's default point is an
+// L.marker whose Icon.Default ignores path options too. So `fillColor`/`strokeColor` silently did
+// nothing for points on BOTH providers. Each adapter now translates the SAME neutral style into its
+// own circle primitive — a google symbol icon, an L.circleMarker — so a styled point looks the same
+// on either. `pointRadius` (px) sizes it.
 /**
  * @typedef {Object} NeutralStyle
  * @property {string} [fillColor]
@@ -137,13 +164,43 @@ export function mapProviderNames() {
  * @property {string} [strokeColor]
  * @property {number} [strokeWidth]
  * @property {number} [strokeOpacity]
+ * @property {number} [pointRadius] - radius in px for Point/MultiPoint features (default 6)
  */
+
+/** Default point radius in px — shared, so a point is the same size on every provider. */
+export const DEFAULT_POINT_RADIUS = 6;
+
+// A unit-radius circle as an SVG path, scaled by `pointRadius`. Spelled out rather than using
+// google.maps.SymbolPath.CIRCLE so the translation stays a PURE function: it is unit-tested under
+// Node, where the google namespace does not exist.
+const UNIT_CIRCLE_PATH = "M 0,-1 A 1,1 0 1,0 0,1 A 1,1 0 1,0 0,-1 Z";
+
+/**
+ * The neutral style of a POINT feature → a `google.maps.Symbol` for `Data.StyleOptions.icon`.
+ * @param {NeutralStyle} [s]
+ * @returns {Object} a google.maps.Symbol
+ */
+export function styleToGooglePoint(s = {}) {
+  const { fillColor, fillOpacity, strokeColor, strokeWidth, strokeOpacity, pointRadius } = s;
+  return {
+    path: UNIT_CIRCLE_PATH,
+    scale: pointRadius ?? DEFAULT_POINT_RADIUS,
+    // A symbol defaults to fillOpacity 0 (invisible), unlike a path — so a supplied fillColor
+    // implies a fully opaque fill unless the caller said otherwise.
+    ...(fillColor != null ? { fillColor, fillOpacity: fillOpacity ?? 1 } : {}),
+    ...(strokeColor != null ? { strokeColor } : {}),
+    ...(strokeWidth != null ? { strokeWeight: strokeWidth } : {}),
+    ...(strokeOpacity != null ? { strokeOpacity } : {}),
+  };
+}
+
 /**
  * @param {NeutralStyle} [s]
  * @returns {Object} a `google.maps.Data` style object
  */
 export function styleToGoogle(s = {}) {
-  const { strokeColor, strokeWidth, strokeOpacity, fillColor, fillOpacity, ...rest } = s;
+  const { strokeColor, strokeWidth, strokeOpacity, fillColor, fillOpacity, pointRadius, ...rest } = s;
+  void pointRadius;                                                // point-only; see styleToGooglePoint
   return {
     ...rest,                                                       // provider-native extras (icon, …)
     ...(fillColor != null ? { fillColor } : {}),
@@ -158,7 +215,7 @@ export function styleToGoogle(s = {}) {
  * @returns {Object} Leaflet path options
  */
 export function styleToLeaflet(s = {}) {
-  const { strokeColor, strokeWidth, strokeOpacity, fillColor, fillOpacity, ...rest } = s;
+  const { strokeColor, strokeWidth, strokeOpacity, fillColor, fillOpacity, pointRadius, ...rest } = s;
   return {
     ...rest,                                                       // provider-native extras (dashArray, …)
     ...(fillColor != null ? { fillColor, fill: true } : {}),
@@ -166,6 +223,7 @@ export function styleToLeaflet(s = {}) {
     ...(strokeColor != null ? { color: strokeColor } : {}),       // stroke color → Leaflet's `color`
     ...(strokeWidth != null ? { weight: strokeWidth } : {}),      // px width → Leaflet's `weight`
     ...(strokeOpacity != null ? { opacity: strokeOpacity } : {}),
+    ...(pointRadius != null ? { radius: pointRadius } : {}),      // L.circleMarker's `radius`
   };
 }
 
@@ -278,17 +336,24 @@ registerMapProvider("google", {
     // eslint-disable-next-line no-undef
     const data = new google.maps.Data();
     const added = data.addGeoJson(geojson);   // Data.Feature[] in document order
-    if (typeof style === "function") {
+    if (style) {
       // google.maps.Data.setStyle accepts a per-feature function, but hands it a Data.Feature — not
       // the GeoJSON feature. Map it back by add order so the callback sees feature.properties/geometry.
+      // Always a FUNCTION, even for a static style object: the geometry TYPE decides whether the
+      // style becomes path options or a point symbol, and only the callback sees it.
       const feats = featuresOf(geojson);
       const indexOf = new Map(added.map((df, i) => [df, i]));
       data.setStyle((df) => {
         const i = indexOf.get(df) ?? 0;
-        return styleToGoogle(resolveFeatureStyle(style, feats[i], i));
+        const neutral = typeof style === "function" ? resolveFeatureStyle(style, feats[i], i) : style;
+        const out = styleToGoogle(neutral);
+        // Points draw an icon, not a path — translate the same neutral style into a circle symbol,
+        // unless the caller passed a provider-native `icon` of their own (which `rest` preserved).
+        if (out.icon == null && /Point$/.test(df.getGeometry?.()?.getType?.() || "")) {
+          out.icon = styleToGooglePoint(neutral);
+        }
+        return out;
       });
-    } else if (style) {
-      data.setStyle(styleToGoogle(style));   // neutral vocab → google.maps.Data style
     }
     data.setMap(map);
     return data;
@@ -362,6 +427,83 @@ registerMapProvider("google", {
       cb({ lat: e.latLng.lat(), lng: e.latLng.lng() }));
     // eslint-disable-next-line no-undef
     return () => google.maps.event.removeListener(listener);
+  },
+
+  /**
+   * Turn pan-by-drag on or off. Drag-based selection (freehand, brush) is otherwise unusable: the
+   * same gesture that traces the stroke also pans the map, so the stroke is drawn against a moving
+   * projection and lands nowhere near where it was drawn.
+   * @param {any} map @param {boolean} on
+   */
+  setDraggable(map, on) { map?.setOptions?.({ draggable: !!on }); },
+
+  /**
+   * What one screen pixel is worth on the ground right now, plus the map's pixel size — enough to
+   * express a tool's size in SCREEN units (a brush that stays the same width as you zoom) without the
+   * tool ever touching a map SDK.
+   * @param {any} map @returns {{metresPerPixel: number, width: number, height: number}|null}
+   */
+  viewMetrics(map) {
+    const zoom = map?.getZoom?.(), centre = map?.getCenter?.();
+    if (zoom == null || !centre) return null;
+    const div = map.getDiv?.();
+    return {
+      metresPerPixel: metresPerPixelAt(centre.lat(), zoom),
+      width: div?.offsetWidth ?? 0,
+      height: div?.offsetHeight ?? 0,
+    };
+  },
+
+  /** @returns {Promise<void>} resolves once the camera has settled. */
+  whenIdle(map, { timeout = 400 } = {}) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        // eslint-disable-next-line no-undef
+        google.maps.event.removeListener(listener);
+        resolve();
+      };
+      // eslint-disable-next-line no-undef
+      const listener = google.maps.event.addListenerOnce(map, "idle", finish);
+      // 'idle' does not fire for a map that is ALREADY idle, so the timer is what makes this safe to
+      // await unconditionally — without it, `await whenIdle()` on a still map would hang forever.
+      const timer = setTimeout(finish, timeout);
+    });
+  },
+
+  /**
+   * Restack overlays to match `handles`, ordered bottom → top. Returns the handles, since some may
+   * have been REPLACED (see below) — callers must adopt the returned array.
+   *
+   * Google's `GroundOverlay` exposes no z-index of any kind: its constructor takes only
+   * `{ opacity, clickable, map }` and there is no public reorder. So a raster is restacked by
+   * removing it and re-adding it in the right order, which is why the handle changes. That costs a
+   * flicker and an image re-fetch per reorder — deliberate, because the alternative (replacing
+   * GroundOverlay with a custom OverlayView whose DOM node we own) rewrites the working raster path
+   * on the provider half with the least test coverage. Both live behind this one method, so that
+   * upgrade is available later without touching a single caller.
+   *
+   * KNOWN LIMIT: `google.maps.Data` vectors always draw ABOVE ground overlays in Google's own
+   * stacking, and putting a raster over a vector would mean styling every feature's `zIndex` and
+   * clobbering the host's own style function. So on Google, raster-over-vector is not honoured —
+   * rasters restack among themselves, vectors stay on top.
+   */
+  applyLayerOrder(map, handles = []) {
+    const rasters = handles.filter((h) => h && typeof h.getUrl === "function");
+    return handles.map((h) => {
+      if (!rasters.includes(h)) return h;               // vectors: nothing to do (see the limit above)
+      const url = h.getUrl(), bounds = h.getBounds();
+      const opacity = h.get?.("opacity") ?? 1;
+      const clickable = !!h.get?.("clickable");
+      h.setMap(null);
+      // eslint-disable-next-line no-undef
+      const next = new google.maps.GroundOverlay(url, bounds, { opacity, clickable });
+      next.setMap(map);
+      return next;
+    });
   },
 
   // ---- generalized map events (the event-dispatch first slice — PACKAGE_ROADMAP §1) ----
@@ -466,15 +608,27 @@ registerMapProvider("leaflet", {
   addVector(map, geojson, { style } = {}) {
     const L = _leaflet;
     if (!L) throw new Error("leaflet provider: addVector called before a leaflet map was created");
-    let opts = {};
-    if (typeof style === "function") {
-      // L.geoJSON's style callback gets the GeoJSON feature but no index; recover it from a
-      // reference map (L.geoJSON keeps the original feature object as layer.feature).
-      const indexOf = new Map(featuresOf(geojson).map((f, i) => [f, i]));
-      opts = { style: (feature) => styleToLeaflet(resolveFeatureStyle(style, feature, indexOf.get(feature) ?? 0)) };
-    } else if (style) {
-      opts = { style: () => styleToLeaflet(style) };   // neutral vocab → L path opts
-    }
+    // L.geoJSON's style callback gets the GeoJSON feature but no index; recover it from a
+    // reference map (L.geoJSON keeps the original feature object as layer.feature).
+    const indexOf = typeof style === "function"
+      ? new Map(featuresOf(geojson).map((f, i) => [f, i]))
+      : null;
+    const neutralFor = (feature) => (typeof style === "function"
+      ? resolveFeatureStyle(style, feature, indexOf.get(feature) ?? 0)
+      : (style || {}));
+
+    const opts = {
+      // Leaflet's default for a Point is L.marker with Icon.Default, which resolves its PNGs from
+      // the URL of a `<script src=".../leaflet.js">` tag. This package BUNDLES Leaflet, so that tag
+      // never exists, Icon.Default falls back to a page-relative `images/marker-icon.png`, and every
+      // point renders as a broken image. A circleMarker needs no asset at all AND honours the
+      // neutral style vocabulary that an icon marker ignores — the same circle google draws above.
+      pointToLayer: (feature, latlng) => {
+        const s = neutralFor(feature);
+        return L.circleMarker(latlng, { radius: DEFAULT_POINT_RADIUS, ...styleToLeaflet(s) });
+      },
+    };
+    if (style) opts.style = (feature) => styleToLeaflet(neutralFor(feature));   // neutral vocab → L path opts
     const layer = L.geoJSON(geojson, opts);
     layer.addTo(map);
     return layer;
@@ -535,6 +689,63 @@ registerMapProvider("leaflet", {
     const handler = (e) => cb({ lat: e.latlng.lat, lng: e.latlng.lng });
     map.on("mousemove", handler);
     return () => map.off("mousemove", handler);
+  },
+
+  /**
+   * Turn pan-by-drag on or off — the same contract the google provider implements, for the same
+   * reason: a freehand stroke and a map pan are the same gesture, so one must be suppressed.
+   * @param {any} map @param {boolean} on
+   */
+  setDraggable(map, on) { if (on) map?.dragging?.enable?.(); else map?.dragging?.disable?.(); },
+
+  /**
+   * Ground metres per screen pixel + the map's pixel size — the same contract the google provider
+   * implements, from Leaflet's own accessors.
+   * @param {any} map @returns {{metresPerPixel: number, width: number, height: number}|null}
+   */
+  viewMetrics(map) {
+    const zoom = map?.getZoom?.(), centre = map?.getCenter?.();
+    if (zoom == null || !centre) return null;
+    const size = map.getSize?.();
+    return {
+      metresPerPixel: metresPerPixelAt(centre.lat, zoom),
+      width: size?.x ?? 0,
+      height: size?.y ?? 0,
+    };
+  },
+
+  /** @returns {Promise<void>} resolves once the camera has settled. */
+  whenIdle(map, { timeout = 400 } = {}) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        map.off("moveend", finish);
+        map.off("zoomend", finish);
+        resolve();
+      };
+      map.on("moveend", finish);
+      map.on("zoomend", finish);
+      // Neither event fires for a map that is ALREADY still, so the timer is what makes this safe to
+      // await unconditionally. It also caps the wait if an animation is interrupted mid-flight.
+      const timer = setTimeout(finish, timeout);
+    });
+  },
+
+  /**
+   * Restack overlays to match `handles`, ordered bottom → top. Returns the same handles — unlike
+   * Google, nothing has to be recreated here.
+   *
+   * `bringToFront()` exists on both handle types (`L.ImageOverlay` and `L.GeoJSON`, via
+   * `L.FeatureGroup`), and calling it over the list in order leaves the last one on top. That is
+   * simpler and more reliable than assigning z-indices: Leaflet has no z-index for vector paths at
+   * all, only pane-relative DOM order, so a `setZIndex`-shaped API would be a half-truth.
+   */
+  applyLayerOrder(map, handles = []) {
+    for (const h of handles) h?.bringToFront?.();
+    return handles;
   },
 
   // ---- generalized map events: the SAME contract the google provider implements ----

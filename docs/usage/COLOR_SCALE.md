@@ -148,6 +148,18 @@ cs.set({ missingColor: null });         // the default: no colour at all
 grid's `noData` is a separate, earlier decision — see [LAYER_SUBTYPES.md](./LAYER_SUBTYPES.md)).
 Set it when "no data here" is information the reader should see rather than a gap.
 
+`getColor`/`getRgb` apply this **before** any arithmetic, which is the whole point: numeric coercion
+turns `null` and `''` into `0`, so an absent value would otherwise take the colour of the domain
+minimum — "no data" rendering as "the lowest reading". With no `missingColor` set, both return
+`null`; with one set, `getColor` returns it **verbatim** (so any CSS colour works) and `getRgb`
+parses it (6-digit hex). Note `0` is a *value* and still colours normally.
+
+### Reading the domain back
+
+`getValues()` returns the breakpoints — `[min, …, max]` — for **both** kinds of scale, so
+`getValues()[0]` and `.at(-1)` are the public way to read a scale's domain. There are deliberately no
+`min`/`max` getters; `set({ min, max })` writes them and this reads them back.
+
 Because it is orthogonal to the modes, switching palette/stops/colorStops leaves it in place.
 
 ## The override callback (`colorFor`)

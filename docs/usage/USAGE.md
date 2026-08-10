@@ -21,15 +21,18 @@ The package is a **headless flood-visualization engine**. Two ways to use it:
 > [UI.md](./UI.md) (the opt-in headless UI module — toast/tooltip/info-window/tools-panel/
 > region-draw/operations-panel).
 
-**Try it:** serve the repo root (`npx serve .`) and open [`examples/test.html`](../../examples/test.html) for a
-smoke test, [`examples/api-test.esm.html`](../../examples/api-test.esm.html) for the full bench, or
-[`examples/method-playground.html`](../../examples/method-playground.html) for every public method with sample
-parameters.
+**Try it:** serve the repo root (`npx serve .`) and open
+[`examples/01-quickstart.html`](../../examples/01-quickstart.html). Six runnable pages cover the
+package end to end — quickstart, [Dataset operations](../../examples/02-datasets-and-ops.html),
+[colour and the read-models](../../examples/03-color-and-read-models.html),
+[temporal data](../../examples/04-temporal.html), [the UI module](../../examples/05-ui-toolkit.html)
+and [storage](../../examples/06-storage-and-records.html) — each explaining what it is doing beside
+the code that does it. See [examples/README.md](../../examples/README.md).
 
 ## Contents
 
 [Install](#install--import) · [Booting the widget](#booting-the-widget) · [`FimViz`](#fimviz-namespace) ·
-[`FimMap`](#fimmap-instance) · [Configuration](#configuration) · [Events](#events) · [`Dataset`](#dataset) ·
+[`FimMap`](#fimmap-instance-from-mountcreate) · [Configuration](#configuration) · [Events](#events) · [`Dataset`](#dataset) ·
 [`warp`](#warp) · [`Storage`](#storage) · [`ColorScale`](#colorscale) · [Palettes](#palettes) ·
 [`Legend`](#legend) · [`Stats`](#stats) · [Filters](#filters) · [`Layer`](#layer) ·
 [From file to rendered layer](#from-file-to-rendered-layer) ·
@@ -92,7 +95,7 @@ import { createToast, createToolsPanel, bindHoverValue } from 'fimviz/ui';
 | Specifier | Resolves to | For |
 |---|---|---|
 | `fimviz` | `dist/fimviz.js` | the whole engine — everything above |
-| `fimviz/ui` | `dist/ui.js` | the [headless UI module](./UI.md) — its **only** home, deliberately not re-exported by the barrel. Its own build entry pulls just the small pure deps (no geotiff, no Maps loader, no GDAL), so a consumer who wants a toast or a tools panel downloads ~17 KB; and with one entry an app can't end up running two copies with two registries |
+| `fimviz/ui` | `dist/ui.js` | the [headless UI module](./UI.md) — its **only** home, deliberately not re-exported by the barrel. Its own build entry pulls just the small pure deps (no geotiff, no Maps loader, no GDAL), so a consumer who wants a toast or a tools panel downloads ~56 KB; and with one entry an app can't end up running two copies with two registries |
 | `fimviz/src` | `src/package/lib.js` | the same barrel as raw, unbundled source — bring your own bundler |
 | `fimviz/src/*` | any source module | the escape hatch for an internal the barrel doesn't re-export, e.g. `fimviz/src/io/parsePrimitives.js` for the parse primitives without the Maps loader |
 
@@ -198,9 +201,31 @@ name/extension). Supported: `geotiff` (.tif/.tiff), `geojson` (.geojson/.json, i
 `kmz`, `shp` (a .zip with .shp/.dbf/.shx), `csv` (a `latField`/`lngField` column pair, or a
 `geometryField` of WKT/GeoJSON per row — auto-detected from common column names when omitted; use
 `csvHeaders(text)` to read the header row and build a mapping picker **before** calling `parseFile`),
-`xyz` (headerless `x y z` point files; `{ swapXY: true }` for northing-first exports). **Parsing never
-reprojects** — the Dataset comes back in its **native** `crs`; warp deliberately with
-[`warp`](#warp).
+`xyz` (headerless `x y z` point files; `{ swapXY: true }` for northing-first exports), and the
+multi-dimensional scientific formats below. **Parsing never reprojects** — the Dataset comes back in
+its **native** `crs`; warp deliberately with [`warp`](#warp).
+
+**Multi-dimensional scientific formats** — `netcdf4`/`netcdf3` (.nc/.nc4/.cdf), `grib2`
+(.grib/.grib2/.grb2) and `zarr` (a store URL) — parse through this same call. The extension only
+routes; the file's own header decides which of the four it is, and that is what lands on `ds.format`.
+The result is a `Dataset` with a real **time axis**, so `select()` scrubs a timestep and `reduce()`
+collapses the series. Extra options, all optional: `{ variable }` (defaults to the first supported
+one — one variable per Dataset), `{ grid: { bbox, width, height } }` (a **partial** override of the
+native grid; required for GRIB2/NetCDF3 and for curvilinear files, which report no extent),
+`{ series }` (the time axis — supply `coords` to label a file nothing else can, or `false` for a
+single grid), `{ dims: { order } }` (`'yx'` CF default, or `'xy'`), `{ lon }`
+(`'native'`/`'-180..180'`/`'0..360'`), and `{ allowExtraDims: true }` to accept a collapsed vertical
+level or ensemble member. NetCDF3 needs none of these in practice: its extent and timestamps are read
+from the file's own CF coordinate variables by `io/netcdf3.js`, the one container format FIMViz parses
+itself (header only, and only for files it fully recognises). See
+[DATASET_OPERATIONS.md → Reading NetCDF / GRIB2 / Zarr](./DATASET_OPERATIONS.md#reading-netcdf--grib2--zarr)
+and the live page at `examples/04-temporal.html`.
+
+> **One packaging caveat.** The reader for these four formats is a ~193 KB-wasm dependency that is
+> **external** to `dist/fimviz.js`: nothing is downloaded unless one of these files is actually
+> opened, and nothing at all is bundled. A bundler consumer needs `sciwrid-toolkit` installed; a raw
+> `<script type="module">` page needs an import-map entry for it (see `examples/04-temporal.html`).
+> Without either, only these formats fail, and the thrown error says exactly this.
 
 ### `FimVizInstance` (via `FimViz.current()` or `fim.app`)
 
@@ -317,8 +342,8 @@ conventions the reference app uses.
 **The engine names no element of yours.** It never looks up an id, sets a `style`, or writes text into
 your page — it reports *what happened* and you decide what that looks like. `busy` is the clearest case:
 the engine says it is working, and whether that means a spinner, a cursor or nothing is entirely yours.
-`examples/depth-events.html` is a host with none of the reference app's markup, driving its own spinner,
-hover readout and legend from these events alone.
+`examples/05-ui-toolkit.html` drives a spinner, a hover readout, a legend and a stats panel from these
+events alone, using nothing but the widgets in `fimviz/ui`.
 
 ---
 

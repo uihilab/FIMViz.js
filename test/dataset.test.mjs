@@ -220,3 +220,248 @@ describe("warp (eager free function)", () => {
   // its Emscripten loader fails in Node ("sn.readFileSync is not a function") — so the warp path
   // needs browser verification. Everything up to the getGdal() call is covered above.
 });
+
+// An axis entry's `ref` can be an IN-FILE selector instead of a URL, so one multi-dimensional source
+// (NetCDF/GRIB2/Zarr) backs a whole temporal axis. See docs/PACKAGE_ROADMAP.md §8.
+describe("Dataset: selection axis — in-file selector refs", () => {
+  // A stand-in for a multi-dim reader: decodes whichever slice `root.select` names, and records the
+  // (root, select) pairs it was handed so a test can assert what actually reached the materializer.
+  const seen = [];
+  registerMaterializer("test-nd", async (root, ds) => {
+    seen.push({ kind: root.kind, url: root.url ?? null, select: root.select ?? null, name: ds.name });
+    const v = root.select ? root.select.t * 10 : -1;
+    return new RasterGrid({
+      pixels: Float32Array.from([v, v, v, v]), width: 2, height: 2,
+      bounds: { north: 1, south: 0, east: 1, west: 0 }, crs: "EPSG:4326",
+    });
+  });
+
+  const ndAxis = {
+    name: "time", unit: "h",
+    entries: [
+      { coord: 0, ref: { select: { variable: "TMP", t: 0 } }, meta: { valid: "T00" } },
+      { coord: 6, ref: { select: { variable: "TMP", t: 1 } }, meta: { valid: "T06" } },
+    ],
+  };
+  const ndSource = () => new Dataset({
+    name: "forecast.nc", kind: "raster", format: "test-nd", crs: "EPSG:4326",
+    bounds: { north: 1, south: 0, east: 1, west: 0 },
+    data: new ArrayBuffer(8), axis: ndAxis,
+  });
+
+  test("a selector entry yields a child on the SAME source, carrying the selection", () => {
+    const ds = ndSource();
+    const child = ds.select(6);
+    assert.deepEqual(child.selector, { variable: "TMP", t: 1 }, "the selection rides on the child");
+    assert.equal(child.data, ds.data, "shares the parent's bytes — not a second download");
+    assert.equal(child.format, "test-nd", "same file, so the same materializer decodes it");
+    assert.equal(child.kind, "raster");
+    assert.equal(child.axes, null, "a child is ONE payload, not a series — so it can force");
+    assert.equal(child.meta.valid, "T06", "the entry's meta is merged over the parent's");
+  });
+
+  test("nearest-coord lookup works the same as it does for URL refs", () => {
+    assert.deepEqual(ndSource().select(5).selector, { variable: "TMP", t: 1 }, "5 → nearest coord 6");
+  });
+
+  test("forcing a selector child hands the materializer BOTH the source and the selection", async () => {
+    seen.length = 0;
+    const grid = await ndSource().select(6).grid();
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].kind, "inline", "the parent's inline source, unchanged");
+    assert.deepEqual(seen[0].select, { variable: "TMP", t: 1 }, "…plus which slice to decode");
+    assert.deepEqual([...grid.pixels], [10, 10, 10, 10]);
+  });
+
+  test("a URL-rooted series selects in-file too, resolver and all", async () => {
+    seen.length = 0;
+    const ds = new Dataset({
+      name: "remote.nc", kind: "raster", format: "test-nd",
+      url: "https://data.example/f.nc", resolveUrl: (u) => `https://proxy.example/${u}`,
+      axis: ndAxis,
+    });
+    await ds.select(0).grid();
+    assert.equal(seen[0].kind, "url");
+    assert.equal(seen[0].url, "https://proxy.example/https://data.example/f.nc",
+      "the carried resolver still applies — a proxied series stays proxied across select()");
+    assert.deepEqual(seen[0].select, { variable: "TMP", t: 0 });
+  });
+
+  test("reduce() collapses a selector axis — the payoff of routing through select()", async () => {
+    const mean = await ndSource().reduce("mean").grid();
+    assert.deepEqual([...mean.pixels], [5, 5, 5, 5], "(0*10 + 1*10) / 2");
+    const max = await ndSource().reduce("max").grid();
+    assert.deepEqual([...max.pixels], [10, 10, 10, 10]);
+  });
+
+  test("a selector child round-trips through toRecord/fromRecord", async () => {
+    const back = Dataset.fromRecord(ndSource().select(6).toRecord());
+    assert.deepEqual(back.selector, { variable: "TMP", t: 1 });
+    assert.equal(back.format, "test-nd");
+    assert.equal(back.axes, null);
+    assert.deepEqual([...(await back.grid()).pixels], [10, 10, 10, 10], "and still forces correctly");
+  });
+
+  test("a selector entry with no source to select FROM throws, naming the cause", () => {
+    const orphan = new Dataset({ name: "no-source", format: "test-nd", axis: ndAxis });
+    assert.throws(() => orphan.select(0), /in-file selector.*no source/s);
+  });
+
+  test("URL refs and named variants are untouched by the selector branch", () => {
+    const urlAxis = {
+      name: "stage",
+      entries: [
+        { coord: 1, ref: "a/one.tif" },
+        { coord: 2, ref: { raster: "a/two.tif", vector: "a/two.kmz" } },
+        { coord: 3, ref: { select: "not-an-object" } },
+      ],
+    };
+    const ds = new Dataset({ name: "series", axis: urlAxis, data: new ArrayBuffer(1) });
+    assert.equal(ds.select(1).selector, null, "a bare URL ref is still a URL root");
+    assert.equal(ds.select(2, { variant: "vector" }).name, "two.kmz", "named variants still resolve");
+    assert.throws(() => ds.select(2), /named variants/, "…and still demand a variant");
+    // A variant that happens to be CALLED "select" holds a string, so it is not read as a selector.
+    assert.throws(() => ds.select(3), /named variants/,
+      "the discriminator is an object-valued `select`, not merely the key's presence");
+  });
+});
+
+// selectRange narrows an axis to a window. The distinction that matters: select() resolves to ONE
+// payload, selectRange returns another SERIES — so everything that worked on the whole axis works on
+// the window, reduce() included. See docs/PACKAGE_ROADMAP.md §8.
+describe("Dataset: selectRange — series in, series out", () => {
+  const axis = {
+    name: "time", unit: "ms",
+    entries: [0, 10, 20, 30, 40].map((c) => ({ coord: c, ref: { select: { variable: "V", time: c / 10 } } })),
+  };
+  const series = () => new Dataset({ name: "s", kind: "raster", format: "test-nd",
+    data: new ArrayBuffer(4), axis });
+
+  test("narrows to the inclusive window, keeping the Dataset a series", () => {
+    const win = series().selectRange(10, 30);
+    assert.deepEqual(win.axis.entries.map((e) => e.coord), [10, 20, 30], "both bounds included");
+    assert.equal(win.axes.length, 1, "still a selection-axis Dataset, not a payload");
+    assert.equal(win.selector, null, "…so it carries no selection of its own");
+    assert.equal(win.data, series().data === null ? null : win.data, "sanity");
+  });
+
+  test("the window is itself selectable and reducible — nothing special-cased", () => {
+    const win = series().selectRange(10, 30);
+    assert.deepEqual(win.select(20).selector, { variable: "V", time: 2 }, "select() works on a window");
+    assert.doesNotThrow(() => win.reduce("mean"), "and so does reduce(), over just those entries");
+  });
+
+  test("reversed bounds are swapped, not rejected", () => {
+    assert.deepEqual(series().selectRange(30, 10).axis.entries.map((e) => e.coord), [10, 20, 30]);
+  });
+
+  test("a window narrower than the sampling matches nothing and says so with null", () => {
+    // Deliberately NOT snapped to the nearest entry: a window is already tolerant of falling between
+    // samples, so widening silently would hand back a bigger span than was asked for.
+    assert.equal(series().selectRange(11, 19), null);
+    assert.equal(series().selectRange(100, 200), null, "outside the axis entirely");
+    // …but asking for an axis that does not exist is a MISTAKE, not an empty result, so it throws.
+    assert.throws(() => new Dataset({ name: "no-axes" }).selectRange(0, 1),
+      /no selection axis 0 .*no axes at all/s);
+  });
+
+  test("ISO-8601 string coords compare chronologically, being lexicographic", () => {
+    const iso = new Dataset({ name: "t", axis: { name: "time", entries: [
+      { coord: "2023-08-28T00:00:00Z", ref: "a" }, { coord: "2023-08-29T00:00:00Z", ref: "b" },
+      { coord: "2023-08-30T00:00:00Z", ref: "c" },
+    ] } });
+    const win = iso.selectRange("2023-08-28T12:00:00Z", "2023-08-29T12:00:00Z");
+    assert.deepEqual(win.axis.entries.map((e) => e.coord), ["2023-08-29T00:00:00Z"]);
+  });
+
+  test("a second axis is carried through untouched", () => {
+    const two = new Dataset({ name: "2d", data: new ArrayBuffer(4), axes: [
+      axis, { name: "member", entries: [{ coord: 0, ref: "m0" }, { coord: 1, ref: "m1" }] },
+    ] });
+    const win = two.selectRange(0, 10);
+    assert.equal(win.axes[0].entries.length, 2, "time narrowed");
+    assert.equal(win.axes[1].entries.length, 2, "member untouched");
+    assert.deepEqual(two.selectRange(1, 1, { axis: "member" }).axes[1].entries.map((e) => e.coord), [1],
+      "and the axis can be chosen by name");
+  });
+
+  test("a series is not forceable even though it now carries the file's bytes", async () => {
+    // In-file selectors changed this: a series used to be URL-backed with no `data`, so the
+    // no-source check caught it by accident. It has to stand on `axes` alone now.
+    await assert.rejects(() => series().load(), /selection-axis series.*select\(coord\)/s);
+    await assert.rejects(() => series().selectRange(10, 30).load(), /selection-axis series/);
+  });
+});
+
+// An axis carries its own algebra: which verbs are legal is a property of the AXIS, not the verb.
+// The two flags are independent, which is why there are two — ensemble member is unordered yet
+// reducible; a band axis is ordered yet not. See DatasetAxis in package/dataset.js.
+describe("Dataset: axis algebra (ordered / commensurable)", () => {
+  const entries = [0, 1, 2].map((c) => ({ coord: c, ref: { select: { i: c } } }));
+  const ds = (patch) => new Dataset({ name: "a", kind: "raster", format: "test-nd",
+    data: new ArrayBuffer(4), axis: { name: "ax", entries, ...patch } });
+
+  test("both default to true — every axis built before the flags existed was both", () => {
+    const d = ds({});
+    assert.equal(d.selectAxisEntry(0.4).coord, 0, "nearest-match still applies");
+    assert.ok(d.selectRange(0, 1), "and so does a window");
+    assert.doesNotThrow(() => d.reduce("mean"));
+  });
+
+  test("an UNORDERED axis has no 'between' and no 'nearest' — identities, not magnitudes", () => {
+    const d = ds({ ordered: false });
+    assert.equal(d.selectAxisEntry(1).coord, 1, "exact match is still fine");
+    assert.equal(d.selectAxisEntry(1.4), null,
+      "…but 1.4 must NOT snap to member 1: closest is meaningless on an identity axis");
+    assert.throws(() => d.selectRange(0, 2), /unordered.*no "between"/s);
+    assert.doesNotThrow(() => d.reduce("mean"),
+      "reduce is unaffected — ensemble members are unordered yet perfectly averageable");
+  });
+
+  test("a NON-COMMENSURABLE axis cannot be reduced — different quantities", () => {
+    const d = ds({ commensurable: false });
+    assert.throws(() => d.reduce("mean"), /not commensurable.*different quantities/s);
+    assert.ok(d.select(1), "selecting one entry is still correct");
+    assert.ok(d.selectRange(0, 1), "and a window is fine — bands are ordered even when incomparable");
+  });
+
+  test("the flags are independent, not two names for one thing", () => {
+    // band: ordered, not commensurable. member: unordered, commensurable. Neither implies the other.
+    const band = ds({ ordered: true, commensurable: false });
+    const member = ds({ ordered: false, commensurable: true });
+    assert.ok(band.selectRange(0, 1));
+    assert.throws(() => band.reduce("mean"));
+    assert.throws(() => member.selectRange(0, 1));
+    assert.doesNotThrow(() => member.reduce("mean"));
+  });
+});
+
+// Variants are NOT an axis and deliberately never became one — a variant switches the Dataset's
+// KIND, while every genuine axis preserves kind/CRS/bounds. They therefore need their own discovery
+// route, since "call select() without one and read the error" is no way to build a picker.
+describe("Dataset: named variants are not an axis", () => {
+  const ds = () => new Dataset({ name: "s", axis: { name: "stage", entries: [
+    { coord: 19.5, ref: { raster: "a.tif", vector: "a.kmz" } },
+    { coord: 34, ref: "plain.kmz" },
+    { coord: 40, ref: { select: { t: 0 } } },
+  ] } });
+
+  test("selecting a variant changes KIND — which is why it fails the fold-in test", () => {
+    const r = ds().select(19.5, { variant: "raster" });
+    const v = ds().select(19.5, { variant: "vector" });
+    assert.equal(r.kind, "raster");
+    assert.equal(v.kind, "vector");
+    assert.notEqual(r.crs, v.crs, "…and the CRS too: the Dataset invariant an axis must preserve");
+  });
+
+  test("variantsAt enumerates them, so a picker needs no thrown error to find them", () => {
+    assert.deepEqual(ds().variantsAt(19.5), ["raster", "vector"]);
+    assert.equal(ds().variantsAt(34), null, "a plain URL ref has no variants");
+    assert.equal(ds().variantsAt(40), null, "a selector ref is a slice, not a set of encodings");
+    assert.equal(ds().variantsAt(999, { nearest: false }), null, "no entry, no variants");
+  });
+
+  test("omitting a required variant still throws, naming the ones available", () => {
+    assert.throws(() => ds().select(19.5), /named variants \(raster, vector\)/);
+  });
+});

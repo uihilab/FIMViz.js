@@ -8,7 +8,7 @@
 
 > **hillshadeGrid**(`grid`, `opts?`): [`RasterGrid`](../../materialize/classes/RasterGrid.md)
 
-Defined in: [package/rasterOps.js:285](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/rasterOps.js#L285)
+Defined in: [package/rasterOps.js:378](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/rasterOps.js#L378)
 
 Hillshade — a shaded-relief illumination raster via Horn's method (gdaldem's default hillshade
 algorithm): 0 (dark) – 255 (bright). `altitude`/`azimuth` are the light source's elevation/compass

@@ -1,8 +1,13 @@
-// ui/readModels.js — thin renderers over the Legend/Stats read-models (PACKAGE_ROADMAP.md §5).
+// ui/readModels.js — the Legend/Stats read-models: pure renderers, and live bindings
+// (PACKAGE_ROADMAP.md §5).
 //
-// Legends and stats are DATA first (Legend.toJSON()/Stats.toJSON()); these helpers return the data,
-// or an HTML string when `{ html: true }`. Ensemble/comparison "legends" are just a Legend the layer
-// exposes — no binder. Pure (no DOM), so node-testable. Headless rule holds trivially.
+// Legends and stats are DATA first (Legend.toJSON()/Stats.toJSON()); `renderLegend`/`renderStats`
+// return the data, or an HTML string when `{ html: true }`. Those two are PURE — no DOM, so they are
+// node-testable and usable from anywhere.
+//
+// `bindLegend`/`bindStats` are the live half: they mount one of those renderers into an element and
+// keep it current by subscribing to the layer's own effect events, so a host never has to remember to
+// re-read after a repaint. DOM only inside functions, per the module rule.
 
 const fmtNum = (v) => (typeof v === "number" && Number.isFinite(v) ? (Number.isInteger(v) ? v : v.toFixed(3)) : String(v));
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -43,4 +48,121 @@ export function renderStats(stats, { html = false } = {}) {
     .map(([k, v]) => `<tr><td style="color:#888;padding-right:10px">${esc(k)}</td><td>${esc(fmtNum(v))}</td></tr>`)
     .join("");
   return `<table class="fim-stats" style="border-collapse:collapse;font:12px ui-monospace,Menlo,monospace">${rows}</table>`;
+}
+
+// ── live bindings ───────────────────────────────────────────────────────────────────────────────
+//
+// The layer's effect events, and why exactly these three:
+//   restyle    — the colour scale changed (palette, bands, min/max, opacity)
+//   recomputed — the pixels changed (noData, an applied op)
+//   rendered   — a draw completed, which is when a legend derived FROM the grid (a GDAL legend
+//                detected mid-render) first exists at all
+// `settings` is deliberately not among them: it fires for every knob including the ones that change
+// neither, such as the hover toggle.
+const MODEL_EVENTS = ["restyle", "recomputed", "rendered"];
+
+/**
+ * Shared machinery for the two binders below.
+ *
+ * Two things it exists to get right. **Coalescing:** one logical change can emit more than one of
+ * MODEL_EVENTS (a settings write that redraws emits `recomputed` *and* `rendered`), so updates are
+ * batched to one per microtask. **Ordering:** `getStats()` is async, and a fast sequence of edits can
+ * resolve out of order — the token means a stale result is dropped rather than painted over a newer
+ * one, which is the difference between a lagging panel and a wrong one.
+ */
+function bindReadModel(layer, { root, name, read, empty }) {
+  if (!layer) throw new Error(`${name}: a layer is required`);
+  const doc = root?.ownerDocument || (typeof document === "undefined" ? null : document);
+  if (!doc) throw new Error(`${name}: no document — this is the live half of the module, mount it in a browser`);
+
+  const el = doc.createElement("div");
+  el.setAttribute("data-fim-ui", name);
+  root?.appendChild(el);
+
+  let token = 0;
+  let scheduled = false;
+  let dead = false;
+
+  async function paint() {
+    scheduled = false;
+    if (dead) return;
+    const mine = ++token;
+    let out;
+    try { out = await read(); }
+    catch (err) { console.error(`[fimviz] ${name} failed to read:`, err); out = null; }
+    if (dead || mine !== token) return;                  // a newer update overtook this one
+    if (out == null || out === "") { el.textContent = ""; if (empty) el.append(empty); return; }
+    if (typeof out === "string") el.innerHTML = out;
+    else { el.textContent = ""; el.append(String(out)); }
+  }
+
+  function schedule() {
+    if (scheduled || dead) return;
+    scheduled = true;
+    queueMicrotask(paint);
+  }
+
+  const onEvent = () => schedule();
+  for (const e of MODEL_EVENTS) layer.on?.(e, onEvent);
+  // A removed layer's panel would otherwise sit there showing the last thing it saw, holding a
+  // subscription to a layer that is gone.
+  const onRemoved = () => { el.textContent = ""; if (empty) el.append(empty); off(); };
+  layer.on?.("removed", onRemoved);
+
+  function off() {
+    if (dead) return;
+    dead = true;
+    for (const e of MODEL_EVENTS) layer.off?.(e, onEvent);
+    layer.off?.("removed", onRemoved);
+  }
+
+  paint();
+  return {
+    el,
+    /** Force a re-read — for state the layer cannot know about, such as a newly drawn region. */
+    update: schedule,
+    off,
+    destroy() { off(); el.remove(); },
+  };
+}
+
+/**
+ * Mount a legend that keeps itself current.
+ *
+ * ```js
+ * const legend = bindLegend(layer, { root: document.querySelector('#legend') });
+ * layer.set({ palette: 'viridis' });     // the panel repaints itself
+ * ```
+ * @param {import('../package/layer.js').Layer} layer
+ * @param {{ root?: Element, html?: boolean, render?: Function, empty?: string }} [opts]
+ *   `render` overrides `renderLegend` — take the Legend, return an HTML string.
+ * @returns {{ el: Element, update: () => void, off: () => void, destroy: () => void }}
+ */
+export function bindLegend(layer, { root, html = true, render = renderLegend, empty = "" } = {}) {
+  return bindReadModel(layer, {
+    root, name: "legend", empty,
+    read: () => render(layer.getLegend?.() ?? null, { html }),
+  });
+}
+
+/**
+ * Mount a statistics table that keeps itself current.
+ *
+ * `filter` may be a value or a getter — a getter, because the usual filter is a drawn region that
+ * changes independently of the layer. The layer emits nothing when a region is drawn, so call
+ * `update()` after that; everything the LAYER can know about is already automatic.
+ *
+ * @param {import('../package/layer.js').Layer} layer
+ * @param {{ root?: Element, html?: boolean, filter?: *|(() => *), render?: Function, empty?: string }} [opts]
+ * @returns {{ el: Element, update: () => void, off: () => void, destroy: () => void }}
+ */
+export function bindStats(layer, { root, html = true, filter, render = renderStats, empty = "" } = {}) {
+  return bindReadModel(layer, {
+    root, name: "stats", empty,
+    read: async () => {
+      const f = typeof filter === "function" ? filter() : filter;
+      const stats = await layer.getStats?.(f ? { filter: f } : {});
+      return render(stats ?? null, { html });
+    },
+  });
 }

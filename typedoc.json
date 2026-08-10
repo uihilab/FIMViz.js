@@ -23,6 +23,7 @@
     "src/io/parse.js",
     "src/io/materializers.js",
     "src/io/reprojector.js",
+    "src/io/sciwrid.js",
     "src/ui/toast.js",
     "src/ui/tooltip.js",
     "src/ui/infoWindow.js",

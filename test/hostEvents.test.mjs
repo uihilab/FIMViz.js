@@ -23,6 +23,7 @@ import {
   createEmitter, setHostSink, setErrorSink,
   emitHost, notify, notifyStorageChanged, notifyUploadComplete, reportError,
 } from "../src/package/events.js";
+import { parseSource } from "../src/io/parse.js";
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), "..", "src");
 
@@ -302,5 +303,43 @@ describe("the engine never resolves its FimMap from the ambient default app", ()
     assert.deepEqual(offenders, [],
       "emit the data and let the host render it — the engine must not name host markup, " +
       "and the ambient scope belongs to the app that owns those elements");
+  });
+});
+
+// `busy` is the event a host uses to say "something is happening". It was defined and documented
+// from the start, but only the app-tier overlay layers ever emitted it — the modern
+// parseFile/addDataset path announced nothing, so a busy indicator wired to it was decorative.
+describe("busy on the mainstream path", () => {
+  function busySink() {
+    const seen = [];
+    const em = createEmitter();
+    em.on("busy", (p) => seen.push(p));
+    setHostSink(em);
+    return seen;
+  }
+  afterEach(() => setHostSink(null));
+
+  test("a parse announces its start and end", async () => {
+    const seen = busySink();
+    const blob = new Blob([JSON.stringify({ type: "FeatureCollection", features: [] })],
+      { type: "application/geo+json" });
+    await parseSource(blob, { name: "empty.geojson" });
+    assert.deepEqual(seen, [{ active: true, source: "parse" }, { active: false, source: "parse" }]);
+  });
+
+  // The `finally` is the whole point: an indicator left spinning after a failed parse is worse than
+  // no indicator, because it reports work that is not happening.
+  test("a FAILED parse still clears it", async () => {
+    const seen = busySink();
+    await assert.rejects(() => parseSource(new Blob(["x"]), { name: "mystery.zzz" }),
+      /unsupported or undetected format/);
+    assert.deepEqual(seen.at(-1), { active: false, source: "parse" });
+  });
+
+  test("with no sink attached, parsing still works", async () => {
+    setHostSink(null);
+    const blob = new Blob([JSON.stringify({ type: "FeatureCollection", features: [] })],
+      { type: "application/geo+json" });
+    await assert.doesNotReject(() => parseSource(blob, { name: "empty.geojson" }));
   });
 });

@@ -14,7 +14,7 @@ is the *why*, those are the *what*.
 [1. Architecture decisions](#1-architecture-decisions-resolved) ·
 [2. Tradeoffs, rejections, and open questions](#2-tradeoffs-rejections-and-open-questions) ·
 [3. Implementation status](#3-implementation-status) ·
-[4. Known open bugs](#4-known-open-bugs) ·
+[4. Known gaps](#4-known-gaps) ·
 [5. Incomplete / deferred work](#5-incomplete--deferred-work) ·
 [6. Cross-references](#6-cross-references)
 
@@ -83,6 +83,16 @@ is the *why*, those are the *what*.
 - **The CRS precondition is strict in the engine, convenience is app-tier policy.** `render()` asks
   `provider.acceptsCRS(ds.crs)`; a mismatch **emits a host event and throws** — no silent reproject.
   Auto-reproject-then-render is a config flag the host can add; the engine never guesses.
+- **`provider` is required and has no default — the same "never guess" rule, applied at boot.** The
+  two built-in backends differ in *credentials* **and** in *capability*: `'leaflet'` needs nothing and
+  gives map + vectors + static rasters, `'google'` needs an `apiKey` and is the only one carrying the
+  full overlay tier (velocity, damage markers, ArcGIS depth). A default would silently decide both for
+  a host — either demanding a key it never asked to need, or quietly withholding tiers it thought it
+  had — so `mount()` throws `config-invalid` naming both options instead (`mount.js`, checked before
+  any container/markup work so the message survives a registered runtime booting its own map).
+  `mapProvider.js`'s `DEFAULT_PROVIDER = 'leaflet'` is deliberately **not** this default: it is the
+  fallback a *detached* layer resolves against — one constructed with no mounted app, so with no
+  `config.provider` to read at all.
 - **The Settings/Operations change-model: a change to a Layer is either an *operation* (replaces or
   re-acquires the source data — `setSources`/`deriveSources`, `reproject`, `select(coord)`, `reload`,
   `show`/`hide`/`fit`/`remove` — imperative Layer/Dataset **methods**) or a *setting* (a parameter applied
@@ -151,6 +161,61 @@ is the *why*, those are the *what*.
   *catalog* does not (unrelated members) → stays a shape. Division of labor: the library owns axis metadata
   + lazy `select()`; the app owns the slider UI and the domain adapter, building the slider generically
   from `ds.axes` without the engine ever learning "stage" vs. "time".
+  - **An axis entry's `ref` says how to GET the payload, not only where to fetch it.** The original
+    shape assumed *one file per entry* — a URL (or named URL variants) — which is FIM Scenario's shape
+    and no multi-dimensional format's. A third form, `{ select: {…} }`, marks the entry as a **slice of
+    the source this Dataset already holds**: `select()` returns a child rooted on the parent's own
+    bytes/URL (no second fetch, same `format`, no `axes` of its own) and the selection reaches the
+    decoder as `root.select`. It is discriminated on an *object-valued* `select` key, so a named URL
+    variant that happens to be called `select` is still a variant. **Rejected: a second bypass.** The
+    WaterML/NWIS adapter met the same "entries aren't separately fetchable" problem and routed *around*
+    `select()` (`ref: null`, bespoke accessors) — correct there, but repeating it would have left three
+    incompatible axis shapes and a `reduce()` that works on only one. Because `reduce()` is already
+    sugar over `select()` + `combine()`, folding the in-file case into `select()` bought temporal
+    aggregation for free. Landed with the NetCDF4/GRIB2/Zarr adapter — [PACKAGE_ROADMAP.md §8](./PACKAGE_ROADMAP.md#8-multi-dimensional-formats--real-temporal-datasets-sciwrid-toolkit-as-a-materializer).
+  - **Named variants stay a `ref` shape, NOT an axis — the fold-in test decides it.** `ref: { raster:
+    'a.tif', vector: 'a.kmz' }` is a categorical dimension expressed as a ref shape rather than as
+    `axes[1]`, which reads like an inconsistency once axes gain an algebra (`{ ordered: false,
+    commensurable: false }` describes a variant exactly). Investigated and **rejected**, for two
+    independent reasons:
+    1. **A variant switches the Dataset's `kind`** — `.tif` yields a raster in an unknown CRS, `.kmz` a
+       vector in EPSG:4326 — while every genuine axis preserves kind, CRS and bounds. That is precisely
+       the fold-in test above ("does it share Dataset's invariant?"), which variants fail: a variant is
+       a choice of *encoding of the same datum*, not a coordinate in the data. Time, level, band and
+       ensemble member are all kind-preserving; variant is the one that isn't.
+    2. **A URL-ref axis cannot be peeled.** `select()` on a selector ref merges coordinates and defers
+       resolution to the materializer, but a URL ref must yield a complete URL *at select time* — so a
+       URL-backed axis can only ever be the **last** axis resolved. This is a general constraint of the
+       model, not a fact about variants, and it is visible in FIM Scenario already: it ships one
+       stage-series *per model* rather than a model × stage product.
+    What the review did produce is the real gap it was masking: variants were **undiscoverable** except
+    by calling `select()` without one and reading the thrown error. `ds.variantsAt(coord)` now
+    enumerates them, which is what a picker actually needs — without pretending they are an axis.
+
+  - **RESOLVED: the model is 2-D grids + selection axes, NOT an N-D array algebra.** Once one file can
+    back a whole axis, the pull toward xarray is constant — broadcasting, partial reduction, a cube
+    value type — and each step looks small on its own. The decision is to stop at: a `Dataset` forces
+    to a **2-D grid**, and every other dimension (time, level, ensemble member, band, variable) is a
+    **selection axis** you resolve down. Anything genuinely N-D is iterated in app code.
+    - **What that buys.** One decoded representation (`RasterGrid`/`VectorFeatures`) that every op,
+      `Stats`, `ColorScale`, `Legend` and `RasterLayer` already understands. Adding an axis costs
+      nothing downstream, because downstream never sees an axis.
+    - **What it costs, accepted.** No `a.combine(b)` that pairs entries by matching coordinate
+      (broadcasting), and no *partial* reduce — collapsing time on a `(time × member)` series to leave
+      a member series is N reductions, not one, and needs the alignment machinery this decision
+      declines. Reducing **every** remaining axis is fine (the cross-product flattens to one list of
+      payloads), so `reduce` refuses only the partial case.
+    - **Consequences that fell out immediately.** `select()` must **peel** one axis rather than resolve
+      to a payload: selecting a timestep from `(time × member)` leaves a member series, and the
+      selector merges (`{t}` then `{m}` reaches the decoder as `{t, m}`). Forcing is gated on *any*
+      remaining axis, not on the selector's absence. And an axis had to start declaring **its own
+      algebra** — `ordered` gates `selectRange`/nearest-match, `commensurable` gates `reduce` — two
+      independent flags, since an ensemble member axis is unordered yet reducible and a band axis is
+      ordered yet not. That keeps verb legality a property of the axis instead of a guard per axis kind.
+    - **The alternative, rejected:** grow toward N-D array semantics. Not because it is wrong — it is
+      what xarray is for — but because the halfway house is the bad outcome: broadcasting for one case,
+      then `reduce` needing alignment, then needing a cube, with each step justified by the last. A
+      consumer wanting real N-D algebra is better served composing FIMViz with a library built for it.
 - **App-specific domain formats get adapters; the neutral core never learns a proprietary schema.**
   `parseFile` handles only generic formats (geojson/kml/kmz/shp/geotiff; HAZUS damage is included because
   it's a FEMA *standard*, not one lab's schema). Two FIMViz-specific JSON formats stayed out, **not
@@ -179,6 +244,197 @@ is the *why*, those are the *what*.
   host, never the engine. One item was **kept** by
   deliberate decision, not oversight: `Legend.toHtml()` emits this app's DOM markup, but the model is
   already data-complete (`stops`/`toJSON`) and moving `toHtml` to a `ui/` renderer isn't worth the churn.
+
+- **The neutral style vocabulary covers points as a circle on every provider, not as each provider's
+  default marker.** `fillColor`/`strokeColor` are *path* options: `google.maps.Data` draws a Point with
+  its `icon`, and Leaflet's default Point is an `L.marker` with `Icon.Default`. Neither reads the path
+  style, so every style key silently did nothing on points — on both providers. Leaflet was worse than
+  silent: `Icon.Default` resolves its PNGs from the URL of a `<script src=".../leaflet.js">` tag, and this
+  package *bundles* Leaflet, so no such tag exists, the path fell back to a page-relative
+  `images/marker-icon.png`, and every point rendered as a **broken image**. Both adapters now translate the
+  same neutral style into their own circle primitive — a `google.maps.Symbol` (`styleToGooglePoint`, a
+  literal SVG arc path rather than `google.maps.SymbolPath.CIRCLE` so the translation stays a pure
+  function testable under Node) and an `L.circleMarker` — sized by a new `pointRadius` key. A host that
+  genuinely wants a pin still passes a provider-native `icon` through the documented escape hatch, which
+  wins over the injected symbol. **Rejected:** shipping the Leaflet marker PNGs as assets, or setting
+  `L.Icon.Default.imagePath`. Both restore a marker that still ignores the neutral vocabulary, so points
+  would remain the one geometry you cannot style portably — and they add an asset-path problem to every
+  consumer's build.
+
+- **`Filter.from` is duck-typed on `test()`, not `instanceof Filter`.** `fimviz` and `fimviz/ui` are two
+  separate webpack bundles, and `ui/regionDraw.js` imports `SpatialFilter` from `package/filter.js` — so
+  `dist/ui.js` carries its **own copy** of that class. A `SpatialFilter` built by the UI module's own
+  `createRegionDraw` was therefore not `instanceof` the engine bundle's `Filter`, and
+  `layer.getStats({ filter })` threw `Filter.from: unrecognized filter input` on the UI module's own
+  output. Class identity is per-module-instance; testing for the method — the only thing any call site
+  uses — is what actually holds across the seam, and it is what the rest of the engine already does
+  (nothing does `instanceof Dataset`). Arrays are checked first, since a polygon is an object too.
+  **Rejected:** externalizing `fimviz` from the `ui` bundle. It would give one shared class, but
+  `fimviz/ui` exists precisely so a host can take a toast or a tools panel for ~56 KB instead of pulling
+  the whole engine; duck-typing fixes the identity problem without giving that up, and generalizes to a
+  host passing its own filter object.
+
+- **Four selection tools, one geometry.** `createRegionDraw` grew from a click-per-vertex polygon into
+  polygon / rectangle / freehand / brush, and the thing that made it cheap is that all four already had a
+  shared output: **rings of `{lat,lng}`**, which is what `SpatialFilter`, `dataset.mask()` and
+  `layer.getStats({ filter })` have always taken. So the modes differ only in how they *fill* the ring
+  list, and every consumer downstream — the operations panel, the stats call, a host's own code — is
+  untouched and cannot tell which tool drew the shape. The brush exploits the same seam a second time:
+  a stamp per stroke sample makes it a *multi*-polygon, which `SpatialFilter` already unions
+  ("inside ANY ring") without a line of new code. **Rejected:** a per-tool factory
+  (`createRectangleSelect`, `createBrushSelect`, …). Four objects would each need their own capture
+  lifecycle, key handling, camera-freeze and trailing-click discipline — the ~15 lines that differ per
+  tool are dwarfed by the ~80 that do not, and a host wanting a toolbar would have had to tear one tool
+  down and build another on every mode switch rather than call `setMode()`.
+
+- **"Headless" left the selection tools with nothing drawing them — a real defect, found in the
+  browser.** `createRegionDraw` names no map SDK, which is exactly what lets it run on Google, Leaflet
+  and a test's fake map. The consequence nobody had checked was that clicking three points showed
+  *nothing at all*, which reads as the tool being broken rather than as a documented division of
+  labour. `ui/regionOverlay.js` is the missing half, and it draws three feature kinds because **a
+  selection is visible long before it is a polygon**: a vertex marker from the first click, an open
+  edge line at two points, a closed ring at three. `onPreview` had to start carrying `points` as well
+  as `rings` for the same reason — a host given only rings has nothing to show until the third click.
+  **Rejected:** letting the tool draw directly. It would have to name a map SDK, or `fimviz/ui` would
+  have to import the provider registry — pulling Leaflet into the ~56 KB bundle whose whole point is
+  not to. The seam is `fim.addScratchVector` instead: engine-side, provider-neutral, and deliberately
+  **not a Layer** (never hit-tested, reordered, listed, or saved — scaffolding, not data).
+
+- **Brush size can be a SCREEN size, not just metres.** A brush measured in ground metres doubles and
+  halves under the cursor as you zoom, which is the one thing a brush must not do. `brushRadius` now
+  also takes `'2vw'`/`'2vh'`/`'20px'`, resolved per stamp against a new optional provider method
+  `viewMetrics` (metres-per-pixel + the map's pixel size, computed identically on both providers from
+  zoom and centre latitude). Metres stay available and stay the default, because "300 m either side of
+  this line" is a real analytical request. `vw` is a percentage of the **map container**, not the
+  window: the map is the surface being painted, and a page with a sidebar would otherwise hand you a
+  brush wider than the map.
+
+- **The trailing click after a drag is eaten, not ignored.** A press-drag-release emits `mousedown`,
+  `mouseup`, *and then* `click`. Freehand and brush auto-finish on `mouseup` — which releases the modal
+  capture — so that final click would fall through to ordinary layer dispatch and "click" whatever sits
+  under the end of the stroke, silently changing the selected layer every time someone paints. The tool
+  therefore installs a throwaway capture that swallows exactly one click, released on arrival or on a
+  400 ms timer (touch never sends one, and a map stranded in capture is worse than a stray click). It is
+  installed *before* `onComplete` runs, so a host that starts another tool from that callback replaces it
+  and still wins. **Rejected:** finishing on the `click` instead of the `mouseup` — that defers the whole
+  completion behind an event some touch stacks never deliver.
+
+- **The operations panel is a table, not a form per op.** Going from two ops to the engine's full raster
+  set (clip · mask · reclassify · slope · aspect · hillshade · resample · reproject · combine · reduce ·
+  zonal stats · group by, plus rasterize on the vector side) is a table entry apiece — `{ id, group,
+  kind, fields, enabled, fill, run }` — because the only thing that genuinely differs between ops is
+  which controls they need and the one line that calls the Dataset. The shape earns three properties
+  that hand-written forms would each have to re-implement: an op's controls **cannot** disagree with
+  what it passes (both come from `fields`); ops are filtered by `kind`, so a vector layer is never
+  offered `clip` — an op that could only ever throw is not shown at all; and an op whose requirement is
+  missing (no region wired up, no second raster layer, no selection axis, no `fim`) is **disabled with
+  the reason printed** rather than failing when pressed. **Rejected:** auto-generating the form from the
+  method signatures. `slope(opts)` and `combine(others, opts)` carry no runtime type information, and
+  the useful parts — that resample's method list is GDAL-gated, that clip should prefill from the
+  layer's own bounds — are not in the signature at all.
+
+- **The tools panel offers every knob the change-model accepts, and the two mode-switching ones needed
+  real editors.** `RasterSettings.SCALE_KEYS` has always listed seven; `rasterControls` offered two. A
+  knob the settings layer honours but no preset exposes is a knob nobody can reach, so the gap was the
+  bug. `min`/`max`/`unit` are ordinary inputs; `stops` (discrete bands) and `colorStops` (gradient
+  control points) are row editors — the same widget with two row shapes, since a band is
+  `{min,max,color,label}` and a control point is `{value,color}`. Both write the WHOLE array on every
+  edit, because that is what `setStops`/`setColorStops` take: there is no per-row engine call to route
+  to. **Rejected:** a JSON textarea for the two array knobs. General, and it would have been an hour's
+  work, but it makes the most structured part of the scale the least editable, and every typo becomes a
+  parse error instead of an impossible state.
+
+  The panel **does not police the three mutually-exclusive colouring modes** — it inherits the exclusion
+  from the engine, where `setPalette`/`setStops`/`setColorStops` each clear the others. So adding a band
+  leaves palette mode on its own, and picking a palette is how you get back. Neither editor has a
+  "clear", because emptying `stops` does not restore palette mode: `setStops([])` leaves the scale
+  explicit with zero bands — nothing painted. A separate "mode" control was **rejected** for the same
+  reason: it would be a second, weaker copy of a rule the engine already enforces, and the two could
+  disagree.
+
+- **The dropzone is a DOM contract, not a loader.** `fim.addDataset(file)` already takes a `File`, so
+  the widget adds nothing to loading — it exists because the *drag* half is where the mistakes are, and
+  each one fails silently. `dragover` must be cancelled or the browser navigates away to display the
+  file and `drop` never fires at all; `dragenter`/`dragleave` fire for every descendant crossed, so an
+  uncounted pair flickers the highlight; `dataTransfer.items` carries dragged text and links whose
+  `getAsFile()` is `null`. All three are pinned by tests, because none of them is visible in code
+  review and all of them are invisible until someone drags a file.
+
+  Loading is **sequential**, not parallel: several large GeoTIFFs decoding at once compete for the same
+  budget and make each other slower, and the resulting layer stacking order becomes whichever finished
+  first rather than the order they were dropped in. It is also **per-file** — one bad file reports and
+  the rest still land, because dropping five and getting nothing because the third was a text file is a
+  worse outcome than four layers and one message. **Not handled:** a dropped *directory*, which is what
+  an unzipped `.zarr` store is. That needs `webkitGetAsEntry` and a recursive walk, and the supported
+  Zarr paths today are a `.zarr.zip` or a URL.
+
+- **The axis slider is not a time slider.** Scrubbing is `layer.setSources([ds.select(coord)])`, which
+  says nothing about time — so `createAxisSlider` takes an axis by index or name and drives stage,
+  level, band, ensemble member or variable equally. Naming it after the temporal case would have been
+  the same mistake the axes model was built to avoid: the model already refuses to special-case time,
+  and a `createTimeSlider` would have re-introduced the special case at the UI layer.
+
+  It exists as an export, rather than as fifteen lines in each page, for two properties the hand-rolled
+  version in `temporal-netcdf.html` had to get right and every other host would have had to rediscover.
+  **A stale frame must never win:** dragging fires far faster than a grid decodes, several swaps are in
+  flight, and they do not resolve in order — without a token the last frame to *resolve* wins rather
+  than the last one asked for, and the map shows a step nobody selected with nothing to trigger a
+  correction. **Playback must be paced by the decode:** each frame is queued only once the previous one
+  lands, because a fixed `setInterval` on a slow source queues frames faster than they can be drawn and
+  the playhead runs away from the map. Writing the widget also surfaced a third: the range's value has
+  to be read *before* the repaint that writes the position back into it, or every drag snaps the thumb
+  back to where it started.
+
+- **The host bus had seven events nobody consumed, and only five of them deserved a widget.**
+  `busy` → `createBusyIndicator`, the `raster:metadata`/`-hidden` pair → `bindRasterMetadata`, and the
+  two layer warnings (`layer:raster-oversized`, `layer:crs-unrenderable`) → `connectToast`, since both
+  describe something visibly wrong with what was just drawn and previously reached only `console.warn`
+  — where nobody looking at the map would find them. **`storage:changed` and `upload:complete` were
+  deliberately left unbound:** each means "a host list you own is stale" / "dismiss the affordance you
+  showed", and neither the list nor the affordance is ours. Building one would repeat the
+  app-opinionated mistake the unified Layer Panel was kept out of the package to avoid, so they stay
+  ordinary `fim.on(...)` events and the doc says why.
+
+  Two design points. `createBusyIndicator` **ref-counts by `source`** — the event carries one
+  precisely because work overlaps, and a single boolean lets the first job to finish hide an indicator
+  two others still need; a stray `active:false` from a source that never started is ignored rather
+  than clearing everything. And `bindRasterMetadata` **hides without forgetting**, because the engine's
+  event is named "no longer current", not "clear" — so a host can still read the last-known values.
+
+- **`busy` was defined, documented, and never emitted by the modern path.** Only the app-tier overlay
+  layers (`depthMap`/`ensemble`/`velocity`) ever called `notifyBusy`, so a busy indicator wired to
+  `parseFile`/`addDataset` would have been decorative — the binding was worth nothing without this.
+  It is now emitted by `parseSource` (`source: 'parse'`) and by the GDAL warp inside a forced
+  `reproject` (`source: 'reproject'`), which is the longest operation in the library since the first
+  one lazily pulls ~38 MB of wasm from a CDN. Both emits are paired in a `finally`: an indicator left
+  spinning after a failure is worse than no indicator, because it reports work that is not happening.
+  Deliberately **not** added to every op — a per-pixel `mask` on a decoded grid finishes in a frame,
+  and announcing it would only make the indicator flicker.
+
+- **The read-model panels bind themselves; the tools panel does so only on request.** `bindLegend`/
+  `bindStats` subscribe to the layer's own `restyle`/`recomputed`/`rendered` and repaint, so a host
+  never has to remember to re-read after an op — the example page's hand-written `readModels()` is
+  gone. `settings` is excluded from that list because it also fires for knobs that change neither the
+  colours nor the pixels. Two properties the hand-rolled version did not have: **coalescing** (one
+  settings write that redraws emits `recomputed` *and* `rendered`, so reads batch per microtask) and
+  **ordering** (`getStats()` is async; a token drops a stale result rather than letting it paint over a
+  newer one — a lagging panel is recoverable, a wrong one is not).
+
+  `createToolsPanel` takes the same treatment behind `reactive: true`, and the asymmetry is deliberate:
+  **it is made of live inputs, and a restyle arrives on every keystroke-driven commit**, so a naive
+  subscription rebuilds the field out from under the cursor. The rule is to defer while focus is inside
+  the panel and redraw on `focusout` — the user's own edits are exactly the ones needing no repaint,
+  since the control they are typing in already holds the value. **Rejected:** re-rendering and then
+  restoring focus + selection by control id. It works until a control's identity changes underneath it
+  (which is precisely what the band editor does when a row is added), and it fights the user for the
+  caret on every keystroke to fix a staleness nobody can observe mid-edit.
+
+- **Terminals stay in the same panel but report on a different channel.** `zonalStats` and `groupBy`
+  return a *table*, not a Dataset, so routing them through `onApply` would have told the host "the
+  layer changed" when it hadn't. They get `onResult(id, data)` and provably leave `layer.sources`
+  alone. **Rejected:** a separate analysis panel — the user's question ("summarise this region") arrives
+  while looking at the same layer and the same drawn region as the ops above it; splitting the view
+  would have duplicated both wires.
 
 ### 1.2 Instance-scoped DOM, event inversion, and the engine→host boundary
 
@@ -344,6 +600,13 @@ specific tiers they were first decided for are done:
   listener removal vs. Leaflet's instance-call-needing-name+handler. *Rejected:* returning
   `{provider, handle}` and having each caller branch on which provider it got — the exact per-call-site
   branching the seam exists to avoid.
+- **Drag lock (`setDraggable`)** — one line per provider (`map.setOptions({draggable})` vs.
+  `map.dragging.enable()/disable()`), added because a freehand or brush stroke is *the same gesture as a
+  map pan*: without it the stroke is traced against a moving projection and lands nowhere near where it
+  was drawn. Optional in the contract and a no-op when absent, so a third-party provider is not forced to
+  implement it — the drag tools then merely feel bad rather than break. *Rejected:* having the selection
+  tool call `preventDefault()` on the original DOM event — the tool is headless by design and receives
+  only normalized `{type, lat, lng}`, and both SDKs handle dragging above where that event surfaces.
 
 **Why the remaining four tiers aren't a mechanical swap:** *Velocity's animated canvas* is a full-viewport
 canvas repainted every frame by its own rAF loop, driven by five Google-specific listeners
@@ -548,13 +811,135 @@ own runtime from its own composition root.
   possible because the recipe is immutable and hashable, but premature until a real usage path shows the
   redundancy actually costing something.
 
-### 5.3 Browser verification still owed
+### 5.3 Browser verification — what a real-Chrome pass found
 
 Recorded because it's easy to lose track of what's been confirmed by hand vs. only by `npm test`, which
-does not cover `google.maps` rendering or the GDAL WASM warp. Owed, at the engine level: vector-layer
-rendering + neutral-style translation on both providers (Google and Leaflet); raster overlay
-colorize/opacity/hit-test on Google; the GDAL WASM reproject forced at a real terminal; and the
-`http://[::1]:PORT` loopback fix (confirm data actually fetches over IPv6 loopback, not just `localhost`).
+does not cover `google.maps` rendering, Leaflet, canvas, or the GDAL WASM warp.
+
+> **Note on the page names below.** `examples/` was rebuilt as six explanatory notebooks
+> (`01-quickstart` … `06-storage-and-records`), replacing the fourteen ad-hoc pages and the guided
+> `verify.html` checklist this section was written against. The findings stand; the page names are
+> historical. `05-ui-toolkit.html` now covers what `ui-tools.html` and `verify.html` covered between
+> them, and `04-temporal.html` replaces `temporal-netcdf.html` — but the **Pass/Fail capture and the
+> Markdown report are gone**, so a release pass is now "open the six pages and look", with no
+> recorded verdicts.
+
+**Discharged on Leaflet** by a headless-Chrome pass over every page in `examples/` — all 14 load with a
+clean console, and `ui-tools.html` + `temporal-netcdf.html` were driven end to end (file load → tools
+panel → legend/stats → hover → dispatch → region draw → scoped stats; and scan → scrub → `reduce`
+across NetCDF4, Zarr and GRIB2). Four defects that `npm test` structurally could not see:
+
+- **Two example pages were entirely dead.** A stray `}` in `ui-tools.html` and `method-playground.html`
+  meant the module never parsed, so nothing on either page ran. A syntax error in an inline
+  `<script type="module">` produces exactly one console line and no other symptom — nothing in the
+  repo checked those scripts, because they are HTML, not JS.
+- **Every Point feature rendered as a broken image on Leaflet.** See §1.1's point-styling entry.
+- **`fimviz/ui`'s own region-draw output was rejected by the engine.** See §1.1's `Filter.from` entry.
+- **`mount("map", …)` produced two nodes with `id="map"`.** The injection guard checked the
+  container's *descendants* for a `#map`, so a container that was *itself* `#map` got another one
+  nested inside it. Fixed by treating a container named `map` as already providing the map div on the
+  bare-engine path (with a runtime there is a real widget to inject, and the host owns the naming).
+
+**Fixed — the selection tools drew nothing, and the brush panned the map.** The first browser pass over
+the four-mode selection tier found two defects that every one of the 52 headless tests had been blind to,
+for the same underlying reason: both live in the seam between the tool and the map, and the tool is
+headless by design.
+
+- *Nothing was rendering the shape.* The module produces `{lat,lng}` and names no map SDK, so drawing was
+  "the host's job" — and no host was doing it. Fixed by `ui/regionOverlay.js` + `fim.addScratchVector`;
+  see §1.1. The lesson generalizes: a division of labour that no shipped caller performs is a missing
+  feature, not a documented boundary.
+- *Dragging with the brush selected panned the map.* Not the drag lock — `setDraggable` works. The
+  example's toolbar let you pick a mode without arming the tool, and `start()` is what takes pan-by-drag
+  away, so the obvious gesture (pick "brush", drag) hit an unarmed tool and Leaflet's own dragging. The
+  separate "Draw" button was the wrong shape; picking a tool now arms it. `UI.md` states the rule
+  explicitly, because any host can build the same trap.
+
+**Open — region draw drops its first vertex.** Driving the selection step of the (now removed)
+`verify.html` with four clicks records
+only three, and the recorded ring is the *last three* corners: the first click after
+`createRegionDraw().start()` never reaches the capture handler. A user clicking the minimum three
+points therefore gets two and is told "need ≥3 points", which reads as the tool being broken. A second
+anomaly in the same trace is unexplained: the recorded vertices span twice the expected lat/lng range
+for their pixel positions — an exact 2× scale error, as if the click→LatLng conversion used a zoom one
+level below the displayed one. Both are visible in the page's own `[verify]` console trace; the vertex
+entries now carry the map's zoom and bounds at the moment of each click, which is the next thing to
+read. Not yet diagnosed to engine vs. example vs. Leaflet animation timing (`#rg-draw` calls
+`rasterLayer.fit()` immediately before `start()`, so an in-flight zoom animation is a live suspect for
+both symptoms).
+
+**Fixed (interim) — raster overlays were plate carrée content drawn into a Mercator viewport.**
+`RasterLayer._draw` colorizes a grid to a data URL and hands it to `addRasterImage`, which is
+`L.imageOverlay(url, [[s,w],[n,e]])` on Leaflet and a `GroundOverlay` on Google. Both stretch that
+image **linearly in Web Mercator screen space**, while our grid rows are evenly spaced in **latitude**.
+The two agree only near the equator, and the error grows with the extent's height:
+
+| dataset | extent | worst latitude error |
+|---|---|---|
+| `idalia-nldas2.nc` (regional) | 25.06 – 36.94 °N | 0.19° ≈ 21 km |
+| CMIP `tos` (global ocean) | −80 – +90 ° | 25.67° ≈ 2850 km |
+
+This went unnoticed because every raster the library had rendered was a regional flood map ~12° tall,
+where the error is a couple of screen pixels — it took a global NetCDF3 to make it obvious. A second
+problem rides along: **latitude 90 is infinite in Mercator** (y = 37.3, against 3.14 at the
+conventional ±85.05° cutoff), so the top of such a file has nowhere to be drawn and the provider
+simply clamps.
+
+**The existing reprojection machinery does not address it, and it is worth recording why**, because
+both plausible-looking routes are dead ends. `resampleGrid` maps destination pixels *linearly in
+lat/lng* (`lat = bn - (dy+0.5)/h * (bn-bs)`), so it is a plate-carrée→plate-carrée resampler and can
+never produce Mercator-spaced rows. And warping to `EPSG:3857` is refused before it draws: both
+providers declare `acceptsCRS` as the WGS84 family only, so `Layer._checkProviderCRS` throws — with a
+message advising `ds.reproject('EPSG:4326')`, which walks the caller straight back into the bug. Even
+with that guard lifted, `addRasterImage` takes lat/lng bounds while a 3857 grid's are metres.
+
+**Landed: the row remap** (`geo/mercator.js`, wired into `RasterLayer._draw`). Rows are resampled onto
+Mercator-even spacing before colorizing; columns are untouched because longitude is linear in Mercator.
+Only the **image** is reprojected — the source grid is left alone, so `rasterData`/`meta`, hover, Stats
+and the filters keep reading real values at real coordinates, which is what kept the change contained.
+
+- **The row count is derived, not guessed, and the intuition runs the opposite way to expectation.**
+  Mercator's row spacing in latitude is `dy·cos φ`, so it is **sparsest at the equator** — that is
+  where source detail would be lost, and it fixes the requirement at `height × (Δy / Δφ_radians)`.
+  An early estimate of ~11× came from reading the *pole* as the binding constraint; at the pole the
+  output oversamples, which costs nothing. The real factor is **1.94×** for a −80…85 global field and
+  **1.17×** for the Idalia regional fixture. A single image handles global data comfortably, which is
+  the opposite of what motivated looking at tiles in the first place.
+- **Latitude beyond ±85.0511° is clipped, and the overlay box shrinks with it.** Not clamped — leaving
+  the box at ±90 while dropping the rows would reintroduce exactly the misplacement being fixed.
+- **`nearest` is the default resampling**, matching `resampleGrid`'s reasoning: interpolating a
+  classified raster invents values between the classes. `resample: 'linear'` is available and falls
+  back to nearest beside any NaN/nodata.
+
+**Still open: tiles, and the decision point now exists ahead of the backend.** `rasterRenderPlan`
+returns `mode: 'tiles'` when the ideal image exceeds a pixel budget (16 Mpx) or a side limit (8192 px),
+both overridable per layer along with `tileSize`, `strategy` (`auto`/`image`/`tiles`), `mercator` and
+`resample`. Until a tile backend exists, that verdict means the image is drawn **capped** — correctly
+placed, aspect preserved, downsampled — plus a `console.warn` and a `layer:raster-oversized` host
+event. A baked image is fixed in resolution: zoom past what it was sized for and you are magnifying
+pixels, which no static heuristic can detect. Tiles (`L.GridLayer#createTile` / `ImageMapType`)
+resample per viewport and are the real answer; the plan is to build them alongside ArcGIS server data
+viewing, where the same tile plumbing is needed anyway. Reusable when that happens: `resample.js`'s
+`nearestAt`/`bilinearAt` already take `(pixels, meta, lng, lat, noData)` — exactly the per-pixel query
+a tile needs — though they are module-private today.
+
+**Rejected: warping to EPSG:3857 through the existing `reproject()`.** Architecturally the general
+answer, and the one to reach for if genuinely projected grids (polar stereographic, rotated pole) ever
+need to reach the map. But it is refused before it draws (`acceptsCRS` is WGS84-only on both
+providers), `addRasterImage` takes lat/lng bounds while a 3857 grid's are metres, and it would make
+every global raster depend on a ~38 MB wasm download to do four lines of trigonometry.
+
+**Still owed:** everything Google-side — vector rendering and neutral-style translation on
+`google.maps.Data` (including the new point symbol), and raster overlay colorize/opacity/hit-test. Also
+the GDAL WASM reproject forced at a real terminal, and the `http://[::1]:PORT` loopback fix (confirm
+data actually fetches over IPv6 loopback, not just `localhost`).
+
+The parts that need a human eye — legibility, tooltip tracking, gradient rendering, dispatch order,
+modal capture — are exercised by `examples/05-ui-toolkit.html`, which mounts every `fimviz/ui` widget
+on one map. **There is no longer a guided checklist**: `verify.html`, which numbered those checks and
+captured Pass/Fail into a Markdown report, was removed with the example rebuild. Its checks now have
+to be remembered rather than read, which is a real regression in release discipline and worth
+restoring if browser passes become routine. See [examples/README.md](../examples/README.md).
 
 ### 5.4 Bigger, further-out additions
 
@@ -590,8 +975,11 @@ Everything else stayed internal and the docs now say so:
   which is what the seam already dispatches to. A caller who wants a decode calls `ds.load()`; one
   who wants a warp calls `ds.reproject(crs)`. Nothing is left for the handle to do.
 - **`providerRequiresApiKey`** — its only use was a provider-picker deciding whether to show a key
-  field, and `mount()` already throws `config-invalid` naming the missing key. Retired along with
-  the google default (`provider` now defaults to `'leaflet'`, which needs no key at all).
+  field, and `mount()` already throws `config-invalid` naming the missing key. Retired from the
+  barrel along with the google default — `provider` now has **no** default at all and is required
+  (§1.1), so there is no implied backend whose key requirement a caller would need to ask about.
+  (`mapProvider.js`'s `DEFAULT_PROVIDER = 'leaflet'` is *not* that default: it is what a **detached**
+  layer — one built with no mounted app, so no `config.provider` to read — resolves against.)
 - **`styleToGoogle`/`styleToLeaflet`/`featuresOf`/`resolveFeatureStyle`** — provider-implementation
   detail. `VectorLayer` applies them; a third-party provider author reads `mapProvider.js`, which
   carries the full contract and two worked implementations.
@@ -603,3 +991,16 @@ Everything else stayed internal and the docs now say so:
 because it happens to be exported from its module. Everything remains reachable through
 `fimviz/src/*` for anyone who really needs it — with no types and no stability promise, which is the
 honest signal that they are off the supported path.
+
+**A corollary, learned from `parseSciwrid`.** The multi-dimensional formats (NetCDF/GRIB2/Zarr) spent
+their first iteration reachable *only* through `fimviz/src/io/sciwrid.js`, and the reason given was
+bundle payload: the reader carries a ~193 KB wasm that must not land in every consumer's initial
+download. But "off the barrel" was never what enforced that — a **dynamic `import()`** was, and it
+still is. Making the caller type the adapter's name bought nothing and cost the obvious thing: opening
+a `.nc` looked like a different kind of act from opening a `.tif`, and the vendor's name leaked into
+user code and error messages for no reason a user could act on. `io/parse.js` now routes those
+extensions itself, behind `import("./sciwrid.js")`, and `dist/fimviz.js` contains zero occurrences of
+"sciwrid" — the payload rule intact, the API surface honest. `parseSciwrid` stays internal, in exactly
+the sense `parseSource` is. The general lesson: **when an internal name is the only way to do
+something ordinary, the boundary is in the wrong place** — the fix is to serve the need publicly, not
+to promote the internal.

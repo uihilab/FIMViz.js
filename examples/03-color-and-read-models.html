@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — 3. Colour &amp; the read-models</title>
+<style>
+  :root { --bg:#0f1216; --panel:#161b22; --code:#0b0e13; --line:#2b3440; --fg:#e6edf3; --dim:#8b949e;
+          --accent:#58a6ff; --ok:#3fb950; --bad:#f85149; --warn:#d29922; }
+  @media (prefers-color-scheme:light) {
+    :root { --bg:#fff; --panel:#f6f8fa; --code:#f6f8fa; --line:#d0d7de; --fg:#1f2328; --dim:#59636e; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:15px/1.65 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { border-bottom:1px solid var(--line); padding:28px 24px 22px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  h1 { margin:0 0 6px; font-size:23px; letter-spacing:-.01em; }
+  .lead { margin:0; color:var(--dim); max-width:82ch; }
+  .setup { margin:14px 0 0; padding:9px 13px; border:1px solid var(--line); border-left:3px solid var(--accent);
+           border-radius:6px; background:var(--panel); font-size:13px; color:var(--dim); max-width:82ch; }
+  main { display:grid; grid-template-columns:minmax(0,1fr) 400px; gap:30px; padding:22px 24px 80px; }
+  @media (max-width:1000px) { main { grid-template-columns:1fr; } }
+  section { padding:22px 0 4px; border-top:1px solid var(--line); }
+  section:first-child { border-top:0; padding-top:8px; }
+  h2 { font-size:16px; margin:0 0 8px; }
+  h2 .n { color:var(--accent); font:600 13px/1 ui-monospace,Menlo,monospace; margin-right:8px;
+          border:1px solid var(--line); border-radius:5px; padding:3px 6px; }
+  p { margin:0 0 12px; max-width:78ch; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.9em;
+         background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:0 4px; }
+  pre { margin:0 0 12px; padding:12px 14px; border:1px solid var(--line); border-radius:8px;
+        background:var(--code); overflow:auto; font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  pre.out { background:var(--panel); color:var(--dim); max-height:320px; white-space:pre-wrap; }
+  pre.out.bad { color:var(--bad); border-color:var(--bad); }
+  .k { color:var(--dim); } .s { color:var(--ok); } .f { color:var(--accent); }
+  .label { font:600 10.5px/1 ui-sans-serif,system-ui; letter-spacing:.09em; text-transform:uppercase;
+           color:var(--dim); margin:0 0 6px; }
+  .controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 12px; }
+  button { background:transparent; color:var(--accent); border:1px solid var(--line); border-radius:6px;
+           padding:5px 11px; font:inherit; font-size:13px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button.on { background:var(--accent); color:#08111f; font-weight:600; }
+  select, input[type=number], input[type=color] { background:var(--bg); color:var(--fg);
+           border:1px solid var(--line); border-radius:6px; padding:4px 7px; font:inherit; font-size:13px; }
+  input[type=number] { width:80px; }
+  label.ctl { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--dim); }
+  aside { position:sticky; top:22px; align-self:start; display:flex; flex-direction:column; gap:14px; }
+  .card { border:1px solid var(--line); border-radius:10px; background:var(--panel); padding:12px 13px; }
+  .card h3 { margin:0 0 9px; font:600 10.5px/1 ui-sans-serif,system-ui; letter-spacing:.09em;
+             text-transform:uppercase; color:var(--dim); }
+  .strip { display:flex; height:34px; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  .strip div { flex:1; }
+  .scaleaxis { display:flex; justify-content:space-between; font:11px ui-monospace,Menlo,monospace;
+               color:var(--dim); margin-top:5px; }
+  .thumb img { width:100%; border:1px solid var(--line); border-radius:6px; display:block;
+               image-rendering:pixelated; background:repeating-conic-gradient(#7772 0 25%,#0000 0 50%) 0 0/14px 14px; }
+  table { border-collapse:collapse; font-size:12.5px; margin:0 0 12px; width:100%; }
+  th, td { border:1px solid var(--line); padding:4px 8px; text-align:right; }
+  th { color:var(--dim); font-weight:600; background:var(--panel); }
+  th:first-child, td:first-child { text-align:left; }
+  .sw { display:inline-block; width:12px; height:12px; border:1px solid #8886; vertical-align:-1px; }
+  nav.more { border-top:1px solid var(--line); padding:18px 24px 40px; font-size:13px; color:var(--dim); }
+  nav.more a { color:var(--accent); }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <h1>3 · Colour &amp; the read-models</h1>
+  <p class="lead">
+    <code>ColorScale</code> answers one question — <em>what colour is this number?</em> — and
+    <code>Legend</code> and <code>Stats</code> are derived views of the answer. All three are pure and
+    headless: <b>there is no map on this page</b>. The picture on the right is
+    <code>gridToDataURL()</code>, the same colorize pipeline a <code>RasterLayer</code> draws through.
+  </p>
+  <p class="setup">
+    Serve the repo root and run <code>npm run build</code> first. Everything here also works under a
+    bundler with no DOM at all — except <code>gridToDataURL</code>, which needs a canvas.
+  </p>
+</header>
+
+<main class="wrap">
+<div>
+
+  <section>
+    <h2><span class="n">1</span>Three mutually exclusive modes</h2>
+    <p>
+      A scale is in exactly one of three states, and setting one <b>clears</b> the others. That
+      exclusivity lives in the engine, not in the UI — which is why the tools panel in notebook 5 has no
+      "mode" control and no "clear" button: picking a palette is how you get back to palette mode, and
+      emptying the stops array would leave an explicit scale with nothing in it.
+    </p>
+    <pre><span class="k">// 1 · PALETTE — a named ramp over a [min, max] domain, banded or smooth.</span>
+<span class="f">const</span> cs = <span class="f">new</span> <span class="f">ColorScale</span>({ palette: <span class="s">"viridis"</span>, min: <span class="s">0</span>, max: <span class="s">10</span>, continuous: <span class="f">true</span>, unit: <span class="s">"m"</span> });
+
+<span class="k">// 2 · CLASSED STOPS — flat colours per range. No interpolation. The shape a GDAL</span>
+<span class="k">//     legend embedded in a GeoTIFF arrives in.</span>
+cs.<span class="f">setStops</span>([
+  { range: [<span class="s">0</span>, <span class="s">2</span>],        color: <span class="s">"#08306b"</span>, label: <span class="s">"shallow"</span> },
+  { range: [<span class="s">2</span>, <span class="s">5</span>],        color: <span class="s">"#4292c6"</span>, label: <span class="s">"moderate"</span> },
+  { range: [<span class="s">5</span>, <span class="f">Infinity</span>], color: <span class="s">"#deebf7"</span>, label: <span class="s">"deep"</span> },
+]);
+
+<span class="k">// 3 · CONTINUOUS CONTROL POINTS — arbitrary breakpoints, interpolated between the</span>
+<span class="k">//     bracketing pair. For data whose interesting range is not evenly spread.</span>
+cs.<span class="f">setColorStops</span>([<span class="s">0</span>, <span class="s">0.5</span>, <span class="s">2</span>, <span class="s">10</span>], [<span class="s">"#ffffcc"</span>, <span class="s">"#a1dab4"</span>, <span class="s">"#2c7fb8"</span>, <span class="s">"#253494"</span>]);
+
+cs.kind;         <span class="k">// 'continuous' | 'classed'</span>
+cs.isExplicit;   <span class="k">// true once you leave plain palette mode</span>
+cs.<span class="f">getValues</span>();  <span class="k">// the breakpoints — the PUBLIC way to read the domain back</span></pre>
+    <div class="controls">
+      <button data-mode="palette" class="on">palette</button>
+      <button data-mode="stops">classed stops</button>
+      <button data-mode="colorStops">control points</button>
+      <label class="ctl">ramp <select id="pal"></select></label>
+      <label class="ctl"><input type="checkbox" id="cont" checked /> continuous</label>
+      <label class="ctl">min <input type="number" id="min" value="0" step="0.5" /></label>
+      <label class="ctl">max <input type="number" id="max" value="10" step="0.5" /></label>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-modes">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span><code>missingColor</code> — the value that isn't one</h2>
+    <p>
+      The three modes above all answer "what colour is this <em>number</em>?". <code>missingColor</code>
+      answers the one they cannot: what colour is <code>null</code>, <code>NaN</code>,
+      <code>''</code>, or a property that is not numeric at all.
+    </p>
+    <p>
+      It is applied <b>before any arithmetic</b>, and that is the whole point. Numeric coercion turns
+      <code>null</code> and <code>''</code> into <code>0</code>, so without this an absent value would be
+      painted the colour of the domain minimum — "no data" rendering as "the lowest reading", which is
+      the one confusion that must never happen on a flood map. <code>null</code> (the default) means
+      <em>the consumer decides</em>: a vector feature keeps its base style, a raster pixel stays
+      transparent. And <code>0</code> is a real value — it still colours normally.
+    </p>
+    <pre>cs.<span class="f">set</span>({ missingColor: <span class="s">"#cccccc"</span> });
+
+cs.<span class="f">getColor</span>(<span class="f">null</span>);   <span class="k">// '#cccccc'  — NOT the colour of 0</span>
+cs.<span class="f">getColor</span>(<span class="f">NaN</span>);    <span class="k">// '#cccccc'</span>
+cs.<span class="f">getColor</span>(<span class="s">""</span>);     <span class="k">// '#cccccc'</span>
+cs.<span class="f">getColor</span>(<span class="s">0</span>);      <span class="k">// the ramp's first colour — zero IS a reading</span>
+
+<span class="k">// It sits OUTSIDE the three modes, so switching palette/stops/colorStops keeps it.</span></pre>
+    <div class="controls">
+      <label class="ctl">missingColor <input type="color" id="miss" value="#cccccc" /></label>
+      <button id="btn-miss-null">set it back to null</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-miss">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>Escape hatch and change hook</h2>
+    <p>
+      <code>colorFor</code> is a plain property checked before every mode — return a colour to override,
+      <code>null</code> to fall through. The gotcha is that assigning it is a raw property write, so it
+      fires no <code>onChange</code> and triggers no repaint on its own.
+    </p>
+    <p>
+      Everything else notifies, and a <code>set()</code> batch notifies <b>once</b> for the whole patch
+      rather than once per key. That is what makes a five-key edit one repaint instead of five.
+    </p>
+    <pre>cs.<span class="f">onChange</span>((scale) =&gt; redraw(scale));
+
+cs.<span class="f">set</span>({ palette: <span class="s">"plasma"</span>, min: <span class="s">0</span>, max: <span class="s">5</span>, continuous: <span class="f">true</span> });   <span class="k">// → ONE notification</span>
+
+cs.colorFor = (v) =&gt; (v &lt; <span class="s">0</span> ? <span class="s">"#000000"</span> : <span class="f">null</span>);   <span class="k">// no onChange — repaint yourself</span></pre>
+    <div class="controls">
+      <button id="btn-batch">one batched set() of four keys</button>
+      <button id="btn-colorfor">toggle colorFor override</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-change">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span><code>Legend</code> — the display read-model</h2>
+    <p>
+      Derived from a scale, data-complete on its own (<code>{unit, kind, source, stops}</code>), with
+      <code>toHtml()</code> as a convenience renderer. <code>source</code> matters for labelling: a
+      <code>gdal</code> or <code>custom</code> legend shows the labels it was given, while
+      <code>palette</code> and <code>default</code> legends build <code>"lo–hi unit"</code> themselves,
+      because a bare ramp has no author-supplied text to preserve. <code>formatLabel</code> wins over
+      both.
+    </p>
+    <p>
+      A GeoTIFF can carry a legend in its <code>GDAL_METADATA</code> tag, and
+      <code>ColorScale.fromGdalLegend()</code> turns one into a classed scale.
+      Worth knowing: the <em>parser</em> for that tag is registered by an app-tier module, not by the
+      engine bundle — so with plain <code>fimviz</code>, step 2 of a <code>RasterLayer</code>'s
+      auto-resolution never fires and an embedded legend has to be built explicitly.
+    </p>
+    <pre><span class="f">const</span> legend = Legend.<span class="f">fromColorScale</span>(cs);
+
+legend.<span class="f">toJSON</span>();   <span class="k">// { unit, kind, source, stops } — render it however you like</span>
+legend.<span class="f">toHtml</span>();   <span class="k">// a gradient bar (continuous) or a swatch list (classed)</span>
+
+legend.formatLabel = (stop) =&gt; <span class="s">`${stop.label} — ${stop.count ?? 0} cells`</span>;
+
+<span class="k">// A GDAL-embedded legend, built explicitly:</span>
+ColorScale.<span class="f">fromGdalLegend</span>([{ range: [<span class="s">0</span>, <span class="s">2</span>], color: <span class="s">"#08306b"</span>, label: <span class="s">"0 – 2 m"</span> }], <span class="s">"m"</span>);</pre>
+    <p class="label">Output</p>
+    <pre class="out" id="o-legend">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">5</span><code>Stats</code> over a raster</h2>
+    <p>
+      One pass over the pixels, and then it is <b>terminal</b>: a <code>Stats</code> has already reduced
+      the raster away, so there is deliberately no <code>stats.applyFilter()</code>. "Statistics, then
+      filter" is always a fresh computation with the filter supplied up front — which is why
+      <code>filter</code> is an argument here and not a method.
+    </p>
+    <p>
+      Pass the same <code>ColorScale</code> the map is drawn with as <code>classify</code> and the
+      <code>byClass</code> buckets line up exactly with the legend beside them.
+    </p>
+    <pre><span class="f">const</span> grid = <span class="f">await</span> ds.<span class="f">grid</span>();
+
+<span class="k">// Stats.raster takes the flat meta shape: bounds as bw/bs/be/bn, plus size.</span>
+<span class="f">const</span> stats = Stats.<span class="f">raster</span>(grid.pixels, {
+  bw: grid.bounds.west, bs: grid.bounds.south,
+  be: grid.bounds.east, bn: grid.bounds.north,
+  width: grid.width, height: grid.height, noData: grid.noData, unit: <span class="s">"m"</span>,
+}, { classify: cs, skipZero: <span class="f">false</span>, bins: <span class="s">64</span> });
+
+stats.<span class="f">describe</span>();        <span class="k">// one human line</span>
+stats.<span class="f">percentile</span>(<span class="s">95</span>);    <span class="k">// from the histogram</span>
+stats.<span class="f">diff</span>(otherStats);  <span class="k">// { deltaMin, deltaMax, deltaMean, … }</span>
+stats.<span class="f">toCSV</span>();           <span class="k">// or stats.download('depth.csv')</span></pre>
+    <div class="controls">
+      <label class="ctl"><input type="checkbox" id="skipzero" /> skipZero</label>
+      <button id="btn-stats">recompute</button>
+    </div>
+    <div id="byclass"></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-stats">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">6</span><code>Stats</code> over vectors — the same read-model</h2>
+    <p>
+      Features instead of pixels, so the fields differ (<code>featureCount</code>,
+      <code>byType</code>, <code>area</code>, <code>length</code>, <code>bbox</code>) — but classification
+      is identical: give it a scale <em>and</em> the property to read, and you get the same
+      <code>byClass</code> shape a raster produces. Nothing here needs a map or a render; it computes
+      straight from GeoJSON.
+    </p>
+    <pre><span class="f">const</span> vf = <span class="f">await</span> counties.<span class="f">features</span>();   <span class="k">// VectorFeatures — iterable</span>
+
+<span class="f">const</span> areaScale = <span class="f">new</span> <span class="f">ColorScale</span>({ palette: <span class="s">"viridis"</span>, min: <span class="s">0</span>, max: <span class="s">4e9</span>, continuous: <span class="f">false</span> });
+
+<span class="f">const</span> vs = Stats.<span class="f">vector</span>(vf, { classify: areaScale, classifyBy: <span class="s">"SHAPE_Area"</span> });
+vs.featureCount;   <span class="k">// 99</span>
+vs.byType;          <span class="k">// { polygon, line, point }</span>
+vs.byClass;         <span class="k">// counts per band of the scale above</span>
+
+<span class="k">// A VectorLayer wires both automatically from its own colorScale + colorBy:</span>
+<span class="f">await</span> vectorLayer.<span class="f">getStats</span>();</pre>
+    <div class="controls"><button id="btn-vstats">compute vector stats</button></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-vstats">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">7</span>Filters — scoping a computation</h2>
+    <p>
+      Two shapes, one interface. <code>SpatialFilter</code> is pure polygon geometry and works on both
+      kinds (a raster pixel and a vector feature both have a position). <code>PredicateFilter</code> is
+      an arbitrary test — <code>(value, x, y, at)</code> for rasters, <code>(feature)</code> for vectors.
+      <code>Filter.all([…])</code> conjoins them, and <code>Filter.from()</code> accepts a function, a
+      filter or a raw polygon.
+    </p>
+    <p>
+      Geometry is deliberately kept apart from policy: the filter says <em>where</em>, and each consumer
+      decides what that means — statistics <b>exclude</b>, a raster render <b>dims</b>, a marker layer
+      <b>hides</b>. <code>Filter.from</code> is duck-typed on <code>test()</code> rather than
+      <code>instanceof</code>, so a filter built inside <code>fimviz/ui</code> — a different bundle with
+      its own copy of the class — is still accepted here.
+    </p>
+    <pre><span class="f">const</span> region = <span class="f">new</span> <span class="f">SpatialFilter</span>([ring]);          <span class="k">// one ring, or many (a union)</span>
+region.<span class="f">contains</span>(lat, lng);                       <span class="k">// point-in-polygon, the public test</span>
+region.<span class="f">pixelBbox</span>(meta);                          <span class="k">// fast-reject window in pixel space</span>
+
+<span class="f">const</span> deep = <span class="f">new</span> <span class="f">PredicateFilter</span>((v) =&gt; v &gt; <span class="s">2</span>);      <span class="k">// raster: by value</span>
+<span class="f">const</span> both = Filter.<span class="f">all</span>([region, deep]);            <span class="k">// AND</span>
+
+Stats.<span class="f">raster</span>(pixels, meta, { filter: both });
+<span class="f">await</span> layer.<span class="f">getStats</span>({ filter: region });        <span class="k">// the same argument, from a layer</span></pre>
+    <div class="controls">
+      <button id="btn-f-region">region only</button>
+      <button id="btn-f-deep">depth &gt; 2 m only</button>
+      <button id="btn-f-both">both (AND)</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-filter">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">8</span>Rendering them — <code>fimviz/ui</code>'s thin wrappers</h2>
+    <p>
+      <code>renderLegend</code> and <code>renderStats</code> are pure: data by default, HTML on request.
+      They exist so a host does not hand-roll the same two renderers, and they are the read-only half of
+      the UI module — the live, self-updating versions (<code>bindLegend</code>,
+      <code>bindStats</code>) are in notebook 5.
+    </p>
+    <pre><span class="f">import</span> { renderLegend, renderStats } <span class="f">from</span> <span class="s">"fimviz/ui"</span>;
+
+<span class="f">renderLegend</span>(legend);                 <span class="k">// → legend.toJSON()</span>
+<span class="f">renderLegend</span>(legend, { html: <span class="f">true</span> });   <span class="k">// → an HTML string</span>
+<span class="f">renderStats</span>(stats,  { html: <span class="f">true</span> });   <span class="k">// → a table of the scalar fields</span></pre>
+    <div id="rendered"></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-render">…</pre>
+  </section>
+
+</div>
+
+<aside>
+  <div class="card">
+    <h3>The live scale</h3>
+    <div class="strip" id="strip"></div>
+    <div class="scaleaxis"><span id="ax-lo">—</span><span id="ax-hi">—</span></div>
+  </div>
+  <div class="card">
+    <h3>legend.toHtml()</h3>
+    <div id="legend-html"></div>
+  </div>
+  <div class="card thumb">
+    <h3>gridToDataURL() — no map involved</h3>
+    <div id="thumb">decoding…</div>
+  </div>
+</aside>
+</main>
+
+<nav class="more wrap">
+  Next: <a href="04-temporal.html">4 · Temporal &amp; multi-dimensional data</a> ·
+  back to <a href="02-datasets-and-ops.html">2 · Datasets &amp; operations</a>
+</nav>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js"
+} }
+</script>
+
+<script type="module">
+import {
+  FimViz, ColorScale, Legend, Stats, Filter, SpatialFilter, PredicateFilter, gridToDataURL,
+} from "fimviz";
+import { renderLegend, renderStats } from "fimviz/ui";
+
+// No mount() on this page — nothing here needs a map. FimViz.parseFile is the pure parse: no
+// instance, no registration, no side effect. The built-in decoders registered themselves as an
+// import side effect of the barrel, so there is nothing to set up.
+
+const $ = (s) => document.querySelector(s);
+const show = (sel, v, bad = false) => {
+  const el = $(sel);
+  el.className = "out" + (bad ? " bad" : "");
+  el.textContent = typeof v === "string" ? v : JSON.stringify(v, null, 2);
+};
+const round = (n, d = 3) => (typeof n === "number" && Number.isFinite(n) ? +n.toFixed(d) : n);
+
+async function sampleDataset(name) {
+  const res = await fetch(`../assets/SampleFiles/${name}`);
+  if (!res.ok) throw new Error(`${name}: HTTP ${res.status} — serve the REPO ROOT, not /examples`);
+  return FimViz.parseFile(new File([await res.blob()], name));
+}
+
+// One decoded grid, reused by every section on the page.
+const ds = await sampleDataset("4326.tif");
+const grid = await ds.grid();
+const meta = {
+  bw: grid.bounds.west, bs: grid.bounds.south, be: grid.bounds.east, bn: grid.bounds.north,
+  width: grid.width, height: grid.height, noData: grid.noData, unit: "m",
+};
+
+// The one scale every section reads. Mutating it repaints the three cards on the right.
+const cs = new ColorScale({ palette: "viridis", min: 0, max: 10, continuous: true, unit: "m" });
+let mode = "palette";
+
+// ---------------------------------------------------------------- the live preview
+function paint() {
+  // Sample the scale across its own domain — getValues() is the public domain reader. There are no
+  // min/max getters, so reaching for `cs.min` yields undefined and every sample becomes NaN.
+  const vals = cs.getValues();
+  const lo = vals[0], hi = vals[vals.length - 1];
+  const cells = [];
+  for (let i = 0; i < 24; i++) {
+    const c = cs.getColor(lo + (i / 23) * (hi - lo));
+    cells.push(`<div style="background:${c ?? "transparent"}"></div>`);
+  }
+  $("#strip").innerHTML = cells.join("");
+  $("#ax-lo").textContent = `${round(lo, 2)} ${cs.unit ?? ""}`;
+  $("#ax-hi").textContent = `${round(hi, 2)} ${cs.unit ?? ""}`;
+  $("#legend-html").innerHTML = Legend.fromColorScale(cs).toHtml() || "<i>no stops</i>";
+  $("#thumb").innerHTML =
+    `<img alt="the sample raster colorized by the current scale" src="${gridToDataURL(grid, { colorScale: cs })}" />`;
+}
+cs.onChange(paint);   // every setter notifies; a set() batch notifies exactly once
+
+// ---------------------------------------------------------------- 1 · the three modes
+for (const name of ColorScale.palettes()) {
+  const o = document.createElement("option");
+  o.value = o.textContent = name;
+  $("#pal").append(o);
+}
+$("#pal").value = "viridis";
+
+function applyMode() {
+  const min = Number($("#min").value), max = Number($("#max").value);
+  if (mode === "palette") {
+    cs.set({ palette: $("#pal").value, min, max, continuous: $("#cont").checked });
+  } else if (mode === "stops") {
+    // Flat bands, looked up rather than interpolated. The last band's upper bound is unbounded.
+    cs.setStops([
+      { range: [min, min + (max - min) * 0.2], color: "#08306b", label: "shallow" },
+      { range: [min + (max - min) * 0.2, min + (max - min) * 0.5], color: "#4292c6", label: "moderate" },
+      { range: [min + (max - min) * 0.5, Infinity], color: "#deebf7", label: "deep" },
+    ]);
+  } else {
+    // Control points: the spacing is the point — most of the ramp spent on the first half-metre.
+    cs.setColorStops([min, min + 0.5, min + 2, max], ["#ffffcc", "#a1dab4", "#2c7fb8", "#253494"]);
+    cs.set({ continuous: $("#cont").checked });
+  }
+  show("#o-modes", {
+    mode,
+    kind: cs.kind,
+    isExplicit: cs.isExplicit,
+    domain: cs.getValues().map((v) => round(v, 2)),
+    stops: cs.getStops().length,
+    toJSON: cs.toJSON(),
+    sample: { "0": cs.getColor(0), "1.5": cs.getColor(1.5), "6": cs.getColor(6) },
+    note: "the other two representations were cleared by this write — they are exclusive",
+  });
+  refreshLegend();
+}
+document.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("[data-mode]").forEach((x) => x.classList.toggle("on", x === b));
+  mode = b.dataset.mode;
+  applyMode();
+}));
+for (const id of ["#pal", "#cont", "#min", "#max"]) $(id).addEventListener("change", applyMode);
+
+// ---------------------------------------------------------------- 2 · missingColor
+function missingReport() {
+  show("#o-miss", {
+    missingColor: cs.missingColor,
+    "getColor(null)": cs.getColor(null),
+    "getColor(NaN)": cs.getColor(NaN),
+    "getColor('')": cs.getColor(""),
+    "getColor(0)": cs.getColor(0),
+    "getRgb(null)": cs.getRgb(null),
+    why: "applied BEFORE any arithmetic — otherwise null coerces to 0 and absent looks like the minimum",
+    survivesModeSwitch: true,
+  });
+}
+$("#miss").addEventListener("input", () => { cs.set({ missingColor: $("#miss").value }); missingReport(); });
+$("#btn-miss-null").addEventListener("click", () => { cs.set({ missingColor: null }); missingReport(); });
+
+// ---------------------------------------------------------------- 3 · onChange / colorFor
+let notifications = 0;
+cs.onChange(() => notifications++);
+$("#btn-batch").addEventListener("click", () => {
+  const before = notifications;
+  cs.set({ palette: "plasma", min: 0, max: 5, continuous: true, unit: "m" });
+  document.querySelectorAll("[data-mode]").forEach((x) => x.classList.toggle("on", x.dataset.mode === "palette"));
+  mode = "palette"; $("#pal").value = "plasma"; $("#min").value = 0; $("#max").value = 5;
+  show("#o-change", {
+    keysWritten: 5,
+    onChangeFired: notifications - before,
+    why: "one batch, one notification — five separate writes would be five repaints",
+  });
+  refreshLegend();
+});
+let overriding = false;
+$("#btn-colorfor").addEventListener("click", () => {
+  overriding = !overriding;
+  const before = notifications;
+  cs.colorFor = overriding ? (v) => (v < 1 ? "#ff0066" : null) : null;
+  paint();   // ← doing this by hand IS the gotcha: a raw property write notifies nobody
+  show("#o-change", {
+    colorFor: overriding ? "(v) => v < 1 ? '#ff0066' : null" : null,
+    onChangeFired: notifications - before,
+    consequence: "0 — assigning colorFor is a plain property write, so nothing repainted itself",
+    "getColor(0.5)": cs.getColor(0.5),
+    "getColor(4)": cs.getColor(4),
+  });
+});
+
+// ---------------------------------------------------------------- 4 · Legend
+function refreshLegend() {
+  const legend = Legend.fromColorScale(cs);
+  const gdal = ColorScale.fromGdalLegend(
+    [{ range: [0, 2], color: "#08306b", label: "0 – 2 m" },
+     { range: [2, 5], color: "#4292c6", label: "2 – 5 m" }], "m");
+  show("#o-legend", {
+    fromCurrentScale: legend.toJSON(),
+    labelSource: legend.source,
+    labelRule: legend.source === "gdal" || legend.source === "custom"
+      ? "stored labels are shown verbatim"
+      : "labels are built from the numbers, since a bare ramp has none",
+    fromGdalLegend: Legend.fromColorScale(gdal).toJSON(),
+    autoDetectNote:
+      "RasterLayer auto-detects a GDAL_METADATA legend only when a parser is registered — " +
+      "an app-tier module does that, so with plain `fimviz` you build it explicitly like this",
+  });
+  paint();
+}
+
+// ---------------------------------------------------------------- 5 · raster Stats
+function rasterStats() {
+  const stats = Stats.raster(grid.pixels, meta, { classify: cs, skipZero: $("#skipzero").checked });
+  const other = Stats.raster(grid.pixels, meta, { filter: new PredicateFilter((v) => v > 1) });
+  const rows = (stats.byClass ?? []).map((c) => ({
+    swatch: `<span class="sw" style="background:${c.color}"></span>`,
+    label: c.label ?? "—", count: c.count, "area km²": round(c.area / 1e6, 3),
+  }));
+  $("#byclass").innerHTML = rows.length
+    ? `<table><thead><tr><th></th><th>class</th><th>count</th><th>area km²</th></tr></thead><tbody>${
+        rows.map((r) => `<tr><td>${r.swatch}</td><td>${r.label}</td><td>${r.count}</td><td>${r["area km²"]}</td></tr>`).join("")
+      }</tbody></table>`
+    : "";
+  show("#o-stats", {
+    describe: stats.describe(),
+    min: round(stats.min), max: round(stats.max), mean: round(stats.mean),
+    median: round(stats.median), stddev: round(stats.stddev), sum: round(stats.sum, 1),
+    count: stats.count, areaKm2: round(stats.area / 1e6, 2),
+    p50: round(stats.percentile(50)), p95: round(stats.percentile(95)),
+    histogramBins: stats.histogram.bins.length,
+    byClass: stats.byClass?.map((c) => ({ label: c.label, count: c.count })) ?? null,
+    "diff(depth > 1 m only)": Object.fromEntries(
+      Object.entries(stats.diff(other)).map(([k, v]) => [k, round(v, 2)])),
+    csv: stats.toCSV().split("\n").slice(0, 3).join("\n"),
+  });
+}
+$("#btn-stats").addEventListener("click", rasterStats);
+$("#skipzero").addEventListener("change", rasterStats);
+
+// ---------------------------------------------------------------- 6 · vector Stats
+$("#btn-vstats").addEventListener("click", async () => {
+  try {
+    const counties = await sampleDataset("Iowa_County_Boundaries.json");
+    const vf = await counties.features();
+    const areaScale = new ColorScale({ palette: "viridis", min: 0, max: 4e9, continuous: false });
+    const vs = Stats.vector(vf, { classify: areaScale, classifyBy: "SHAPE_Area" });
+    const biggest = vf.toArray().sort((a, b) => b.properties.SHAPE_Area - a.properties.SHAPE_Area)[0];
+    show("#o-vstats", {
+      featureCount: vs.featureCount,
+      byType: vs.byType,
+      areaKm2: round(vs.area / 1e6, 1),
+      lengthKm: round(vs.length / 1e3, 1),
+      bbox: vs.bbox,
+      describe: vs.describe(),
+      byClass: vs.byClass?.map((c) => ({ label: c.label, count: c.count })),
+      largestCounty: biggest.properties.CountyName,
+      iterable: `for (const f of vf) — ${vf.count} features, .toArray() normalizes every payload shape`,
+    });
+  } catch (e) { show("#o-vstats", `${e.name}: ${e.message}`, true); }
+});
+
+// ---------------------------------------------------------------- 7 · filters
+const ring = [
+  { lat: 34.392, lng: -89.95 }, { lat: 34.392, lng: -89.90 },
+  { lat: 34.355, lng: -89.90 }, { lat: 34.355, lng: -89.95 },
+];
+const region = new SpatialFilter([ring]);
+const deep = new PredicateFilter((v) => v > 2);
+
+function withFilter(which) {
+  const filter = which === "region" ? region : which === "deep" ? deep : Filter.all([region, deep]);
+  const all = Stats.raster(grid.pixels, meta);
+  const scoped = Stats.raster(grid.pixels, meta, { filter });
+  show("#o-filter", {
+    filter: which,
+    unfiltered: { count: all.count, mean: round(all.mean), max: round(all.max) },
+    scoped: { count: scoped.count, mean: round(scoped.mean), max: round(scoped.max) },
+    keptFraction: round(scoped.count / all.count, 4),
+    "region.contains(34.37, -89.92)": region.contains(34.37, -89.92),
+    "region.contains(34.34, -89.85)": region.contains(34.34, -89.85),
+    "region.pixelBbox(meta)": region.pixelBbox(meta),
+    "region.isEmpty()": region.isEmpty(),
+    rule: "no stats.applyFilter() exists — a Stats has already reduced the pixels away",
+  });
+}
+$("#btn-f-region").addEventListener("click", () => withFilter("region"));
+$("#btn-f-deep").addEventListener("click", () => withFilter("deep"));
+$("#btn-f-both").addEventListener("click", () => withFilter("both"));
+
+// ---------------------------------------------------------------- 8 · ui renderers
+{
+  const legend = Legend.fromColorScale(cs);
+  const stats = Stats.raster(grid.pixels, meta, { classify: cs });
+  $("#rendered").innerHTML =
+    `<div style="display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start">
+       <div>${renderLegend(legend, { html: true })}</div>
+       <div style="font-size:12.5px">${renderStats(stats, { html: true })}</div>
+     </div>`;
+  show("#o-render", {
+    "renderLegend(legend)": renderLegend(legend),
+    "renderStats(stats) keys": Object.keys(renderStats(stats)),
+    note: "both are pure — no DOM, node-testable; the HTML above is the { html: true } form",
+  });
+}
+
+// ---------------------------------------------------------------- first paint
+applyMode();
+missingReport();
+rasterStats();
+paint();
+</script>
+</body>
+</html>

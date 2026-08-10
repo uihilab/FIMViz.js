@@ -8,9 +8,14 @@
 // import just the UI without pulling in the engine.
 
 export { createToast, connectToast } from "./toast.js";
+export { createBusyIndicator, bindRasterMetadata, renderRasterMetadata } from "./hostBindings.js";
 export { createTooltip, bindHoverValue } from "./tooltip.js";
 export { createInfoWindow, propsTable, bindFeatureInfo } from "./infoWindow.js";
 export { createToolsPanel, rasterControls, vectorControls } from "./toolsPanel.js";
-export { renderLegend, renderStats } from "./readModels.js";
-export { createRegionDraw } from "./regionDraw.js";
+export { renderLegend, renderStats, bindLegend, bindStats } from "./readModels.js";
+export { createRegionDraw, REGION_MODES } from "./regionDraw.js";
+export { createRegionOverlay, regionGeoJSON } from "./regionOverlay.js";
 export { createOperationsPanel } from "./operationsPanel.js";
+export { createLayerPanel, createLayerSelect, layerLabel } from "./layerPanel.js";
+export { createAxisSlider, axisOf, axisEntryLabel } from "./axisSlider.js";
+export { createDropzone, DROP_EXTENSIONS } from "./dropzone.js";

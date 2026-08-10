@@ -7,7 +7,7 @@ A companion to the docs in this folder ([USAGE.md](./USAGE.md), [APP_STARTUP.md]
 [DATASET_OPERATIONS.md](./DATASET_OPERATIONS.md)) — one runnable snippet per documented method, in the
 same order as the doc that names it, so you can walk a doc top-to-bottom and paste the matching block
 into the console to check it still behaves as written. Not a test suite (no assertions) — read the
-printed value yourself, same spirit as `examples/method-playground.html`.
+printed value yourself.
 
 ## Contents
 
@@ -25,8 +25,9 @@ These snippets assume a page that has booted a `FimMap` and exposed the package 
 booted `FimMap` as `window.fim` plus every export these snippets use callable directly. Any host page
 that does `import * as FIM from 'fimviz'; import * as UI from 'fimviz/ui';
 Object.assign(window, FIM, UI)` and mounts a map will do — the UI module is a separate entry, so both
-imports are needed. `examples/console-test.html` and `examples/method-playground.html` are two such
-pages you can open in a browser.
+imports are needed. No page in `examples/` does that any more; the quickest bench is to open
+[`examples/01-quickstart.html`](../../examples/01-quickstart.html), which already has a booted map,
+and paste the two imports plus the `Object.assign` into its console.
 
 Registries are reached through the type that owns them (`Layer.registerType`,
 `ColorScale.registerPalette`, `Dataset.registerMaterializer`, `FimViz.registerMapProvider`, …), so
@@ -64,7 +65,9 @@ const RASTER_URL  = '/assets/SampleFiles/4326.tif';                  // WGS84 al
 const DEPTH_URL   = '/assets/SampleFiles/Brazos_RP100_depth.tif';    // a second, differently-shaped raster
 const CMP_A_URL   = '/assets/SampleFiles/Compare_0-0-DEP-12840.tif'; // two aligned extent rasters —
 const CMP_B_URL   = '/assets/SampleFiles/Compare_0-0-DEP-17780.tif'; //   good for Comparison/Ensemble tests
-const GEOJSON_URL = '/assets/SampleFiles/Iowa_city.json';
+// A real FeatureCollection (99 county polygons). NOT Iowa_city.json — that one is a site-config
+// blob with no `type`/`features`, so parseFile rejects it as vector.
+const GEOJSON_URL = '/assets/SampleFiles/Iowa_County_Boundaries.json';
 const KMZ_URL     = '/assets/SampleFiles/ames.kmz';
 ```
 
@@ -75,7 +78,7 @@ const rasterFile = await urlToFile(RASTER_URL, '4326.tif', 'image/tiff');
 let ds = await fim.addDataset(rasterFile);           // → Dataset, kind:'raster'
 console.log(ds.kind, ds.format, ds.crs, ds.bounds);
 
-const vectorFile = await urlToFile(GEOJSON_URL, 'Iowa_city.json', 'application/geo+json');
+const vectorFile = await urlToFile(GEOJSON_URL, 'Iowa_County_Boundaries.json', 'application/geo+json');
 const dsVector = await fim.addDataset(vectorFile);   // → Dataset, kind:'vector'
 console.log(dsVector.kind, dsVector.format, dsVector.crs, dsVector.bounds);
 
@@ -391,10 +394,9 @@ FimViz.providerAcceptsCRS('google', 'EPSG:26915');// false — needs reprojectin
 FimViz.providerAcceptsCRS('leaflet', null);       // true — unknown CRS treated permissively
 ```
 
-`providerRequiresApiKey(name)` is documented in this doc's seam table but is **not** re-exported from
-the barrel (only `mount.js` uses it internally) — see
-[Doc/reality gaps](#docreality-gaps-found-while-writing-this) below. Exercise the same behavior
-black-box instead, via the error it produces:
+`providerRequiresApiKey(name)` is **not** re-exported from the barrel — only `mount.js` uses it
+internally, and `mount()` already throws `config-invalid` naming the missing key, so nothing was left
+for a caller to do with it. Exercise the same behaviour black-box instead, via the error it produces:
 
 ```js
 try { await mount(document.createElement('div'), { provider: 'google', isolated: true, apiKey: '' }); }

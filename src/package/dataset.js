@@ -31,13 +31,14 @@ import {
 } from "./materialize.js";
 import {
   maskGrid, clipGrid, reclassifyGrid, combineGrids, zonalStats,
-  slopeGrid, aspectGrid, hillshadeGrid, rasterizeFeatures,
+  slopeGrid, aspectGrid, hillshadeGrid, rasterizeFeatures, groupByGrid,
 } from "./rasterOps.js";
 // resampleGrid is pure JS / headless (geo/resample.js has zero imports of its own) — same status as
 // rasterOps.js, which already imports it for combine()'s LHS-conform resampling. registerResampler
 // (the escape hatch for GDAL-only methods) and resampleGrid itself are also barrel-exported directly
 // (lib.js), so a caller can use either the Dataset op below or the raw function on pixel arrays.
 import { resampleGrid, registerResampler } from "../geo/resample.js";
+import { notifyBusy } from "./events.js";
 
 // A resample target is either resample.js's native meta shape already, or anything grid-shaped
 // (a RasterGrid, or another Dataset's already-forced .grid() result) — normalized the same way
@@ -71,16 +72,61 @@ function formatFromName(name) {
 }
 const kindOfFormat = (fmt) => (fmt === "geotiff" ? "raster" : fmt ? "vector" : null);
 
+// Is this axis-entry `ref` an in-file selector rather than a URL / named URL variants? Discriminated
+// on an OBJECT-valued `select` key: named variants are string-valued throughout, so a variant literally
+// named "select" (holding a URL string) is still read as a variant, not mistaken for a selector.
+const isSelectorRef = (ref) =>
+  !!ref && typeof ref === "object" && !!ref.select && typeof ref.select === "object";
+
 /**
+ * One entry on a selection axis. `ref` says how to GET this entry's payload, and has three forms —
+ * the axis model is agnostic about which, so `select()`/`reduce()` work the same over all of them:
+ *
+ * - `'stage_12.tif'` — a **URL** (relative to `select`'s `base`). One file per entry: the FIM Scenario
+ *   shape, where each timestep/stage is its own downloadable raster.
+ * - `{ raster: 'a.tif', vector: 'a.geojson' }` — **named URL variants**; `select({ variant })` picks one.
+ * - `{ select: { variable: 'TMP', date: '…' } }` — an **in-file selector**. The entry is not a separate
+ *   file: it is a slice of the SAME source this Dataset already points at (a NetCDF/GRIB2/Zarr file
+ *   holding every timestep). The child shares the parent's bytes/URL and carries the selector through
+ *   to the materializer as `root.select`. Optional siblings `name`/`crs`/`bounds` override what the
+ *   child would otherwise inherit from its parent.
+ *
+ * The third form is what lets one multi-dimensional file back a whole temporal axis. Without it an
+ * axis entry must be separately fetchable, which is true of FIM Scenario and false of every
+ * scientific multi-dim format.
+ *
  * @typedef {Object} DatasetAxisEntry
  * @property {number|string} coord
- * @property {string|Object<string,string>} ref
+ * @property {string|Object<string,string>|{select: Object, name?: string, crs?: string, bounds?: DatasetBounds}} ref
  * @property {Object} [meta]
  */
 /**
+ * A selection axis, and **its algebra**. Which verbs are legal is a property of the axis, not of the
+ * verb — so a band, variable or ensemble axis is safe by construction instead of by special case.
+ *
+ * The two flags are **independent**, which is the whole reason there are two. Ensemble member is the
+ * proof: unordered (member 3 is not "between" 2 and 4) yet perfectly reducible (the members are the
+ * same quantity, differently realised). Band is the mirror image: ordered by index, but a mean of red
+ * and near-infrared is not a thing.
+ *
+ * | axis | `ordered` | `commensurable` |
+ * |---|---|---|
+ * | time, level, stage, depth | ✅ | ✅ |
+ * | ensemble member | ✗ | ✅ |
+ * | band (R/G/B) | ✅ | ✗ |
+ * | variable (Rainf/Tair) | ✗ | ✗ |
+ *
+ * Both default to `true`, which is what every axis built before them was: FIM Scenario's stage and
+ * the NetCDF/GRIB2/Zarr time axis are ordered and commensurable.
+ *
  * @typedef {Object} DatasetAxis
  * @property {string} name
  * @property {string|null} [unit]
+ * @property {boolean} [ordered=true] - do the coords have a magnitude, so that "between" and
+ *   "nearest" mean something? Gates `selectRange` and `selectAxisEntry`'s nearest-match. Without it,
+ *   nearest-match would happily snap `select(1.5)` to band 2.
+ * @property {boolean} [commensurable=true] - do the entries measure the same quantity in the same
+ *   units, so that averaging across them is meaningful? Gates `reduce`.
  * @property {DatasetAxisEntry[]} entries
  */
 /**
@@ -93,6 +139,9 @@ export class Dataset {
   #url = null;          // root only: a URI source (fromURL). Mutually exclusive with inline `data`.
   #resolveUrl = null;   // url root only: an optional (url)=>string resolver (host CORS-proxy/mirror),
                         //   applied at force time. Instance-supplied, never serialized (a function).
+  #selector = null;     // root only: an IN-FILE selection (e.g. { variable, date }), handed to the
+                        //   materializer as `root.select`. What lets one multi-dimensional source back
+                        //   a whole axis without one file per entry — see select()'s selector refs.
   #inputs = null;       // derived only: the INPUT Datasets (array — unary ops are length-1, N-ary ops
                         //   like combine/difference hold several). null on a root.
   #op = null;           // derived only: a declarative op descriptor, e.g. { op:'reproject', crs }
@@ -115,10 +164,12 @@ export class Dataset {
    * @param {((url: string) => string)|null} [init.resolveUrl] - url root only: resolver applied to the URL at force time
    * @param {DatasetAxis|null} [init.axis] - 1-D sugar for a single selection axis
    * @param {DatasetAxis[]|null} [init.axes]
+   * @param {Object|null} [init.selector] - an in-file selection passed to the materializer as `root.select`
+   *   (normally produced by `select()` off a selector ref, not passed by hand)
    */
   constructor({ id, name, kind = null, format = null, crs = null,
                 bounds = null, meta = {}, data = null, url = null, resolveUrl = null,
-                axis = null, axes = null } = {}) {
+                selector = null, axis = null, axes = null } = {}) {
     this.id = id || nextId();
     this.name = name || this.id;
     this.kind = kind;
@@ -129,6 +180,7 @@ export class Dataset {
     this.data = data;                  // inlined payload (root). null for url roots + derived nodes.
     this.#url = url;
     this.#resolveUrl = resolveUrl;
+    this.#selector = selector;
     this.axes = axes ?? (axis ? [axis] : null);
   }
 
@@ -411,6 +463,41 @@ export class Dataset {
    * grid); returns data, not a Dataset. @param {Array<{id?, polygon?, filter?}>} zones
    * @param {{ noData?: number }} [opts] @returns {Promise<Array>}
    */
+  /**
+   * Reduce this raster's pixels **grouped by another raster's values** — a TERMINAL returning a table,
+   * not a Dataset. The third kind of reduction in the model:
+   *
+   * | verb | collapses | grouped by | returns |
+   * |---|---|---|---|
+   * | `reduce(op)` | a selection axis | — | a Dataset (one grid) |
+   * | `zonalStats(zones)` | space | geometry | a table |
+   * | `groupBy(by)` | space | **another raster's values** | a table |
+   *
+   * This is what "one variable as a series against another" means concretely — mean depth per
+   * land-use class, rainfall binned by elevation, a rating curve. It is a distinct verb rather than an
+   * overload because the grouping key comes from data, not from the axis model or from geometry.
+   *
+   * `by` is conformed onto THIS Dataset's grid (the same LHS-conform rule `combine` uses), and a pixel
+   * counts only where both rasters have a value.
+   *
+   * ```js
+   * await depth.groupBy(landuse);                  // one row per distinct land-use code
+   * await rain.groupBy(dem, { bins: 10 });          // ten equal-width elevation bands
+   * await rain.groupBy(dem, { bins: [0, 100, 500, 2000] });
+   * ```
+   * @param {Dataset} by - a raster Dataset whose values define the groups
+   * @param {{ bins?: number|number[], method?: string, noData?: number, byNoData?: number }} [opts]
+   * @returns {Promise<Array<Object>>}
+   */
+  async groupBy(by, opts = {}) {
+    this.#assertRasterOp("groupBy");
+    if (!by || typeof by.grid !== "function") {
+      throw new Error("groupBy: `by` must be a raster Dataset whose values define the groups");
+    }
+    const [mine, theirs] = await Promise.all([this.grid(), by.grid()]);
+    return groupByGrid(mine, theirs, opts);
+  }
+
   async zonalStats(zones, opts = {}) {
     this.#assertRasterOp("zonalStats");
     return zonalStats(await this.grid(), zones, opts);
@@ -478,9 +565,13 @@ export class Dataset {
     if (!["sum", "mean", "min", "max"].includes(op)) {
       throw new Error(`reduce: op must be one of sum/mean/min/max (got "${op}")`);
     }
-    const ax = typeof axis === "number" ? this.axes?.[axis] : this.axes?.find((a) => a.name === axis);
-    const entries = ax?.entries;
-    if (!entries?.length) throw new Error("reduce: no selection-axis entries to reduce (no axis, or the named axis is empty)");
+    const { ax } = this.#requireAxis(axis);
+    if (ax.commensurable === false) {
+      throw new Error(`reduce: axis "${ax.name}" is not commensurable — its entries measure different ` +
+        "quantities (a variable or band axis), so averaging across them has no meaning. select() one " +
+        "entry, or reduce a different axis.");
+    }
+    const entries = ax.entries;
     const datasets = entries.map((e) => this.select(e.coord, { axis, variant }));
     if (datasets.some((d) => !d)) throw new Error("reduce: an axis entry failed to resolve to a Dataset");
     return datasets[0].combine(datasets.slice(1), { op, method });
@@ -499,22 +590,60 @@ export class Dataset {
   }
 
   /**
-   * Resolve one selection-axis entry into a child URL-rooted Dataset (lazy). Sugar over
-   * selectAxisEntry: it picks the entry, resolves its `ref` (a bare URL, or a named variant chosen via
-   * `opts.variant`), infers the format from the URL, and carries the entry's opaque `meta`. Returns
-   * null when no entry matches. Kind-neutral: which variant (raster vs vector) is the caller's call.
+   * Resolve one selection-axis entry into a child Dataset (lazy). Sugar over selectAxisEntry: it picks
+   * the entry, resolves its `ref`, and carries the entry's opaque `meta`. Returns null when no entry
+   * matches. Kind-neutral: which variant (raster vs vector) is the caller's call.
+   *
+   * The `ref` decides what kind of child comes back (see {@link DatasetAxisEntry}):
+   * - a **URL** (bare, or a named variant picked via `opts.variant`) → a URL-rooted child, format
+   *   inferred from the URL. One file per entry.
+   * - an **in-file selector** (`{ select: {…} }`) → a child rooted on the SAME source as this Dataset
+   *   (its bytes or URL, plus resolver), carrying the selector for the materializer. One file, many
+   *   entries — a NetCDF/GRIB2/Zarr time axis.
+   *
+   * Either way the child has no `axes` of its own: it is one payload, not a series, so it forces
+   * through `load()`/`grid()` like any other Dataset and every op chains off it normally.
+   *
    * @param {number|string} coord
    * @param {Object} [opts]
    * @param {number|string} [opts.axis=0] - which axis (index or name) to look up on
    * @param {boolean} [opts.nearest=true] - fall back to the closest numeric coord on a miss
-   * @param {string} [opts.variant] - required when the matched entry's `ref` has named variants (e.g. `{raster, vector}`)
-   * @param {string} [opts.base] - URL prefix prepended to the resolved `ref`
+   * @param {string} [opts.variant] - required when the matched entry's `ref` has named URL variants (e.g. `{raster, vector}`)
+   * @param {string} [opts.base] - URL prefix prepended to a resolved URL `ref` (ignored by selector refs)
    * @returns {Dataset|null}
    */
   select(coord, opts = {}) {
+    const { idx } = this.#requireAxis(opts.axis ?? 0);
     const entry = this.selectAxisEntry(coord, opts);
     if (!entry) return null;
     let ref = entry.ref;
+
+    // In-file selector: this entry is a SLICE of the source we already hold, not a separate download.
+    // Checked before the variant branch because both are objects — a selector is discriminated by an
+    // object-valued `select` key, while named variants are string-valued throughout.
+    if (isSelectorRef(ref)) {
+      if (!this.#url && this.data == null) {
+        throw new Error(`select: "${this.name}"'s axis entry ${JSON.stringify(entry.coord)} is an ` +
+          "in-file selector, but this Dataset has no source to select from (no data, no url).");
+      }
+      // Selecting PEELS one axis: the chosen coordinate is folded into the selector and that axis is
+      // dropped, while every other axis stays. So on a (time × member) series, select(t) leaves a
+      // member series rather than a payload, and a second select() finishes the job — which is what
+      // makes axes the model for extra dimensions rather than a special case for exactly one. The
+      // selector MERGES for the same reason: {t} then {m} must arrive at the decoder as {t, m}.
+      const remaining = (this.axes || []).filter((_, i) => i !== idx);
+      return new Dataset({
+        name: ref.name || `${this.name}[${entry.coord}]`,
+        kind: this.kind, format: this.format,
+        crs: ref.crs ?? this.crs,
+        bounds: ref.bounds ?? this.#bounds,
+        meta: { ...(this.#meta || {}), ...(entry.meta || {}) },
+        data: this.data, url: this.#url, resolveUrl: this.#resolveUrl,
+        selector: { ...(this.#selector || {}), ...ref.select },
+        axes: remaining.length ? remaining : null,
+      });
+    }
+
     if (ref && typeof ref === "object") {
       if (!opts.variant) throw new Error(`select: entry ref has named variants (${Object.keys(ref).join(", ")}); pass { variant }`);
       ref = ref[opts.variant];
@@ -525,6 +654,112 @@ export class Dataset {
     // resolved across select() — instance-safe, since the resolver is carried, not read ambiently.
     return Dataset.fromURL(url, { name: String(ref).split("/").pop(), meta: entry.meta || {},
       resolveUrl: this.#resolveUrl });
+  }
+
+  /**
+   * The named variants available at one axis coordinate, or `null` when that entry has none.
+   *
+   * Variants are **not** an axis and deliberately never became one, so they need their own way to be
+   * discovered — previously the only way to learn an entry had them was to call `select()` without one
+   * and read the thrown error, which is no way to build a picker.
+   *
+   * Why not an axis (see DECISIONS §1.1): a variant switches the Dataset's **kind** — `.tif` gives a
+   * raster in an unknown CRS, `.kmz` a vector in EPSG:4326 — while every genuine axis preserves kind,
+   * CRS and bounds. It is a choice of *encoding of the same datum*, not a coordinate in the data.
+   *
+   * ```js
+   * ds.variantsAt(19.5);                       // → ['raster', 'vector']  (or null)
+   * ds.select(19.5, { variant: 'raster' });
+   * ```
+   * @param {number|string} coord
+   * @param {{ axis?: number|string, nearest?: boolean }} [opts]
+   * @returns {string[]|null}
+   */
+  variantsAt(coord, opts = {}) {
+    const ref = this.selectAxisEntry(coord, opts)?.ref;
+    if (!ref || typeof ref !== "object" || isSelectorRef(ref)) return null;
+    const names = Object.keys(ref).filter((k) => typeof ref[k] === "string");
+    return names.length ? names : null;
+  }
+
+  /** The in-file selection this Dataset forces with, or null. @returns {Object|null} */
+  get selector() { return this.#selector; }
+
+  /**
+   * Resolve an axis by index or name for the OPERATIONS (`select`/`selectRange`/`reduce`), throwing
+   * when it does not exist.
+   *
+   * The split this settles: asking for an axis that isn't there is a **programming error** — the
+   * caller believed this Dataset was a series and it isn't — while asking for a coordinate no entry
+   * carries is a **data condition**, which stays `null`. Previously the same "no axis" case returned
+   * `null` from `select` and threw from `reduce`, so identical mistakes surfaced two different ways.
+   * The lookup (`selectAxisEntry`) keeps returning `null` throughout: a lookup that finds nothing is
+   * not a mistake.
+   * @param {number|string} axis
+   * @returns {{ ax: DatasetAxis, idx: number }}
+   */
+  #requireAxis(axis) {
+    const idx = typeof axis === "number" ? axis : (this.axes?.findIndex((a) => a.name === axis) ?? -1);
+    const ax = idx >= 0 ? this.axes?.[idx] : null;
+    if (!ax?.entries?.length) {
+      throw new Error(`"${this.name}": no selection axis ${JSON.stringify(axis)} — ` + (this.axes?.length
+        ? `available: ${this.axes.map((a, i) => `${i}:${a.name ?? "?"}(${a.entries?.length ?? 0})`).join(", ")}`
+        : "this Dataset has no axes at all (a plain parsed file has none, and neither has a fully " +
+          "selected one). Check `ds.axes` before offering a slider."));
+    }
+    return { ax, idx };
+  }
+
+  /**
+   * Narrow one axis to the window `[from, to]` — a **series in, series out** operation, which is what
+   * separates it from `select()`. `select(coord)` resolves to ONE payload and hands back something
+   * forceable; `selectRange` hands back another selection-axis Dataset, still lazy, still unforceable
+   * on its own. That is the point: everything that works on the full series works on the window,
+   * `reduce()` most of all — "the mean of these six hours" is `selectRange(a, b).reduce('mean')`,
+   * with no new machinery on either side.
+   *
+   * Both bounds are **inclusive**, and the comparison is a plain `>=`/`<=` on the entry coords, so it
+   * is type-agnostic: numeric coords (epoch milliseconds, a stage in feet) compare numerically, and
+   * ISO-8601 strings compare lexicographically, which for ISO-8601 is the same as chronologically.
+   * Reversed bounds are swapped rather than rejected. Unlike `select()` there is no nearest-match: a
+   * window is already tolerant of falling between samples, so a range narrower than the sampling
+   * interval matches nothing and returns `null` — which is honest, where snapping would silently hand
+   * back a wider span than asked for.
+   *
+   * Coords are compared as given — `Date.parse(iso)` for the epoch-millisecond axes `parseSciwrid`
+   * builds. The engine stays domain-neutral about what a coordinate means.
+   *
+   * ```js
+   * const storm = ds.selectRange(Date.parse('2023-08-29T00:00Z'), Date.parse('2023-08-30T00:00Z'));
+   * storm.axis.entries.length;          // just that day's steps
+   * await storm.reduce('max').grid();    // peak rainfall WITHIN the window
+   * storm.select(coord);                  // and one step out of it, as usual
+   * ```
+   *
+   * @param {number|string} from - inclusive lower bound
+   * @param {number|string} to - inclusive upper bound
+   * @param {Object} [opts]
+   * @param {number|string} [opts.axis=0] - which axis (index or name) to narrow
+   * @returns {Dataset|null} a Dataset whose chosen axis holds only the matching entries; `null` when
+   *   the axis is missing/empty or nothing falls inside the window
+   */
+  selectRange(from, to, { axis = 0 } = {}) {
+    const { ax, idx } = this.#requireAxis(axis);
+    if (ax.ordered === false) {
+      throw new Error(`selectRange: axis "${ax.name}" is unordered — its coords are identities, not ` +
+        "magnitudes, so there is no \"between\" to select. Use select(coord) per entry.");
+    }
+    const [lo, hi] = from <= to ? [from, to] : [to, from];
+    const entries = ax.entries.filter((e) => e.coord >= lo && e.coord <= hi);
+    if (!entries.length) return null;
+    // Every OTHER axis is carried through untouched — narrowing time must not disturb a variable or
+    // ensemble axis sitting beside it.
+    return new Dataset({
+      name: this.name, kind: this.kind, format: this.format, crs: this.crs,
+      bounds: this.#bounds, meta: this.#meta,
+      data: this.data, url: this.#url, resolveUrl: this.#resolveUrl,
+      axes: this.axes.map((a, i) => (i === idx ? { ...a, entries } : a)),
+    });
   }
 
   /**
@@ -542,7 +777,9 @@ export class Dataset {
     if (!entries?.length) return null;
     const exact = entries.find((e) => e.coord === coord);
     if (exact) return exact;
-    if (!nearest || typeof coord !== "number") return null;
+    // Nearest is a magnitude operation: on an unordered axis "closest" is meaningless, and snapping
+    // e.g. select(1.5) to band 2 would be a confident wrong answer rather than a miss.
+    if (!nearest || ax.ordered === false || typeof coord !== "number") return null;
     let best = null, bestD = Infinity;
     for (const e of entries) {
       if (typeof e.coord !== "number") continue;
@@ -585,8 +822,20 @@ export class Dataset {
   // ---- private force helpers ----
 
   async #materializeRoot() {
+    // A selection-axis series is not forceable, whether or not it holds bytes. That distinction used
+    // to be free — a series was URL-backed and had no `data`, so the no-source branch below caught it.
+    // In-file selectors changed that: a NetCDF/GRIB2/Zarr series carries the whole file, so the
+    // series check has to come first and stand on `axes` alone. A node with its own `selector` is the
+    // exception — it is one resolved slice, and forcing it is exactly right.
+    // ANY remaining axis means unresolved: `select()` peels one axis at a time, so a partially
+    // selected node carries both a selector and the axes still outstanding. Keying this off the
+    // selector's absence would let that node through and decode an incomplete selection.
+    if (this.axes?.length) {
+      throw new Error(`load(): "${this.name}" is a selection-axis series — ` +
+        `${this.axes.map((a) => `${a.name || "?"}(${a.entries?.length ?? 0})`).join(", ")} ` +
+        "still unresolved. select(coord) each remaining axis, or reduce(op) to collapse one.");
+    }
     if (!this.#url && this.data == null) {
-      if (this.axes) throw new Error(`load(): "${this.name}" is a selection-axis series — select(coord) an entry first`);
       throw new Error(`load(): "${this.name}" has no source (no data, no url)`);
     }
     const mat = getMaterializer(this.format);
@@ -598,6 +847,10 @@ export class Dataset {
     // the resolved URL — keeps the resolution here (instance-supplied) and materializers dumb.
     const url = this.#url && this.#resolveUrl ? this.#resolveUrl(this.#url) : this.#url;
     const root = this.#url ? { kind: "url", url } : { kind: "inline", data: this.data };
+    // An in-file selector rides on the root, so a materializer reads the source and which slice of it
+    // to decode from ONE argument. Absent (the common case) the key is simply not there, so every
+    // existing materializer is unaffected.
+    if (this.#selector) root.select = this.#selector;
     return mat(root, this);
   }
 
@@ -625,11 +878,20 @@ export class Dataset {
         // decoded grid directly rather than either reprojecting a stale file or failing outright.
         const parent = this.#inputs[0];
         const rootRepresentsBase = !parent.#nonReprojectAncestorOp();
-        const out = await warp(base, this.#op.crs, {
-          source: rootRepresentsBase ? this.#rootData() : null,
-          grid: base,
-          name: this.name,
-        });
+        // By far the longest operation in the library: the first warp lazily pulls ~38 MB of GDAL
+        // wasm and data from a CDN before it computes anything. A host showing no indicator through
+        // that looks hung, so this is the one op that announces itself.
+        notifyBusy(true, "reproject");
+        let out;
+        try {
+          out = await warp(base, this.#op.crs, {
+            source: rootRepresentsBase ? this.#rootData() : null,
+            grid: base,
+            name: this.name,
+          });
+        } finally {
+          notifyBusy(false, "reproject");
+        }
         this.#warnings.push(`Reprojected "${this.name}" ${base.crs || "unknown"} → ${this.#op.crs}.`);
         return out;
       }
@@ -748,6 +1010,9 @@ export class Dataset {
     } else {                                   // inline root — classic shape (with data)
       base.data = this.data;
     }
+    // A selector root round-trips as a root + its in-file selection. Only present when set, so an
+    // ordinary record is byte-identical to what it was before selectors existed.
+    if (!this.#inputs && this.#selector) base.selector = this.#selector;
     if (opts.storeMaterialized) {
       if (!this.isMaterialized) throw new Error("toRecord({storeMaterialized}): call await ds.load() first");
       base.materialized = { ...this.#materialized };   // plain snapshot; revived by kind in fromRecord

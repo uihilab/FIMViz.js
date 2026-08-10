@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — 6. Storage &amp; records</title>
+<style>
+  :root { --bg:#0f1216; --panel:#161b22; --code:#0b0e13; --line:#2b3440; --fg:#e6edf3; --dim:#8b949e;
+          --accent:#58a6ff; --ok:#3fb950; --bad:#f85149; --warn:#d29922; }
+  @media (prefers-color-scheme:light) {
+    :root { --bg:#fff; --panel:#f6f8fa; --code:#f6f8fa; --line:#d0d7de; --fg:#1f2328; --dim:#59636e; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:15px/1.65 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { border-bottom:1px solid var(--line); padding:28px 24px 22px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  h1 { margin:0 0 6px; font-size:23px; letter-spacing:-.01em; }
+  .lead { margin:0; color:var(--dim); max-width:82ch; }
+  .setup { margin:14px 0 0; padding:9px 13px; border:1px solid var(--line); border-left:3px solid var(--accent);
+           border-radius:6px; background:var(--panel); font-size:13px; color:var(--dim); max-width:82ch; }
+  main { display:grid; grid-template-columns:minmax(0,1fr) 400px; gap:30px; padding:22px 24px 80px; }
+  @media (max-width:1000px) { main { grid-template-columns:1fr; } }
+  section { padding:22px 0 4px; border-top:1px solid var(--line); }
+  section:first-child { border-top:0; padding-top:8px; }
+  h2 { font-size:16px; margin:0 0 8px; }
+  h2 .n { color:var(--accent); font:600 13px/1 ui-monospace,Menlo,monospace; margin-right:8px;
+          border:1px solid var(--line); border-radius:5px; padding:3px 6px; }
+  p { margin:0 0 12px; max-width:78ch; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.9em;
+         background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:0 4px; }
+  pre { margin:0 0 12px; padding:12px 14px; border:1px solid var(--line); border-radius:8px;
+        background:var(--code); overflow:auto; font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  pre.out { background:var(--panel); color:var(--dim); max-height:300px; white-space:pre-wrap; }
+  pre.out.bad { color:var(--bad); border-color:var(--bad); }
+  .k { color:var(--dim); } .s { color:var(--ok); } .f { color:var(--accent); }
+  .label { font:600 10.5px/1 ui-sans-serif,system-ui; letter-spacing:.09em; text-transform:uppercase;
+           color:var(--dim); margin:0 0 6px; }
+  .controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 12px; }
+  button { background:transparent; color:var(--accent); border:1px solid var(--line); border-radius:6px;
+           padding:5px 11px; font:inherit; font-size:13px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button.danger { color:var(--bad); }
+  aside { position:sticky; top:22px; align-self:start; display:flex; flex-direction:column; gap:12px; }
+  .card { border:1px solid var(--line); border-radius:10px; background:var(--panel); padding:12px 13px;
+          font-size:12.5px; color:var(--dim); }
+  .card h3 { margin:0 0 8px; font:600 10.5px/1 ui-sans-serif,system-ui; letter-spacing:.09em;
+             text-transform:uppercase; display:flex; justify-content:space-between; }
+  table { border-collapse:collapse; font-size:12px; width:100%; }
+  th, td { border:1px solid var(--line); padding:4px 7px; text-align:left; word-break:break-all; }
+  th { color:var(--dim); font-weight:600; }
+  nav.more { border-top:1px solid var(--line); padding:18px 24px 40px; font-size:13px; color:var(--dim); }
+  nav.more a { color:var(--accent); }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <h1>6 · Storage &amp; records</h1>
+  <p class="lead">
+    Two independent ideas that pair well. <code>Dataset.toRecord()</code> serializes a Dataset as its
+    <b>source plus its op recipe</b> — small, because the immutable pipeline <em>is</em> the value.
+    <code>Storage</code> is a <b>generic</b> key-value store over IndexedDB that knows nothing about
+    Datasets, files or FIMViz: you name the database, the tables and the keys, and it stores your value
+    <b>verbatim</b>.
+  </p>
+  <p class="setup">
+    This page has no map. It writes to a real IndexedDB database in your browser called
+    <code>fimviz-notebook</code> — the last section deletes it. Serve the repo root; IndexedDB does not
+    work from <code>file://</code>.
+  </p>
+</header>
+
+<main class="wrap">
+<div>
+
+  <section>
+    <h2><span class="n">1</span><code>toRecord()</code> — the recipe <em>is</em> the value</h2>
+    <p>
+      A Dataset is a lazy chain, so the honest way to persist one is to persist the chain: where the
+      bytes came from, and which operations were applied. That is what <code>toRecord()</code> gives you
+      by default, and it is why storing a five-op derivation costs about as much as storing the original.
+      <code>{ storeMaterialized: true }</code> embeds the decoded grid as well — call
+      <code>await ds.load()</code> first, or it throws.
+    </p>
+    <p>
+      <code>Dataset.fromRecord()</code> rehydrates either form, replaying the op chain node by node. It
+      is <b>required</b>: a structured clone drops prototypes, so what comes back out of IndexedDB is
+      inert data until this rebuilds it.
+    </p>
+    <pre><span class="f">const</span> ds      = <span class="f">await</span> FimViz.<span class="f">parseFile</span>(file);
+<span class="f">const</span> derived = ds.<span class="f">clip</span>(bbox).<span class="f">reclassify</span>([{ min: <span class="s">2</span>, max: <span class="f">Infinity</span>, value: <span class="s">1</span> }]);
+
+<span class="f">const</span> recipe = derived.<span class="f">toRecord</span>();                          <span class="k">// source + ops</span>
+<span class="f">await</span> derived.<span class="f">load</span>();
+<span class="f">const</span> baked  = derived.<span class="f">toRecord</span>({ storeMaterialized: <span class="f">true</span> });  <span class="k">// …plus the decoded grid</span>
+
+<span class="f">const</span> back = Dataset.<span class="f">fromRecord</span>(recipe);   <span class="k">// the chain rebuilt, still lazy</span>
+<span class="f">await</span> back.<span class="f">grid</span>();                          <span class="k">// re-runs it from the stored bytes</span>
+
+<span class="k">// A callback-form reclassify does NOT survive: functions cannot be structured-cloned.</span>
+<span class="k">// Use range rules for a chain you intend to persist.</span></pre>
+    <div class="controls"><button id="btn-record">build both records</button></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-record">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>Values are stored <em>verbatim</em></h2>
+    <p>
+      Keys are <b>out-of-line</b> — the store never reaches into your value to find its key — and that is
+      precisely what lets the value be stored by structured clone rather than as JSON. An
+      <code>ArrayBuffer</code>, a <code>TypedArray</code>, a <code>Blob</code>, a <code>Map</code>, a
+      <code>Set</code>, a <code>Date</code>: all round-trip exactly.
+    </p>
+    <p>
+      The alternative silently destroys data, which is the whole argument:
+      <code>JSON.stringify(arrayBuffer)</code> is <code>"{}"</code>. Not an error, not a warning — an
+      empty object where your raster used to be. The button below demonstrates it on real bytes.
+    </p>
+    <pre><span class="f">const</span> db = <span class="f">new</span> <span class="f">Storage</span>({ name: <span class="s">"fimviz-notebook"</span>, version: <span class="s">1</span>, tables: [<span class="s">"files"</span>, <span class="s">"notes"</span>] });
+
+<span class="f">await</span> db.<span class="f">put</span>(<span class="s">"files"</span>, <span class="s">"depth.tif"</span>, arrayBuffer);   <span class="k">// stored byte for byte</span>
+(<span class="f">await</span> db.<span class="f">get</span>(<span class="s">"files"</span>, <span class="s">"depth.tif"</span>)).byteLength;   <span class="k">// unchanged</span>
+
+<span class="f">JSON</span>.<span class="f">stringify</span>(arrayBuffer);   <span class="k">// "{}"  ← the thing this design exists to avoid</span></pre>
+    <div class="controls"><button id="btn-verbatim">store an ArrayBuffer both ways</button></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-verbatim">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>Discovery — ask before you open</h2>
+    <p>
+      IndexedDB <b>cannot downgrade</b>: opening at a version lower than the one on disk throws a hard
+      <code>VersionError</code>. And the on-disk version is not something a host can track for itself,
+      because <code>createTable</code>/<code>dropTable</code> bump it as a side effect — so the number
+      you passed to the constructor goes stale on its own. Those two facts are why discovery exists.
+    </p>
+    <p>
+      The safest open is to <b>omit <code>version</code> entirely</b>, which attaches to whatever is
+      already there. And <code>Storage.databases()</code> <em>throws</em> on engines without
+      <code>indexedDB.databases()</code> rather than reporting an empty list — "no databases" and
+      "cannot tell" must not look alike when the next step might be destroying data.
+    </p>
+    <pre><span class="f">await</span> Storage.<span class="f">databases</span>();          <span class="k">// [{ name, version }, …] for this origin</span>
+<span class="f">await</span> Storage.<span class="f">exists</span>(<span class="s">"fimviz-notebook"</span>);
+
+<span class="f">await</span> db.<span class="f">version</span>();      <span class="k">// the CURRENT on-disk version — never creates, never upgrades</span>
+db.declaredVersion;      <span class="k">// what THIS instance was constructed with</span>
+
+<span class="f">new</span> <span class="f">Storage</span>({ name: <span class="s">"fimviz-notebook"</span>, tables: [<span class="s">"files"</span>] });   <span class="k">// no version → no downgrade risk</span></pre>
+    <div class="controls"><button id="btn-discover">inspect this origin</button></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-discover">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span>Rows</h2>
+    <p>
+      <code>db.table(name)</code> binds the table so a call reads as a verb on the table itself. It is
+      pure sugar — every method delegates to the db-level call with <code>table</code> bound, so the two
+      forms are fully interchangeable and there is nothing to dispose.
+    </p>
+    <p>
+      Two distinctions the API keeps that a thinner wrapper usually loses. <code>has()</code>
+      distinguishes a stored <code>undefined</code> from a missing key. And a <b>broken read rejects</b>
+      rather than resolving <code>undefined</code>, so a failure cannot be mistaken for an absence. Every
+      write really commits before its promise resolves — it awaits the transaction, not just the request.
+    </p>
+    <pre><span class="f">const</span> files = db.<span class="f">table</span>(<span class="s">"files"</span>);
+
+<span class="f">await</span> files.<span class="f">put</span>(key, value);   <span class="k">// → the key</span>
+<span class="f">await</span> files.<span class="f">get</span>(key);
+<span class="f">await</span> files.<span class="f">has</span>(key);          <span class="k">// distinguishes a stored `undefined` from absent</span>
+<span class="f">await</span> files.<span class="f">delete</span>(key);
+<span class="f">await</span> files.<span class="f">list</span>({ keys: <span class="f">true</span> });   <span class="k">// cheap — no values deserialized (a filename picker)</span>
+<span class="f">await</span> files.<span class="f">list</span>();                <span class="k">// [{ key, value }] in key order</span>
+<span class="f">await</span> files.<span class="f">clear</span>();               <span class="k">// this table only</span></pre>
+    <div class="controls">
+      <button id="btn-seed">write three rows</button>
+      <button id="btn-list">list keys, then values</button>
+      <button id="btn-has">has() vs get()</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-rows">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">5</span>Two kinds of change, two different tools</h2>
+    <p>
+      <b>Data</b> migration needs no version bump at all: keys are out-of-line and values are verbatim,
+      so a record's <em>shape</em> was never part of the schema. <code>map()</code> walks a table in key
+      order inside one transaction; return a new value to update the row,
+      <code>Storage.DELETE</code> to remove it, or <code>undefined</code> to leave it alone. That last
+      default matters — a callback that forgets to return does nothing, rather than wiping the table.
+    </p>
+    <p>
+      <b>Structural</b> change — which stores exist — is the other tool, because IndexedDB only permits
+      it inside an upgrade transaction. <code>createTable</code>/<code>dropTable</code> bump the version
+      for you; <code>versionMigrate</code> is the hook for anything more (create a store, copy rows
+      between stores) and runs inside that transaction.
+    </p>
+    <pre><span class="k">// DATA — no version bump.</span>
+<span class="f">await</span> db.<span class="f">table</span>(<span class="s">"notes"</span>).<span class="f">map</span>((key, value) =&gt; {
+  <span class="f">if</span> (value.stale) <span class="f">return</span> Storage.DELETE;      <span class="k">// a Symbol — cannot collide with your data</span>
+  <span class="f">if</span> (value.v === <span class="s">1</span>) <span class="f">return</span> { ...value, v: <span class="s">2</span> };   <span class="k">// rewrite it</span>
+  <span class="k">// return undefined → untouched</span>
+});   <span class="k">// → how many rows were updated or deleted</span>
+
+<span class="f">await</span> db.<span class="f">clearAll</span>();   <span class="k">// every row in every table, one transaction, schema kept</span>
+
+<span class="k">// STRUCTURAL — bumps the version.</span>
+<span class="f">await</span> db.<span class="f">createTable</span>(<span class="s">"thumbnails"</span>);   <span class="k">// false if it already existed</span>
+<span class="f">await</span> db.<span class="f">dropTable</span>(<span class="s">"thumbnails"</span>);
+
+<span class="f">new</span> <span class="f">Storage</span>({ name, version: <span class="s">3</span>, versionMigrate: ({ db, transaction, oldVersion }) =&gt; { … } });</pre>
+    <div class="controls">
+      <button id="btn-map">run a map() migration</button>
+      <button id="btn-table">create, then drop a table</button>
+      <button id="btn-clearall">clearAll()</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-migrate">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">6</span>The round trip that motivates all of it</h2>
+    <p>
+      Parse a file, derive from it, store the recipe, close the tab, come back, rehydrate, and force —
+      the grid is rebuilt from bytes that never left the browser. This is the whole offline-dataset path,
+      and the record it writes is small enough that a handful of them is unremarkable.
+    </p>
+    <p>
+      One thing to know when the chain includes a multi-dimensional format: rehydrating skips the parser,
+      so a selector-backed Dataset needs its decoders registered before <code>fromRecord</code>.
+    </p>
+    <pre><span class="f">const</span> derived = ds.<span class="f">clip</span>(bbox).<span class="f">reclassify</span>(rules);
+
+<span class="f">await</span> db.<span class="f">table</span>(<span class="s">"files"</span>).<span class="f">put</span>(<span class="s">"scenario-a"</span>, derived.<span class="f">toRecord</span>());
+<span class="k">// … later, or after a reload …</span>
+<span class="f">const</span> record  = <span class="f">await</span> db.<span class="f">table</span>(<span class="s">"files"</span>).<span class="f">get</span>(<span class="s">"scenario-a"</span>);
+<span class="f">const</span> rebuilt = Dataset.<span class="f">fromRecord</span>(record);
+
+<span class="f">await</span> rebuilt.<span class="f">grid</span>();      <span class="k">// same pixels, chain replayed</span>
+<span class="f">await</span> fim.<span class="f">addLayer</span>(rebuilt);   <span class="k">// or straight onto a map</span></pre>
+    <div class="controls">
+      <button id="btn-roundtrip">store, rehydrate and compare</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-round">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">7</span>Scope, and the end of the line</h2>
+    <p>
+      <b>"Not a database library" is a decision, not a gap.</b> There is no query language, no index
+      management, and no transaction API beyond the calls above. If you need more, the intended answer is
+      to build an adapter around a real database rather than to grow this class — the surface is kept
+      small enough that such an adapter could slot in later.
+    </p>
+    <p>
+      The engine also names <b>no database and no table</b>, anywhere: a host owns the schema, which is
+      why <code>fim.storage</code> throws until you pass <code>storage</code> to <code>mount()</code>. And
+      the standing policy is that a schema change bumps the version and accepts a reset — this is storage
+      a host should treat as disposable.
+    </p>
+    <pre><span class="f">await</span> db.<span class="f">close</span>();     <span class="k">// drop the connection; data persists, the next call reopens</span>
+<span class="f">await</span> db.<span class="f">destroy</span>();   <span class="k">// delete the whole database</span>
+
+<span class="k">// Shared across every map on an app, and only if the host asked for it:</span>
+<span class="f">const</span> fim = <span class="f">await</span> <span class="f">mount</span>(<span class="s">"#map"</span>, { provider: <span class="s">"leaflet"</span>,
+  storage: { name: <span class="s">"my-store"</span>, version: <span class="s">1</span>, tables: [<span class="s">"userFiles"</span>] } });
+fim.storage;   <span class="k">// throws unless that option was given</span></pre>
+    <div class="controls">
+      <button id="btn-close">close the connection</button>
+      <button id="btn-destroy" class="danger">destroy the database</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-scope">…</pre>
+  </section>
+
+</div>
+
+<aside>
+  <div class="card">
+    <h3><span>fimviz-notebook</span><span id="db-version">v?</span></h3>
+    <div id="inspector">nothing yet</div>
+  </div>
+  <div class="card">
+    <h3>Reference</h3>
+    Full API: <code>docs/usage/STORAGE.md</code>. The record format and the op-chain replay live in
+    <code>docs/usage/DATASET_OPERATIONS.md</code>.
+  </div>
+</aside>
+</main>
+
+<nav class="more wrap">
+  Back to <a href="01-quickstart.html">1 · Quickstart</a> ·
+  <a href="05-ui-toolkit.html">5 · The UI toolkit</a>
+</nav>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js"
+} }
+</script>
+
+<script type="module">
+import { FimViz, Dataset, Storage } from "fimviz";
+
+const $ = (s) => document.querySelector(s);
+const show = (sel, v, bad = false) => {
+  const el = $(sel);
+  el.className = "out" + (bad ? " bad" : "");
+  el.textContent = typeof v === "string" ? v : JSON.stringify(v, null, 2);
+};
+const kb = (n) => `${(n / 1024).toFixed(1)} KB`;
+
+// How big is a record, really? `JSON.stringify` is useless here — an ArrayBuffer stringifies to "{}",
+// which is the very trap section 2 is about. So walk the record and add up the binary payloads: a
+// derived node nests `inputs` recursively, and only the root leaf carries the bytes.
+function weigh(record, acc = { bytes: 0, ops: [], nodes: 0 }) {
+  if (!record || typeof record !== "object") return acc;
+  acc.nodes++;
+  for (const v of Object.values(record)) {
+    if (v instanceof ArrayBuffer) acc.bytes += v.byteLength;
+    else if (ArrayBuffer.isView(v)) acc.bytes += v.byteLength;
+    else if (v && typeof v === "object" && !Array.isArray(v)) weigh(v, acc);
+  }
+  if (record.op?.op) acc.ops.push(record.op.op);
+  (record.inputs || []).forEach((r) => weigh(r, acc));
+  return acc;
+}
+
+// The host names the database, the tables and the keys — the engine names none of them.
+const DB = "fimviz-notebook";
+let db = new Storage({ name: DB, version: 1, tables: ["files", "notes"] });
+
+// ---------------------------------------------------------------- the inspector on the right
+async function inspect() {
+  try {
+    const tables = await db.tables();
+    const version = await db.version();
+    $("#db-version").textContent = `v${version ?? "—"}`;
+    const blocks = [];
+    for (const t of tables) {
+      const rows = await db.list(t, { keys: true });
+      blocks.push(`<div style="margin-bottom:8px"><b>${t}</b> — ${rows.length} row(s)` +
+        (rows.length ? `<table><tbody>${rows.map((k) => `<tr><td>${String(k)}</td></tr>`).join("")}</tbody></table>` : "") +
+        `</div>`);
+    }
+    $("#inspector").innerHTML = blocks.join("") || "no tables";
+  } catch (e) {
+    $("#inspector").textContent = `${e.name}: ${e.message}`;
+  }
+}
+
+async function sampleFile(name) {
+  const res = await fetch(`../assets/SampleFiles/${name}`);
+  if (!res.ok) throw new Error(`${name}: HTTP ${res.status} — serve the REPO ROOT, not /examples`);
+  return new File([await res.blob()], name);
+}
+
+// One parsed Dataset, reused below. parseFile is the pure parse — no map, no instance.
+const ds = await FimViz.parseFile(await sampleFile("4326.tif"));
+const rules = [{ min: 2, max: Infinity, value: 1 }];
+const bbox = { north: 34.39, south: 34.35, west: -89.96, east: -89.87 };
+const derived = ds.clip(bbox).reclassify(rules);
+
+// ---------------------------------------------------------------- 1 · records
+$("#btn-record").addEventListener("click", async () => {
+  try {
+    const recipe = derived.toRecord();
+    await derived.load();                                   // required before storeMaterialized
+    const baked = derived.toRecord({ storeMaterialized: true });
+    const rebuilt = Dataset.fromRecord(recipe);
+    const g = await rebuilt.grid();
+    const light = weigh(recipe), heavy = weigh(baked);
+    show("#o-record", {
+      recipeKeys: Object.keys(recipe),
+      recipe: { nodes: light.nodes, ops: light.ops, binaryPayload: kb(light.bytes) },
+      recipeIsSmallBecause: "it stores the SOURCE bytes plus the ops, not the decoded pixels",
+      materialized: { ops: heavy.ops, binaryPayload: kb(heavy.bytes) },
+      difference: kb(heavy.bytes - light.bytes) + " of decoded grid embedded on top of the source",
+      measuringNote: "JSON.stringify would report both as tiny — an ArrayBuffer stringifies to '{}'",
+      rehydrated: {
+        kind: rebuilt.kind, format: rebuilt.format,
+        grid: `${g.width}×${g.height}`, crs: g.crs,
+        note: "fromRecord replayed clip + reclassify — a structured clone alone drops the prototypes",
+      },
+    });
+  } catch (e) { show("#o-record", `${e.name}: ${e.message}`, true); }
+});
+
+// ---------------------------------------------------------------- 2 · verbatim
+$("#btn-verbatim").addEventListener("click", async () => {
+  try {
+    const bytes = await (await sampleFile("4326.tif")).arrayBuffer();
+    await db.put("files", "raw.tif", bytes);
+    const back = await db.get("files", "raw.tif");
+    const asJson = JSON.stringify(bytes);
+    await db.put("notes", "shapes", {
+      map: new Map([["a", 1]]), set: new Set([1, 2]), when: new Date(2020, 0, 1),
+      typed: new Float32Array([1.5, 2.5]),
+    });
+    const shapes = await db.get("notes", "shapes");
+    show("#o-verbatim", {
+      wroteBytes: bytes.byteLength,
+      readBackBytes: back.byteLength,
+      identical: back.byteLength === bytes.byteLength,
+      "JSON.stringify(arrayBuffer)": asJson,
+      lostThisWay: `${bytes.byteLength} bytes → ${asJson.length} characters of nothing`,
+      otherStructuredCloneTypes: {
+        map: shapes.map instanceof Map, set: shapes.set instanceof Set,
+        date: shapes.when instanceof Date, typed: shapes.typed instanceof Float32Array,
+      },
+    });
+    await inspect();
+  } catch (e) { show("#o-verbatim", `${e.name}: ${e.message}`, true); }
+});
+
+// ---------------------------------------------------------------- 3 · discovery
+$("#btn-discover").addEventListener("click", async () => {
+  try {
+    let databases;
+    try { databases = await Storage.databases(); }
+    catch (e) { databases = `throws here: ${e.message}`; }   // "cannot tell" ≠ "none"
+    show("#o-discover", {
+      databases,
+      "exists('fimviz-notebook')": await Storage.exists(DB),
+      onDiskVersion: await db.version(),
+      declaredVersion: db.declaredVersion,
+      diverges: (await db.version()) !== db.declaredVersion,
+      whyItDiverges: "createTable/dropTable bump the version as a side effect",
+      safeOpen: "omit `version` and you attach to whatever exists — no downgrade risk",
+    });
+    await inspect();
+  } catch (e) { show("#o-discover", `${e.name}: ${e.message}`, true); }
+});
+
+// ---------------------------------------------------------------- 4 · rows
+$("#btn-seed").addEventListener("click", async () => {
+  try {
+    const notes = db.table("notes");
+    await notes.put("a", { v: 1, text: "first" });
+    await notes.put("b", { v: 1, text: "second", stale: true });
+    await notes.put("c", { v: 2, text: "already migrated" });
+    await notes.put("empty", undefined);     // a STORED undefined — has() can still see it
+    show("#o-rows", {
+      wrote: ["a", "b", "c", "empty"],
+      handle: "db.table('notes') is sugar — db.put('notes', …) writes the same rows",
+      committed: "each promise resolved only after the transaction completed",
+    });
+    await inspect();
+  } catch (e) { show("#o-rows", `${e.name}: ${e.message}`, true); }
+});
+$("#btn-list").addEventListener("click", async () => {
+  try {
+    const notes = db.table("notes");
+    show("#o-rows", {
+      "list({ keys: true })": await notes.list({ keys: true }),
+      "list()": await notes.list(),
+      order: "key order, always",
+      cheap: "the keys form deserializes no values — what a filename picker wants",
+    });
+  } catch (e) { show("#o-rows", `${e.name}: ${e.message}`, true); }
+});
+$("#btn-has").addEventListener("click", async () => {
+  try {
+    const notes = db.table("notes");
+    show("#o-rows", {
+      "get('empty')": await notes.get("empty"),
+      "has('empty')": await notes.has("empty"),
+      "get('nope')": await notes.get("nope"),
+      "has('nope')": await notes.has("nope"),
+      distinction: "a stored `undefined` and a missing key both read as undefined — has() tells them apart",
+    });
+  } catch (e) { show("#o-rows", `${e.name}: ${e.message}`, true); }
+});
+
+// ---------------------------------------------------------------- 5 · migration
+$("#btn-map").addEventListener("click", async () => {
+  try {
+    const before = await db.list("notes");
+    const touched = await db.table("notes").map((key, value) => {
+      if (value?.stale) return Storage.DELETE;        // a Symbol, so it cannot collide with your data
+      if (value?.v === 1) return { ...value, v: 2, migratedAt: "now" };
+      return undefined;                                // untouched — the safe default
+    });
+    show("#o-migrate", {
+      rowsTouched: touched,
+      before: before.map((r) => ({ key: r.key, v: r.value?.v, stale: !!r.value?.stale })),
+      after: (await db.list("notes")).map((r) => ({ key: r.key, v: r.value?.v })),
+      versionBumped: false,
+      why: "keys are out-of-line and values verbatim, so a record's shape was never schema",
+    });
+    await inspect();
+  } catch (e) { show("#o-migrate", `${e.name}: ${e.message}`, true); }
+});
+$("#btn-table").addEventListener("click", async () => {
+  try {
+    const v0 = await db.version();
+    const created = await db.createTable("thumbnails");
+    const v1 = await db.version();
+    const again = await db.createTable("thumbnails");     // false — already there
+    const dropped = await db.dropTable("thumbnails");
+    const v2 = await db.version();
+    show("#o-migrate", {
+      created, createdAgain: again, dropped,
+      versions: { before: v0, afterCreate: v1, afterDrop: v2 },
+      declaredVersion: db.declaredVersion,
+      lesson: "the constructor's number is now stale — this is what version() is for",
+      tables: await db.tables(),
+    });
+    await inspect();
+  } catch (e) { show("#o-migrate", `${e.name}: ${e.message}`, true); }
+});
+$("#btn-clearall").addEventListener("click", async () => {
+  try {
+    const cleared = await db.clearAll();
+    show("#o-migrate", {
+      clearedTables: cleared,
+      schemaKept: await db.tables(),
+      versionKept: await db.version(),
+      contrast: "clear(table) empties one; this empties all of them in ONE transaction",
+    });
+    await inspect();
+  } catch (e) { show("#o-migrate", `${e.name}: ${e.message}`, true); }
+});
+
+// ---------------------------------------------------------------- 6 · round trip
+$("#btn-roundtrip").addEventListener("click", async () => {
+  try {
+    const original = await derived.grid();
+    await db.table("files").put("scenario-a", derived.toRecord());
+
+    // Everything below is what a fresh page load would do: read inert data, rebuild, force.
+    const record = await db.table("files").get("scenario-a");
+    const rebuilt = Dataset.fromRecord(record);
+    const grid = await rebuilt.grid();
+
+    const same = original.width === grid.width && original.height === grid.height;
+    let diff = 0;
+    for (let i = 0; i < original.pixels.length; i++) {
+      const a = original.pixels[i], b = grid.pixels[i];
+      if (Number.isNaN(a) && Number.isNaN(b)) continue;
+      if (a !== b) diff++;
+    }
+    show("#o-round", {
+      storedRecord: { nodes: weigh(record).nodes, binaryPayload: kb(weigh(record).bytes) },
+      chainReplayed: weigh(record).ops,
+      sameShape: same,
+      differingPixels: diff,
+      isMaterializedOnRehydrate: false,
+      note: "the record is inert until fromRecord rebuilds it — structured clone drops prototypes",
+    });
+    await inspect();
+  } catch (e) { show("#o-round", `${e.name}: ${e.message}`, true); }
+});
+
+// ---------------------------------------------------------------- 7 · lifecycle
+$("#btn-close").addEventListener("click", async () => {
+  try {
+    await db.close();
+    const after = await db.list("notes", { keys: true });   // reopens transparently
+    show("#o-scope", {
+      closed: true,
+      readAfterClose: after,
+      note: "close() drops the connection, not the data — the next call reopens it",
+    });
+  } catch (e) { show("#o-scope", `${e.name}: ${e.message}`, true); }
+});
+$("#btn-destroy").addEventListener("click", async () => {
+  try {
+    await db.destroy();
+    show("#o-scope", {
+      destroyed: DB,
+      existsNow: await Storage.exists(DB),
+      note: "gone. Reload the page to recreate it at version 1.",
+    });
+    $("#inspector").textContent = "destroyed";
+    $("#db-version").textContent = "—";
+    db = new Storage({ name: DB, version: 1, tables: ["files", "notes"] });
+  } catch (e) { show("#o-scope", `${e.name}: ${e.message}`, true); }
+});
+
+// ---------------------------------------------------------------- go
+await inspect();
+show("#o-record", { ready: true, dataset: ds.name, chain: "clip → reclassify", hint: "press a button" });
+</script>
+</body>
+</html>

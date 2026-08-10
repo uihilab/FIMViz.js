@@ -44,6 +44,16 @@ const libEsmConfig = {
   mode: "production",
   module: { rules: moduleRules },
   plugins: [defineEmptyKey],
+  // `sciwrid-toolkit` is the one dependency we deliberately do NOT bundle. io/sciwrid.js reaches it
+  // through a dynamic import, so webpack would otherwise pull its reader into an async chunk — and
+  // re-bundling it breaks it in two ways: it loads h5wasm via `await import(c)` with a VARIABLE, which
+  // a bundler compiles into a build-time lookup that can never reach the CDN, and its wasm/worker are
+  // resolved relative to its own import.meta.url. Left external, the emitted `import("sciwrid-toolkit")`
+  // resolves at runtime to the package's own browser build (an import map entry, or the consumer's
+  // bundler), which is how the example pages already load it. It also keeps the ~193 KB wasm out of
+  // dist entirely — the payload rule in PACKAGE_ROADMAP.md §8.
+  externalsType: "module",
+  externals: { "sciwrid-toolkit": "sciwrid-toolkit" },
   // minimize:true still strips whitespace/comments/dead code (worth keeping for size), but Terser's
   // default `mangle` renames every class, function, variable, and private (#foo) field to a short
   // symbol — that's what turns `Dataset { #url, #warnings, ... }` into `Di { #t, #e, ... }` in the

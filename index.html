@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz.js — a headless flood-inundation-map visualization engine</title>
+<meta name="description" content="A headless flood-inundation-map visualization engine for the browser: lazy Datasets, real spatial operations, colour scales and read-models, Google Maps or Leaflet — and no UI at all." />
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="index.html">FIM<span>Viz</span>.js</a>
+    <nav>
+      <a href="#examples">Examples</a>
+      <a href="#guides">Guides</a>
+      <a href="#api">API</a>
+      <a href="#design">Design</a>
+      <a href="https://github.com/uihilab/FIMViz.js">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <span class="pill">● Not yet on npm — clone and build</span>
+      <h1>A flood-inundation-map engine<br /><span class="dim">that ships no user interface.</span></h1>
+      <p class="tagline">
+        Parse GeoTIFF, GeoJSON, shapefiles, NetCDF, GRIB2 or Zarr into a <b>lazy Dataset</b>; clip, mask,
+        reclassify, reproject and reduce it with real spatial operations; render it through Google Maps
+        or Leaflet. Every widget is yours to build — or to take, one at a time, from an opt-in toolkit.
+      </p>
+      <div class="cta">
+        <a class="btn primary" href="examples/01-quickstart.html">Get started</a>
+        <a class="btn" href="api/index.html">API reference</a>
+        <a class="btn" href="guides/usage.html">Usage guides</a>
+        <a class="btn" href="https://github.com/uihilab/FIMViz.js">GitHub</a>
+      </div>
+    </div>
+
+    <figure class="demo">
+      <div id="hero-map"></div>
+      <figcaption id="hero-caption">
+        <b>Booting…</b> this map is <code>dist/fimviz.js</code> running on this page.
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>The whole idea</h2>
+    <p class="intro">Four calls put a flood raster on a map. Everything else composes from the same three objects.</p>
+    <div class="split">
+      <div>
+<pre><code>import { FimViz } from 'fimviz';
+
+// `provider` is required and has no default — the two
+// backends differ in credentials *and* in capability,
+// so the engine never picks one for you.
+const fim = await FimViz.mount('#map', { provider: 'leaflet' });
+
+// Header only. Nothing is decoded, and parsing never
+// reprojects: ds.crs is whatever the file itself declares.
+const ds = await fim.addDataset(file);
+
+// This is the call that forces the chain — decode,
+// colorize, draw — and infers the layer type from ds.kind.
+const layer = await fim.addLayer(ds);
+layer.fit();</code></pre>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:14px">
+          <h3>Dataset — a lazy, immutable op chain</h3>
+          <p>A root wraps a source; every operation returns a <em>new</em> node. Nothing is fetched,
+             decoded or warped until a terminal forces it, and the result is memoized per node. That is
+             why an op is cheap, an original is never damaged, and one parse can feed a dozen
+             derivations.</p>
+        </div>
+        <div class="card" style="margin-bottom:14px">
+          <h3>Layer — one rendering of one or more Datasets</h3>
+          <p>Evented, provider-neutral, and it never names an element of yours. It emits; your UI
+             subscribes.</p>
+        </div>
+        <div class="card">
+          <h3>ColorScale — value to colour, and the read-models</h3>
+          <p>One mutable scale with three exclusive modes, from which <code>Legend</code> and
+             <code>Stats</code> are derived — so the legend, the histogram buckets and the pixels on
+             screen can never disagree.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>What it is, and what it deliberately isn't</h2>
+    <p class="intro">Three decisions you will feel within ten minutes of using it.</p>
+    <div class="grid c3">
+      <div class="card">
+        <h3>Headless, and enforced</h3>
+        <p>No widget markup, no CSS, no panels, and not one <code>window.foo()</code> call into your
+           app. The engine's only outbound channel is an event bus, and a source-scan test fails the
+           build if a core module reaches for the DOM or names a database.</p>
+      </div>
+      <div class="card">
+        <h3>Lazy and immutable</h3>
+        <p><code>ds.clip(bbox).mask(poly).reclassify(rules)</code> does no work at all. The terminals —
+           <code>grid()</code>, <code>features()</code>, <code>load()</code>, or a Layer rendering it —
+           are what run the chain, once, and memoize it.</p>
+      </div>
+      <div class="card">
+        <h3>It never guesses</h3>
+        <p>Parsing never reprojects. A raster in a CRS the provider cannot draw throws instead of
+           landing in the wrong place. A file with no usable extent throws instead of being placed
+           confidently and wrongly. An unknown palette throws with the list of real ones.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>The object model</h2>
+    <p class="intro">Small on purpose: two decoded value types, one rendering object, three read-models.</p>
+    <div class="split">
+      <figure class="model">
+        <svg viewBox="0 0 560 260" role="img" aria-label="Source bytes become a Dataset, which forces to a grid or features, which a Layer renders through a map provider; a ColorScale derives a Legend and Stats.">
+          <defs>
+            <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
+            </marker>
+          </defs>
+          <g fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55" marker-end="url(#a)">
+            <path d="M104,44 H168" /><path d="M266,44 H330" /><path d="M428,44 V96" />
+            <path d="M104,150 H168" /><path d="M266,150 H330" /><path d="M266,150 L330,206" />
+            <path d="M212,68 V126" />
+          </g>
+          <g font-family="ui-monospace,Menlo,monospace" font-size="12.5" text-anchor="middle">
+            <g fill="currentColor" opacity=".18">
+              <rect x="8" y="26" width="96" height="36" rx="7" /><rect x="168" y="26" width="98" height="36" rx="7" />
+              <rect x="330" y="26" width="196" height="36" rx="7" /><rect x="330" y="96" width="196" height="36" rx="7" />
+              <rect x="8" y="132" width="96" height="36" rx="7" /><rect x="168" y="132" width="98" height="36" rx="7" />
+              <rect x="330" y="132" width="196" height="36" rx="7" /><rect x="330" y="188" width="196" height="36" rx="7" />
+            </g>
+            <g fill="currentColor">
+              <text x="56" y="49">file / URL</text>
+              <text x="217" y="49">Dataset</text>
+              <text x="428" y="49">RasterGrid</text>
+              <text x="428" y="119">VectorFeatures</text>
+              <text x="56" y="155">ColorScale</text>
+              <text x="217" y="155">Layer</text>
+              <text x="428" y="155">map provider</text>
+              <text x="428" y="211">Legend · Stats</text>
+            </g>
+            <g fill="currentColor" opacity=".6" font-size="10.5">
+              <text x="136" y="38">parse</text>
+              <text x="298" y="38">force</text>
+              <text x="136" y="144">attach</text>
+              <text x="298" y="144">draw</text>
+              <text x="317" y="196" text-anchor="end">derive</text>
+            </g>
+          </g>
+        </svg>
+        <figcaption>
+          A <code>Dataset</code> forces to exactly one of two value types. Every other dimension —
+          time, level, ensemble member, band — is a <b>selection axis</b> you resolve down with
+          <code>select()</code>, never an N-dimensional cube.
+        </figcaption>
+      </figure>
+      <div>
+        <div class="card" style="margin-bottom:14px">
+          <h3>A provider seam, not a Google dependency</h3>
+          <p>Map, vectors and static raster images go through a registered provider — Leaflet and Google
+             ship with it, and a neutral style vocabulary is translated into each SDK's own names. The
+             animated velocity canvas, HAZUS markers and ArcGIS depth tiers remain Google-only.</p>
+        </div>
+        <div class="card">
+          <h3>Registries live on the type they serve</h3>
+          <p><code>Layer.registerType</code>, <code>ColorScale.registerPalette</code>,
+             <code>Dataset.registerMaterializer</code>, <code>FimViz.registerMapProvider</code> — the
+             library owns the mechanism, your app registers the specifics.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>What's in it</h2>
+    <p class="intro">All of it runs in the browser. The heavy parts load only when something asks for them.</p>
+    <div class="caps">
+      <div>
+        <h3>Formats in</h3>
+        <ul>
+          <li>GeoTIFF</li><li>GeoJSON</li><li>KML</li><li>KMZ</li><li>Shapefile</li>
+          <li>CSV</li><li>XYZ</li><li>NetCDF3</li><li>NetCDF4</li><li>GRIB2</li><li>Zarr</li>
+          <li>HAZUS damage</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Operations</h3>
+        <ul>
+          <li>clip</li><li>mask</li><li>reclassify</li><li>slope</li><li>aspect</li><li>hillshade</li>
+          <li>resampleTo</li><li>reproject</li><li>combine</li><li>difference</li><li>rasterize</li>
+          <li>zonalStats</li><li>groupBy</li><li>reduce</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Read-models</h3>
+        <ul>
+          <li>ColorScale ×3 modes</li><li>Legend</li><li>Stats</li>
+          <li>SpatialFilter</li><li>PredicateFilter</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Temporal &amp; multi-dimensional</h3>
+        <ul>
+          <li>selection axes</li><li>select</li><li>selectRange</li><li>reduce</li>
+          <li>in-file selectors</li>
+        </ul>
+      </div>
+      <div>
+        <h3>UI toolkit <span class="muted">(opt-in)</span></h3>
+        <ul>
+          <li>toast</li><li>busy</li><li>dropzone</li><li>layer panel</li><li>tools panel</li>
+          <li>legend / stats</li><li>tooltip</li><li>info window</li><li>region draw ×4</li>
+          <li>operations panel</li><li>axis slider</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Storage</h3>
+        <ul>
+          <li>IndexedDB KV</li><li>verbatim values</li><li>Dataset records</li><li>op-chain replay</li>
+          <li>data migration</li>
+        </ul>
+      </div>
+    </div>
+    <p class="muted" style="margin:18px 0 0; font-size:14px">
+      The engine bundle is around 210 KB and the UI module around 55 KB. GDAL (a ~38 MB wasm, for
+      reprojection) and the NetCDF/GRIB2/Zarr reader are <b>never bundled</b> — they load on first use,
+      so a consumer who parses a GeoTIFF and draws it downloads neither.
+    </p>
+  </div>
+</section>
+
+<section class="band" id="examples">
+  <div class="wrap">
+    <h2>Examples</h2>
+    <p class="intro">Six runnable pages. Each explains what it is doing beside the code that does it,
+       and the code runs on the page as you read.</p>
+    <div class="grid c3">
+      <a class="card" href="examples/01-quickstart.html">
+        <h3><span class="num">01</span>Quickstart</h3>
+        <p>Mount, parse, render, fit. The colour-scale precedence chain, live recolouring, the legend
+           and statistics, a hover readout, a vector layer, and teardown.</p>
+        <div class="tags"><span class="tag">live map</span><span class="tag">keyless</span></div>
+      </a>
+      <a class="card" href="examples/02-datasets-and-ops.html">
+        <h3><span class="num">02</span>Datasets &amp; operations</h3>
+        <p>Laziness and terminals, clip · mask · reclassify, terrain, band maths, zonal statistics and
+           group-by, chaining off a Layer, rasterize, and the GDAL warp.</p>
+        <div class="tags"><span class="tag">two maps</span><span class="tag">keyless</span></div>
+      </a>
+      <a class="card" href="examples/03-color-and-read-models.html">
+        <h3><span class="num">03</span>Colour &amp; read-models</h3>
+        <p>The three exclusive ColorScale modes, <code>missingColor</code>, Legend, Stats over rasters
+           and vectors, and the Filter family.</p>
+        <div class="tags"><span class="tag">no map</span><span class="tag">pure</span></div>
+      </a>
+      <a class="card" href="examples/04-temporal.html">
+        <h3><span class="num">04</span>Temporal data</h3>
+        <p>NetCDF4, Zarr, GRIB2 and NetCDF3 through the ordinary <code>addDataset</code>. The axis,
+           <code>select</code>, <code>selectRange</code>, <code>reduce</code>, and a scrubber.</p>
+        <div class="tags"><span class="tag">live map</span><span class="tag">wasm</span></div>
+      </a>
+      <a class="card" href="examples/05-ui-toolkit.html">
+        <h3><span class="num">05</span>The UI toolkit</h3>
+        <p>Every <code>fimviz/ui</code> export mounted the way an app would mount it — panels, the four
+           selection tools, live read-models, and the engine-to-host bus.</p>
+        <div class="tags"><span class="tag">interactive</span><span class="tag">keyless</span></div>
+      </a>
+      <a class="card" href="examples/06-storage-and-records.html">
+        <h3><span class="num">06</span>Storage &amp; records</h3>
+        <p><code>toRecord</code>/<code>fromRecord</code>, why values are stored verbatim, discovery,
+           migration, and a full store → rehydrate → force round trip.</p>
+        <div class="tags"><span class="tag">no map</span><span class="tag">IndexedDB</span></div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="guides">
+  <div class="wrap">
+    <h2>Usage guides</h2>
+    <p class="intro">Task-oriented, with parameter tables and worked examples. Start with the overview.</p>
+    <div class="guidelist">
+      <a href="guides/usage.html"><span class="g-name">USAGE</span><span class="g-desc">The narrative overview — install, boot, every type, hosting and limitations.</span></a>
+      <a href="guides/app-startup.html"><span class="g-name">APP_STARTUP</span><span class="g-desc">Every way to mount, the options table, and the file-upload flow.</span></a>
+      <a href="guides/app-startup-advanced.html"><span class="g-name">…ADVANCED</span><span class="g-desc">The map-provider seam, the decode seam, and the fuller FimMap API.</span></a>
+      <a href="guides/dataset-operations.html"><span class="g-name">DATASET_OPERATIONS</span><span class="g-desc">Every op, the terminals, axes, and the multi-dimensional formats.</span></a>
+      <a href="guides/layers.html"><span class="g-name">LAYERS</span><span class="g-desc">The base Layer: render pipeline, chainable ops, settings, events.</span></a>
+      <a href="guides/layer-subtypes.html"><span class="g-name">LAYER_SUBTYPES</span><span class="g-desc">Raster, vector, comparison and ensemble-aggregation layers.</span></a>
+      <a href="guides/color-scale.html"><span class="g-name">COLOR_SCALE</span><span class="g-desc">All three colouring modes, with worked examples for each.</span></a>
+      <a href="guides/legend.html"><span class="g-name">LEGEND</span><span class="g-desc">The display read-model and how labels resolve.</span></a>
+      <a href="guides/storage.html"><span class="g-name">STORAGE</span><span class="g-desc">The generic key-value store, discovery, and version management.</span></a>
+      <a href="guides/ui.html"><span class="g-name">UI</span><span class="g-desc">The opt-in headless UI module, widget by widget.</span></a>
+      <a href="guides/console-snippets.html"><span class="g-name">Console snippets</span><span class="g-desc">One runnable snippet per documented method, in doc order.</span></a>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="api">
+  <div class="wrap">
+    <h2>API reference</h2>
+    <p class="intro">Generated from the library's own JSDoc — every parameter, every return type,
+       with search.</p>
+    <div class="split">
+      <div>
+        <p class="muted" style="margin-top:0">
+          The guides above are the narrative; this is the exhaustive listing. It covers the public
+          surface plus the seams a host implements — the map-provider contract, the materializer
+          registry, and the layer-type registry.
+        </p>
+        <a class="btn primary" href="api/index.html">Browse the API</a>
+      </div>
+      <div class="grid c2">
+        <a class="card" href="api/classes/package_dataset.Dataset.html"><h3>Dataset</h3><p>The lazy op chain.</p></a>
+        <a class="card" href="api/classes/package_layer.Layer.html"><h3>Layer</h3><p>Rendering, settings, events.</p></a>
+        <a class="card" href="api/classes/package_colorScale.ColorScale.html"><h3>ColorScale</h3><p>Value to colour.</p></a>
+        <a class="card" href="api/classes/package_stats.Stats.html"><h3>Stats</h3><p>The computed read-model.</p></a>
+        <a class="card" href="api/classes/package_fimMap.FimMap.html"><h3>FimMap</h3><p>The per-map handle.</p></a>
+        <a class="card" href="api/classes/io_storage.Storage.html"><h3>Storage</h3><p>The key-value store.</p></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="design">
+  <div class="wrap">
+    <h2>Design &amp; direction</h2>
+    <p class="intro">Why the library has the shape it has, what was rejected, and what is still open.</p>
+    <div class="grid c2">
+      <a class="card" href="guides/class-diagram.html">
+        <h3>Class diagram</h3>
+        <p>The object model as UML — what owns what, what derives from what, and the build status of
+           every class.</p>
+      </a>
+      <a class="card" href="guides/decisions.html">
+        <h3>Decisions &amp; tradeoffs</h3>
+        <p>The consolidated history: what was decided and why, what was considered and rejected, what
+           is built, and what is knowingly incomplete.</p>
+      </a>
+      <a class="card" href="guides/roadmap.html">
+        <h3>Package roadmap</h3>
+        <p>Forward design for capabilities we want — each hanging off an existing seam, with the landed
+           slices marked.</p>
+      </a>
+      <a class="card" href="guides/case-studies.html">
+        <h3>Case studies</h3>
+        <p>Ten end-to-end demos against real public data, each scored against what actually ships
+           today rather than what is designed for.</p>
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer class="site">
+  <div class="wrap">
+    <span>ISC licensed</span>
+    <span>·</span>
+    <a href="https://github.com/uihilab/FIMViz.js">github.com/uihilab/FIMViz.js</a>
+    <span>·</span>
+    <span>University of Iowa Hydroinformatics Lab</span>
+    <span class="sep"><a href="https://github.com/uihilab/SciWrid-Toolkit">SciWrid Toolkit</a> reads the
+      multi-dimensional formats</span>
+  </div>
+</footer>
+
+<script type="importmap">
+{ "imports": { "fimviz": "./dist/fimviz.js" } }
+</script>
+
+<script type="module">
+// The hero map is not a screenshot: it boots the same bundle every example loads, renders a real
+// GeoTIFF from assets/, and reports what it did underneath. If this panel says it failed, the build
+// is broken — which makes the landing page its own smoke test.
+import { FimViz, ColorScale } from "fimviz";
+
+const caption = document.getElementById("hero-caption");
+try {
+  const fim = await FimViz.mount("#hero-map", { provider: "leaflet" });
+
+  const res = await fetch("./assets/SampleFiles/4326.tif");
+  if (!res.ok) throw new Error(`sample raster: HTTP ${res.status}`);
+  const ds = await fim.addDataset(new File([await res.blob()], "4326.tif"));
+
+  const layer = await fim.addLayer(ds);
+  await layer.set({
+    colorScale: new ColorScale({ palette: "viridis", min: 0, max: 10, continuous: true, unit: "m" }),
+    opacity: 0.85,
+  });
+  layer.fit();
+
+  const stats = await layer.getStats();
+  caption.innerHTML =
+    `<b>${ds.name}</b> · ${layer.meta.width}×${layer.meta.height} · ${ds.crs} · ` +
+    `${stats.count.toLocaleString()} wet cells, up to ${stats.max.toFixed(1)} m — ` +
+    `parsed, colorized and drawn on this page by <code>dist/fimviz.js</code>.`;
+} catch (e) {
+  caption.innerHTML =
+    `<b>The demo did not boot.</b> ${e.message}. Run <code>npm run build</code> and serve the ` +
+    `repository root — this page loads <code>./dist/fimviz.js</code> and <code>./assets/</code>.`;
+}
+</script>
+</body>
+</html>

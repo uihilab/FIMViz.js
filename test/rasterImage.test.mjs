@@ -1,5 +1,6 @@
 // rasterImage — the pure raster colorize (package/rasterImage.js). The canvas encode (rgbaToDataURL/
-// gridToDataURL) is browser-only and verified in examples/dataset-layer.html; colorizeGrid is pure.
+// gridToDataURL) is browser-only and verified in examples/03-color-and-read-models.html, which draws
+// the sample raster with it; colorizeGrid is pure.
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";

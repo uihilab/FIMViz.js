@@ -16,7 +16,9 @@ principle.
 > `Storage` is a **generic** KV store (db/table/row, verbatim structured-clone values), not a Dataset store
 > — the app names the database. `Catalog` is a **shape** (`{ list, load }`), not a class:
 > `fimDatabaseCatalog(url)` satisfies it, as does `Storage` + `Dataset.fromRecord`. The FIM Scenario
-> selection axis **folds into `Dataset`** via `axes`/`axis` + `select()`. Full rationale:
+> selection axis **folds into `Dataset`** via `axes`/`axis` + `select()` — an axis entry addresses
+> either a separate file (a URL) **or a slice of the source already held** (`ref: { select: {…} }`),
+> which is what lets one NetCDF/GRIB2/Zarr file back a whole time axis. Full rationale:
 > [DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md](./DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md) §1.1.
 
 ---
@@ -73,7 +75,8 @@ classDiagram
         +crs : string (native, never assumed)
         +bounds : Bounds (in crs)
         +meta : object
-        +axes : Array (selection axis, e.g. FIM Scenario stage/time)
+        +axes : Array (selection axis: FIM Scenario stage, or a NetCDF/GRIB2/Zarr time axis)
+        +selector : Object (an IN-FILE selection, set by select() off a selector ref)
         +warnings : string[]
         +isMaterialized : boolean
         +fromURL(url, opts)$ Dataset

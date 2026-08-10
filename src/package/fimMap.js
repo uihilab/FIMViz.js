@@ -14,7 +14,7 @@
 import { parseSource } from "../io/parse.js";
 import { proxiedUrl } from "./config.js";
 import { createLayer, dispatchMapEventToLayers } from "./layer.js";
-import { getMapProvider } from "./mapProvider.js";
+import { getMapProvider, DEFAULT_PROVIDER } from "./mapProvider.js";
 import { ColorScale } from "./colorScale.js";
 
 // `#foo` -> `[id="foo"]` for the exact-id case only. See $() below for why.
@@ -308,8 +308,13 @@ export class FimMap {
   /**
    * Parse a source (File | Blob | ArrayBuffer | URL) into a Dataset and register it on this
    * instance. Returns the Dataset (not yet rendered — addLayer draws it).
+   *
+   * Format comes from the extension: geotiff, geojson, kml, kmz, shp, csv, xyz, and the
+   * multi-dimensional scientific formats (.nc/.nc4/.cdf, .grib/.grib2/.grb2, .zarr), which return a
+   * Dataset carrying a **time axis** to `select()` and `reduce()` over. `options` is passed through
+   * to the parser — see `parseSource` for the per-format keys.
    * @param {File|Blob|ArrayBuffer|string} source
-   * @param {Object} [options]
+   * @param {Object} [options] - see `io/parse.js`'s `parseSource`
    * @returns {Promise<import('./dataset.js').Dataset>}
    */
   async addDataset(source, options = {}) {
@@ -370,6 +375,7 @@ export class FimMap {
     }
     const layer = await createLayer(this, type, opts);
     this.layers.push(layer);
+    this.#layersChanged("added", layer);
     return layer;
   }
 
@@ -391,7 +397,7 @@ export class FimMap {
     layer._map = this;
     layer._name = name;
     this.#layersByName.set(name, layer);
-    if (!this.layers.includes(layer)) this.layers.push(layer);
+    if (!this.layers.includes(layer)) { this.layers.push(layer); this.#layersChanged("added", layer); }
     return layer;
   }
 
@@ -407,10 +413,24 @@ export class FimMap {
     if (layer) layer.remove();   // remove() calls back into _unregisterLayer
   }
 
+  /**
+   * Announce that the layer SET changed — added, removed, or reordered.
+   *
+   * `layers` is a plain public array with no change signal of its own, so anything rendering a view
+   * of it (ui/layerPanel.js) had no way to stay in sync short of polling. One event covers all three
+   * mutations because a panel redraws the whole list either way; `reason` is there for a consumer
+   * that wants to animate only insertions.
+   * @param {'added'|'removed'|'reordered'} reason
+   * @param {import('./layer.js').Layer|null} [layer]
+   */
+  #layersChanged(reason, layer = null) {
+    this.emit("layers:changed", { reason, layer, layers: this.layers.slice() });
+  }
+
   /** Internal: drop a Layer from the registry (called by Layer.remove()). @internal @param {import('./layer.js').Layer} layer @returns {void} */
   _unregisterLayer(layer) {
     const i = this.layers.indexOf(layer);
-    if (i >= 0) this.layers.splice(i, 1);
+    if (i >= 0) { this.layers.splice(i, 1); this.#layersChanged("removed", layer); }
     if (layer?._name && this.#layersByName.get(layer._name) === layer) {
       this.#layersByName.delete(layer._name);
     }
@@ -504,6 +524,108 @@ export class FimMap {
     this.#capture = typeof handler === "function" ? handler : null;
     return () => { if (this.#capture === handler) this.#capture = null; };
   }
+  /**
+   * Resolve once the map's camera has settled.
+   *
+   * The reason this exists rather than a `setTimeout`: `fitBounds`/`fit()` are ANIMATED on both
+   * providers, and anything that reads the projection while one is in flight gets the pre-animation
+   * one. A click captured mid-zoom therefore lands at the wrong coordinates — off by exactly 2× when
+   * the fit changed zoom by one level. So the rule is `layer.fit(); await fim.whenIdle();` before
+   * starting any tool that converts pointer position to coordinates.
+   *
+   * Safe to await unconditionally: it resolves on a timeout when the map is already still, and
+   * resolves immediately when the provider declares no `whenIdle` at all.
+   * @param {{ timeout?: number }} [opts]
+   * @returns {Promise<void>}
+   */
+  /**
+   * Turn pan-by-drag on or off.
+   *
+   * Exists for drag-based selection: a freehand or brush stroke is the SAME gesture as a map pan, so
+   * one of the two has to give. The tool suppresses dragging for the length of the stroke and
+   * restores it on finish/cancel — which is why restoring is in a `finally`, not on the happy path.
+   *
+   * A no-op when the provider declares no `setDraggable`, so a caller never has to feature-detect.
+   * @param {boolean} on
+   * @returns {FimMap}
+   */
+  setMapDraggable(on) {
+    const provider = getMapProvider(this.config?.provider || DEFAULT_PROVIDER);
+    if (this.map && typeof provider?.setDraggable === "function") provider.setDraggable(this.map, !!on);
+    return this;
+  }
+
+  /**
+   * Draw a GeoJSON overlay that is NOT a Layer — a tool's in-progress shape, a rubber band, a
+   * highlight. It never enters `fim.layers`, so it is not hit-tested, not reordered, not listed in the
+   * layer panel and not saved: it is scaffolding the user is looking at, not data they loaded.
+   *
+   * This exists because the selection tools are headless by design — they produce `{lat,lng}` and name
+   * no map SDK — which left "show me what I am drawing" with nowhere to live. Putting it here rather
+   * than in `fimviz/ui` keeps the provider registry (and Leaflet) out of the `dist/ui.js` bundle.
+   *
+   * @param {Object} geojson - a Feature or FeatureCollection
+   * @param {{ style?: Object|Function }} [opts] - the neutral style vocabulary `VectorLayer` uses
+   * @returns {*} an opaque handle to pass to {@link removeScratchVector}, or null if there is no map
+   */
+  addScratchVector(geojson, { style } = {}) {
+    const provider = getMapProvider(this.config?.provider || DEFAULT_PROVIDER);
+    if (!this.map || typeof provider?.addVector !== "function" || !geojson) return null;
+    return provider.addVector(this.map, geojson, { style });
+  }
+
+  /** Tear down a handle from {@link addScratchVector}. Safe on null. @param {*} handle @returns {FimMap} */
+  removeScratchVector(handle) {
+    const provider = getMapProvider(this.config?.provider || DEFAULT_PROVIDER);
+    if (handle && this.map && typeof provider?.removeVector === "function") {
+      try { provider.removeVector(this.map, handle); } catch { /* already gone */ }
+    }
+    return this;
+  }
+
+  /**
+   * Ground metres per screen pixel, plus the map's pixel size — what lets a tool be sized in SCREEN
+   * units (a brush that stays the same width as you zoom) without touching a map SDK.
+   * @returns {{metresPerPixel: number, width: number, height: number}|null} null when unavailable
+   */
+  viewMetrics() {
+    const provider = getMapProvider(this.config?.provider || DEFAULT_PROVIDER);
+    if (!this.map || typeof provider?.viewMetrics !== "function") return null;
+    return provider.viewMetrics(this.map);
+  }
+
+  async whenIdle(opts = {}) {
+    const provider = getMapProvider(this.config?.provider || DEFAULT_PROVIDER);
+    const map = this.map;
+    if (!map || typeof provider?.whenIdle !== "function") return;
+    await provider.whenIdle(map, opts);
+  }
+
+  /**
+   * Push this instance's layer order down to the map, so what is DRAWN on top matches what
+   * `layers` says is on top.
+   *
+   * Worth being explicit about why this is needed at all: `dispatchMapEventToLayers` already walks
+   * `layers` top-down and treats the last entry as the topmost for hit-testing, but visual stacking
+   * has only ever been whatever order the provider happened to insert overlays in. The two could
+   * therefore disagree — the layer that received a click was not necessarily the one drawn on top.
+   * This makes the array authoritative for both.
+   * @returns {FimMap}
+   */
+  applyLayerOrder() {
+    const provider = getMapProvider(this.config?.provider || DEFAULT_PROVIDER);
+    const map = this.map;
+    if (!map || typeof provider?.applyLayerOrder !== "function") return this;
+    // Bottom → top is the array's own order. Each layer exposes ONE provider handle; a layer with
+    // none yet (never rendered, or hidden by teardown) simply has no place in the stack.
+    const owners = this.layers.filter((l) => l._providerHandle);
+    const reordered = provider.applyLayerOrder(map, owners.map((l) => l._providerHandle));
+    // A provider may hand back REPLACED handles (Google recreates ground overlays), so adopt them or
+    // the next removeLayer()/opacity change would act on a handle no longer on the map.
+    owners.forEach((l, i) => { if (reordered[i] !== undefined) l._adoptProviderHandle(reordered[i]); });
+    return this;
+  }
+
   /** Release any modal interaction, restoring normal layer dispatch. @returns {FimMap} */
   releaseInteraction() { this.#capture = null; return this; }
   /** Is a modal interaction currently capturing events? @returns {boolean} */

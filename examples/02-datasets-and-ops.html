@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — 2. Datasets &amp; operations</title>
+<style>
+  :root { --bg:#0f1216; --panel:#161b22; --code:#0b0e13; --line:#2b3440; --fg:#e6edf3; --dim:#8b949e;
+          --accent:#58a6ff; --ok:#3fb950; --bad:#f85149; --warn:#d29922; }
+  @media (prefers-color-scheme:light) {
+    :root { --bg:#fff; --panel:#f6f8fa; --code:#f6f8fa; --line:#d0d7de; --fg:#1f2328; --dim:#59636e; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:15px/1.65 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { border-bottom:1px solid var(--line); padding:28px 24px 22px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  h1 { margin:0 0 6px; font-size:23px; letter-spacing:-.01em; }
+  .lead { margin:0; color:var(--dim); max-width:82ch; }
+  .setup { margin:14px 0 0; padding:9px 13px; border:1px solid var(--line); border-left:3px solid var(--accent);
+           border-radius:6px; background:var(--panel); font-size:13px; color:var(--dim); max-width:82ch; }
+  main { display:grid; grid-template-columns:minmax(0,1fr) 440px; gap:30px; padding:22px 24px 80px; }
+  @media (max-width:1000px) { main { grid-template-columns:1fr; } }
+  section { padding:22px 0 4px; border-top:1px solid var(--line); }
+  section:first-child { border-top:0; padding-top:8px; }
+  h2 { font-size:16px; margin:0 0 8px; }
+  h2 .n { color:var(--accent); font:600 13px/1 ui-monospace,Menlo,monospace; margin-right:8px;
+          border:1px solid var(--line); border-radius:5px; padding:3px 6px; }
+  p { margin:0 0 12px; max-width:78ch; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.9em;
+         background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:0 4px; }
+  pre { margin:0 0 12px; padding:12px 14px; border:1px solid var(--line); border-radius:8px;
+        background:var(--code); overflow:auto; font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  pre.out { background:var(--panel); color:var(--dim); max-height:300px; white-space:pre-wrap; }
+  pre.out.bad { color:var(--bad); border-color:var(--bad); }
+  .k { color:var(--dim); } .s { color:var(--ok); } .f { color:var(--accent); }
+  .label { font:600 10.5px/1 ui-sans-serif,system-ui; letter-spacing:.09em; text-transform:uppercase;
+           color:var(--dim); margin:0 0 6px; }
+  .controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 12px; }
+  button { background:transparent; color:var(--accent); border:1px solid var(--line); border-radius:6px;
+           padding:5px 11px; font:inherit; font-size:13px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button.warn { color:var(--warn); }
+  label.ctl { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--dim); }
+  input[type=number] { width:74px; background:var(--bg); color:var(--fg); border:1px solid var(--line);
+                       border-radius:6px; padding:4px 6px; font:inherit; font-size:13px; }
+  aside { position:sticky; top:22px; align-self:start; }
+  .maptitle { font:600 10.5px/1 ui-sans-serif,system-ui; letter-spacing:.09em; text-transform:uppercase;
+              color:var(--dim); margin:0 0 6px; display:flex; justify-content:space-between; }
+  .mapbox { height:236px; border:1px solid var(--line); border-radius:10px; overflow:hidden;
+            margin-bottom:14px; }
+  .note { font-size:12.5px; color:var(--dim); border:1px solid var(--line); border-radius:8px;
+          padding:9px 11px; background:var(--panel); }
+  table { border-collapse:collapse; font-size:12.5px; margin:0 0 12px; width:100%; }
+  th, td { border:1px solid var(--line); padding:4px 8px; text-align:right; }
+  th { color:var(--dim); font-weight:600; text-align:right; background:var(--panel); }
+  th:first-child, td:first-child { text-align:left; }
+  nav.more { border-top:1px solid var(--line); padding:18px 24px 40px; font-size:13px; color:var(--dim); }
+  nav.more a { color:var(--accent); }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <h1>2 · Datasets &amp; operations</h1>
+  <p class="lead">
+    A <code>Dataset</code> is not a decoded raster — it is a <b>lazy, immutable node in an op chain</b>.
+    A root wraps a source; every operation returns a <em>new</em> node; nothing is fetched, decoded or
+    warped until a <b>terminal</b> forces it. That one design decision is why an op is cheap, why an
+    original is never damaged, and why the same parsed bytes can feed a dozen different derivations.
+  </p>
+  <p class="setup">
+    Two maps on the right: <b>source</b> never changes, <b>result</b> shows whatever the last operation
+    produced. A page may only mount one map per app, so the second one passes
+    <code>{ isolated: true }</code> to get its own. Serve the repo root and run
+    <code>npm run build</code> first.
+  </p>
+</header>
+
+<main class="wrap">
+<div>
+
+  <section>
+    <h2><span class="n">1</span>Nothing happens until you force it</h2>
+    <p>
+      Chaining builds a description. <code>isMaterialized</code> stays <code>false</code> the whole way
+      down, and the four terminals — <code>load()</code>, <code>grid()</code>, <code>features()</code>,
+      <code>zonalStats()</code> — are the only things that make work happen. A <code>Layer</code>
+      rendering the Dataset is a terminal too, which is why notebook 1 decoded at <code>addLayer</code>
+      and not at <code>addDataset</code>.
+    </p>
+    <p>
+      The result is <b>memoized per node</b>, so forcing the same node twice is free, and two chains that
+      share a parent share that parent's decode. <code>release()</code> evicts it.
+    </p>
+    <pre><span class="f">const</span> ds      = <span class="f">await</span> fim.<span class="f">addDataset</span>(file);        <span class="k">// header only</span>
+<span class="f">const</span> clipped = ds.<span class="f">clip</span>(bbox);                    <span class="k">// a new node. Still nothing.</span>
+<span class="f">const</span> shallow = clipped.<span class="f">reclassify</span>(rules);      <span class="k">// another. Still nothing.</span>
+
+ds.isMaterialized;        <span class="k">// false</span>
+shallow.isMaterialized;   <span class="k">// false</span>
+
+<span class="f">const</span> grid = <span class="f">await</span> shallow.<span class="f">grid</span>();          <span class="k">// ← the whole chain runs here, once</span>
+<span class="f">await</span> shallow.<span class="f">grid</span>();                         <span class="k">// memoized — free</span>
+
+shallow.warnings;   <span class="k">// collected at force time, e.g. "reclassify: 812 pixels matched no rule"</span>
+shallow.<span class="f">release</span>();  <span class="k">// drop the memoized decode; the recipe survives</span></pre>
+    <p class="label">Output</p>
+    <pre class="out" id="o-lazy">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span><code>clip</code> — cut the footprint down</h2>
+    <p>
+      Takes a bounds object in the Dataset's own CRS and snaps to pixel edges. The grid shrinks; values
+      are untouched. Edit the numbers and re-run — the result map redraws from a fresh chain each time,
+      while the source Dataset is never modified.
+    </p>
+    <pre><span class="f">const</span> cut = ds.<span class="f">clip</span>({ north: <span class="s">34.39</span>, south: <span class="s">34.35</span>, west: <span class="s">-89.96</span>, east: <span class="s">-89.87</span> });
+
+<span class="f">await</span> resultLayer.<span class="f">setSources</span>([cut]);   <span class="k">// immutable swap: point the layer at a new node</span></pre>
+    <div class="controls">
+      <label class="ctl">N <input type="number" id="c-n" value="34.39" step="0.005" /></label>
+      <label class="ctl">S <input type="number" id="c-s" value="34.35" step="0.005" /></label>
+      <label class="ctl">W <input type="number" id="c-w" value="-89.96" step="0.005" /></label>
+      <label class="ctl">E <input type="number" id="c-e" value="-89.87" step="0.005" /></label>
+      <button id="btn-clip">clip</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-clip">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span><code>mask</code> — keep what is inside a polygon</h2>
+    <p>
+      Pixels outside the polygon become <code>NaN</code>, which colorize draws as transparent and
+      <code>Stats</code> excludes — the two agree on what "absent" means, so a masked raster and its
+      statistics never disagree. The <b>footprint is unchanged</b>: masking hides values, clipping
+      removes ground.
+    </p>
+    <p>
+      The polygon can be a ring of <code>{lat, lng}</code>, a multi-ring array, or a
+      <code>SpatialFilter</code> — the same object the drawing tools in notebook 5 hand you, which is
+      why a drawn shape needs no conversion to become an analysis mask.
+    </p>
+    <pre><span class="f">const</span> ring = [{ lat: <span class="s">34.392</span>, lng: <span class="s">-89.95</span> }, { lat: <span class="s">34.392</span>, lng: <span class="s">-89.87</span> },
+              { lat: <span class="s">34.345</span>, lng: <span class="s">-89.87</span> }, { lat: <span class="s">34.345</span>, lng: <span class="s">-89.95</span> }];
+
+ds.<span class="f">mask</span>(ring);                  <span class="k">// keep inside</span>
+ds.<span class="f">mask</span>(ring, { invert: <span class="f">true</span> });  <span class="k">// …or punch that shape out</span>
+
+<span class="k">// A SpatialFilter is interchangeable here, and unions multiple rings:</span>
+ds.<span class="f">mask</span>(<span class="f">new</span> <span class="f">SpatialFilter</span>([ringA, ringB]));</pre>
+    <div class="controls">
+      <button id="btn-mask">mask</button>
+      <button id="btn-mask-inv">mask, inverted</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-mask">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span><code>reclassify</code> — remap values</h2>
+    <p>
+      Two forms. <b>Rules</b> are first-match-wins ranges, and survive <code>toRecord()</code> — a range
+      with no <code>value</code> means "keep what is there", so a plain threshold is one unbounded rule.
+      A <b>callback</b> is called once per valid pixel with its value and flat index: cheaper past a
+      couple of ranges, and not restricted to contiguous bands, but it cannot be serialized.
+    </p>
+    <p>
+      Existing noData is never passed to either. Anything that matches nothing becomes noData under the
+      default <code>unmatched: 'nodata'</code> — and if that actually punched holes, the count arrives on
+      <code>ds.warnings</code>, so incomplete coverage is reported rather than silently drawn.
+    </p>
+    <pre><span class="k">// Rules: three depth bands, everything above 6 m kept as-is.</span>
+ds.<span class="f">reclassify</span>([
+  { min: <span class="s">0</span>, max: <span class="s">2</span>, value: <span class="s">1</span> },
+  { min: <span class="s">2</span>, max: <span class="s">4</span>, value: <span class="s">2</span> },
+  { min: <span class="s">4</span>, max: <span class="s">6</span>, value: <span class="s">3</span> },
+  { min: <span class="s">6</span>, max: <span class="f">Infinity</span> },          <span class="k">// no `value` → keep the pixel's own</span>
+]);
+
+<span class="k">// Callback: anything per-pixel. `null` means unmatched.</span>
+ds.<span class="f">reclassify</span>((v, i) =&gt; (v &gt; <span class="s">2</span> ? <span class="f">Math</span>.<span class="f">round</span>(v) : <span class="f">null</span>));
+
+<span class="k">// A threshold is just an unbounded rule — "wet or nothing":</span>
+ds.<span class="f">reclassify</span>([{ min: <span class="s">0.3</span>, max: <span class="f">Infinity</span>, value: <span class="s">1</span> }]);</pre>
+    <div class="controls">
+      <button id="btn-rc-rules">reclassify (rules)</button>
+      <button id="btn-rc-fn">reclassify (callback)</button>
+      <button id="btn-rc-thresh">threshold &gt; 0.3 m</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-rc">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">5</span>Terrain — <code>slope</code>, <code>aspect</code>, <code>hillshade</code></h2>
+    <p>
+      Horn's 1981 3×3 gradient — the same algorithm <code>gdaldem</code> uses, run in plain JavaScript on
+      the decoded grid. <b>No GDAL, no wasm.</b> Cell size defaults to the grid's own pixel size in the
+      bounds' units, which for EPSG:4326 is <em>degrees</em> — pass metres for a true-scale result.
+    </p>
+    <p>
+      Honest caveat about this page: no DEM ships with the repo, so these run over a flood-depth grid.
+      The arithmetic is exactly what it would be on elevation; only the interpretation is nonsense.
+    </p>
+    <pre>ds.<span class="f">slope</span>({ unit: <span class="s">"degrees"</span> });      <span class="k">// or 'percent'</span>
+ds.<span class="f">aspect</span>();                          <span class="k">// downslope compass bearing, 0–360</span>
+ds.<span class="f">hillshade</span>({ azimuth: <span class="s">315</span>, altitude: <span class="s">45</span> });
+
+<span class="k">// Metres per cell, if you want a slope that means something:</span>
+ds.<span class="f">slope</span>({ cellsizeX: <span class="s">10</span>, cellsizeY: <span class="s">10</span> });</pre>
+    <div class="controls">
+      <button id="btn-slope">slope</button>
+      <button id="btn-aspect">aspect</button>
+      <button id="btn-hill">hillshade</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-terrain">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">6</span>Band math — <code>combine</code> and <code>difference</code></h2>
+    <p>
+      Two flood scenarios over the same town, differenced pixel by pixel. N-ary ops are
+      <b>LHS-conforming</b>: every other input is resampled onto <em>this</em> Dataset's grid, and if a
+      CRS had to be converted the op records a warning rather than throwing. That rule is what makes
+      "which grid does the answer live on" have an obvious answer.
+    </p>
+    <p>
+      <code>difference</code>/<code>ratio</code> are strictly binary; <code>sum</code>,
+      <code>mean</code>, <code>min</code> and <code>max</code> take any number of inputs.
+    </p>
+    <pre><span class="f">const</span> a = <span class="f">await</span> fim.<span class="f">addDataset</span>(scenarioA);   <span class="k">// 1312×664</span>
+<span class="f">const</span> b = <span class="f">await</span> fim.<span class="f">addDataset</span>(scenarioB);   <span class="k">// same grid here, but it need not be</span>
+
+a.<span class="f">difference</span>(b);                          <span class="k">// sugar for combine([b], { op:'difference' })</span>
+a.<span class="f">combine</span>([b], { op: <span class="s">"ratio"</span> });
+a.<span class="f">combine</span>([b, c], { op: <span class="s">"mean"</span> });          <span class="k">// N-ary</span>
+
+(<span class="f">await</span> diff.<span class="f">grid</span>()) &amp;&amp; diff.warnings;      <span class="k">// e.g. "resampled onto this grid"</span></pre>
+    <div class="controls">
+      <button id="btn-diff">difference</button>
+      <button id="btn-mean">mean of the two</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-band">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">7</span>Three kinds of reduction</h2>
+    <p>
+      Easy to conflate, so worth naming: <code>reduce()</code> collapses a <b>selection axis</b> (time,
+      level, member — notebook 4). <code>zonalStats()</code> collapses <b>space, grouped by
+      geometry</b>. <code>groupBy()</code> collapses <b>space, grouped by another raster's values</b>.
+      The last two return a table, not a Dataset — so they arrive on a different channel from anything
+      that changes a layer.
+    </p>
+    <pre><span class="k">// zonalStats — per-polygon summary. `zones` take a polygon or a SpatialFilter.</span>
+<span class="f">await</span> ds.<span class="f">zonalStats</span>([
+  { id: <span class="s">"west"</span>, polygon: westRing },
+  { id: <span class="s">"east"</span>, polygon: eastRing },
+]);
+<span class="k">// → [{ id, count, sum, min, max, mean, area }, …]</span>
+
+<span class="k">// groupBy — "mean depth per class of another raster". Discrete, or binned:</span>
+<span class="f">await</span> depth.<span class="f">groupBy</span>(other);                  <span class="k">// one row per distinct value</span>
+<span class="f">await</span> depth.<span class="f">groupBy</span>(other, { bins: <span class="s">5</span> });       <span class="k">// five equal-width bands</span>
+<span class="f">await</span> depth.<span class="f">groupBy</span>(other, { bins: [<span class="s">0</span>, <span class="s">1</span>, <span class="s">3</span>, <span class="s">10</span>] });   <span class="k">// explicit edges</span></pre>
+    <div class="controls">
+      <button id="btn-zonal">zonal stats</button>
+      <button id="btn-group">group by the other scenario (5 bins)</button>
+    </div>
+    <div id="tbl"></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-reduce">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">8</span>The same ops, straight off a <code>Layer</code></h2>
+    <p>
+      A layer exposes the unary ops so you can transform what is on screen without touching Datasets by
+      hand. Three timings are worth knowing: the <b>sources are rewritten immediately</b> (so
+      <code>getStats()</code> and <code>fit()</code> tell the truth mid-chain, and a bad argument throws
+      at the call that made it), the <b>map redraws once at <code>render()</code></b>, and the
+      <b>data still computes lazily</b> inside that render. <code>layer.dirty</code> reports an applied
+      but undrawn op; <code>reset()</code> goes back to the sources the layer was built from.
+    </p>
+    <p>
+      Not available on a layer: <code>combine</code>/<code>difference</code> — "which source is the left
+      operand" has no answer there — and <code>rasterize</code>, which changes the Dataset's kind and so
+      cannot return the same layer.
+    </p>
+    <pre><span class="f">await</span> layer.<span class="f">clip</span>(bbox).<span class="f">mask</span>(ring).<span class="f">reclassify</span>(rules).<span class="f">render</span>();
+layer.dirty;              <span class="k">// false again — the chain was drawn</span>
+<span class="f">await</span> layer.<span class="f">reset</span>();       <span class="k">// back to the original sources, re-rendered</span></pre>
+    <div class="controls">
+      <button id="btn-chain">clip → mask → reclassify → render</button>
+      <button id="btn-reset">reset</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-chain">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">9</span><code>rasterize</code> — vector into raster</h2>
+    <p>
+      The one kind-changing op that ships: it point-tests every pixel centre against each polygon and
+      burns a property value or a constant, so counties become a grid you can run raster maths over.
+      Later features win on overlap; holes are ignored, and only Polygon/MultiPolygon are handled.
+    </p>
+    <pre><span class="f">const</span> counties = <span class="f">await</span> fim.<span class="f">addDataset</span>(countyGeoJson);
+
+<span class="f">const</span> grid = counties.<span class="f">rasterize</span>({
+  width: <span class="s">600</span>, height: <span class="s">400</span>,
+  field: <span class="s">"SHAPE_Area"</span>,   <span class="k">// burn a property … or omit it and burn `burnValue`</span>
+});
+
+<span class="k">// It is a raster Dataset now — every raster op applies:</span>
+<span class="f">await</span> grid.<span class="f">grid</span>();
+counties.<span class="f">rasterize</span>({ width: <span class="s">600</span>, height: <span class="s">400</span>, burnValue: <span class="s">1</span> });   <span class="k">// a coverage mask</span></pre>
+    <div class="controls"><button id="btn-rasterize">rasterize the counties</button></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-rasterize">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">10</span>Reprojection, and the precondition that forces it</h2>
+    <p>
+      Both built-in providers accept only the WGS84 family, and the engine <b>never warps behind your
+      back</b>: rendering a raster in another CRS throws an actionable error instead of drawing a
+      plausible-looking map in the wrong place. The Brazos sample below is EPSG:26914 (UTM 14N), so it
+      fails on purpose.
+    </p>
+    <p>
+      <code>ds.reproject(crs)</code> is the lazy op; <code>warp(ds, crs)</code> is the eager free
+      function. Both dispatch to the same GDAL warp, which is <b>browser-only</b> and lazily pulls about
+      38 MB of wasm from a CDN on first use — so the button below is opt-in, and the first press is slow.
+    </p>
+    <pre><span class="f">const</span> utm = <span class="f">await</span> fim.<span class="f">addDataset</span>(brazosFile);
+utm.crs;   <span class="k">// 'EPSG:26914' — parsing never reprojects</span>
+
+<span class="f">await</span> fim.<span class="f">addLayer</span>(utm);
+<span class="k">// ✗ throws: the 'leaflet' provider cannot render CRS 'EPSG:26914'. Reproject first…</span>
+
+<span class="f">await</span> fim.<span class="f">addLayer</span>(utm.<span class="f">reproject</span>(<span class="s">"EPSG:4326"</span>));   <span class="k">// ✓ warps when the render forces it</span>
+
+<span class="k">// No setup call is needed: the barrel registers a JIT loader, so the first</span>
+<span class="k">// forced reproject is what imports GDAL. registerGdalReprojector() only pre-warms it.</span></pre>
+    <div class="controls">
+      <button id="btn-crs">show the CRS error</button>
+      <button id="btn-warp" class="warn">reproject with GDAL (~38 MB, slow first time)</button>
+    </div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-warp">…</pre>
+  </section>
+
+  <section>
+    <h2><span class="n">11</span>The same maths without a Dataset</h2>
+    <p>
+      Every raster op above is a thin lazy wrapper over a pure function on a decoded
+      <code>RasterGrid</code>, and those functions are exported. If you already hold a grid — from
+      <code>ds.grid()</code>, from your own decoder, or built by hand — call them directly.
+      <code>Dataset.fromGrid()</code> is the way back in, so <code>ds.grid()</code> is not a one-way
+      door.
+    </p>
+    <pre><span class="f">import</span> { maskGrid, clipGrid, reclassifyGrid, combineGrids, zonalStats,
+         slopeGrid, aspectGrid, hillshadeGrid, rasterizeFeatures,
+         colorizeGrid, gridToDataURL, Dataset } <span class="f">from</span> <span class="s">"fimviz"</span>;
+
+<span class="f">const</span> grid  = <span class="f">await</span> ds.<span class="f">grid</span>();
+<span class="f">const</span> small = <span class="f">clipGrid</span>(grid, bbox);
+<span class="f">const</span> shown = <span class="f">gridToDataURL</span>(small, { colorScale });   <span class="k">// a PNG data URL</span>
+
+<span class="f">const</span> back  = Dataset.<span class="f">fromGrid</span>(small);   <span class="k">// pre-materialized: no decode, ops chain again</span>
+<span class="f">await</span> back.<span class="f">slope</span>().<span class="f">grid</span>();</pre>
+    <div class="controls"><button id="btn-pure">run the pure functions</button></div>
+    <p class="label">Output</p>
+    <pre class="out" id="o-pure">…</pre>
+    <div id="thumb"></div>
+  </section>
+
+</div>
+
+<aside>
+  <p class="maptitle"><span>Source — untouched</span><span id="src-label">…</span></p>
+  <div class="mapbox" id="map-src"></div>
+  <p class="maptitle"><span>Result — the last operation</span><span id="res-label">—</span></p>
+  <div class="mapbox" id="map-res"></div>
+  <div class="note" id="note">
+    One <code>FimViz</code> app allows one mounted map, so the result map is mounted with
+    <code>{ isolated: true }</code> — its own app, its own bus, its own dataset registry.
+  </div>
+</aside>
+</main>
+
+<nav class="more wrap">
+  Next: <a href="03-color-and-read-models.html">3 · Colour &amp; read-models</a> ·
+  back to <a href="01-quickstart.html">1 · Quickstart</a>
+</nav>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js"
+} }
+</script>
+
+<script type="module">
+import {
+  FimViz, Dataset, ColorScale, SpatialFilter,
+  clipGrid, maskGrid, slopeGrid, gridToDataURL,
+} from "fimviz";
+
+const $ = (s) => document.querySelector(s);
+const show = (sel, v, bad = false) => {
+  const el = $(sel);
+  el.className = "out" + (bad ? " bad" : "");
+  el.textContent = typeof v === "string" ? v : JSON.stringify(v, null, 2);
+};
+const round = (n, d = 3) => (typeof n === "number" && Number.isFinite(n) ? +n.toFixed(d) : n);
+const busy = (on) => document.querySelectorAll("button").forEach((b) => (b.disabled = on));
+
+async function sample(name) {
+  const res = await fetch(`../assets/SampleFiles/${name}`);
+  if (!res.ok) throw new Error(`${name}: HTTP ${res.status} — serve the REPO ROOT, not /examples`);
+  return new File([await res.blob()], name);
+}
+
+// Two maps, two apps. A second mount() on the same app throws `already-mounted` — one live map per
+// FimViz — so the result map asks for its own with { isolated: true }.
+const fim  = await FimViz.mount("#map-src", { provider: "leaflet" });
+const fim2 = await FimViz.mount("#map-res", { provider: "leaflet", isolated: true });
+
+const ds = await fim.addDataset(await sample("4326.tif"));
+const srcLayer = await fim.addLayer(ds);
+await srcLayer.set({ palette: "blues", continuous: true, min: 0, max: 10 });
+srcLayer.fit();
+$("#src-label").textContent = `${ds.name} · ${ds.crs}`;
+
+// One layer on the result map, re-pointed at whatever the last operation produced. setSources is an
+// immutable swap and is atomic: if the re-render throws, sources and result roll back.
+let resLayer = null;
+async function result(derived, { label, palette = "blues", min = 0, max = 10, fit = false } = {}) {
+  if (!resLayer) {
+    resLayer = await fim2.addLayer(derived);
+  } else {
+    await resLayer.setSources([derived]);
+  }
+  await resLayer.set({ palette, continuous: true, min, max });
+  if (fit) resLayer.fit();
+  $("#res-label").textContent = label;
+  return resLayer;
+}
+
+// ---------------------------------------------------------------- 1 · laziness
+{
+  const clipped = ds.clip({ north: 34.39, south: 34.35, west: -89.96, east: -89.87 });
+  const shallow = clipped.reclassify([{ min: 0, max: 2, value: 1 }]);
+
+  const before = { ds: ds.isMaterialized, clipped: clipped.isMaterialized, shallow: shallow.isMaterialized };
+  const t0 = performance.now();
+  const grid = await shallow.grid();                 // the whole chain runs here
+  const firstForce = performance.now() - t0;
+  const t1 = performance.now();
+  await shallow.grid();                              // memoized
+  const secondForce = performance.now() - t1;
+
+  show("#o-lazy", {
+    isMaterializedBeforeForcing: before,
+    afterForcing: { ds: ds.isMaterialized, clipped: clipped.isMaterialized, shallow: shallow.isMaterialized },
+    forcedGrid: `${grid.width}×${grid.height} ${grid.crs}`,
+    firstForceMs: round(firstForce, 1),
+    memoizedForceMs: round(secondForce, 2),
+    warnings: shallow.warnings,
+    note: "the parent decoded once; both nodes above it are now materialized too",
+  });
+}
+
+// ---------------------------------------------------------------- 2 · clip
+$("#btn-clip").addEventListener("click", async () => {
+  busy(true);
+  try {
+    const bbox = {
+      north: Number($("#c-n").value), south: Number($("#c-s").value),
+      west: Number($("#c-w").value), east: Number($("#c-e").value),
+    };
+    const cut = ds.clip(bbox);
+    const g = await cut.grid();
+    await result(cut, { label: "clip", fit: true });
+    const src = await ds.grid();
+    show("#o-clip", {
+      requested: bbox,
+      source: { size: `${src.width}×${src.height}`, bounds: src.bounds },
+      clipped: { size: `${g.width}×${g.height}`, bounds: g.bounds },
+      note: "snapped to pixel edges, so the returned bounds may differ slightly from the request",
+      sourceUntouched: `${src.width}×${src.height} — ops never mutate`,
+    });
+  } catch (e) { show("#o-clip", `${e.name}: ${e.message}`, true); }
+  busy(false);
+});
+
+// ---------------------------------------------------------------- 3 · mask
+const ring = [
+  { lat: 34.392, lng: -89.95 }, { lat: 34.392, lng: -89.87 },
+  { lat: 34.345, lng: -89.87 }, { lat: 34.345, lng: -89.95 },
+];
+async function runMask(invert) {
+  busy(true);
+  try {
+    const masked = ds.mask(ring, { invert });
+    await result(masked, { label: invert ? "mask (inverted)" : "mask", fit: true });
+    const before = await srcLayer.getStats();
+    const after = await resLayer.getStats();
+    show("#o-mask", {
+      invert,
+      validPixels: { before: before.count, after: after.count },
+      mean: { before: round(before.mean), after: round(after.mean) },
+      footprint: "unchanged — mask hides values, clip removes ground",
+      absent: "outside pixels are NaN: transparent when drawn, excluded from Stats",
+    });
+  } catch (e) { show("#o-mask", `${e.name}: ${e.message}`, true); }
+  busy(false);
+}
+$("#btn-mask").addEventListener("click", () => runMask(false));
+$("#btn-mask-inv").addEventListener("click", () => runMask(true));
+
+// ---------------------------------------------------------------- 4 · reclassify
+async function runReclass(kind) {
+  busy(true);
+  try {
+    let derived, described;
+    if (kind === "rules") {
+      const rules = [
+        { min: 0, max: 2, value: 1 }, { min: 2, max: 4, value: 2 },
+        { min: 4, max: 6, value: 3 }, { min: 6, max: Infinity },
+      ];
+      derived = ds.reclassify(rules);
+      described = "4 bands, the last one keeping its own values";
+    } else if (kind === "fn") {
+      derived = ds.reclassify((v) => (v > 2 ? Math.round(v) : null));
+      described = "callback: round anything over 2 m, drop the rest — cannot be serialized";
+    } else {
+      derived = ds.reclassify([{ min: 0.3, max: Infinity, value: 1 }]);
+      described = "one unbounded rule = a threshold: wet (1) or nothing";
+    }
+    const g = await derived.grid();
+    await result(derived, { label: `reclassify (${kind})`, palette: "plasma", min: 0, max: kind === "thresh" ? 1 : 4 });
+    show("#o-rc", {
+      form: described,
+      unmatchedCount: g.meta?.unmatchedCount ?? 0,
+      warnings: derived.warnings,
+      distinctValues: [...new Set(Array.from(g.pixels).filter(Number.isFinite))].sort((a, b) => a - b).slice(0, 12),
+      serializable: kind !== "fn",
+    });
+  } catch (e) { show("#o-rc", `${e.name}: ${e.message}`, true); }
+  busy(false);
+}
+$("#btn-rc-rules").addEventListener("click", () => runReclass("rules"));
+$("#btn-rc-fn").addEventListener("click", () => runReclass("fn"));
+$("#btn-rc-thresh").addEventListener("click", () => runReclass("thresh"));
+
+// ---------------------------------------------------------------- 5 · terrain
+async function runTerrain(op) {
+  busy(true);
+  try {
+    const derived = op === "slope" ? ds.slope({ unit: "degrees" })
+      : op === "aspect" ? ds.aspect()
+      : ds.hillshade({ azimuth: 315, altitude: 45 });
+    const g = await derived.grid();
+    const max = op === "aspect" ? 360 : op === "hillshade" ? 255 : 90;
+    await result(derived, { label: op, palette: op === "hillshade" ? "grayscale" : "terrain", min: 0, max });
+    const s = await resLayer.getStats();
+    show("#o-terrain", {
+      op,
+      cellSize: "defaulted to the grid's own pixel size — in DEGREES for EPSG:4326",
+      min: round(s.min), max: round(s.max), mean: round(s.mean),
+      pixels: `${g.width}×${g.height}`,
+      caveat: "run over flood depth, not elevation — the maths is right, the meaning is not",
+    });
+  } catch (e) { show("#o-terrain", `${e.name}: ${e.message}`, true); }
+  busy(false);
+}
+$("#btn-slope").addEventListener("click", () => runTerrain("slope"));
+$("#btn-aspect").addEventListener("click", () => runTerrain("aspect"));
+$("#btn-hill").addEventListener("click", () => runTerrain("hillshade"));
+
+// ---------------------------------------------------------------- 6 · band math
+let scenA = null, scenB = null;
+async function scenarios() {
+  scenA ??= await fim.addDataset(await sample("Compare_0-0-DEP-12840.tif"));
+  scenB ??= await fim.addDataset(await sample("Compare_0-0-DEP-17780.tif"));
+  return [scenA, scenB];
+}
+$("#btn-diff").addEventListener("click", async () => {
+  busy(true);
+  try {
+    const [a, b] = await scenarios();
+    const diff = a.difference(b);
+    const g = await diff.grid();
+    await result(diff, { label: "difference", palette: "rainbow", min: -3, max: 3, fit: true });
+    const s = await resLayer.getStats();
+    show("#o-band", {
+      lhs: `${(await a.grid()).width}×${(await a.grid()).height}`,
+      rhs: `${(await b.grid()).width}×${(await b.grid()).height}`,
+      resultGrid: `${g.width}×${g.height} — the LEFT operand's grid, always`,
+      min: round(s.min), max: round(s.max), mean: round(s.mean),
+      warnings: diff.warnings,
+      reading: "negative = scenario B is deeper there",
+    });
+  } catch (e) { show("#o-band", `${e.name}: ${e.message}`, true); }
+  busy(false);
+});
+$("#btn-mean").addEventListener("click", async () => {
+  busy(true);
+  try {
+    const [a, b] = await scenarios();
+    const avg = a.combine([b], { op: "mean" });
+    await result(avg, { label: "mean of two scenarios", min: 0, max: 10, fit: true });
+    const s = await resLayer.getStats();
+    show("#o-band", {
+      op: "mean (N-ary — pass as many Datasets as you like)",
+      min: round(s.min), max: round(s.max), mean: round(s.mean),
+      warnings: avg.warnings,
+    });
+  } catch (e) { show("#o-band", `${e.name}: ${e.message}`, true); }
+  busy(false);
+});
+
+// ---------------------------------------------------------------- 7 · reductions
+const table = (rows, cols) => {
+  const head = cols.map((c) => `<th>${c}</th>`).join("");
+  const body = rows.map((r) => `<tr>${cols.map((c) => `<td>${r[c] ?? "—"}</td>`).join("")}</tr>`).join("");
+  $("#tbl").innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+};
+
+$("#btn-zonal").addEventListener("click", async () => {
+  busy(true);
+  try {
+    const west = [{ lat: 34.40, lng: -89.98 }, { lat: 34.40, lng: -89.91 },
+                  { lat: 34.33, lng: -89.91 }, { lat: 34.33, lng: -89.98 }];
+    const east = [{ lat: 34.40, lng: -89.91 }, { lat: 34.40, lng: -89.83 },
+                  { lat: 34.33, lng: -89.83 }, { lat: 34.33, lng: -89.91 }];
+    // A terminal: it forces the grid and returns data, never a Dataset.
+    const rows = await ds.zonalStats([{ id: "west", polygon: west }, { id: "east", polygon: east }]);
+    table(rows.map((r) => ({
+      id: r.id, count: r.count, mean: round(r.mean, 2), min: round(r.min, 2),
+      max: round(r.max, 2), "area km²": round(r.area / 1e6, 4),
+    })), ["id", "count", "mean", "min", "max", "area km²"]);
+    show("#o-reduce", {
+      verb: "zonalStats — collapses SPACE, grouped by GEOMETRY",
+      returns: "a table; the layer is untouched",
+      rows,
+      areaUnits: "area is in the bounds' units squared — degrees² here, so divide with care",
+    });
+  } catch (e) { show("#o-reduce", `${e.name}: ${e.message}`, true); }
+  busy(false);
+});
+
+$("#btn-group").addEventListener("click", async () => {
+  busy(true);
+  try {
+    const [a, b] = await scenarios();
+    const rows = await a.groupBy(b, { bins: 5 });
+    table(rows.map((r) => ({
+      class: r.class, range: r.range ? `${round(r.range[0], 2)}–${round(r.range[1], 2)}` : "—",
+      count: r.count, mean: round(r.mean, 3), max: round(r.max, 2),
+    })), ["class", "range", "count", "mean", "max"]);
+    show("#o-reduce", {
+      verb: "groupBy — collapses SPACE, grouped by ANOTHER RASTER'S VALUES",
+      question: "mean depth in scenario A, banded by scenario B's depth",
+      conform: "`by` is resampled onto the left grid, the same LHS rule combine() uses",
+      counted: "only where BOTH rasters have a value",
+      rows,
+    });
+  } catch (e) { show("#o-reduce", `${e.name}: ${e.message}`, true); }
+  busy(false);
+});
+
+// ---------------------------------------------------------------- 8 · layer-level ops
+$("#btn-chain").addEventListener("click", async () => {
+  busy(true);
+  try {
+    const before = srcLayer.dataset.id;
+    srcLayer.clip({ north: 34.39, south: 34.35, west: -89.96, east: -89.87 })
+            .mask(ring)
+            .reclassify([{ min: 0, max: 3, value: 1 }, { min: 3, max: Infinity, value: 2 }]);
+    const dirtyNow = srcLayer.dirty;      // applied, not yet drawn
+    await srcLayer.render();
+    await srcLayer.set({ palette: "plasma", min: 0, max: 2 });
+    show("#o-chain", {
+      sourceIdBefore: before,
+      sourceIdAfter: srcLayer.dataset.id,
+      dirtyAfterChaining: dirtyNow,
+      dirtyAfterRender: srcLayer.dirty,
+      redraws: "one — the chain applied synchronously, the map drew once at render()",
+      note: "this is the SOURCE map; press reset to put it back",
+    });
+  } catch (e) { show("#o-chain", `${e.name}: ${e.message}`, true); }
+  busy(false);
+});
+$("#btn-reset").addEventListener("click", async () => {
+  busy(true);
+  try {
+    await srcLayer.reset();
+    await srcLayer.set({ palette: "blues", min: 0, max: 10 });
+    show("#o-chain", { reset: true, dataset: srcLayer.dataset.name, dirty: srcLayer.dirty });
+  } catch (e) { show("#o-chain", `${e.name}: ${e.message}`, true); }
+  busy(false);
+});
+
+// ---------------------------------------------------------------- 9 · rasterize
+$("#btn-rasterize").addEventListener("click", async () => {
+  busy(true);
+  try {
+    const counties = await fim.addDataset(await sample("Iowa_County_Boundaries.json"));
+    const burned = counties.rasterize({ width: 600, height: 400, field: "SHAPE_Area" });
+    const g = await burned.grid();
+    await result(burned, { label: "rasterized counties", palette: "viridis", min: 0, max: 4e9, fit: true });
+    show("#o-rasterize", {
+      from: { kind: counties.kind, format: counties.format, features: (await counties.features()).count },
+      to: { kind: burned.kind, size: `${g.width}×${g.height}`, bounds: g.bounds },
+      field: "SHAPE_Area burned per pixel; later features win on overlap",
+      limits: "Polygon/MultiPolygon only, holes ignored (rings union, as SpatialFilter does)",
+    });
+  } catch (e) { show("#o-rasterize", `${e.name}: ${e.message}`, true); }
+  busy(false);
+});
+
+// ---------------------------------------------------------------- 10 · reproject
+let brazos = null;
+$("#btn-crs").addEventListener("click", async () => {
+  busy(true);
+  try {
+    brazos ??= await fim.addDataset(await sample("Brazos_RP100_depth.tif"));
+    try {
+      await fim2.addLayer(brazos);   // deliberately unrenderable
+      show("#o-warp", "unexpected: that should have thrown", true);
+    } catch (e) {
+      show("#o-warp", {
+        datasetCrs: brazos.crs,
+        thrown: `${e.name}: ${e.message}`,
+        why: "the engine reports rather than guessing — a silent warp would hide a wrong-CRS file",
+      });
+    }
+  } catch (e) { show("#o-warp", `${e.name}: ${e.message}`, true); }
+  busy(false);
+});
+$("#btn-warp").addEventListener("click", async () => {
+  busy(true);
+  show("#o-warp", "loading GDAL (~38 MB of wasm, first time only) and warping…");
+  try {
+    brazos ??= await fim.addDataset(await sample("Brazos_RP100_depth.tif"));
+    const t0 = performance.now();
+    const wgs84 = brazos.reproject("EPSG:4326");     // lazy — nothing has happened yet
+    const g = await wgs84.grid();                     // ← GDAL loads and warps here
+    await result(wgs84, { label: "reprojected to EPSG:4326", min: 0, max: 8, fit: true });
+    show("#o-warp", {
+      from: brazos.crs, to: g.crs,
+      size: `${g.width}×${g.height}`, bounds: g.bounds,
+      seconds: round((performance.now() - t0) / 1000, 1),
+      warnings: wgs84.warnings,
+      note: "browser-only — gdal3.js has no Node build, so npm test cannot cover this path",
+    });
+  } catch (e) { show("#o-warp", `${e.name}: ${e.message}`, true); }
+  busy(false);
+});
+
+// ---------------------------------------------------------------- 11 · pure grid functions
+$("#btn-pure").addEventListener("click", async () => {
+  busy(true);
+  try {
+    const grid = await ds.grid();
+    const small = clipGrid(grid, { north: 34.39, south: 34.35, west: -89.96, east: -89.87 });
+    const holed = maskGrid(small, ring, { invert: true });
+    const slope = slopeGrid(small, { unit: "degrees" });
+
+    const cs = new ColorScale({ palette: "viridis", min: 0, max: 10, continuous: true });
+    $("#thumb").innerHTML =
+      `<img alt="colorized grid" style="max-width:100%;border:1px solid var(--line);border-radius:8px"
+            src="${gridToDataURL(small, { colorScale: cs })}" />`;
+
+    // Back into the chain — fromGrid wraps an already-decoded grid as a pre-materialized Dataset.
+    const back = Dataset.fromGrid(small);
+    const chained = await back.reclassify([{ min: 2, max: Infinity, value: 1 }]).grid();
+
+    show("#o-pure", {
+      source: `${grid.width}×${grid.height}`,
+      clipGrid: `${small.width}×${small.height}`,
+      maskGrid: `${holed.width}×${holed.height} (same footprint, values punched out)`,
+      slopeGrid: `${slope.width}×${slope.height}`,
+      fromGrid: { isMaterialized: back.isMaterialized, kind: back.kind, format: back.format },
+      chainedOffAGrid: `${chained.width}×${chained.height}`,
+      gridToDataURL: "rendered above — colorizeGrid + a canvas encode, no map involved",
+    });
+  } catch (e) { show("#o-pure", `${e.name}: ${e.message}`, true); }
+  busy(false);
+});
+</script>
+</body>
+</html>

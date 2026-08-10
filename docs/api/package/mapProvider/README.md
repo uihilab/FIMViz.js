@@ -15,6 +15,7 @@
 
 ## Variables
 
+- [DEFAULT\_POINT\_RADIUS](variables/DEFAULT_POINT_RADIUS.md)
 - [DEFAULT\_PROVIDER](variables/DEFAULT_PROVIDER.md)
 
 ## Functions
@@ -28,4 +29,5 @@
 - [registerMapProvider](functions/registerMapProvider.md)
 - [resolveFeatureStyle](functions/resolveFeatureStyle.md)
 - [styleToGoogle](functions/styleToGoogle.md)
+- [styleToGooglePoint](functions/styleToGooglePoint.md)
 - [styleToLeaflet](functions/styleToLeaflet.md)

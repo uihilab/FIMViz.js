@@ -11,13 +11,15 @@
 // wasm/data from a CDN) and forced a defensive double-read of the original buffer to rescue the
 // GDAL_METADATA/nodata tags the warp destroys. See docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1.
 //
-// Implemented: geotiff, geojson (+ HAZUS damage), kml, kmz, shp.
+// Implemented: geotiff, geojson (+ HAZUS damage), kml, kmz, shp, csv, xyz, and the multi-dimensional
+// scientific formats (netcdf4/netcdf3/grib2/zarr) via io/sciwrid.js.
 
 import { bbox } from "@turf/turf";
 import { kml } from "@tmcw/togeojson";
 import { fromArrayBuffer } from "geotiff";
 import { readCrs } from "../geo/crs.js";
 import { Dataset } from "../package/dataset.js";
+import { notifyBusy } from "../package/events.js";
 
 // jszip (~95 KB) and shpjs (~16 KB, but it drags proj4 + wkt-parser + mgrs ≈ 300 KB) are loaded
 // ON DEMAND, not at module scope: only a caller who actually opens a .kmz or a zipped shapefile
@@ -25,6 +27,24 @@ import { Dataset } from "../package/dataset.js";
 // Every other format — geojson, geotiff, kml, csv, xyz — stays free of them entirely.
 const loadJSZip = () => import("jszip").then((m) => m.default ?? m);
 const loadShp = () => import("shpjs").then((m) => m.default ?? m);
+
+// The multi-dimensional formats obey the same rule, for a much larger payload: io/sciwrid.js reaches
+// a ~193 KB wasm reader (plus lazily h5wasm/numcodecs/...). Two deferrals stack here — this import
+// keeps the ADAPTER out of the initial bundle, and the adapter's own dynamic import keeps the READER
+// out until a Dataset is actually forced. So `addDataset` gaining these formats costs a consumer who
+// never opens one exactly nothing, which is what let them come off the opt-in path and onto the
+// public parser at all (PACKAGE_ROADMAP.md §8's "bundle discipline is non-negotiable").
+const loadMultidim = () => import("./sciwrid.js");
+
+// Duplicated from sciwrid.js's SCIWRID_FORMATS rather than imported, because importing it statically
+// would pull the adapter into the initial bundle and undo the deferral above. `parse.test.mjs` pins
+// the two lists together so the copy cannot drift.
+//
+// 'multidim' is the extension-detected sentinel, not a real format: `.nc` does not say whether a file
+// is NetCDF3 or NetCDF4, and `scan()` identifies it authoritatively anyway — the Dataset ends up
+// carrying the format the scanner found. The concrete names are accepted too, for an explicit
+// `{ format }` override.
+const MULTIDIM_FORMATS = new Set(["multidim", "netcdf4", "netcdf3", "grib2", "zarr"]);
 
 // geojson/kml/kmz/shp are WGS84 by specification (RFC 7946 / OGC KML); shpjs reprojects to it.
 const VECTOR_CRS = "EPSG:4326";
@@ -45,8 +65,27 @@ function detectFormat(name) {
     case "zip": case "shp": return "shp";
     case "csv": return "csv";
     case "xyz": return "xyz";
+    // Multi-dimensional scientific formats — all routed to one adapter, which asks scan() which of
+    // them the bytes actually are. `.cdf` is the old NetCDF3 extension; `.zarr` names a directory
+    // store rather than a file, so it arrives as a URL.
+    case "nc": case "nc3": case "nc4": case "netcdf": case "cdf":
+    case "grib": case "grib2": case "grb": case "grb2":
+    case "zarr":
+      return "multidim";
     default: return null;
   }
+}
+
+// The name a source carries, WITHOUT reading it — format detection needs a name, and the
+// multi-dimensional branch must decide before anything is fetched. Trailing slashes are stripped so a
+// Zarr store URL ('.../store.zarr/') still yields an extension.
+function nameOf(source, options = {}) {
+  if (options.name) return options.name;
+  if (typeof source === "string") {
+    return source.split("?")[0].replace(/\/+$/, "").split("/").pop() || "download";
+  }
+  if (source instanceof ArrayBuffer) return "buffer";
+  return source?.name || "blob";
 }
 
 // Normalize any accepted source to { blob, name }.
@@ -58,15 +97,13 @@ async function toBlobAndName(source, options = {}) {
     const url = typeof options.resolveUrl === "function" ? options.resolveUrl(source) : source;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`parseFile: fetch failed (${res.status}) for ${source}`);
-    const blob = await res.blob();
-    const name = options.name || source.split("/").pop().split("?")[0] || "download";
-    return { blob, name };
+    return { blob: await res.blob(), name: nameOf(source, options) };
   }
   if (source instanceof ArrayBuffer) {
-    return { blob: new Blob([source]), name: options.name || "buffer" };
+    return { blob: new Blob([source]), name: nameOf(source, options) };
   }
   // File or Blob
-  return { blob: source, name: options.name || source.name || "blob" };
+  return { blob: source, name: nameOf(source, options) };
 }
 
 /**
@@ -74,23 +111,67 @@ async function toBlobAndName(source, options = {}) {
  * `fim.addDataset` — use those; this export exists for the composition root and tests.
  * @internal
  * @param {File|Blob|ArrayBuffer|string} source
- * @param {{ format?: string, name?: string }} [options] - format/name auto-detected when omitted
+ * @param {Object} [options] - format/name are auto-detected from the extension when omitted
+ * @param {string} [options.format] - override detection
+ * @param {string} [options.name] - override the name detection reads
+ * @param {string} [options.latField] - csv: latitude column (with `lngField`)
+ * @param {string} [options.lngField] - csv: longitude column (with `latField`)
+ * @param {string} [options.geometryField] - csv: a WKT / GeoJSON-geometry column instead of a pair
+ * @param {string} [options.delimiter] - csv: field separator, default ','
+ * @param {boolean} [options.swapXY] - xyz: rows ordered northing/easting first
+ * @param {string} [options.variable] - netcdf/grib2/zarr: which variable (one per Dataset)
+ * @param {{width?: number, height?: number, bbox?: number[]}} [options.grid] - netcdf/grib2/zarr:
+ *   PARTIAL override of the native grid; required for GRIB2/NetCDF3 and curvilinear files, which
+ *   report no extent
+ * @param {false|{coords?: *, length?: number, name?: string, unit?: string}} [options.series] -
+ *   netcdf/grib2/zarr: the series (time) axis. Defaults to the file's CF times, or integer indices
+ *   over its leading dimension when it has none; `false` forces a single grid
+ * @param {{order?: 'yx'|'xy'}} [options.dims] - netcdf/grib2/zarr: which trailing pair of the shape
+ *   is (lat, lon); 'yx' (CF) by default
+ * @param {'native'|'-180..180'|'0..360'} [options.lon] - netcdf/grib2/zarr: re-express the extent in
+ *   a longitude convention, rolling a global grid where needed
+ * @param {boolean} [options.allowExtraDims] - netcdf/grib2/zarr: accept a collapsed vertical level,
+ *   ensemble member or band
+ * @param {(url: string) => string} [options.resolveUrl] - host CORS-proxy/mirror for a URL source
  * @returns {Promise<import('../package/dataset.js').Dataset>}
  */
 export async function parseSource(source, options = {}) {
-  const { blob, name } = await toBlobAndName(source, options);
+  // Detection runs on the NAME, which every source type yields without being read — so the
+  // multi-dimensional branch below can be taken before a single byte is fetched.
+  const name = nameOf(source, options);
   const format = options.format || detectFormat(name);
-  switch (format) {
-    case "geojson": return parseGeoJSON(blob, name);
-    case "kml": return parseKML(blob, name);
-    case "kmz": return parseKMZ(blob, name);
-    case "shp": return parseShapefile(blob, name);
-    case "geotiff": return parseGeoTIFF(blob, name);
-    case "csv": return parseCSV(blob, name, options);
-    case "xyz": return parseXYZ(blob, name, options);
-    default:
-      throw new Error(`parseFile: unsupported or undetected format for '${name}'. ` +
-        `Supported: geotiff, geojson, kml, kmz, shp, csv, xyz.`);
+
+  // Fetching and decoding is the longest thing on this path — a remote GeoTIFF, a shapefile that
+  // drags proj4 in behind it — and until now it announced nothing, so a host had no way to show that
+  // anything was happening. Paired in a `finally` so a parse that throws still clears the indicator.
+  notifyBusy(true, "parse");
+  try {
+    // Handed the ORIGINAL source, deliberately not the Blob toBlobAndName would produce. These files
+    // are read lazily: the adapter needs only scan() (metadata) up front, and a URL-rooted Dataset
+    // then decodes ONE timestep at force time. Normalizing to a Blob first would download an entire
+    // 120-timestep NetCDF or Zarr store to answer a question about its header — exactly the eagerness
+    // the axis model exists to avoid.
+    if (MULTIDIM_FORMATS.has(format)) {
+      const { parseSciwrid } = await loadMultidim();
+      return await parseSciwrid(source, { ...options, name });
+    }
+
+    const { blob } = await toBlobAndName(source, options);
+    switch (format) {
+      case "geojson": return await parseGeoJSON(blob, name);
+      case "kml": return await parseKML(blob, name);
+      case "kmz": return await parseKMZ(blob, name);
+      case "shp": return await parseShapefile(blob, name);
+      case "geotiff": return await parseGeoTIFF(blob, name);
+      case "csv": return await parseCSV(blob, name, options);
+      case "xyz": return await parseXYZ(blob, name, options);
+      default:
+        throw new Error(`parseFile: unsupported or undetected format for '${name}'. ` +
+          "Supported: geotiff, geojson, kml, kmz, shp, csv, xyz, netcdf (.nc/.nc4/.cdf), " +
+          "grib2 (.grib/.grib2/.grb2), zarr.");
+    }
+  } finally {
+    notifyBusy(false, "parse");
   }
 }
 

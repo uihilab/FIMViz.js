@@ -13,7 +13,7 @@ on the wrong kind.
 [Raster — unary](#raster--unary) · [Raster — binary / N-ary](#raster--binary--n-ary) ·
 [Vector](#vector--the-one-kind-changing-op) · [Notes](#notes) ·
 [Standalone grid functions](#standalone-grid-functions-no-dataset-needed) ·
-[Standalone reproject()](#standalone-reproject-distinct-from-datasetreproject) ·
+[Standalone warp()](#standalone-warp-the-eager-twin-of-datasetreproject) ·
 [Vendored primitives](#vendored-primitives) ·
 [GDAL escape hatch (callGdal)](#gdal-escape-hatch-callgdal)
 
@@ -48,7 +48,8 @@ raw File/Blob/ArrayBuffer/URL into a Dataset for you.
 
 | Method                          | Params                                                                                                    | Returns                                      | Notes                                                                                                                                                                                                                                                       |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `select(coord, opts?)`          | `coord: number|string`; `opts.axis=0` (index/name), `opts.nearest=true`, `opts.variant`, `opts.base`      | `Dataset|null`                               | Resolves one axis entry to a child URL-rooted Dataset. Only meaningful on a Dataset with `.axes` (a selection-axis series) — a plain parsed file has none. `null` on no match. `opts.variant` required when the entry's `ref` is `{raster, vector}`-shaped. |
+| `select(coord, opts?)`          | `coord: number|string`; `opts.axis=0` (index/name), `opts.nearest=true`, `opts.variant`, `opts.base`      | `Dataset|null`                               | Resolves one axis entry to a child Dataset — URL-rooted, or rooted on this Dataset's own source for an in-file selector ([below](#axis-entries-one-file-per-entry-or-one-file-many-entries)). **PEELS** one axis: the coord folds into the selector and that axis drops, while any other axes stay — so on `(time × member)` this leaves a member series, and a second `select()` finishes it. **Throws** when the named/indexed axis does not exist (a mistake); returns `null` when the axis exists but no entry matches (a data condition). `opts.variant` required when the entry's `ref` is `{raster, vector}`-shaped. |
+| `selectRange(from, to, opts?)`  | `from`/`to`: inclusive bounds (same type as the coords); `opts.axis=0`                                    | `Dataset|null`                               | **Series in, series out** — narrows one axis to a window instead of resolving one entry, so `select()`/`reduce()` still work on the result ("the mean of these six hours" is `selectRange(a,b).reduce('mean')`). Reversed bounds swap. No nearest-match: a window narrower than the sampling returns `null` rather than silently widening. Other axes are untouched. **Throws** on a missing axis, or on an axis declared `ordered: false`. |
 | `selectAxisEntry(coord, opts?)` | same `opts` (no `variant`/`base`)                                                                         | `DatasetAxisEntry|null`                      | What `select` looks up before resolving the URL — exact match first, nearest **numeric** coord on a miss (`nearest:true`, default).                                                                                                                         |
 | `reduce(op?, opts?)`            | `op: 'sum'|'mean'|'min'|'max'` (default `'mean'`); `opts.axis=0`, `opts.method='nearest'`, `opts.variant` | `Dataset`                                    | Collapse a temporal/vertical axis to one grid — sugar over `select()` every entry + `combine()`. Throws if no axis / empty axis / an entry fails to resolve.                                                                                                |
 | `toRecord(opts?)`               | `opts.storeMaterialized=false`                                                                            | `Object`                                     | Structured-cloneable snapshot for `Storage.put()`. Default = source + op recipe (small); `storeMaterialized:true` also embeds the decoded grid/features (call `await ds.load()` first, or it throws).                                                       |
@@ -57,6 +58,231 @@ raw File/Blob/ArrayBuffer/URL into a Dataset for you.
 
 
 
+
+### Axis entries: one file per entry, or one file many entries
+
+An axis entry's `ref` says how to GET that entry's payload, and takes three forms. `select()` and
+`reduce()` behave identically across all three — the axis model doesn't care which you built:
+
+```js
+// 1. A URL — one file per entry (the FIM Scenario shape: each stage/timestep its own raster).
+{ coord: 19.5, ref: 'stage_19p5.tif' }                       // → a URL-rooted child
+
+// 2. Named URL variants — pick one with select(coord, { variant }); ds.variantsAt(coord) lists them.
+{ coord: 19.5, ref: { raster: 'a.tif', vector: 'a.kmz' } }    // → select(19.5, { variant: 'raster' })
+
+// 3. An IN-FILE selector — the entry is a slice of the SAME source, not a separate download.
+{ coord: 6, ref: { select: { variable: 'TMP', t: 1 } } }      // → a child sharing this file's bytes
+```
+
+**Form 2 is not an axis, on purpose.** A variant switches the Dataset's `kind` — `.tif` gives a raster
+in an unknown CRS, `.kmz` a vector in EPSG:4326 — whereas every axis preserves kind, CRS and bounds.
+It is a choice of *encoding of the same datum*, not a coordinate in the data. Use `ds.variantsAt(coord)`
+to enumerate what an entry offers (`['raster', 'vector']`, or `null`) rather than catching the error
+`select()` throws when you omit a required one.
+
+Form 3 is what lets **one multi-dimensional file** (NetCDF/GRIB2/Zarr, every timestep inside it) back a
+whole temporal axis. The child shares the parent's bytes or URL — no second fetch — carries the same
+`format`, and the selection reaches the decoder as `root.select`:
+
+```js
+const child = ds.select(6);      // ds.format 'netcdf4', ds.data the file's bytes
+child.selector;                   // → { variable: 'TMP', t: 1 }
+child.axes;                       // → null — a child is ONE payload, so it forces like any Dataset
+await child.grid();               // materializer receives { kind:'inline', data, select: {…} }
+await ds.reduce('mean').grid();   // every entry resolved + reduced — no extra machinery
+```
+
+A **series is not forceable** — `load()`/`grid()` on one throws, naming `select()`/`reduce()` as the
+way forward. That holds whether or not it carries the file's bytes, which an in-file series does:
+
+```js
+const storm = ds.selectRange(t0, t1);   // → a NARROWER series, still lazy, still not forceable
+await storm.reduce('max').grid();        // the peak within that window
+storm.select(coord);                      // …or one step out of it
+```
+
+`select`'s `base` applies to URL refs only. A selector ref may also carry `name`/`crs`/`bounds` to
+override what the child would otherwise inherit from its parent. Selecting on a Dataset with no source
+of its own (no `data`, no `url`) throws — there is nothing to select *from*. Selector children round-trip
+through `toRecord()`/`fromRecord()` like any root.
+
+Writing a materializer that understands selectors is one `if`: `root.select` is simply absent for
+ordinary sources, so existing decoders are unaffected. See
+[APP_STARTUP_ADVANCED.md → Materialize / decode extension seam](./APP_STARTUP_ADVANCED.md#materialize--decode-extension-seam).
+
+### Reading NetCDF / GRIB2 / Zarr
+
+The concrete producer of selector axes — multi-dimensional scientific formats. They open through the
+ordinary `fim.addDataset(file)` / `FimViz.parseFile(file)`, on extension (`.nc`, `.nc4`, `.cdf`,
+`.grib`, `.grib2`, `.grb2`, `.zarr`); the file's own header decides which of the four it is.
+
+Under it is [SciWrid Toolkit](https://github.com/uihilab/SciWrid-Toolkit), reached through a dynamic
+import and left **external to the bundle**, so its ~193 KB wasm is downloaded only by a page that
+actually opens one of these files, and is never bundled into `dist/fimviz.js`. The consequence for a
+consumer is that `sciwrid-toolkit` must be *resolvable* — an npm dependency under a bundler, an
+import-map entry in a raw browser page (`examples/04-temporal.html` shows one). Only these four
+formats depend on it, and the thrown error says so.
+
+One call covers every format — the differences live inside the adapter (GRIB2 reports `nx`/`ny`
+instead of a `shape`; Zarr reports `shape` as an array rather than a string). What differs for a
+*caller* is what `scan()` can tell us about a file, which is not uniform:
+
+| Format | Extent | Series axis | So you get |
+|---|---|---|---|
+| **NetCDF4** | ✅ `scan()`, from 1-D coords | ✅ CF timestamps | the full temporal path |
+| **Zarr v2** | ✅ `scan()`, when the store has CF coords | ✅ CF timestamps | the full temporal path |
+| **GRIB2** | ❌ never — supply `grid.bbox` | ✅ CF timestamps | scrub + `reduce()`, with an extent |
+| **NetCDF3** | ✅ **the file's own header** | ✅ **the file's own header** | the full temporal path |
+
+NetCDF3 gets its extent and its timestamps from a different place than the other three, and that is
+worth knowing about. `scan()` supplies neither — SciWrid populates a bbox only on its
+netcdf4/zarr/parquet paths, and its NetCDF3 time-units accessor is still outstanding upstream. But the
+files themselves carry `lon`/`lat`/`time` coordinate variables with CF `units` right there in the
+header, so [`io/netcdf3.js`](../../src/io/netcdf3.js) reads them. It is the **one** container format
+FIMViz parses itself, it reads the **header only** (never pixels — point it at a data variable and it
+refuses), and it declines any bytes that are not NetCDF-3 classic, so it cannot affect the other
+formats. `meta.axisSource` records where the axis came from: `'scan'`, `'header'`, `'caller'`, or
+`'index'`. Pass `header: false` to switch the supplement off.
+
+One consequence worth stating: this works from **inline bytes only**. A NetCDF3 opened from a URL is
+never fetched just to read its header — that would undo the laziness the URL path exists for — so it
+still needs `grid.bbox`.
+
+**Calendars that are not Gregorian keep the file's own numbers.** A `360_day` or `noleap` calendar has
+no real instants to convert to, so rather than fabricating dates *or* falling back to bare positions,
+the axis carries the raw offsets with the file's units as `axis.unit` — e.g. `'days since 2001-1-1'`
+with coords `15, 45, 75…`. Ordered, exact, and selectable; just not calendar dates.
+
+#### Dimensions beyond (lat, lon) + time
+
+`T(time, level, lat, lon)` is ordinary — ERA5, GFS, CMIP. The decoder exposes no way to pick a level,
+member or band, so a 4-D variable **throws** rather than silently handing you whichever slice the
+reader chose:
+
+```js
+await fim.addDataset(file, { allowExtraDims: true });   // accept it; recorded on meta.extraDims
+```
+
+This is arithmetic on the declared `shape`, not on what the reader admits to — which is why a
+**NetCDF3** file trips it even though `scan()` reports no time axis: its time dimension is *invisible*
+but still there, and was being collapsed unannounced.
+
+```js
+const ds = await fim.addDataset(file);            // header only — nothing decoded
+ds.format;                                         // 'netcdf4' — from the file, not the extension
+ds.axis.entries.length;                            // 120 timesteps
+ds.meta.grid;                                      // { width, height, bbox, bounds } — the file's NATIVE grid
+ds.meta.unit;                                      // 'kg m-2'
+
+const t = ds.select(Date.parse('2023-08-28T06:00:00Z'));   // → one grid, lazily, off the same bytes
+await fim.addLayer(t);                                       // renders like any raster (already EPSG:4326)
+
+await ds.reduce('mean').grid();    // temporal mean over the whole axis
+await ds.reduce('max').grid();     // …or the storm peak
+```
+
+| Option | Notes |
+|---|---|
+| `variable` | which variable; defaults to the first `supported` one. **One variable per Dataset** — call it again for another. |
+| `grid` | **Partial** override of the native grid — anything omitted comes from the variable's own shape and `scan().bbox`. Pass `width`/`height` alone to decode coarser than native; pass `bbox` alone when the file's extent can't be derived (below). |
+| `series` | The series (time) axis: `{ coords, length, name, unit }`. `coords` may be an array or a generator `(i, n) => …`; ISO strings and `Date`s become epoch ms. Resolved in priority order: this option → `scan()`'s CF times → the file's own header (NetCDF3) → integer indices. **`series: false`** forces a single grid. |
+| `header` | `false` disables the NetCDF3 header supplement, so extent and times come from `scan()` alone. Diagnostic; there is no reason to set it in normal use. |
+| `dims` | `{ order: 'yx' \| 'xy' }` — which trailing pair of the declared shape is (lat, lon). `'yx'` is CF order and the default; `'xy'` is for a variable declared `(…, lon, lat)`. Decides native height/width only. |
+| `lon` | `'native'` (default), `'-180..180'`, or `'0..360'` — re-express the extent in a longitude convention. |
+| `allowExtraDims` | accept a dimension beyond (lat, lon) + the series axis, collapsed by the reader. |
+| `workers` | `extractGrid`'s worker count. Defaults to SciWrid's own in a browser, and to `0` under Node, where the worker pool never resolves. |
+| `name` / `resolveUrl` | as elsewhere. |
+
+#### Which axis is the series axis (and why you cannot choose)
+
+The series axis is always the file's **outermost non-spatial dimension**. That is not a simplification
+we chose — `scan()` reports a variable's shape as bare numbers (`'24x170x180'`) with no dimension
+*names*, and the decoder exposes exactly one index knob. You can say how long that axis is, what its
+coordinates mean, and what to call it; there is nothing that could act on "use dimension 2 instead".
+A file whose layout genuinely differs needs `dims.order` (for the spatial pair) or a transposed copy.
+
+#### Longitude conventions are applied by us, not by the reader
+
+Asking the decoder for a `[-180, …, 180]` window on a `0..360` file returns **the file's own pixels
+with the requested bbox echoed back** — same data, new label, Pacific drawn where the Atlantic
+belongs. So `lon` is implemented as a column roll on the decoded grid:
+
+- a **global** extent (span 360°) is genuinely rolled, half the grid width for the usual case;
+- a **regional** extent a whole turn away (`270..285` → `-90..-75`) is relabelled with no pixel work;
+- anything else — a regional extent that would cross the antimeridian in the target window — **throws**,
+  because expressing it would need the grid split and re-joined, and `bounds` cannot hold `east < west`.
+
+```js
+await fim.addDataset(file, { grid: { bbox: [0, -80, 360, 90] }, lon: '-180..180' });
+// bounds → { west: -180, east: 180, … }, and every decoded timestep is rolled to match
+```
+
+`lon` fixes *where* the grid claims to be. How it is **drawn** is a separate concern handled by
+`geo/mercator.js`: raster overlays are images placed in a lat/lng box, which Leaflet and Google both
+stretch linearly in Web Mercator, so the rows are resampled onto Mercator spacing before colorizing.
+That is automatic — a global field renders correctly with no options — and latitude beyond ±85.0511°
+is clipped away (it is not representable in Mercator) with the overlay box shrinking to match. Only
+the image is reprojected; hover, `Stats` and the filters keep reading the source grid.
+
+The knobs, on `addLayer(ds, { raster })` or `layer.render({ raster })`:
+
+| Key | Default | Notes |
+|---|---|---|
+| `strategy` | `'auto'` | `'image'` or `'tiles'` to force. `auto` picks by output size. |
+| `maxPixels` | `16e6` | Above this the plan asks for tiles. |
+| `maxDimension` | `8192` | Per-side limit; the largest safe canvas edge everywhere. |
+| `tileSize` | `256` | Carried on the plan for the tile backend. |
+| `mercator` | `true` | `false` for a provider that already draws plate carrée. |
+| `resample` | `'nearest'` | `'linear'` interpolates; nearest keeps classified values intact. |
+
+> **Tiles are not implemented yet.** When the plan says `tiles`, the image is still drawn — correctly
+> placed and aspect-preserved, but downsampled to fit the budget — with a `console.warn` and a
+> `layer:raster-oversized` host event. A baked image is also fixed in resolution, so zooming far past
+> what it was sized for magnifies pixels. See
+> [DECISIONS → raster overlays](../DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md).
+
+**Axis coordinates are epoch milliseconds**, not ISO strings — `select()`'s nearest-match is
+numeric-only, and that is what a time slider needs. The ISO timestamp is on each entry's `meta.time`,
+so `ds.selectAxisEntry(Date.parse(iso)).meta.time` reads it back.
+
+No GDAL is involved: `extractGrid` resamples onto a geographic bbox, so these arrive as `EPSG:4326`
+and render directly. Missing values arrive as `NaN`, which colorize and `Stats` already treat as
+absent. Rehydrating a stored selector Dataset skips the parser, so call `registerSciwridFormats()`
+once at boot before `Dataset.fromRecord`.
+
+#### "has no usable geographic extent"
+
+A common failure on real-world files, and a recoverable one. It happens for three different reasons,
+and the message says which:
+
+- **The format never reports one.** `scan()` derives a bbox only on its netcdf4/zarr/parquet paths —
+  so for **GRIB2 and NetCDF3 it is *always* absent**, whatever the file's grid looks like. Every file
+  of those two formats needs an extent supplied. (This is a property of the reader, not of your file:
+  don't go looking for curvilinear coordinates.)
+- **No bbox was derived** (netcdf4/zarr). There `scan()` reads **1-D** coordinate variables, so a
+  **curvilinear** grid (2-D `lat(j,i)`/`lon(j,i)` — ocean `tos` products, NEMO, tripolar and rotated
+  grids) or a **Zarr store with no CF coordinates** leaves nothing to place the data with.
+- **A bbox was derived and rejected.** `scan()`'s matcher accepts variables *named* `x`/`y`, so a
+  **projected** file (HRRR, RAP, NAM, WRF) reports its extent in **metres** — e.g.
+  `[-2699020, -1588806, 2697980, 1588806]`. That is checked as degrees (`|lat| ≤ 90`, `|lon| ≤ 360`)
+  and refused, because placing it would be silently wrong rather than loudly broken.
+
+> **Not caught:** a **rotated-pole** grid (CORDEX/COSMO, `rlat`/`rlon`) reports plausible small
+> degree-like numbers that are not geographic. Detecting it needs the `grid_mapping` attribute, which
+> `scan()` does not expose — so such a file will render in the wrong place without complaint. See
+> [PACKAGE_ROADMAP.md §8.1](../PACKAGE_ROADMAP.md#81-which-grids-we-actually-support-scope-and-the-silent-failure-guard).
+
+The pixels are perfectly readable; only the *extent* is unknown, so nothing can place them on a map.
+FIMViz will not guess one — a wrong extent silently puts every pixel in the wrong place, which is the
+same failure the CRS precondition exists to prevent. Supply it instead:
+
+```js
+await fim.addDataset(file, { grid: { bbox: [-180, -90, 180, 90] } });   // width/height stay native
+```
+
+The thrown error names the variable, its shape, and the variables present, so you can tell which case
+you are in. `examples/04-temporal.html` has an "extent override" box that does exactly this.
 
 ## Terminals (force the chain — nothing exists until one of these runs)
 
@@ -104,9 +330,34 @@ All throw `"<op>: raster-only op"` if called on a vector Dataset.
 | `aspect()`                                       | —                                                                                                                                                                                    | Downslope compass bearing, Horn's method.                                                                                                                                                                                   |
 | `hillshade(opts?)`                               | `opts.altitude`, `opts.azimuth`, `opts.zFactor`, `opts.cellsizeX`, `opts.cellsizeY`                                                                                                  | Shaded-relief illumination.                                                                                                                                                                                                 |
 | `zonalStats(zones, opts?)` — **terminal, async** | `zones: [{id?,polygon?,filter?}]`; `opts.noData`                                                                                                                                     | Returns data (an array), not a Dataset. Forces the grid.                                                                                                                                                                    |
+| `groupBy(by, opts?)` — **terminal, async** | `by`: a raster `Dataset` whose values define the groups; `opts.bins` (a count → equal-width bands, or explicit edges), `opts.method`, `opts.noData`, `opts.byNoData` | Reduce this raster **grouped by another raster's values** — "mean depth per land-use class", "rainfall binned by elevation". Returns a table. `by` is conformed onto this grid (the same LHS rule `combine` uses); a pixel counts only where **both** rasters have a value. |
 
 
 
+
+### Three kinds of reduction — which verb collapses what
+
+Easy to conflate, so stated once. All three shrink something; they differ in *what* and *by what*:
+
+| verb | collapses | grouped by | returns |
+|---|---|---|---|
+| `reduce(op)` | a **selection axis** (time, level, member) | — | a `Dataset` (one grid) |
+| `zonalStats(zones)` | **space** | geometry (polygons) | a table |
+| `groupBy(by)` | **space** | **another raster's values** | a table |
+
+`groupBy` is what "one variable as a series against another" means concretely. It is a distinct verb
+rather than an overload of the other two because its grouping key comes from *data* — not from the
+axis model, and not from geometry.
+
+```js
+await depth.groupBy(landuse);                        // one row per distinct class
+await rain.groupBy(dem, { bins: 10 });                // ten equal-width elevation bands
+await rain.groupBy(dem, { bins: [0, 100, 500, 2000] });  // explicit edges
+// -> [{ class, range?, count, sum, min, max, mean, area }, ...]
+```
+
+Note what is *not* here: producing a new **grid** from two variables is `combine`/`difference` (band
+math). `groupBy` is the table-producing half of the same question.
 
 ## Raster — binary / N-ary
 

@@ -6,7 +6,7 @@
 
 # Class: Dataset
 
-Defined in: [package/dataset.js:91](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L91)
+Defined in: [package/dataset.js:136](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L136)
 
 ## Constructors
 
@@ -14,7 +14,7 @@ Defined in: [package/dataset.js:91](https://github.com/uihilab/FIMViz.js/blob/4b
 
 > **new Dataset**(`init?`): `Dataset`
 
-Defined in: [package/dataset.js:119](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L119)
+Defined in: [package/dataset.js:169](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L169)
 
 #### Parameters
 
@@ -74,6 +74,13 @@ inlined payload only (raster bytes or parsed GeoJSON)
 
 url root only: resolver applied to the URL at force time
 
+###### selector?
+
+`any` = `null`
+
+an in-file selection passed to the materializer as `root.select`
+  (normally produced by `select()` off a selector ref, not passed by hand)
+
 ###### url?
 
 `string` = `null`
@@ -90,7 +97,7 @@ a URI root (set via Dataset.fromURL); leaves `data` null
 
 > **axes**: [`DatasetAxis`](../interfaces/DatasetAxis.md)[]
 
-Defined in: [package/dataset.js:132](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L132)
+Defined in: [package/dataset.js:183](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L183)
 
 ***
 
@@ -98,7 +105,7 @@ Defined in: [package/dataset.js:132](https://github.com/uihilab/FIMViz.js/blob/4
 
 > **crs**: `string`
 
-Defined in: [package/dataset.js:126](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L126)
+Defined in: [package/dataset.js:176](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L176)
 
 ***
 
@@ -106,7 +113,7 @@ Defined in: [package/dataset.js:126](https://github.com/uihilab/FIMViz.js/blob/4
 
 > **data**: `any`
 
-Defined in: [package/dataset.js:129](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L129)
+Defined in: [package/dataset.js:179](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L179)
 
 ***
 
@@ -114,7 +121,7 @@ Defined in: [package/dataset.js:129](https://github.com/uihilab/FIMViz.js/blob/4
 
 > **format**: `"geotiff"` \| `"geojson"` \| `"kml"` \| `"kmz"` \| `"shp"` \| `"hazus"`
 
-Defined in: [package/dataset.js:125](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L125)
+Defined in: [package/dataset.js:175](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L175)
 
 ***
 
@@ -122,7 +129,7 @@ Defined in: [package/dataset.js:125](https://github.com/uihilab/FIMViz.js/blob/4
 
 > **id**: `string`
 
-Defined in: [package/dataset.js:122](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L122)
+Defined in: [package/dataset.js:172](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L172)
 
 ***
 
@@ -130,7 +137,7 @@ Defined in: [package/dataset.js:122](https://github.com/uihilab/FIMViz.js/blob/4
 
 > **kind**: `"raster"` \| `"vector"`
 
-Defined in: [package/dataset.js:124](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L124)
+Defined in: [package/dataset.js:174](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L174)
 
 ***
 
@@ -138,7 +145,7 @@ Defined in: [package/dataset.js:124](https://github.com/uihilab/FIMViz.js/blob/4
 
 > **name**: `string`
 
-Defined in: [package/dataset.js:123](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L123)
+Defined in: [package/dataset.js:173](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L173)
 
 ## Accessors
 
@@ -148,7 +155,7 @@ Defined in: [package/dataset.js:123](https://github.com/uihilab/FIMViz.js/blob/4
 
 > **get** **axis**(): [`DatasetAxis`](../interfaces/DatasetAxis.md)
 
-Defined in: [package/dataset.js:261](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L261)
+Defined in: [package/dataset.js:312](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L312)
 
 The primary (first) selection axis, or null.
 
@@ -164,7 +171,7 @@ The primary (first) selection axis, or null.
 
 > **get** **bounds**(): [`DatasetBounds`](../interfaces/DatasetBounds.md)
 
-Defined in: [package/dataset.js:250](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L250)
+Defined in: [package/dataset.js:301](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L301)
 
 The footprint, in `crs`. Constructor-known for a root (or an op whose result is knowable upfront,
 e.g. `clip`), `null` when it genuinely isn't (e.g. a fresh `reproject()` node — the real bounds
@@ -185,7 +192,7 @@ construction-time placeholder.
 
 > **get** **isMaterialized**(): `boolean`
 
-Defined in: [package/dataset.js:267](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L267)
+Defined in: [package/dataset.js:318](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L318)
 
 Has this node been forced (decoded/warped) yet?
 
@@ -201,11 +208,27 @@ Has this node been forced (decoded/warped) yet?
 
 > **get** **meta**(): `any`
 
-Defined in: [package/dataset.js:258](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L258)
+Defined in: [package/dataset.js:309](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L309)
 
 Free-form metadata (GDAL legend/unit/noData, …). Same self-updating rule as `bounds`: once forced,
 reads off the memoized result — which matters for raster ops like `reproject` whose reprojector
 refreshes dimension fields (`width`/`height`) that the pre-force value can't know.
+
+##### Returns
+
+`any`
+
+***
+
+### selector
+
+#### Get Signature
+
+> **get** **selector**(): `any`
+
+Defined in: [package/dataset.js:685](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L685)
+
+The in-file selection this Dataset forces with, or null.
 
 ##### Returns
 
@@ -219,7 +242,7 @@ refreshes dimension fields (`width`/`height`) that the pre-force value can't kno
 
 > **get** **warnings**(): `string`[]
 
-Defined in: [package/dataset.js:264](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L264)
+Defined in: [package/dataset.js:315](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L315)
 
 Warnings collected when this node was forced (implicit reprojection, defaults, …).
 
@@ -233,7 +256,7 @@ Warnings collected when this node was forced (implicit reprojection, defaults, �
 
 > **aspect**(): `Dataset`
 
-Defined in: [package/dataset.js:434](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L434)
+Defined in: [package/dataset.js:520](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L520)
 
 Aspect — the downslope compass bearing via Horn's method (rasterOps.aspectGrid). Lazy.
 
@@ -247,7 +270,7 @@ Aspect — the downslope compass bearing via Horn's method (rasterOps.aspectGrid
 
 > **clip**(`bbox`): `Dataset`
 
-Defined in: [package/dataset.js:334](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L334)
+Defined in: [package/dataset.js:385](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L385)
 
 Clip (crop) to a bbox — the footprint shrinks to the overlap, snapped to pixel edges. Lazy.
 
@@ -281,7 +304,7 @@ Clip (crop) to a bbox — the footprint shrinks to the overlap, snapped to pixel
 
 > **combine**(`others`, `opts?`): `Dataset`
 
-Defined in: [package/dataset.js:374](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L374)
+Defined in: [package/dataset.js:425](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L425)
 
 Band math: combine this raster with `others` per pixel (LHS-conform — the others are resampled onto
 THIS grid). `op`: difference/ratio (binary) or sum/mean/min/max (N-ary). Lazy N-ary op node.
@@ -312,7 +335,7 @@ THIS grid). `op`: difference/ratio (binary) or sum/mean/min/max (N-ary). Lazy N-
 
 > **difference**(`other`): `Dataset`
 
-Defined in: [package/dataset.js:382](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L382)
+Defined in: [package/dataset.js:433](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L433)
 
 Sugar: this − other, per pixel (LHS-conform).
 
@@ -332,7 +355,7 @@ Sugar: this − other, per pixel (LHS-conform).
 
 > **download**(): `void`
 
-Defined in: [package/dataset.js:808](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L808)
+Defined in: [package/dataset.js:1063](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L1063)
 
 Save the original bytes/content to disk. Inline roots only (a URL root has no local bytes yet).
 `document` is ambient, so this costs nothing in the import graph.
@@ -347,7 +370,7 @@ Save the original bytes/content to disk. Inline roots only (a URL root has no lo
 
 > **features**(): `Promise`\<[`VectorFeatures`](../../materialize/classes/VectorFeatures.md)\>
 
-Defined in: [package/dataset.js:576](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L576)
+Defined in: [package/dataset.js:812](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L812)
 
 Force + assert vector.
 
@@ -361,7 +384,7 @@ Force + assert vector.
 
 > **grid**(): `Promise`\<[`RasterGrid`](../../materialize/classes/RasterGrid.md)\>
 
-Defined in: [package/dataset.js:569](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L569)
+Defined in: [package/dataset.js:805](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L805)
 
 Force + assert raster.
 
@@ -371,11 +394,71 @@ Force + assert raster.
 
 ***
 
+### groupBy()
+
+> **groupBy**(`by`, `opts?`): `Promise`\<`any`[]\>
+
+Defined in: [package/dataset.js:491](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L491)
+
+Reduce this raster's pixels **grouped by another raster's values** — a TERMINAL returning a table,
+not a Dataset. The third kind of reduction in the model:
+
+| verb | collapses | grouped by | returns |
+|---|---|---|---|
+| `reduce(op)` | a selection axis | — | a Dataset (one grid) |
+| `zonalStats(zones)` | space | geometry | a table |
+| `groupBy(by)` | space | **another raster's values** | a table |
+
+This is what "one variable as a series against another" means concretely — mean depth per
+land-use class, rainfall binned by elevation, a rating curve. It is a distinct verb rather than an
+overload because the grouping key comes from data, not from the axis model or from geometry.
+
+`by` is conformed onto THIS Dataset's grid (the same LHS-conform rule `combine` uses), and a pixel
+counts only where both rasters have a value.
+
+```js
+await depth.groupBy(landuse);                  // one row per distinct land-use code
+await rain.groupBy(dem, { bins: 10 });          // ten equal-width elevation bands
+await rain.groupBy(dem, { bins: [0, 100, 500, 2000] });
+```
+
+#### Parameters
+
+##### by
+
+`Dataset`
+
+a raster Dataset whose values define the groups
+
+##### opts?
+
+###### bins?
+
+`number` \| `number`[]
+
+###### byNoData?
+
+`number`
+
+###### method?
+
+`string`
+
+###### noData?
+
+`number`
+
+#### Returns
+
+`Promise`\<`any`[]\>
+
+***
+
 ### hillshade()
 
 > **hillshade**(`opts?`): `Dataset`
 
-Defined in: [package/dataset.js:444](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L444)
+Defined in: [package/dataset.js:530](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L530)
 
 Hillshade — a shaded-relief illumination raster via Horn's method (rasterOps.hillshadeGrid). Lazy.
 
@@ -413,7 +496,7 @@ Hillshade — a shaded-relief illumination raster via Horn's method (rasterOps.h
 
 > **load**(): `Promise`\<[`RasterGrid`](../../materialize/classes/RasterGrid.md) \| [`VectorFeatures`](../../materialize/classes/VectorFeatures.md)\>
 
-Defined in: [package/dataset.js:562](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L562)
+Defined in: [package/dataset.js:798](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L798)
 
 Force this node: decode/fetch the root (or force the parent and apply this op), memoize, return the
 decoded RasterGrid | VectorFeatures. Repeated calls reuse the memoized result.
@@ -428,7 +511,7 @@ decoded RasterGrid | VectorFeatures. Repeated calls reuse the memoized result.
 
 > **mask**(`polygon`, `opts?`): `Dataset`
 
-Defined in: [package/dataset.js:323](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L323)
+Defined in: [package/dataset.js:374](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L374)
 
 Mask by a polygon: pixels outside the polygon become transparent (NaN) on force — or inside, with
 `{ invert }`. Footprint unchanged. Lazy: builds a node; the transform runs at terminal.
@@ -457,7 +540,7 @@ a SpatialFilter, or a ring/multi-ring of {lat,lng}|[lat,lng]
 
 > **rasterize**(`opts?`): `Dataset`
 
-Defined in: [package/dataset.js:457](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L457)
+Defined in: [package/dataset.js:543](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L543)
 
 Rasterize this vector Dataset onto a new grid (vector→raster, the kind-changing op —
 PACKAGE_ROADMAP §2 "vectorize/rasterize"). `field` burns each feature's property value; omit for a
@@ -498,7 +581,7 @@ constant `burnValue`. Bounds default to this Dataset's own footprint; `width`/`h
 
 > **reclassify**(`rules`, `opts?`): `Dataset`
 
-Defined in: [package/dataset.js:358](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L358)
+Defined in: [package/dataset.js:409](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L409)
 
 Reclassify pixel values by `rules` (see rasterOps.reclassifyGrid) — EITHER a range-rules array
 (`[{min?,max?,value?}]`, first-match-wins; a rule with no `value` is a "keep matched pixel's
@@ -536,7 +619,7 @@ persist/reload from Storage.
 
 > **reduce**(`op?`, `opts?`): `Dataset`
 
-Defined in: [package/dataset.js:477](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L477)
+Defined in: [package/dataset.js:563](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L563)
 
 Reduce this Dataset's selection axis to ONE grid — collapse a temporal/vertical stack (e.g. a
 stage/time series) via a per-pixel reducer. Sugar over select()+combine(): resolves every axis
@@ -573,7 +656,7 @@ entry to a child Dataset, then LHS-conforms/reduces them exactly like combine() 
 
 > **release**(): `void`
 
-Defined in: [package/dataset.js:583](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L583)
+Defined in: [package/dataset.js:819](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L819)
 
 Drop the memoized decode (evictable cache — the slider's stale-load guard calls this).
 
@@ -587,7 +670,7 @@ Drop the memoized decode (evictable cache — the slider's stale-load guard call
 
 > **reproject**(`toCrs`): `Dataset`
 
-Defined in: [package/dataset.js:278](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L278)
+Defined in: [package/dataset.js:329](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L329)
 
 Reproject to `toCrs` as a LAZY op. Returns a new Dataset; the warp runs only on force, dispatched
 through the registered reprojector (this file imports no GDAL). An exact same-CRS request is a
@@ -609,7 +692,7 @@ no-op that returns `this`. Rasters only (vectors are EPSG:4326 by spec).
 
 > **resampleTo**(`target`, `opts?`): `Dataset`
 
-Defined in: [package/dataset.js:398](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L398)
+Defined in: [package/dataset.js:449](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L449)
 
 Resample onto a specific target grid — lazy: the resample runs on force, via geo/resample.js's
 resampleGrid (also directly barrel-exported as `resampleGrid`/`alignRasters`, so a caller can use
@@ -647,12 +730,21 @@ target's footprint/resolution; `crs` is unchanged (this resamples, it does not r
 
 > **select**(`coord`, `opts?`): `Dataset`
 
-Defined in: [package/dataset.js:514](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L514)
+Defined in: [package/dataset.js:614](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L614)
 
-Resolve one selection-axis entry into a child URL-rooted Dataset (lazy). Sugar over
-selectAxisEntry: it picks the entry, resolves its `ref` (a bare URL, or a named variant chosen via
-`opts.variant`), infers the format from the URL, and carries the entry's opaque `meta`. Returns
-null when no entry matches. Kind-neutral: which variant (raster vs vector) is the caller's call.
+Resolve one selection-axis entry into a child Dataset (lazy). Sugar over selectAxisEntry: it picks
+the entry, resolves its `ref`, and carries the entry's opaque `meta`. Returns null when no entry
+matches. Kind-neutral: which variant (raster vs vector) is the caller's call.
+
+The `ref` decides what kind of child comes back (see [DatasetAxisEntry](../interfaces/DatasetAxisEntry.md)):
+- a **URL** (bare, or a named variant picked via `opts.variant`) → a URL-rooted child, format
+  inferred from the URL. One file per entry.
+- an **in-file selector** (`{ select: {…} }`) → a child rooted on the SAME source as this Dataset
+  (its bytes or URL, plus resolver), carrying the selector for the materializer. One file, many
+  entries — a NetCDF/GRIB2/Zarr time axis.
+
+Either way the child has no `axes` of its own: it is one payload, not a series, so it forces
+through `load()`/`grid()` like any other Dataset and every op chains off it normally.
 
 #### Parameters
 
@@ -672,7 +764,7 @@ which axis (index or name) to look up on
 
 `string`
 
-URL prefix prepended to the resolved `ref`
+URL prefix prepended to a resolved URL `ref` (ignored by selector refs)
 
 ###### nearest?
 
@@ -684,7 +776,7 @@ fall back to the closest numeric coord on a miss
 
 `string`
 
-required when the matched entry's `ref` has named variants (e.g. `{raster, vector}`)
+required when the matched entry's `ref` has named URL variants (e.g. `{raster, vector}`)
 
 #### Returns
 
@@ -696,7 +788,7 @@ required when the matched entry's `ref` has named variants (e.g. `{raster, vecto
 
 > **selectAxisEntry**(`coord`, `opts?`): [`DatasetAxisEntry`](../interfaces/DatasetAxisEntry.md)
 
-Defined in: [package/dataset.js:539](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L539)
+Defined in: [package/dataset.js:773](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L773)
 
 Look up an entry on one axis by coordinate. Exact match first; with { nearest: true } (default) and
 a NUMERIC axis, falls back to the closest coord. `axis` selects which axis (index or name).
@@ -727,11 +819,73 @@ fall back to the closest numeric coord on a miss
 
 ***
 
+### selectRange()
+
+> **selectRange**(`from`, `to`, `opts?`): `Dataset`
+
+Defined in: [package/dataset.js:745](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L745)
+
+Narrow one axis to the window `[from, to]` — a **series in, series out** operation, which is what
+separates it from `select()`. `select(coord)` resolves to ONE payload and hands back something
+forceable; `selectRange` hands back another selection-axis Dataset, still lazy, still unforceable
+on its own. That is the point: everything that works on the full series works on the window,
+`reduce()` most of all — "the mean of these six hours" is `selectRange(a, b).reduce('mean')`,
+with no new machinery on either side.
+
+Both bounds are **inclusive**, and the comparison is a plain `>=`/`<=` on the entry coords, so it
+is type-agnostic: numeric coords (epoch milliseconds, a stage in feet) compare numerically, and
+ISO-8601 strings compare lexicographically, which for ISO-8601 is the same as chronologically.
+Reversed bounds are swapped rather than rejected. Unlike `select()` there is no nearest-match: a
+window is already tolerant of falling between samples, so a range narrower than the sampling
+interval matches nothing and returns `null` — which is honest, where snapping would silently hand
+back a wider span than asked for.
+
+Coords are compared as given — `Date.parse(iso)` for the epoch-millisecond axes `parseSciwrid`
+builds. The engine stays domain-neutral about what a coordinate means.
+
+```js
+const storm = ds.selectRange(Date.parse('2023-08-29T00:00Z'), Date.parse('2023-08-30T00:00Z'));
+storm.axis.entries.length;          // just that day's steps
+await storm.reduce('max').grid();    // peak rainfall WITHIN the window
+storm.select(coord);                  // and one step out of it, as usual
+```
+
+#### Parameters
+
+##### from
+
+`string` \| `number`
+
+inclusive lower bound
+
+##### to
+
+`string` \| `number`
+
+inclusive upper bound
+
+##### opts?
+
+###### axis?
+
+`string` \| `number` = `0`
+
+which axis (index or name) to narrow
+
+#### Returns
+
+`Dataset`
+
+a Dataset whose chosen axis holds only the matching entries; `null` when
+  the axis is missing/empty or nothing falls inside the window
+
+***
+
 ### slope()
 
 > **slope**(`opts?`): `Dataset`
 
-Defined in: [package/dataset.js:425](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L425)
+Defined in: [package/dataset.js:511](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L511)
 
 Slope — per-pixel terrain steepness via Horn's method, computed in pure JS on the decoded grid (no
 GDAL — see rasterOps.slopeGrid; PACKAGE_ROADMAP §2 "terrain"). Lazy.
@@ -766,7 +920,7 @@ GDAL — see rasterOps.slopeGrid; PACKAGE_ROADMAP §2 "terrain"). Lazy.
 
 > **toJSON**(): `any`
 
-Defined in: [package/dataset.js:826](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L826)
+Defined in: [package/dataset.js:1081](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L1081)
 
 Metadata view (without the heavy `data` payload). Axes are lightweight (URLs), so they stay.
 
@@ -780,7 +934,7 @@ Metadata view (without the heavy `data` payload). Axes are lightweight (URLs), s
 
 > **toRecord**(`opts?`): `any`
 
-Defined in: [package/dataset.js:732](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L732)
+Defined in: [package/dataset.js:984](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L984)
 
 A structured-cloneable record for Storage.put(). Default: the SOURCE + op recipe (small) — a root
 inline Dataset still serializes with `data` and round-trips exactly as before (back-compat); a URL
@@ -804,30 +958,66 @@ also embed the decoded RasterGrid/VectorFeatures snapshot
 
 ***
 
+### variantsAt()
+
+> **variantsAt**(`coord`, `opts?`): `string`[]
+
+Defined in: [package/dataset.js:677](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L677)
+
+The named variants available at one axis coordinate, or `null` when that entry has none.
+
+Variants are **not** an axis and deliberately never became one, so they need their own way to be
+discovered — previously the only way to learn an entry had them was to call `select()` without one
+and read the thrown error, which is no way to build a picker.
+
+Why not an axis (see DECISIONS §1.1): a variant switches the Dataset's **kind** — `.tif` gives a
+raster in an unknown CRS, `.kmz` a vector in EPSG:4326 — while every genuine axis preserves kind,
+CRS and bounds. It is a choice of *encoding of the same datum*, not a coordinate in the data.
+
+```js
+ds.variantsAt(19.5);                       // → ['raster', 'vector']  (or null)
+ds.select(19.5, { variant: 'raster' });
+```
+
+#### Parameters
+
+##### coord
+
+`string` \| `number`
+
+##### opts?
+
+###### axis?
+
+`string` \| `number`
+
+###### nearest?
+
+`boolean`
+
+#### Returns
+
+`string`[]
+
+***
+
 ### zonalStats()
 
-> **zonalStats**(`zones`, `opts?`): `Promise`\<`any`[]\>
+> **zonalStats**(`zones`, `opts?`): `Promise`\<`object`[]\>
 
-Defined in: [package/dataset.js:414](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L414)
-
-Zonal statistics — per-zone min/max/mean/sum/count/area over this raster. A TERMINAL (forces the
-grid); returns data, not a Dataset.
+Defined in: [package/dataset.js:500](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L500)
 
 #### Parameters
 
 ##### zones
 
-`object`[]
+`any`
 
 ##### opts?
 
-###### noData?
-
-`number`
-
 #### Returns
 
-`Promise`\<`any`[]\>
+`Promise`\<`object`[]\>
 
 ***
 
@@ -835,7 +1025,7 @@ grid); returns data, not a Dataset.
 
 > `static` **formats**(): `string`[]
 
-Defined in: [package/dataset.js:197](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L197)
+Defined in: [package/dataset.js:248](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L248)
 
 Every format that can be decoded right now — built-ins plus anything registered. Build a file
 picker's `accept` list from it, or check an upload before parsing.
@@ -850,7 +1040,7 @@ picker's `accept` list from it, or check an upload before parsing.
 
 > `static` **fromGrid**(`value`, `opts?`): `Dataset`
 
-Defined in: [package/dataset.js:223](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L223)
+Defined in: [package/dataset.js:274](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L274)
 
 #### Parameters
 
@@ -870,7 +1060,7 @@ Defined in: [package/dataset.js:223](https://github.com/uihilab/FIMViz.js/blob/4
 
 > `static` **fromRecord**(`record`): `Dataset`
 
-Defined in: [package/dataset.js:763](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L763)
+Defined in: [package/dataset.js:1018](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L1018)
 
 Rehydrate a record (recipe or materialized). Structured clone drops prototypes, so this is required.
 
@@ -890,7 +1080,7 @@ Rehydrate a record (recipe or materialized). Structured clone drops prototypes, 
 
 > `static` **fromURL**(`url`, `opts?`): `Dataset`
 
-Defined in: [package/dataset.js:150](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L150)
+Defined in: [package/dataset.js:201](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L201)
 
 A URI-rooted Dataset. It fetches + decodes into a RasterGrid/VectorFeatures on FORCE — nothing
 happens now. Format/kind are inferred from the URL when not given. This is what folds the decoded
@@ -952,7 +1142,7 @@ a resolver (host CORS-proxy/mirror) applied to the URL at force time
 
 > `static` **registerDefaultReprojectorLoader**(`fn`): `void`
 
-Defined in: [package/dataset.js:212](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L212)
+Defined in: [package/dataset.js:263](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L263)
 
 A JIT fallback invoked at most once, on the first force that finds no reprojector registered —
 how the GDAL warp auto-loads with no setup call.
@@ -973,7 +1163,7 @@ how the GDAL warp auto-loads with no setup call.
 
 > `static` **registerMaterializer**(`format`, `fn`): `void`
 
-Defined in: [package/dataset.js:190](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L190)
+Defined in: [package/dataset.js:241](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L241)
 
 Register the decoder for a `format` (e.g. 'geotiff', 'nc').
 
@@ -997,7 +1187,7 @@ Register the decoder for a `format` (e.g. 'geotiff', 'nc').
 
 > `static` **registerReprojector**(`fn`): `void`
 
-Defined in: [package/dataset.js:204](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L204)
+Defined in: [package/dataset.js:255](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L255)
 
 Supply the ONE warp implementation `reproject()` forces through.
 
@@ -1017,7 +1207,7 @@ Supply the ONE warp implementation `reproject()` forces through.
 
 > `static` **registerResampler**(`fn`): `void`
 
-Defined in: [package/dataset.js:221](https://github.com/uihilab/FIMViz.js/blob/4b876c479bb0db4bb7fbe6632ef6f5073c3e1350/src/package/dataset.js#L221)
+Defined in: [package/dataset.js:272](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/dataset.js#L272)
 
 Supply a resampler for the methods the pure-JS path doesn't implement (cubic/lanczos/…), which
 `resampleTo({ method })` otherwise throws on. Synchronous and pixel-level — GDAL's own richer

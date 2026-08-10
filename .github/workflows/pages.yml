@@ -1,0 +1,63 @@
+# Build and publish the FIMViz.js site to GitHub Pages.
+#
+# The site is BUILT rather than served from the repository, because `dist/` is gitignored — without a
+# build step every example page would 404 on `../dist/fimviz.js`, and the live demo on the landing
+# page (which is also the site's smoke test) would be blank.
+#
+# `npm run site` assembles .site/ from the repo layout unchanged, so what deploys is identical to what
+# `npx serve .` shows locally.
+#
+# One-time setup in the repository: Settings → Pages → Build and deployment → Source: GitHub Actions.
+
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race; let a newer commit cancel an in-flight build of an older one.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` needs the vendored SciWrid tarball, which is committed under vendor/ — that is what
+      # keeps a fresh clone installable without a second repository.
+      - run: npm ci
+
+      # The tests do not gate the deploy on their own account; they run because a site built from a
+      # broken bundle is worse than no deploy.
+      - run: npm test
+
+      # build → assemble → typedoc. See scripts/build-site.mjs for why the order matters.
+      - run: npm run site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
