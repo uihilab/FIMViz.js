@@ -21,6 +21,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(ROOT, ".site");
 const REPO = "https://github.com/uihilab/FIMViz.js";
 const BLOB = `${REPO}/blob/main`;
+const LAB = "https://hydroinformatics.tulane.edu";
 
 const r = (...p) => join(ROOT, ...p);
 const o = (...p) => join(OUT, ...p);
@@ -119,30 +120,57 @@ function nav(current) {
   return html;
 }
 
+// The shared chrome. `p` is the prefix back to the site root, so the same markup serves a page at any
+// depth — the guides pass "../", the landing page inlines the same block with "".
+export const topbar = (p, guidesHref = `${p}guides/usage.html`) => `<header class="topbar">
+  <div class="wrap">
+    <a class="lab" href="${LAB}" title="Hydroinformatics Lab">
+      <img src="${p}assets/brand/hilab-logo.png" alt="Hydroinformatics Lab" />
+    </a>
+    <a class="brand" href="${p}index.html">FIM<span>Viz</span>.js</a>
+    <nav>
+      <a href="${p}examples/01-quickstart.html">Examples</a>
+      <a href="${guidesHref}">Guides</a>
+      <a href="${p}api/index.html">API</a>
+      <a href="${REPO}">GitHub</a>
+    </nav>
+  </div>
+</header>`;
+
+export const footer = (p) => `<footer class="site">
+  <div class="wrap">
+    <a class="lab" href="${LAB}" title="Hydroinformatics Lab">
+      <img src="${p}assets/brand/hilab-logo.png" alt="Hydroinformatics Lab" />
+    </a>
+    <div class="colophon">
+      <b>FIMViz.js</b> — a headless flood-inundation-map visualization engine, built by the
+      <a href="${LAB}">Hydroinformatics Lab</a>.
+      ISC licensed · <a href="${REPO}">source on GitHub</a>.
+    </div>
+    <nav>
+      <a href="${p}examples/01-quickstart.html">Examples</a>
+      <a href="${p}guides/usage.html">Guides</a>
+      <a href="${p}api/index.html">API reference</a>
+    </nav>
+  </div>
+</footer>`;
+
 const shell = (guide, body) => `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${guide.title} — FIMViz.js</title>
+<link rel="icon" href="../assets/brand/favicon.png" />
 <link rel="stylesheet" href="../site.css" />
 </head>
 <body>
-<header class="topbar">
-  <div class="wrap">
-    <a class="brand" href="../index.html">FIM<span>Viz</span>.js</a>
-    <nav>
-      <a href="../examples/01-quickstart.html">Examples</a>
-      <a href="./usage.html">Guides</a>
-      <a href="../api/index.html">API</a>
-      <a href="${REPO}">GitHub</a>
-    </nav>
-  </div>
-</header>
+${topbar("../", "./usage.html")}
 <div class="wrap guide">
   <aside>${nav(guide.slug)}</aside>
   <main class="doc">${body}</main>
 </div>
+${footer("../")}
 </body>
 </html>
 `;
@@ -181,6 +209,25 @@ rmSync(r("guides"), { recursive: true, force: true });
 mkdirSync(r("guides"), { recursive: true });
 for (const g of GUIDES) renderGuide(g);
 
+// ── 1b · point typedoc's chrome back at the site ──────────────────────────────────────────────
+//
+// typedoc emits `navigationLinks`, `titleLink` and `customFooterHtml` VERBATIM on every page, so a
+// relative path in them is correct at exactly one depth and broken everywhere else — `../index.html`
+// from api/classes/Foo.html resolves to api/index.html. The options carry a `__SITE__` token instead,
+// and this rewrites it per file to the right number of `../` hops.
+function rewriteApiChrome(dir = r("api"), depth = 0) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, entry.name);
+    if (entry.isDirectory()) { rewriteApiChrome(p, depth + 1); continue; }
+    if (!entry.name.endsWith(".html")) continue;
+    const prefix = "../".repeat(depth + 1);            // api/ itself is one level below the site root
+    const src = readFileSync(p, "utf8");
+    if (!src.includes("__SITE__/")) continue;
+    writeFileSync(p, src.replaceAll("__SITE__/", prefix));
+  }
+}
+rewriteApiChrome();
+
 // ── 2 · assemble the publishable subset ───────────────────────────────────────────────────────
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
@@ -191,6 +238,7 @@ copy("site.css");
 copy("examples");
 copy("guides");
 copy("api");
+copy("assets/brand");
 
 // dist, minus the .d.ts tree — the site serves the bundles, not the types.
 cpSync(r("dist"), o("dist"), { recursive: true, filter: (src) => !src.includes(`${sep}types`) });

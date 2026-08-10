@@ -1,0 +1,29 @@
+/* api-theme.css — the small amount of branding typedoc's own theme cannot express through options.
+ *
+ * Everything else is left to typedoc's default theme on purpose: it already handles light/dark, the
+ * navigation tree and the search index, and re-skinning it would mean re-styling a page we do not
+ * control across upgrades. */
+
+.fim-footer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 0 6px;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+/* The lab wordmark is black artwork on transparency, so it needs a light chip to stay legible in
+   typedoc's dark theme — the same treatment the rest of the site gives it. */
+.fim-footer .lab {
+  display: inline-flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 6px;
+  padding: 5px 8px;
+  line-height: 0;
+  flex-shrink: 0;
+}
+.fim-footer .lab img { height: 20px; width: auto; display: block; }
+.fim-footer span { max-width: 62ch; }
