@@ -139,4 +139,4 @@ would have no bundle for the examples to load.
 
 ## License
 
-ISC.
+MIT.
