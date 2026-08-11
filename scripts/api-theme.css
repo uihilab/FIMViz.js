@@ -1,9 +1,74 @@
-/* api-theme.css — the small amount of branding typedoc's own theme cannot express through options.
+/* api-theme.css — the branding and palette typedoc's own theme cannot express through options.
  *
- * Everything else is left to typedoc's default theme on purpose: it already handles light/dark, the
- * navigation tree and the search index, and re-skinning it would mean re-styling a page we do not
- * control across upgrades. */
+ * Loaded as `customCss` (typedoc copies it to api/assets/custom.css, last of the three stylesheets),
+ * so plain-specificity rules here beat the default theme without any `!important`.
+ *
+ * Layout, the navigation tree and the search index are still typedoc's. Re-implementing those would
+ * mean re-doing the work on every upgrade; recolouring is a handful of variables that the theme is
+ * already built to take. */
 
+/* ── the site's tokens, redeclared ──────────────────────────────────────────────────────────────
+ * site.css is NOT linked on generated pages, so nothing from it is in scope here. These are copies,
+ * and they have to be kept in step with site.css by hand. */
+:root {
+  --fim-sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --fim-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+
+/* ── palette ────────────────────────────────────────────────────────────────────────────────────
+ * typedoc resolves every `--color-*` from a `--light-color-*`/`--dark-color-*` pair, choosing
+ * between them in three places: `@media (prefers-color-scheme)` for the default "os" setting, and
+ * `:root[data-theme="light"]` / `[data-theme="dark"]` for its own toolbar switcher. Overriding the
+ * two SOURCE palettes here — in a plain `:root`, with no media query of our own — feeds all three at
+ * once and leaves the switcher working. Redefining `--color-*` directly would break it.
+ *
+ * Tokens typedoc already derives from these (active-menu-item, icon-background, icon-text,
+ * comment-tag, and every ts-* alias) follow automatically and are deliberately not repeated. */
+:root {
+  /* dark — site.css :root */
+  --dark-color-background:#0f1216;            /* --bg    */
+  --dark-color-background-secondary:#161b22;  /* --panel */
+  --dark-color-accent:#2b3440;                /* --line; typedoc's "accent" is its rule/border grey,
+                                                 not a highlight colour */
+  --dark-color-text:#e6edf3;                  /* --fg    */
+  --dark-color-text-aside:#8b949e;            /* --dim   */
+  --dark-color-contrast-text:#ffffff;
+  --dark-color-document:#e6edf3;
+  --dark-color-link:#58a6ff;                  /* --accent */
+  --dark-color-focus-outline:#58a6ff;
+  --dark-color-background-warning:#d29922;    /* --warn  */
+  --dark-color-warning-text:#0f1216;
+
+  /* light — site.css @media (prefers-color-scheme:light) */
+  --light-color-background:#ffffff;
+  --light-color-background-secondary:#f6f8fa;
+  --light-color-accent:#d0d7de;
+  --light-color-text:#1f2328;
+  --light-color-text-aside:#59636e;
+  --light-color-contrast-text:#000000;
+  --light-color-document:#1f2328;
+  --light-color-link:#0969da;                 /* --accent, light  */
+  --light-color-focus-outline:#0969da;
+  --light-color-background-warning:#d29922;
+  --light-color-warning-text:#1f2328;
+
+  /* The one pair with no site equivalent: the selected-nav-item fill, which has to sit between
+     --panel and --line to read as selected without becoming a second background. */
+  --dark-color-background-active:#232b36;
+  --light-color-background-active:#e6ebf0;
+
+  /* Matches site.css's 60px top bar. typedoc computes --dim-header-height and every sticky offset
+     from this one value, so the whole chrome follows. */
+  --dim-toolbar-contents-height:3.75rem;
+}
+
+/* ── typography ─────────────────────────────────────────────────────────────────────────────────
+ * The default theme's stacks predate ui-sans-serif/ui-monospace; these are site.css's. */
+body { font-family:var(--fim-sans); }
+code, pre, .tsd-signature { font-family:var(--fim-mono); }
+
+/* ── footer ─────────────────────────────────────────────────────────────────────────────────────
+ * Injected verbatim by `customFooterHtml` in typedoc.site.json. */
 .fim-footer {
   display: flex;
   align-items: center;

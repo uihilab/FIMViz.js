@@ -22,6 +22,7 @@ const OUT = join(ROOT, ".site");
 const REPO = "https://github.com/uihilab/FIMViz.js";
 const BLOB = `${REPO}/blob/main`;
 const LAB = "https://hydroinformatics.tulane.edu";
+const TULANE = "https://tulane.edu";
 
 const r = (...p) => join(ROOT, ...p);
 const o = (...p) => join(OUT, ...p);
@@ -124,9 +125,6 @@ function nav(current) {
 // depth — the guides pass "../", the landing page inlines the same block with "".
 export const topbar = (p, guidesHref = `${p}guides/usage.html`) => `<header class="topbar">
   <div class="wrap">
-    <a class="lab" href="${LAB}" title="Hydroinformatics Lab">
-      <img src="${p}assets/brand/hilab-logo.png" alt="Hydroinformatics Lab" />
-    </a>
     <a class="brand" href="${p}index.html">FIM<span>Viz</span>.js</a>
     <nav>
       <a href="${p}examples/01-quickstart.html">Examples</a>
@@ -144,14 +142,8 @@ export const footer = (p) => `<footer class="site">
     </a>
     <div class="colophon">
       <b>FIMViz.js</b> — a headless flood-inundation-map visualization engine, built by the
-      <a href="${LAB}">Hydroinformatics Lab</a>.
-      ISC licensed · <a href="${REPO}">source on GitHub</a>.
+      <a href="${LAB}">Hydroinformatics Lab</a> at <a href="${TULANE}">Tulane University</a>.
     </div>
-    <nav>
-      <a href="${p}examples/01-quickstart.html">Examples</a>
-      <a href="${p}guides/usage.html">Guides</a>
-      <a href="${p}api/index.html">API reference</a>
-    </nav>
   </div>
 </footer>`;
 

@@ -7,17 +7,19 @@
 <link rel="icon" href="../assets/brand/favicon.png" />
 <link rel="stylesheet" href="../site.css" />
 <style>
-  body { margin:0; background:var(--bg); color:var(--fg);
+  body { margin:0; --aside:440px; background:var(--bg); color:var(--fg);
          font:15px/1.65 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-  header.pagehead { border-bottom:1px solid var(--line); padding:26px 0 22px; }
+  header.pagehead { border-bottom:1px solid var(--line);
+                    padding:26px calc(var(--aside) + 54px) 22px 24px; }
   h1 { margin:0 0 6px; font-size:23px; letter-spacing:-.01em; }
-  .lead { margin:0; color:var(--dim); max-width:82ch; }
+  .lead { margin:0; color:var(--dim); max-width:78ch; }
   .setup { margin:14px 0 0; padding:9px 13px; border:1px solid var(--line); border-left:3px solid var(--accent);
-           border-radius:6px; background:var(--panel); font-size:13px; color:var(--dim); max-width:82ch; }
-  main { display:grid; grid-template-columns:minmax(0,1fr) 440px; gap:30px; padding:22px 0 80px; }
-  @media (max-width:1000px) { main { grid-template-columns:1fr; } }
+           border-radius:6px; background:var(--panel); font-size:13px; color:var(--dim); max-width:78ch; }
+  main.wrap { display:grid; grid-template-columns:minmax(0,1fr) var(--aside); gap:30px; padding:22px 24px 80px; }
+  @media (max-width:1000px) { main.wrap { grid-template-columns:1fr; }
+                              header.pagehead { padding-right:24px; } }
   section { padding:22px 0 4px; border-top:1px solid var(--line); }
-  section:first-child { border-top:0; padding-top:8px; }
+  section:first-child { border-top:0; padding-top:0; }   /* flush with the top of the aside */
   h2 { font-size:16px; margin:0 0 8px; }
   h2 .n { color:var(--accent); font:600 13px/1 ui-monospace,Menlo,monospace; margin-right:8px;
           border:1px solid var(--line); border-radius:5px; padding:3px 6px; }
@@ -32,13 +34,13 @@
   .label { font:600 10.5px/1 ui-sans-serif,system-ui; letter-spacing:.09em; text-transform:uppercase;
            color:var(--dim); margin:0 0 6px; }
   .controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 12px; }
-  button { background:transparent; color:var(--accent); border:1px solid var(--line); border-radius:6px;
+  button { background:transparent; color:var(--accent); border:1px solid var(--control-line); border-radius:6px;
            padding:5px 11px; font:inherit; font-size:13px; cursor:pointer; }
   button:hover { border-color:var(--accent); }
   button:disabled { opacity:.45; cursor:not-allowed; }
   button.warn { color:var(--warn); }
   label.ctl { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--dim); }
-  input[type=number] { width:74px; background:var(--bg); color:var(--fg); border:1px solid var(--line);
+  input[type=number] { width:74px; background:var(--bg); color:var(--fg); border:1px solid var(--control-line);
                        border-radius:6px; padding:4px 6px; font:inherit; font-size:13px; }
   aside { position:sticky; top:76px; align-self:start; }
   .maptitle { font:600 10.5px/1 ui-sans-serif,system-ui; letter-spacing:.09em; text-transform:uppercase;
@@ -51,7 +53,7 @@
   th, td { border:1px solid var(--line); padding:4px 8px; text-align:right; }
   th { color:var(--dim); font-weight:600; text-align:right; background:var(--panel); }
   th:first-child, td:first-child { text-align:left; }
-  nav.more { border-top:1px solid var(--line); padding:18px 0 30px; font-size:13px; color:var(--dim); }
+  nav.more { border-top:1px solid var(--line); padding:18px 24px 30px; font-size:13px; color:var(--dim); }
   nav.more a { color:var(--accent); }
 </style>
 </head>
@@ -59,9 +61,6 @@
 
 <header class="topbar">
   <div class="wrap">
-    <a class="lab" href="https://hydroinformatics.tulane.edu" title="Hydroinformatics Lab">
-      <img src="../assets/brand/hilab-logo.png" alt="Hydroinformatics Lab" />
-    </a>
     <a class="brand" href="../index.html">FIM<span>Viz</span>.js</a>
     <nav>
       <a href="01-quickstart.html">Examples</a>
@@ -816,14 +815,8 @@ $("#btn-pure").addEventListener("click", async () => {
     </a>
     <div class="colophon">
       <b>FIMViz.js</b> — a headless flood-inundation-map visualization engine, built by the
-      <a href="https://hydroinformatics.tulane.edu">Hydroinformatics Lab</a>.
-      ISC licensed · <a href="https://github.com/uihilab/FIMViz.js">source on GitHub</a>.
+      <a href="https://hydroinformatics.tulane.edu">Hydroinformatics Lab</a> at <a href="https://tulane.edu">Tulane University</a>.
     </div>
-    <nav>
-      <a href="01-quickstart.html">Examples</a>
-      <a href="../guides/usage.html">Guides</a>
-      <a href="../api/index.html">API reference</a>
-    </nav>
   </div>
 </footer>
 </body>

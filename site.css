@@ -5,15 +5,37 @@
 
 :root {
   --bg:#0f1216; --panel:#161b22; --code:#0b0e13; --line:#2b3440;
-  --fg:#e6edf3; --dim:#8b949e; --faint:#6e7681;
+  /* --faint is the weakest text on the page (.tag, the disabled .caps items, the eyebrow labels) but
+     it is still text at small sizes, so it carries the same 4.5:1 floor as everything else. That caps
+     how faint it can be: the hierarchy below --dim is now a 6.1 → 5.0 step rather than 6.1 → 4.1. */
+  --fg:#e6edf3; --dim:#8b949e; --faint:#7d8590;
   --accent:#58a6ff; --ok:#3fb950; --bad:#f85149; --warn:#d29922;
+  /* The filled call-to-action, its own token rather than a shade of --accent (which stays the
+     link/idiom blue). It has to clear TWO floors at once, which is what pins it here: white text on
+     it at 4.5:1, and the button's own edge against the page at 3:1. Those pull in opposite
+     directions — lighter helps the edge and hurts the label — and #2f6fd0 is about the middle of the
+     narrow band that satisfies both (4.88:1 and 3.85:1). The earlier navy was a comfortable 7.99:1
+     for the label but only 2.35:1 against the dark page. --primary-hover is DARKER than the base for
+     the same reason: going lighter on hover would push the white label under 4.5:1. */
+  --primary:#2f6fd0; --primary-hover:#2a5fb4; --primary-fg:#ffffff;
+  /* Borders on real controls (button/select/input) carry a 3:1 floor that decorative rules do not.
+     --line stays the hairline used for dividers, cards and code blocks; this is its louder twin,
+     used only where a control's edge is the thing being perceived. */
+  --control-line:#5f6875;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --radius:10px;
 }
+/* The light theme is not a tint of the dark one — the semantic hues have to be re-picked, not
+ * reused. #58a6ff / #3fb950 / #f85149 / #d29922 are tuned for a near-black background and land at
+ * 2.4–3.4:1 on white, under the 4.5:1 floor; the replacements clear it against BOTH --bg and the
+ * slightly darker --panel/--code, which is where most of them actually appear (links in a callout,
+ * the .s/.f syntax spans inside a <pre>). Every page on the site inherits these, so the example
+ * notebooks are covered by the same four lines. */
 @media (prefers-color-scheme:light) {
   :root { --bg:#fff; --panel:#f6f8fa; --code:#f6f8fa; --line:#d0d7de;
-          --fg:#1f2328; --dim:#59636e; --faint:#818b98; }
+          --fg:#1f2328; --dim:#59636e; --faint:#6a7280; --control-line:#868f99;
+          --accent:#0969da; --ok:#1a7f37; --bad:#cf222e; --warn:#9a6700; }
 }
 
 * { box-sizing:border-box; }
@@ -31,7 +53,11 @@ pre { background:var(--code); border:1px solid var(--line); border-radius:var(--
 pre code { background:none; border:0; padding:0; font-size:inherit; }
 hr { border:0; border-top:1px solid var(--line); margin:34px 0; }
 
-.wrap { max-width:1120px; margin:0 auto; padding:0 24px; }
+/* `width:100%` is load-bearing: body is a flex column, and an auto margin on the cross axis cancels
+ * the default `stretch`. Without it, a .wrap that is a direct child of body (the example pages'
+ * header/main/nav, the guide grid) shrink-wraps to its contents instead of filling the 1400px, and
+ * each one lands on a different left edge than the top bar's. */
+.wrap { max-width:1400px; width:100%; margin:0 auto; padding:0 24px; }
 .muted { color:var(--dim); }
 .mono { font-family:var(--mono); }
 
@@ -47,15 +73,13 @@ hr { border:0; border-top:1px solid var(--line); margin:34px 0; }
        padding:5px 8px; line-height:0; flex-shrink:0; }
 .lab img { height:20px; width:auto; display:block; }
 .lab:hover { box-shadow:0 0 0 1px var(--accent); }
-.topbar .brand { font:600 15px/1 var(--mono); color:var(--fg); letter-spacing:-.01em;
-                 padding-left:14px; border-left:1px solid var(--line); }
+.topbar .brand { font:600 15px/1 var(--mono); color:var(--fg); letter-spacing:-.01em; }
 .brand span { color:var(--accent); }
 .topbar nav { margin-left:auto; display:flex; gap:18px; font-size:14px; }
 .topbar nav a { color:var(--dim); }
 .topbar nav a:hover { color:var(--fg); text-decoration:none; }
 @media (max-width:620px) {
   .topbar .wrap { gap:10px; }
-  .topbar .brand { padding-left:10px; }
   .topbar nav { gap:12px; font-size:13px; }
 }
 
@@ -72,22 +96,23 @@ footer.site nav { margin-left:auto; display:flex; flex-direction:column; gap:6px
 
 /* ── hero ────────────────────────────────────────────────────────────────────────────────── */
 .hero { padding:56px 0 44px; border-bottom:1px solid var(--line); }
-.hero .wrap { display:grid; grid-template-columns:minmax(0,1fr) 460px; gap:44px; align-items:center; }
-@media (max-width:940px) { .hero .wrap { grid-template-columns:1fr; } }
+.hero .wrap { display:grid; grid-template-columns:minmax(0,1fr) 580px; gap:44px; align-items:center; }
+/* The demo column is wider now, so the two columns would crowd each other sooner — collapse earlier. */
+@media (max-width:1040px) { .hero .wrap { grid-template-columns:1fr; } }
 .hero h1 { margin:0 0 14px; font-size:40px; line-height:1.12; letter-spacing:-.025em; }
 .hero h1 .dim { color:var(--dim); font-weight:400; }
 .hero p.tagline { margin:0 0 20px; font-size:17.5px; color:var(--dim); max-width:56ch; }
 .pill { display:inline-flex; align-items:center; gap:7px; font:12px/1 var(--sans); color:var(--warn);
         border:1px solid var(--warn); border-radius:999px; padding:5px 11px; margin-bottom:18px; }
 .cta { display:flex; gap:10px; flex-wrap:wrap; margin-top:22px; }
-.btn { display:inline-block; border:1px solid var(--line); border-radius:8px; padding:9px 16px;
+.btn { display:inline-block; border:1px solid var(--control-line); border-radius:8px; padding:9px 16px;
        font-size:14.5px; color:var(--fg); }
 .btn:hover { border-color:var(--accent); text-decoration:none; }
-.btn.primary { background:var(--accent); border-color:var(--accent); color:#08111f; font-weight:600; }
-.btn.primary:hover { filter:brightness(1.08); }
+.btn.primary { background:var(--primary); border-color:var(--primary); color:var(--primary-fg); font-weight:600; }
+.btn.primary:hover { background:var(--primary-hover); border-color:var(--primary-hover); color:var(--primary-fg); }
 
 .demo { border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; background:var(--panel); }
-.demo #hero-map { height:300px; background:var(--code); }
+.demo #hero-map { height:380px; background:var(--code); }
 .demo figcaption { padding:10px 13px; border-top:1px solid var(--line); font-size:12.5px; color:var(--dim); }
 .demo figcaption b { color:var(--fg); font-weight:600; }
 
@@ -95,7 +120,10 @@ footer.site nav { margin-left:auto; display:flex; flex-direction:column; gap:6px
 section.band { padding:52px 0; border-bottom:1px solid var(--line); }
 section.band > .wrap > h2 { margin:0 0 6px; font-size:13px; letter-spacing:.1em; text-transform:uppercase;
                             color:var(--dim); font-weight:600; }
-section.band > .wrap > h2 + p.intro { margin:0 0 26px; font-size:19px; max-width:70ch; letter-spacing:-.01em; }
+/* A one-sentence deck, not a paragraph — at a 1400px container a 70ch cap broke every one of these
+   onto a second line less than half way across, which read as a mistake next to the full-width
+   heading and cards. 100ch keeps them on one line here and still wraps sanely if one grows. */
+section.band > .wrap > h2 + p.intro { margin:0 0 26px; font-size:19px; max-width:100ch; letter-spacing:-.01em; }
 
 .grid { display:grid; gap:14px; }
 .grid.c2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -136,7 +164,11 @@ figure.model svg { width:100%; height:auto; display:block; }
 figure.model figcaption { margin-top:14px; font-size:13.5px; color:var(--dim); }
 
 /* ── generated guide pages ───────────────────────────────────────────────────────────────── */
-.guide { display:grid; grid-template-columns:250px minmax(0,1fr); gap:44px; padding:34px 0 90px; }
+/* The doc column is capped rather than left to fill the container: at 1400px an uncapped column ran
+   to ~1050px while the prose inside stopped at its 78ch measure, leaving a wide dead margin that made
+   the page look broken rather than roomy. */
+.guide { display:grid; grid-template-columns:250px minmax(0,900px); justify-content:start;
+         gap:44px; padding:34px 0 90px; }
 @media (max-width:940px) { .guide { grid-template-columns:1fr; gap:22px; } }
 .guide aside { position:sticky; top:76px; align-self:start; max-height:calc(100vh - 96px); overflow:auto; }
 @media (max-width:940px) { .guide aside { position:static; max-height:none; } }
@@ -155,7 +187,7 @@ figure.model figcaption { margin-top:14px; font-size:13.5px; color:var(--dim); }
           border-bottom:1px solid var(--line); }
 .doc h3 { font-size:17px; margin:28px 0 10px; }
 .doc h4 { font-size:15px; margin:22px 0 8px; color:var(--dim); }
-.doc p, .doc li { max-width:80ch; }
+.doc p, .doc li { max-width:78ch; }   /* one measure across the whole site */
 .doc blockquote { margin:16px 0; padding:2px 0 2px 16px; border-left:3px solid var(--accent);
                   color:var(--dim); }
 .doc blockquote p { margin:8px 0; }

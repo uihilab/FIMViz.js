@@ -12,9 +12,6 @@
 
 <header class="topbar">
   <div class="wrap">
-    <a class="lab" href="https://hydroinformatics.tulane.edu" title="Hydroinformatics Lab">
-      <img src="assets/brand/hilab-logo.png" alt="Hydroinformatics Lab" />
-    </a>
     <a class="brand" href="index.html">FIM<span>Viz</span>.js</a>
     <nav>
       <a href="#examples">Examples</a>
@@ -117,7 +114,11 @@ layer.fit();</code></pre>
     <h2>The object model</h2>
     <div class="split">
       <figure class="model">
-        <svg viewBox="0 0 560 260" role="img" aria-label="Source bytes become a Dataset, which forces to a grid or features, which a Layer renders through a map provider; a ColorScale derives a Legend and Stats.">
+        <!-- Two bands, 28 units apart. The value types (RasterGrid / VectorFeatures) occupy the top
+             band; the rendering row (ColorScale → Layer → provider) the bottom one. VectorFeatures
+             used to end exactly where `map provider` began, so the two read as one stack — the gap is
+             what separates "what a Dataset forces to" from "what draws it". -->
+        <svg viewBox="0 0 560 288" role="img" aria-label="Source bytes become a Dataset, which forces to a grid or features, which a Layer renders through a map provider; a ColorScale derives a Legend and Stats.">
           <defs>
             <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
               <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
@@ -126,34 +127,34 @@ layer.fit();</code></pre>
           <g fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55" marker-end="url(#a)">
             <path d="M104,44 H168" />
             <path d="M266,44 H330" /><path d="M266,44 L330,114" />
-            <path d="M104,150 H168" /><path d="M266,150 H330" /><path d="M266,150 L330,206" />
-            <path d="M212,68 V126" />
+            <path d="M104,194 H168" /><path d="M266,194 H330" /><path d="M266,194 L330,250" />
+            <path d="M212,68 V170" />
           </g>
           <g font-family="ui-monospace,Menlo,monospace" font-size="12.5" text-anchor="middle">
             <g fill="currentColor" opacity=".18">
               <rect x="8" y="26" width="96" height="36" rx="7" /><rect x="168" y="26" width="98" height="36" rx="7" />
               <rect x="330" y="26" width="196" height="36" rx="7" /><rect x="330" y="96" width="196" height="36" rx="7" />
-              <rect x="8" y="132" width="96" height="36" rx="7" /><rect x="168" y="132" width="98" height="36" rx="7" />
-              <rect x="330" y="132" width="196" height="36" rx="7" /><rect x="330" y="188" width="196" height="36" rx="7" />
+              <rect x="8" y="176" width="96" height="36" rx="7" /><rect x="168" y="176" width="98" height="36" rx="7" />
+              <rect x="330" y="176" width="196" height="36" rx="7" /><rect x="330" y="232" width="196" height="36" rx="7" />
             </g>
             <g fill="currentColor">
               <text x="56" y="49">file / URL</text>
               <text x="217" y="49">Dataset</text>
               <text x="428" y="49">RasterGrid</text>
               <text x="428" y="119">VectorFeatures</text>
-              <text x="56" y="155">ColorScale</text>
-              <text x="217" y="155">Layer</text>
-              <text x="428" y="155">map provider</text>
-              <text x="428" y="211">Legend · Stats</text>
+              <text x="56" y="199">ColorScale</text>
+              <text x="217" y="199">Layer</text>
+              <text x="428" y="199">map provider</text>
+              <text x="428" y="255">Legend · Stats</text>
             </g>
             <g fill="currentColor" opacity=".6" font-size="10.5">
               <text x="136" y="38">parse</text>
               <text x="298" y="38">force</text>
-              <text x="296" y="66">or</text>
-              <text x="205" y="102" text-anchor="end">sources</text>
-              <text x="136" y="144">attach</text>
-              <text x="298" y="144">draw</text>
-              <text x="317" y="196" text-anchor="end">derive</text>
+              <text x="312" y="80">or</text>
+              <text x="205" y="122" text-anchor="end">sources</text>
+              <text x="136" y="188">attach</text>
+              <text x="298" y="188">draw</text>
+              <text x="290" y="245">derive</text>
             </g>
           </g>
         </svg>
@@ -336,16 +337,8 @@ layer.fit();</code></pre>
     </a>
     <div class="colophon">
       <b>FIMViz.js</b> — a headless flood-inundation-map visualization engine, built by the
-      <a href="https://hydroinformatics.tulane.edu">Hydroinformatics Lab</a>.
-      ISC licensed · <a href="https://github.com/uihilab/FIMViz.js">source on GitHub</a> ·
-      the multi-dimensional formats are read by
-      <a href="https://github.com/uihilab/SciWrid-Toolkit">SciWrid Toolkit</a>.
+      <a href="https://hydroinformatics.tulane.edu">Hydroinformatics Lab</a> at <a href="https://tulane.edu">Tulane University</a>.
     </div>
-    <nav>
-      <a href="examples/01-quickstart.html">Examples</a>
-      <a href="guides/usage.html">Guides</a>
-      <a href="api/index.html">API reference</a>
-    </nav>
   </div>
 </footer>
 

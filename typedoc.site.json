@@ -19,6 +19,6 @@
     "GitHub": "https://github.com/uihilab/FIMViz.js"
   },
 
-  "customFooterHtml": "<div class=\"fim-footer\"><a class=\"lab\" href=\"https://hydroinformatics.tulane.edu\"><img src=\"__SITE__/assets/brand/hilab-logo.png\" alt=\"Hydroinformatics Lab\" /></a><span><b>FIMViz.js</b> — built by the <a href=\"https://hydroinformatics.tulane.edu\">Hydroinformatics Lab</a>. ISC licensed · <a href=\"https://github.com/uihilab/FIMViz.js\">source on GitHub</a>.</span></div>",
+  "customFooterHtml": "<div class=\"fim-footer\"><a class=\"lab\" href=\"https://hydroinformatics.tulane.edu\"><img src=\"__SITE__/assets/brand/hilab-logo.png\" alt=\"Hydroinformatics Lab\" /></a><span><b>FIMViz.js</b> — a headless flood-inundation-map visualization engine, built by the <a href=\"https://hydroinformatics.tulane.edu\">Hydroinformatics Lab</a> at <a href=\"https://tulane.edu\">Tulane University</a>.</span></div>",
   "customFooterHtmlDisableWrapper": true
 }

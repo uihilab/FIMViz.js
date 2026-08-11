@@ -127,6 +127,11 @@ npm run site       # build → typedoc → assemble
 npx serve .        # the whole site, every link live, at http://localhost:3000
 ```
 
+`serve.json` is there to turn `serve`'s default `cleanUrls` **off**. It rewrites `/api/index.html` →
+`/api/index` → `/api`, and that last hop drops the trailing slash, so the generated API pages resolve
+their own `assets/style.css` against `/` instead of `/api/` — every stylesheet and script 404s and the
+reference renders unstyled. GitHub Pages does no such rewriting, so this only ever bit local preview.
+
 `npm run site` builds the bundles, writes the HTML API reference to `api/`, renders the markdown docs
 to `guides/`, and assembles `.site/` — the publishable subset (the landing page, examples, guides,
 API, `dist/`, and only the sample files the pages actually name; no `src/`, `docs/`, `test/` or
@@ -139,4 +144,4 @@ would have no bundle for the examples to load.
 
 ## License
 
-MIT.
+MIT — see [LICENSE](LICENSE).

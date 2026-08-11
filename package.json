@@ -37,7 +37,7 @@
     "site": "npm run build && npm run docs:site && node scripts/build-site.mjs",
     "test": "node --test \"test/*.test.mjs\""
   },
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "@googlemaps/js-api-loader": "^1.16.8",
     "@tmcw/togeojson": "^6.0.0",
