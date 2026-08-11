@@ -7,7 +7,7 @@
 <link rel="icon" href="../assets/brand/favicon.png" />
 <link rel="stylesheet" href="../site.css" />
 <style>
-  body { margin:0; --aside:440px; background:var(--bg); color:var(--fg);
+  body { margin:0; --aside:520px; background:var(--bg); color:var(--fg);
          font:15px/1.65 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
   header.pagehead { border-bottom:1px solid var(--line);
                     padding:26px calc(var(--aside) + 54px) 22px 24px; }
@@ -45,7 +45,7 @@
   aside { position:sticky; top:76px; align-self:start; }
   .maptitle { font:600 10.5px/1 ui-sans-serif,system-ui; letter-spacing:.09em; text-transform:uppercase;
               color:var(--dim); margin:0 0 6px; display:flex; justify-content:space-between; }
-  .mapbox { height:236px; border:1px solid var(--line); border-radius:10px; overflow:hidden;
+  .mapbox { height:300px; border:1px solid var(--line); border-radius:10px; overflow:hidden;
             margin-bottom:14px; }
   .note { font-size:12.5px; color:var(--dim); border:1px solid var(--line); border-radius:8px;
           padding:9px 11px; background:var(--panel); }
@@ -55,6 +55,34 @@
   th:first-child, td:first-child { text-align:left; }
   nav.more { border-top:1px solid var(--line); padding:18px 24px 30px; font-size:13px; color:var(--dim); }
   nav.more a { color:var(--accent); }
+
+  /* ── the six-part stepper, above the title: where you are, and one click to anywhere else ── */
+  nav.steps { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 13px; }
+  nav.steps a { display:inline-flex; align-items:center; gap:7px; padding:4px 11px 4px 5px;
+                border:1px solid var(--line); border-radius:999px; font-size:12.5px; color:var(--dim); }
+  nav.steps a:hover { color:var(--fg); border-color:var(--control-line); text-decoration:none; }
+  nav.steps a .n { display:inline-flex; align-items:center; justify-content:center; width:19px; height:19px;
+                   border-radius:50%; background:var(--panel); font:600 11px/1 ui-monospace,Menlo,monospace; }
+  nav.steps a[aria-current] { color:var(--fg); border-color:var(--accent); }
+  nav.steps a[aria-current] .n { background:var(--accent); color:var(--bg); }
+
+  /* ── preview card for any link carrying data-preview (the stepper and the Next block) ── */
+  .peek { position:absolute; z-index:60; width:330px; padding:12px 14px; border:1px solid var(--line);
+          border-radius:10px; background:var(--panel); font-size:12.5px; line-height:1.55; color:var(--dim);
+          box-shadow:0 14px 36px -14px color-mix(in srgb, var(--fg) 60%, transparent);
+          opacity:0; visibility:hidden; transition:opacity .12s ease; pointer-events:none; }
+  .peek.on { opacity:1; visibility:visible; }
+  .peek h4 { margin:0 0 5px; font-size:13.5px; color:var(--fg); }
+  .peek p { margin:0 0 8px; max-width:none; }
+  .peek ol { margin:0; padding-left:17px; }
+  .peek li { margin:1.5px 0; }
+  .peek li.rest { list-style:none; margin-left:-17px; padding-left:17px; color:var(--faint); }
+  @media (hover:none) { .peek { display:none; } }   /* no hover target on touch — the pills still navigate */
+
+  /* The map is the point of the page, so it carries the visual weight. Theme-aware: the shadow is
+     mixed from --fg, which flips with the theme instead of being a fixed black. */
+  #map, .mapbox { box-shadow:0 1px 2px color-mix(in srgb, var(--fg) 9%, transparent),
+                              0 14px 34px -20px color-mix(in srgb, var(--fg) 55%, transparent); }
 </style>
 </head>
 <body>
@@ -72,6 +100,14 @@
 </header>
 
 <header class="wrap pagehead">
+<nav class="steps" aria-label="The six examples">
+  <a href="01-quickstart.html" data-preview><span class="n">1</span>Quickstart</a>
+  <a href="02-datasets-and-ops.html" aria-current="page"><span class="n">2</span>Datasets &amp; ops</a>
+  <a href="03-color-and-read-models.html" data-preview><span class="n">3</span>Colour</a>
+  <a href="04-temporal.html" data-preview><span class="n">4</span>Temporal</a>
+  <a href="05-ui-toolkit.html" data-preview><span class="n">5</span>UI toolkit</a>
+  <a href="06-storage-and-records.html" data-preview><span class="n">6</span>Storage</a>
+</nav>
   <h1>2 · Datasets &amp; operations</h1>
   <p class="lead">
     A <code>Dataset</code> is not a decoded raster — it is a <b>lazy, immutable node in an op chain</b>.
@@ -406,8 +442,8 @@ utm.crs;   <span class="k">// 'EPSG:26914' — parsing never reprojects</span>
 </main>
 
 <nav class="more wrap">
-  Next: <a href="03-color-and-read-models.html">3 · Colour &amp; read-models</a> ·
-  back to <a href="01-quickstart.html">1 · Quickstart</a>
+  Next: <a href="03-color-and-read-models.html" data-preview>3 · Colour &amp; read-models</a> ·
+  back to <a href="01-quickstart.html" data-preview>1 · Quickstart</a>
 </nav>
 
 <script type="importmap">
@@ -819,5 +855,41 @@ $("#btn-pure").addEventListener("click", async () => {
     </div>
   </div>
 </footer>
+
+<script>
+/* Hover/focus preview for the stepper and the Next block. A classic script, not a module: this is
+   navigation chrome and has to keep working even if the demo above it throws. */
+(() => {
+  const PAGES = {"01-quickstart.html":{"t":"1 · Quickstart — from a file to a map","d":"Four calls from a file to a rendered map, then the legend, stats, a hover readout and a vector layer.","s":["Boot a map","Parse a file into a Dataset","Render it, and fit the map to it","Recolour it live","The two read-models: Legend and Stats","Read a pixel under the cursor","A vector layer on the same map","Teardown"]},"02-datasets-and-ops.html":{"t":"2 · Datasets & operations","d":"The lazy op chain — clip, mask, reclassify, terrain, band math, zonal statistics and the GDAL warp.","s":["Nothing happens until you force it","clip — cut the footprint down","mask — keep what is inside a polygon","reclassify — remap values","Terrain — slope, aspect, hillshade","Band math — combine and difference","Three kinds of reduction","The same ops, straight off a Layer","rasterize — vector into raster","Reprojection, and the precondition that forces it","The same maths without a Dataset"]},"03-color-and-read-models.html":{"t":"3 · Colour & the read-models","d":"The three ColorScale modes, and the Legend, Stats and Filter read-models derived from them.","s":["Three mutually exclusive modes","missingColor — the value that isn't one","Escape hatch and change hook","Legend — the display read-model","Stats over a raster","Stats over vectors — the same read-model","Filters — scoping a computation","Rendering them — fimviz/ui's thin wrappers"]},"04-temporal.html":{"t":"4 · Temporal & multi-dimensional data","d":"NetCDF4, NetCDF3, GRIB2 and Zarr through one call — real axes, select, scrub and reduce.","s":["One call opens all four","select() — one step out of the file","Scrubbing it — createAxisSlider","selectRange() — series in, series out","reduce() — collapse the whole axis","What actually differs between the four formats","Everything the reader assumes is an option you can override"]},"05-ui-toolkit.html":{"t":"5 · The UI toolkit — fimviz/ui","d":"Every export of fimviz/ui mounted live: panels, dropzone, tooltips and the selection tools.","s":["Toast, busy, and the engine→host bus","createDropzone — a DOM contract, not a loader","createLayerPanel and click-to-select","createToolsPanel — a view over layer.settings","bindLegend / bindStats — read-models that keep up","Hover tooltip and feature info window","Selection — four tools, one geometry","createOperationsPanel — the ops as a form","bindRasterMetadata — the last of the bus","The one widget that lives elsewhere"]},"06-storage-and-records.html":{"t":"6 · Storage & records","d":"toRecord/fromRecord, verbatim payloads, discovery, rows and the op-chain round trip.","s":["toRecord() — the recipe is the value","Values are stored verbatim","Discovery — ask before you open","Rows","Two kinds of change, two different tools","The round trip that motivates all of it","Scope, and the end of the line"]}};
+  const SELF = "02-datasets-and-ops.html";
+  const peek = document.createElement("div");
+  peek.className = "peek";
+  document.body.appendChild(peek);
+  let t;
+  const show = (a) => {
+    const p = PAGES[(a.getAttribute("href") || "").split("#")[0]];
+    if (!p || a.getAttribute("href") === SELF) return;
+    const extra = p.s.length > 5 ? '<li class="rest">+' + (p.s.length - 5) + " more</li>" : "";
+    peek.innerHTML = "<h4></h4><p></p><ol>" + p.s.slice(0, 5).map(() => "<li></li>").join("") + extra + "</ol>";
+    peek.querySelector("h4").textContent = p.t;
+    peek.querySelector("p").textContent = p.d;
+    peek.querySelectorAll("ol li:not(.rest)").forEach((li, i) => { li.textContent = p.s[i]; });
+    clearTimeout(t);
+    peek.classList.add("on");
+    const r = a.getBoundingClientRect();
+    const max = scrollX + document.documentElement.clientWidth - 330 - 10;
+    peek.style.left = Math.max(10, Math.min(r.left + scrollX, max)) + "px";
+    peek.style.top = (r.bottom + scrollY + 8) + "px";
+  };
+  const hide = () => { t = setTimeout(() => peek.classList.remove("on"), 90); };
+  for (const a of document.querySelectorAll("[data-preview]")) {
+    a.addEventListener("pointerenter", () => show(a));
+    a.addEventListener("focus", () => show(a));
+    a.addEventListener("pointerleave", hide);
+    a.addEventListener("blur", hide);
+  }
+  addEventListener("keydown", (e) => { if (e.key === "Escape") peek.classList.remove("on"); });
+})();
+</script>
 </body>
 </html>
