@@ -13,9 +13,9 @@
 
   "titleLink": "__SITE__/index.html",
   "navigationLinks": {
-    "Home": "__SITE__/index.html",
     "Examples": "__SITE__/examples/01-quickstart.html",
     "Guides": "__SITE__/guides/usage.html",
+    "API": "__SITE__/api/index.html",
     "GitHub": "https://github.com/uihilab/FIMViz.js"
   },
 

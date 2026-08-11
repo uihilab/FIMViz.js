@@ -215,7 +215,14 @@ function rewriteApiChrome(dir = r("api"), depth = 0) {
     const prefix = "../".repeat(depth + 1);            // api/ itself is one level below the site root
     const src = readFileSync(p, "utf8");
     if (!src.includes("__SITE__/")) continue;
-    writeFileSync(p, src.replaceAll("__SITE__/", prefix));
+    // typedoc's `name` is a plain string, so the two-tone wordmark the rest of the site uses
+    // (FIM + accent-coloured Viz + .js) cannot come from config — it is spliced in here instead.
+    // The trailing "API" is what tells you which section of the site you are in.
+    const out = src
+      .replaceAll("__SITE__/", prefix)
+      .replace(/(<a href="[^"]*" class="title">)FIMViz\.js API(<\/a>)/,
+               `$1FIM<span>Viz</span>.js<em>API</em>$2`);
+    writeFileSync(p, out);
   }
 }
 rewriteApiChrome();

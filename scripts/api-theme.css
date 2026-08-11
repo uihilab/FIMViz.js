@@ -67,17 +67,69 @@
 body { font-family:var(--fim-sans); }
 code, pre, .tsd-signature { font-family:var(--fim-mono); }
 
+/* ── chrome: the same top bar and footer as the rest of the site ────────────────────────────────
+ *
+ * These pages cannot share site.css, so the shared bar is reproduced against typedoc's own markup.
+ * The structure is already close — a sticky bar with a title on the left and links pushed right by
+ * `margin-right:auto`, exactly how .topbar/.wrap behave — so this is a restyle, not a rebuild. The
+ * search field and the mobile menu trigger stay typedoc's; the site has no equivalent to copy. */
+
+/* typedoc's .container is 1700px wide with 2rem gutters; every other page is .wrap at 1400/24px.
+ * Matching it puts the brand, the content and the footer on one left edge across the whole site.
+ * It also narrows the three-column reading measure a little, which is the intended trade. */
+.container { max-width: 1400px; padding: 0 24px; }
+
+/* → site.css .topbar. The translucent-plus-blur background is what makes content scroll under the
+   bar the way it does elsewhere; typedoc's default is a flat --color-background-secondary fill. */
+.tsd-page-toolbar {
+  background: color-mix(in srgb, var(--color-background) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--color-accent);
+}
+.tsd-page-toolbar .tsd-toolbar-contents { gap: 14px; }
+
+/* → site.css .topbar .brand. The <span> and <em> are spliced in by rewriteApiChrome() in
+   scripts/build-site.mjs, because typedoc's `name` option takes a plain string only. */
+.tsd-page-toolbar a.title { font: 600 15px/1 var(--fim-mono); letter-spacing: -.01em; }
+.tsd-page-toolbar a.title:hover { text-decoration: none; }
+.tsd-page-toolbar a.title span { color: var(--color-link); }
+.tsd-page-toolbar a.title em {
+  font: 500 12px/1 var(--fim-sans);
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--color-text-aside);
+  margin-left: 9px;
+  padding-left: 9px;
+  border-left: 1px solid var(--color-accent);
+}
+
+/* → site.css .topbar nav */
+#tsd-toolbar-links { gap: 18px; margin-right: 14px; font-size: 14px; }
+#tsd-toolbar-links a { color: var(--color-text-aside); }
+#tsd-toolbar-links a:hover { color: var(--color-text); text-decoration: none; }
+
 /* ── footer ─────────────────────────────────────────────────────────────────────────────────────
- * Injected verbatim by `customFooterHtml` in typedoc.site.json. */
+ * The inner div is injected verbatim by `customFooterHtml` in typedoc.site.json; the <footer> around
+ * it is typedoc's. → site.css footer.site. */
+footer {
+  max-height: none;   /* typedoc caps this at --dim-footer-height (3.5rem), which clips the colophon */
+  border-top: 1px solid var(--color-accent);
+  padding: 30px 0 44px;
+  font-size: 13.5px;
+  color: var(--color-text-aside);
+}
 .fim-footer {
   display: flex;
-  align-items: center;
-  gap: 14px;
+  align-items: flex-start;
+  gap: 22px;
   flex-wrap: wrap;
-  padding: 14px 0 6px;
-  font-size: 13.5px;
+  max-width: 1400px;      /* the .wrap measure, since typedoc does not wrap the footer in .container */
+  margin: 0 auto;
+  padding: 0 24px;
   line-height: 1.6;
 }
+.fim-footer b { color: var(--color-text); }
 
 /* The lab wordmark is black artwork on transparency, so it needs a light chip to stay legible in
    typedoc's dark theme — the same treatment the rest of the site gives it. */
@@ -91,4 +143,5 @@ code, pre, .tsd-signature { font-family:var(--fim-mono); }
   flex-shrink: 0;
 }
 .fim-footer .lab img { height: 20px; width: auto; display: block; }
-.fim-footer span { max-width: 62ch; }
+/* 52ch is the measure site.css gives the same sentence in footer.site .colophon. */
+.fim-footer span { max-width: 52ch; padding-top: 2px; }
