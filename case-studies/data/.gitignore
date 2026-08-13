@@ -1,0 +1,5 @@
+# Mirrored source rasters and vectors — large, and reproducible from the URLs in README.txt.
+# README.txt is the provenance record (protocol §0.4) and IS tracked.
+*
+!.gitignore
+!README.txt

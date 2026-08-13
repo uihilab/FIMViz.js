@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — Case Study 4, host 3: partial adoption in a foreign map</title>
+<link rel="icon" href="../assets/brand/favicon.png" />
+<link rel="stylesheet" href="../site.css" />
+<!-- The HOST's map library and the HOST's stylesheet. Nothing here comes from the engine. -->
+<link rel="stylesheet" href="../node_modules/leaflet/dist/leaflet.css" />
+<style>
+  body { max-width: 90ch; margin: 0 auto; padding: 30px 22px 70px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  h2 { font-size: 15px; margin: 26px 0 9px; }
+  p { margin: 0 0 11px; }
+  .lead { color: var(--dim); margin-bottom: 16px; }
+  .q { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; margin: 0 0 16px; }
+  #map { height: 430px; border: 1px solid var(--line); border-radius: 8px; }
+  /* The host's own legend markup, fed by the engine's read-model. */
+  .panel { display: grid; grid-template-columns: 1fr 210px; gap: 14px; align-items: start; }
+  @media (max-width: 760px) { .panel { grid-template-columns: 1fr; } }
+  .side { border: 1px solid var(--line); border-radius: 8px; padding: 12px 13px; background: var(--panel); }
+  .side h3 { font-size: 12px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: .06em;
+             color: var(--dim); font-weight: 600; }
+  .side + .side { margin-top: 12px; }
+  .row { display: flex; justify-content: space-between; font-size: 12.5px; margin: 3px 0;
+         font-variant-numeric: tabular-nums; }
+  .row b { font-weight: 600; }
+  .hint { font-size: 12px; color: var(--dim); margin: 0 0 14px; }
+  pre.out { background: var(--panel); color: var(--dim); white-space: pre-wrap; font-size: 12px;
+            margin: 12px 0; max-height: 150px; }
+  pre.out:empty { display: none; }
+  table { border-collapse: collapse; font-size: 12.5px; width: 100%; margin: 0 0 8px; }
+  th, td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; }
+  th { color: var(--dim); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code { font-size: .92em; }
+</style>
+</head>
+<body>
+
+<h1>Case Study 4, host 3 — partial adoption in a foreign map</h1>
+<p class="lead">
+  An existing Leaflet page that adopts three engine pieces and none of its rendering. Part of
+  <a href="case_study4.html">Case Study 4</a>.
+</p>
+<p class="q">
+  <b>The claim under test.</b> The engine is adoptable in pieces. This page owns its map, its
+  markup and its styling; it never calls <code>FimViz.mount</code>, never creates a
+  <code>RasterLayer</code>, and loads no engine CSS. It uses one parse entry, one derived raster op,
+  and two read-models — <code>ColorScale</code> for colour and <code>Stats</code> for description —
+  then draws the result with its own Leaflet calls.
+</p>
+
+<div class="panel">
+  <div>
+    <div id="map"></div>
+    <pre class="out" id="log"></pre>
+  </div>
+  <div>
+    <div class="side">
+      <h3>Legend</h3>
+      <div id="legend"></div>
+    </div>
+    <div class="side">
+      <h3>Statistics</h3>
+      <div id="stats"></div>
+    </div>
+    <div class="side">
+      <h3>Hover</h3>
+      <div id="readout"><span class="row">move over the map</span></div>
+    </div>
+  </div>
+</div>
+
+<h2>What the host actually wrote</h2>
+<p class="hint">
+  Every line below is host code. The engine contributes values, not markup: the legend rows come
+  from <code>Legend.fromColorScale(...).toJSON()</code>, the numbers from <code>Stats.raster</code>,
+  the pixel colours from <code>colorizeGrid</code>. The image goes onto the map through Leaflet's own
+  <code>L.imageOverlay</code>, and the hover readout is Leaflet's <code>mousemove</code> against a
+  plain array lookup.
+</p>
+<pre id="src"></pre>
+
+<h2>Integration cost</h2>
+<div id="cost"></div>
+<p class="hint">
+  The registry column is the honest one: this host touched none. The engine's map-provider,
+  materializer, palette and resampler registries all stayed at their defaults, because the host never
+  asked the engine to render anything. That is the difference between adopting a library in pieces
+  and adopting its rendering model.
+</p>
+
+<h2>What it could not reuse</h2>
+<ul class="hint">
+  <li><code>Legend.toHtml()</code> exists and produces a fine default, but it emits inline-styled
+      markup with hardcoded <code>#ccc</code> borders, so a host with its own design system reads
+      <code>toJSON()</code> and renders its own rows instead. That is the documented intent — the
+      read-model is data first — and this page is the demonstration.</li>
+  <li><code>gridToDataURL</code> was usable here because a browser has a canvas. The headless host in
+      this study could not use it at all.</li>
+  <li>Georeferencing an overlay is the host's problem. The engine hands back a grid with bounds; the
+      host converts those to Leaflet's <code>[[s,w],[n,e]]</code> order itself. One line, but it is a
+      line, and getting the axis order wrong silently mirrors the image.</li>
+</ul>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "leaflet": "../node_modules/leaflet/dist/leaflet-src.esm.js"
+} }
+</script>
+
+<script type="module">
+// ── the host's own map library ────────────────────────────────────────────────────────────────
+import * as L from "leaflet";
+// ── from the engine: one parse entry, two read-models, one colouriser. No renderer. ───────────
+// `FimViz` appears only because `parseFile` hangs off it — there is no ingest entry that does not
+// go through the same namespace as `mount()`. Nothing here mounts anything.
+import { FimViz, ColorScale, Legend, Stats, gridToDataURL } from "fimviz";
+
+const log = (...a) => { document.getElementById("log").textContent += a.join(" ") + "\n"; };
+const t0 = performance.now();
+
+// The host's map. The engine never sees it.
+const map = L.map("map", { center: [33.13, -98.71], zoom: 13 });
+L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}", {
+  attribution: "Esri", maxZoom: 19,
+}).addTo(map);
+
+// ── 1 · ingest and derive, using the engine as a library rather than a framework ───────────────
+const url = "../assets/SampleFiles/Brazos_RP100_depth.tif";
+const bytes = await (await fetch(url)).arrayBuffer();
+const depth = await FimViz.parseFile(new File([bytes], "Brazos_RP100_depth.tif", { type: "image/tiff" }));
+log(`ingested ${depth.name} · crs ${depth.crs}`);
+
+// one derived raster op — the third of the three pieces this host adopts
+const warped = await depth.reproject("EPSG:4326").grid();
+log(`warped to EPSG:4326 → ${warped.width}×${warped.height}`);
+
+// ── 2 · ColorScale decides colour; the host decides everything else ────────────────────────────
+const meta = { bw: warped.bounds.west, bs: warped.bounds.south, be: warped.bounds.east,
+               bn: warped.bounds.north, width: warped.width, height: warped.height,
+               noData: warped.noData, unit: "m" };
+const stats = Stats.raster(warped.pixels, meta, { bins: 24 });
+const scale = new ColorScale({ palette: "blues", min: 0, max: stats.max, continuous: true,
+                               unit: "m", missingColor: "transparent" });
+
+// ── 3 · draw it with the HOST's map API ───────────────────────────────────────────────────────
+const dataUrl = gridToDataURL(warped, { colorScale: scale });
+const b = warped.bounds;
+L.imageOverlay(dataUrl, [[b.south, b.west], [b.north, b.east]], { opacity: 0.85 }).addTo(map);
+map.fitBounds([[b.south, b.west], [b.north, b.east]]);
+
+// ── the host renders the read-models into its own markup ──────────────────────────────────────
+const legend = Legend.fromColorScale(scale);
+legend.formatValue = (v) => v.toFixed(1);
+const stops = legend.toJSON().stops;
+document.getElementById("legend").innerHTML = stops.map((s) => {
+  const v = s.value ?? s.min;
+  return `<div class="row"><span style="display:inline-block;width:34px;height:11px;`
+    + `background:${s.color};border:1px solid var(--line)"></span>`
+    + `<b>${legend.formatValue(v)} ${legend.unit}</b></div>`;
+}).reverse().join("");
+
+document.getElementById("stats").innerHTML = [
+  ["min", stats.min.toFixed(2) + " m"], ["mean", stats.mean.toFixed(2) + " m"],
+  ["median", stats.median.toFixed(2) + " m"], ["max", stats.max.toFixed(2) + " m"],
+  ["std dev", stats.stddev.toFixed(2)], ["wet cells", stats.count.toLocaleString()],
+  ["area", (stats.area / 1e6).toFixed(2) + " km²"],
+].map(([k, v]) => `<div class="row"><span>${k}</span><b>${v}</b></div>`).join("");
+
+// Hover, in host code: Leaflet's event, a plain index into the grid the engine returned.
+const readout = document.getElementById("readout");
+map.on("mousemove", (e) => {
+  const { lat, lng } = e.latlng;
+  const col = Math.floor((lng - b.west) / (b.east - b.west) * warped.width);
+  const row = Math.floor((b.north - lat) / (b.north - b.south) * warped.height);
+  if (col < 0 || row < 0 || col >= warped.width || row >= warped.height) return;
+  const v = warped.pixels[row * warped.width + col];
+  const shown = (Number.isFinite(v) && v !== warped.noData) ? `${v.toFixed(2)} m` : "no data";
+  readout.innerHTML = `<div class="row"><span>depth</span><b>${shown}</b></div>`
+    + `<div class="row"><span>lat</span><b>${lat.toFixed(4)}</b></div>`
+    + `<div class="row"><span>lng</span><b>${lng.toFixed(4)}</b></div>`;
+});
+
+const elapsed = performance.now() - t0;
+log(`first rendered scene in ${elapsed.toFixed(0)} ms`);
+
+// ── the cost table, measured rather than asserted ──────────────────────────────────────────────
+const engineCss = [...document.styleSheets].some((s) => (s.href || "").includes("/dist/"));
+document.getElementById("cost").innerHTML =
+  `<table><tr><th>measure</th><th>value</th></tr>`
+  + [["engine imports", "<code>FimViz.parseFile, ColorScale, Legend, Stats, gridToDataURL</code>"],
+     ["engine map layer mounted", "no — <code>FimViz.mount</code> never called"],
+     ["registries touched", "none"],
+     ["engine CSS loaded", engineCss ? "yes" : "no"],
+     ["host dependencies added", "leaflet (already the host's)"],
+     ["time to first rendered scene", `${elapsed.toFixed(0)} ms`],
+     ["grid returned by the engine", `${warped.width}×${warped.height}`]]
+    .map(([k, v]) => `<tr><td>${k}</td><td class="num">${v}</td></tr>`).join("")
+  + `</table>`;
+
+// Show the host's own source, so the "lines of host code" claim is inspectable rather than asserted.
+const src = document.querySelector('script[type="module"]').textContent;
+const body = src.split("\n").filter((l) => l.trim() && !l.trim().startsWith("//"));
+document.getElementById("src").textContent =
+  `${body.length} non-comment lines of host code in this file.\n\n`
+  + src.split("── 1 ·")[1].split("── the host renders")[0].trim();
+</script>
+</body>
+</html>

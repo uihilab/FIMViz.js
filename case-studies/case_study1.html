@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — Case Study 1: an observed delineation against a modelled hazard map</title>
+<link rel="icon" href="../assets/brand/favicon.png" />
+<link rel="stylesheet" href="../site.css" />
+<style>
+  body { max-width: 96ch; margin: 0 auto; padding: 30px 22px 80px; }
+  h1 { font-size: 23px; margin: 0 0 6px; letter-spacing: -.01em; }
+  h2 { font-size: 15px; margin: 28px 0 9px; }
+  h2 .n { color: var(--dim); font: 600 12px/1 var(--mono); margin-right: 8px; }
+  h3 { font-size: 13px; margin: 0 0 6px; font-weight: 600; }
+  h3 small { color: var(--dim); font-weight: 400; margin-left: 6px; }
+  p { margin: 0 0 11px; }
+  ul { margin: 0 0 11px; padding-left: 20px; }
+  li { margin: 0 0 4px; }
+  .lead { color: var(--dim); margin-bottom: 16px; }
+  .q { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; margin: 0 0 16px; }
+
+  #status { font-size: 12.5px; color: var(--dim); margin: 0 0 16px; min-height: 18px; }
+  .spin { width: 11px; height: 11px; border: 2px solid var(--line); border-top-color: var(--accent);
+          border-radius: 50%; display: inline-block; animation: sp .8s linear infinite;
+          vertical-align: -1px; margin-right: 7px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  #status.done .spin, #status.fail .spin { display: none; }
+  #status.fail { color: var(--bad); }
+
+  .panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0 0 8px; }
+  @media (max-width: 780px) { .panels { grid-template-columns: 1fr; } }
+  .panel .map { height: 290px; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  #diff-map, #agree-map { height: 430px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  #agree-map { height: 340px; }
+  .mapwrap { position: relative; margin: 0 0 6px; }
+  .lg { position: absolute; right: 9px; bottom: 9px; z-index: 1100; background: var(--panel);
+        border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; font-size: 11px;
+        color: var(--fg); box-shadow: 0 1px 5px rgb(0 0 0 / .25); }
+  .lg .title { font-weight: 600; margin: 0 0 4px; }
+  .lg .src { color: var(--dim); font-size: 10px; margin: 4px 0 0; }
+
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0 4px; }
+  .hint { font-size: 12px; color: var(--dim); margin: 0 0 14px; }
+  button { background: transparent; color: var(--accent); border: 1px solid var(--control-line);
+           border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  label.ctl { display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--dim); }
+  label.ctl select { background: var(--bg); color: var(--fg); font: inherit; font-size: 11.5px;
+      border: 1px solid var(--control-line); border-radius: 4px; padding: 2px 5px; }
+  label.ctl input[type=range] { width: 72px; accent-color: var(--accent); }
+
+  pre.out { background: var(--panel); color: var(--dim); white-space: pre-wrap;
+            max-height: 190px; font-size: 12px; margin: 0 0 14px; }
+  pre.out:empty { display: none; }
+  table { border-collapse: collapse; font-size: 12.5px; margin: 0 0 8px; width: 100%; }
+  th, td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.hi td { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+  .swatch { display: inline-block; width: 11px; height: 11px; border: 1px solid #ccc;
+            margin-right: 6px; vertical-align: -1px; }
+  #results:empty, #parity:empty, #regions:empty { display: none; }
+  .todo { color: var(--warn); }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  .k { color: var(--dim); } .s { color: var(--ok); } .f { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>Case Study 1 — An observed delineation against a modelled hazard map</h1>
+<p class="lead">
+  Vector-to-raster evaluation of a modelled flood hazard map against a satellite-derived delineation,
+  including the reprojection, and computed to the same numbers in a browser tab and a headless Node
+  run. Protocol: <a href="CASE_STUDY_PROTOCOL.md">CASE_STUDY_PROTOCOL.md</a> §0 and §1.
+</p>
+<p class="q">
+  <b>The question.</b> Storm Kristin flooded the Sado basin around Ermidas Sado, Portugal in February
+  2026, and Copernicus EMS delineated the extent from COSMO-SkyMed radar. JRC's European river flood
+  hazard map says where a 1-in-100-year river flood should reach. <b>How much of the delineated flood
+  fell inside that hazard map — and do a browser and a headless run agree on the number?</b>
+</p>
+<p class="hint">
+  A secondary question comes free with the data. An EMS delineation product ships an
+  <i>observed</i> extent, mapped from imagery, alongside a <i>modelled</i> extent that extends it
+  where the sensor could not see. The ratio between them is the activation's <b>observability</b> —
+  how much of what was published was actually seen rather than inferred — and it is reported below.
+</p>
+
+<p id="status"><span class="spin"></span><span id="status-text">starting…</span></p>
+
+<h2><span class="n">Fig. 1.1</span>Delineation and hazard map</h2>
+<div class="panels">
+  <div class="panel">
+    <h3 id="t-obs">Observed delineation <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-obs"></div><div class="lg" id="lg-obs" hidden></div></div>
+  </div>
+  <div class="panel">
+    <h3 id="t-jrc">JRC 100-year hazard <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-jrc"></div><div class="lg" id="lg-jrc" hidden></div></div>
+  </div>
+</div>
+<p class="hint">
+  Left: the EMS observed extent, drawn as vector polygons exactly as delivered. Right: the JRC
+  hazard map after the engine warps it from <b>EPSG:3035</b> to EPSG:4326 — the only reprojection in
+  any of these studies, and the reason this pairing was chosen. Both panels are fixed at the
+  warped grid's extent.
+</p>
+
+<h2><span class="n">Fig. 1.2</span>Where they disagree</h2>
+<div class="mapwrap"><div id="diff-map"></div><div class="lg" id="lg-diff" hidden></div></div>
+<div class="controls" id="diff-controls"></div>
+<p class="hint">
+  The observed polygons are burned onto the warped hazard grid with <code>rasterize()</code>, then
+  the two binary masks are scored. <b>wet threshold</b> is the modelled depth in metres above which
+  a hazard cell counts as flooded — it is a stated parameter, never a default, and the table reports
+  every value. <b>alignment</b> picks the grid both rasters resample onto. <b>region</b> scopes the
+  metrics to a sub-area with <code>SpatialFilter</code>, because a single basin-wide CSI hides where
+  a map actually fails. <b>opacity</b> fades the overlay.
+</p>
+
+<pre class="out" id="log"></pre>
+
+<h2><span class="n">§</span>Result</h2>
+<div id="results"></div>
+<p class="hint" id="results-note" hidden></p>
+
+<h2><span class="n">Fig. 1.3</span>Threshold agreement</h2>
+<div class="mapwrap"><div id="agree-map"></div><div class="lg" id="lg-agree" hidden></div></div>
+<p class="hint">
+  The three wet thresholds treated as three ensemble members and aggregated with
+  <code>EnsembleAggregationLayer</code>: each cell is coloured by <i>how many</i> of them call it
+  flooded. 0 is dry at every threshold and 3 is flooded even at 1 m; the band between is where the
+  threshold choice, not the data, decides the answer. The sweep rows in the table below say the same
+  thing as three numbers — this says it as a place.
+</p>
+
+<h2><span class="n">§</span>Region-scoped metrics</h2>
+<div id="regions"></div>
+<p class="hint">
+  The same contingency table restricted to three sub-areas via <code>SpatialFilter</code>. This is
+  the reading a floodplain administrator actually needs: a basin-wide score averages away the places
+  the map is wrong.
+</p>
+
+<h2><span class="n">§</span>Browser against headless</h2>
+<div id="parity"></div>
+<p class="hint" id="parity-note">
+  Run <code>node case-studies/case_study1_headless.mjs</code> from the repository root to produce
+  <code>results_headless.csv</code>; this page fetches it and diffs every metric against its own.
+  The headless run executes the identical chain — same EMS query, same warp, same rasterize, same
+  scoring — so any non-zero difference is a real divergence between the two environments, not a
+  difference of method.
+</p>
+
+<div class="controls">
+  <span class="muted">export —</span>
+  <button id="dlp">performance.csv</button>
+  <button id="dlm">metrics.csv</button>
+  <button id="dlr">results.csv</button>
+</div>
+
+<h2><span class="n">§</span>Method notes</h2>
+<ul>
+  <li><b>The warp is the point.</b> The JRC map is EPSG:3035 (ETRS89-LAEA). Nothing else in these
+      studies reprojects, so this is the only measurement of warp cost. It runs through
+      <code>ds.reproject()</code>, whose GDAL backend is fetched lazily from
+      <code>cdn.jsdelivr.net</code> (~38 MB) — a third-party endpoint that has to be declared in any
+      zero-backend accounting.</li>
+  <li><b>Vector reprojection does not exist.</b> <code>reproject()</code> throws for non-raster kinds
+      ("geojson/kml/kmz/shp are EPSG:4326 by spec"), so with a projected raster and a 4326 vector the
+      only in-engine route is to warp the raster. Here that is also the cheap direction — the raster
+      is 11.6 kB and the vector 500 kB — but a host with the ratio reversed has no engine path at
+      all.</li>
+  <li><b>The barrel is not importable under Node.</b> <code>src/package/lib.js</code> does
+      <code>export { Loader } from "@googlemaps/js-api-loader"</code>, which is CJS and exposes no
+      named ESM export, so importing the engine's public entry throws before any user code runs. The
+      headless script deep-imports individual modules instead. That is a hard blocker on the parity
+      claim, and Case Study 4's headless host inherits it.</li>
+  <li><b>GDAL is browser-only by packaging, not by capability.</b> The default reprojector resolves
+      <code>gdal3.js</code> to that package's browser build, which throws
+      <code>sn.readFileSync is not a function</code> under Node. <code>gdal3.node.js</code> ships in
+      the same package and initialises in ~160 ms with 128 raster drivers. The headless script
+      registers it through <code>Dataset.registerReprojector()</code> — so the seam is what makes
+      parity possible, and a conditional export in <code>geo/gdal.js</code> would close the gap.
+      <code>io/reprojector.js</code>'s header asserts gdal3.js "needs a browser to actually RUN",
+      which is not true.</li>
+  <li><b>The two GDAL builds differ in their API,</b> not just their loader: the browser build's
+      <code>open()</code> takes a <code>File</code>, the Node build's takes a filesystem path. One
+      reprojector cannot serve both.</li>
+  <li><b>Rasterization is the slow step.</b> <code>rasterizeFeatures</code> point-tests every pixel
+      against every feature, so it scales as pixels × features — measured at roughly 3 s for 73
+      polygons onto a 436×401 grid in Node, against 334 ms for the warp it feeds.</li>
+  <li><b>River hazard against a compound event.</b> EMSR864 is classified as a coastal flood
+      activation while its polygons are tagged riverine, and the JRC product models river flooding
+      only. Any part of the observed extent driven by storm surge is outside what the hazard map
+      represents, so a low containment is not by itself evidence the map is wrong. State this in the
+      caption; it is the main threat to the result's interpretation.</li>
+</ul>
+
+<h2><span class="n">§</span>Data</h2>
+<table>
+  <tr><th>Role</th><th>Source</th><th>Endpoint</th></tr>
+  <tr>
+    <td>Activation</td>
+    <td>Copernicus EMS Rapid Mapping API. CORS-open, no key.</td>
+    <td><code>https://rapidmapping.emergency.copernicus.eu/backend/dashboard-api/public-activations/?code=EMSR864</code></td>
+  </tr>
+  <tr>
+    <td>Observed / modelled extent</td>
+    <td>EMSR864 AOI01 (Ermidas Sado) DEL_PRODUCT, COSMO-SkyMed Second Generation, 2026-02-05T18:28. GeoJSON polygons, CRS84.</td>
+    <td><code>https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR864/AOI01/DEL_PRODUCT/…_{observed,modelled}EventA_v1.json</code></td>
+  </tr>
+  <tr>
+    <td>Modelled hazard</td>
+    <td>JRC/EFAS European river flood hazard, 100-year, 100 m, EPSG:3035, CC BY 4.0. Clipped to the AOI in its native projection and mirrored to <code>data/</code>; provenance in <code>data/README.txt</code>.</td>
+    <td><code>https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/FLOODS/EuropeanMaps/floodMap_RP100.zip</code></td>
+  </tr>
+</table>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js"
+} }
+</script>
+
+<script type="module">
+import { FimViz, ColorScale, Dataset, RasterGrid, Stats,
+         ComparisonLayer, EnsembleAggregationLayer } from "fimviz";
+// NOTE: `SpatialFilter` is deliberately NOT imported. `compute({ mask })` and `metricsForMask(mask)`
+// test `mask.length >= 3` and construct the filter internally, so a SpatialFilter instance passed
+// there is silently ignored — while `zonalStats` DOES accept `{ filter: SpatialFilter }`. Two
+// region-scoping APIs, two contracts. This page passes rings, which is what the mask path wants.
+
+// ── §0 instrumentation ────────────────────────────────────────────────────────────────────────
+const REPS = 1;                       // TODO: 5 before recording.
+const CACHE_STATE = "warm";           // TODO: "cold" for the hard-reload pass.
+const BROWSER = navigator.userAgent;
+
+const perf = [], metrics = [], results = [], regionRows = [];
+
+const log = (...a) => { document.getElementById("log").textContent += a.join(" ") + "\n"; };
+const status = (text, state = "") => {
+  document.getElementById("status-text").textContent = text;
+  document.getElementById("status").className = state;
+};
+
+async function stage(name, fields, fn) {
+  const t = `${name}-${perf.length}`;
+  performance.mark(`${t}:start`);
+  const value = await fn();
+  performance.mark(`${t}:end`);
+  const { duration } = performance.measure(t, `${t}:start`, `${t}:end`);
+  perf.push({ study: "1", stage: name, dataset: "", format: "", bytes: "", width: "", height: "",
+              cache_state: CACHE_STATE, browser: BROWSER, rep: 1, ms: duration.toFixed(2), ...fields });
+  log(`${name}  ${(fields.dataset ?? "")}  ${duration.toFixed(1)} ms`);
+  return value;
+}
+
+const toCsv = (rows) => {
+  const cols = Object.keys(rows[0]);
+  return [cols.join(","), ...rows.map((r) => cols.map((c) => JSON.stringify(r[c] ?? "")).join(","))].join("\n");
+};
+const download = (rows, name) => {
+  if (!rows.length) return log(`${name}: nothing recorded yet`);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv" }));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+};
+
+// ── configuration (must match case_study1_headless.mjs) ───────────────────────────────────────
+const EMS_API = "https://rapidmapping.emergency.copernicus.eu/backend/dashboard-api";
+const EMS_CODE = "EMSR864", EMS_AOI = 1;
+const JRC_LOCAL = "./data/jrc_RP100_ermidas_3035.tif";
+const TARGET_CRS = "EPSG:4326";
+const WET_THRESHOLDS = [0, 0.5, 1.0];
+const POLICIES = ["low", "high", "average"];
+const DRY = 0;
+
+// ── maps ──────────────────────────────────────────────────────────────────────────────────────
+const maps = {};
+for (const [k, sel] of [["obs", "#m-obs"], ["jrc", "#m-jrc"], ["diff", "#diff-map"],
+                        ["agree", "#agree-map"]]) {
+  maps[k] = await FimViz.mount(sel, { provider: "leaflet", isolated: true });
+}
+for (const k of ["obs", "jrc"]) {
+  const m = maps[k].map;
+  for (const h of ["dragging", "touchZoom", "doubleClickZoom", "scrollWheelZoom", "boxZoom", "keyboard"]) m[h]?.disable();
+  m.zoomControl?.remove();
+}
+
+let observed = null, modelled = null, jrc = null, warped = null;
+let obsMask = null, modMask = null, fitBounds = null, diffLayer = null;
+let sel = { threshold: 0, policy: "low", region: "basin", opacity: 0.8 };
+
+/** RasterGrid → the flat meta Stats.raster expects. */
+const metaOf = (g) => ({ bw: g.bounds.west, bs: g.bounds.south, be: g.bounds.east,
+                         bn: g.bounds.north, width: g.width, height: g.height, noData: g.noData });
+
+// ── chain helpers (mirrored in the headless script) ───────────────────────────────────────────
+/**
+ * Depth → strict 0/1 wet mask.
+ *
+ * This does NOT use `reclassify`, and the reason is the scoring contract rather than preference:
+ * `compareExtentMetrics` counts every pixel that is not the dry sentinel as wet, and `reclassify`
+ * turns unmatched pixels into NaN — so the hazard raster's -3.4e38 nodata would score as flooded.
+ * A binary grid with `noData: null` is the only input that makes the contingency table mean what it
+ * says. Everything downstream of here is the library's.
+ */
+function thresholdWet(grid, threshold) {
+  const px = new Uint8Array(grid.pixels.length);
+  let wet = 0;
+  for (let i = 0; i < px.length; i++) {
+    const v = grid.pixels[i];
+    if (Number.isFinite(v) && v !== grid.noData && v > threshold) { px[i] = 1; wet++; }
+  }
+  return { grid: new RasterGrid({ pixels: px, width: grid.width, height: grid.height,
+                                  bounds: grid.bounds, crs: grid.crs, noData: null }), wet };
+}
+
+async function rasterizeOnto(vectorDs, target, label) {
+  const g = await stage("t_op", { dataset: `rasterize:${label}` }, () => vectorDs.rasterize({
+    width: target.width, height: target.height, bounds: target.bounds, burnValue: 1,
+  }).grid());
+  const px = new Uint8Array(g.pixels.length);
+  let wet = 0;
+  for (let i = 0; i < px.length; i++) if (g.pixels[i] === 1) { px[i] = 1; wet++; }
+  return { grid: new RasterGrid({ pixels: px, width: g.width, height: g.height,
+                                  bounds: g.bounds, crs: g.crs, noData: null }), wet };
+}
+
+/**
+ * Take the engine's metrics as computed and add only what it does not return.
+ *
+ * `compareExtentMetrics` already yields CSI (`f`), POD (`h`), bias (`b`), kappa (`k`), proportion
+ * correct (`pc`) and the contingency counts. Recomputing those from tp/fp/fn/tn — which an earlier
+ * draft of this page did — would make a study whose whole claim is "evaluation is a reusable engine
+ * capability" quietly reimplement the capability it is arguing for. FAR and containment are the two
+ * the engine genuinely does not expose, so they are the only two derived here.
+ */
+const fromEngine = (m) => ({
+  tp: m.tp, fp: m.fp, fn: m.fn, tn: m.tn, n: m.n,
+  csi: +m.f.toFixed(6), pod: +m.h.toFixed(6), bias: +m.b.toFixed(6),
+  kappa: +m.k.toFixed(6), pc: +m.pc.toFixed(6),
+  far: +(m.tp + m.fp > 0 ? m.fp / (m.tp + m.fp) : 0).toFixed(6),          // not returned
+  containment: +(m.tp + m.fn > 0 ? m.tp / (m.tp + m.fn) : 0).toFixed(6),  // not returned
+});
+
+function scorePair(predGrid, obsGrid, { policy = "low", mask = null } = {}) {
+  const layer = new ComparisonLayer({ sources: [predGrid, obsGrid] });
+  const r = layer.compute({ policy, method: "nearest", dryValue: DRY, ...(mask ? { mask } : {}) });
+  const m = mask ? layer.metricsForMask(mask) : r.metrics;
+  return { result: r, row: { ...fromEngine(m), grid_w: r.grid.width, grid_h: r.grid.height } };
+}
+
+/**
+ * Threshold sensitivity as a surface rather than three table rows: the three wet thresholds are
+ * three ensemble members, and `EnsembleAggregationLayer` counts per pixel how many of them call it
+ * flooded. 0 = dry at every threshold, 3 = flooded even at 1 m — and the cells in between are
+ * exactly where the choice of threshold decides the answer.
+ */
+function thresholdAgreement(warpedGrid) {
+  const members = WET_THRESHOLDS.map((t) => thresholdWet(warpedGrid, t).grid);
+  const layer = new EnsembleAggregationLayer({ sources: members });
+  return { layer, result: layer.compute({ policy: "low", method: "nearest", dryValue: DRY }) };
+}
+
+// Three sub-areas cut from the warped extent: north third, south third, and the central corridor.
+function regions() {
+  const b = warped.bounds, h = (b.north - b.south), w = (b.east - b.west);
+  const box = (s, n, wl, e) => [{ lat: s, lng: wl }, { lat: n, lng: wl }, { lat: n, lng: e },
+                                { lat: s, lng: e }, { lat: s, lng: wl }];
+  return {
+    "north third": box(b.north - h / 3, b.north, b.west, b.east),
+    "south third": box(b.south, b.south + h / 3, b.west, b.east),
+    "central corridor": box(b.south + h / 3, b.north - h / 3, b.west + w / 4, b.east - w / 4),
+  };
+}
+
+// ── rendering ─────────────────────────────────────────────────────────────────────────────────
+const DIFF = { both: "#2c66a5", predOnly: "#007704", obsOnly: "#c0392b" };
+
+async function drawDiff() {
+  const wet = thresholdWet(warped, sel.threshold);
+  const { result } = scorePair(wet.grid, obsMask.grid, { policy: sel.policy });
+  const [pred, obs] = result.aligned;
+  const cat = new Float32Array(pred.length);
+  for (let i = 0; i < pred.length; i++) {
+    const w1 = pred[i] !== result.dryValue, w2 = obs[i] !== result.dryValue;
+    cat[i] = (w1 && w2) ? 1 : w1 ? 2 : w2 ? 3 : NaN;
+  }
+  const g = result.grid;
+  const ds = Dataset.fromGrid(new RasterGrid({
+    pixels: cat, width: g.width, height: g.height, noData: null, crs: TARGET_CRS,
+    bounds: { north: g.bn, south: g.bs, east: g.be, west: g.bw },
+  }));
+  const scale = new ColorScale({ missingColor: "transparent", stops: [
+    { min: 0.5, max: 1.5, color: DIFF.both, label: "both" },
+    { min: 1.5, max: 2.5, color: DIFF.predOnly, label: "hazard map only" },
+    { min: 2.5, max: 3.5, color: DIFF.obsOnly, label: "observed only" },
+  ] });
+  diffLayer?.remove();
+  maps.diff.adoptDataset(ds);
+  diffLayer = await stage("t_paint", { dataset: "disagreement" },
+                          () => maps.diff.addLayer("raster", { source: ds, colorScale: scale }));
+  diffLayer.setOpacity(sel.opacity);
+  maps.diff.map.fitBounds(fitBounds);
+  const host = document.getElementById("lg-diff");
+  host.innerHTML = `<p class="title">≥ ${sel.threshold} m vs observed</p>`
+    + diffLayer.getLegend().toHtml()
+    + `<p class="src">aligned ${sel.policy} · ${g.width}×${g.height}</p>`;
+  host.hidden = false;
+}
+
+function table(id, rows, cols, head, hi = () => false) {
+  document.getElementById(id).innerHTML =
+    `<table><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr>`
+    + rows.map((r) => `<tr class="${hi(r) ? "hi" : ""}">`
+        + cols.map((c, i) => `<td${i ? ' class="num"' : ""}>${r[c]}</td>`).join("") + `</tr>`).join("")
+    + `</table>`;
+}
+
+function renderResults() {
+  table("results", results,
+    ["scope", "wet_threshold_m", "alignment", "tp", "fp", "fn", "containment", "csi", "pod", "far", "bias"],
+    ["scope", "threshold m", "align", "TP", "FP", "FN", "containment", "CSI", "POD", "FAR", "bias"],
+    (r) => r.scope === "basin" && r.wet_threshold_m === sel.threshold && r.alignment === sel.policy);
+  const note = document.getElementById("results-note");
+  note.innerHTML = "<b>containment</b> = TP / (TP + FN): the share of the observed delineation "
+    + "falling inside the hazard map. Source order is [hazard map, observed], so FP is hazard extent "
+    + "with no observed water and FN is observed water the map does not cover. The "
+    + "<b>observability</b> row is the EMS observed extent scored against its own modelled extent — "
+    + "FN there should be 0, since the modelled extent contains the observed one by construction.";
+  note.hidden = false;
+}
+
+async function loadParity() {
+  try {
+    const r = await fetch("./results_headless.csv");
+    if (!r.ok) throw new Error(`no results_headless.csv (${r.status})`);
+    const lines = (await r.text()).trim().split("\n");
+    const cols = lines[0].split(",").map((c) => JSON.parse(c));
+    const rows = lines.slice(1).map((l) => Object.fromEntries(
+      l.split(",").map((v, i) => [cols[i], JSON.parse(v)])));
+    const compare = ["tp", "fp", "fn", "csi", "pod", "far", "bias", "containment"];
+    const out = [];
+    for (const hr of rows) {
+      const br = results.find((x) => x.scope === hr.scope && String(x.wet_threshold_m) === String(hr.wet_threshold_m)
+                                     && x.alignment === "low");
+      if (!br) continue;
+      const diffs = compare.map((c) => Math.abs(Number(br[c]) - Number(hr[c])));
+      out.push({ scope: hr.scope, threshold: hr.wet_threshold_m,
+                 browser_csi: br.csi, headless_csi: hr.csi,
+                 max_abs_diff: Math.max(...diffs).toExponential(2),
+                 identical: diffs.every((d) => d === 0) ? "yes" : "no" });
+    }
+    table("parity", out, ["scope", "threshold", "browser_csi", "headless_csi", "max_abs_diff", "identical"],
+          ["scope", "threshold m", "browser CSI", "headless CSI", "max |Δ|", "identical"]);
+    const allSame = out.every((o) => o.identical === "yes");
+    document.getElementById("parity-note").innerHTML = allSame
+      ? `<span class="ok">Every metric matches exactly across ${out.length} rows.</span> The headless run `
+        + `registers a Node GDAL through <code>Dataset.registerReprojector()</code>; the browser uses the `
+        + `built-in default. Same chain, two environments, identical numbers.`
+      : `<span class="bad">Divergence found.</span> Inspect the rows above — the chains are identical, so a `
+        + `non-zero difference is environmental (GDAL build, resampling, or float handling).`;
+  } catch (e) {
+    document.getElementById("parity-note").innerHTML =
+      `Not run yet — <code>node case-studies/case_study1_headless.mjs</code> from the repository root `
+      + `writes <code>results_headless.csv</code>, then reload. (${e.message})`;
+  }
+}
+
+// ── controls ──────────────────────────────────────────────────────────────────────────────────
+function buildControls() {
+  const host = document.getElementById("diff-controls");
+  host.innerHTML = "";
+  const add = (label, node) => {
+    const l = document.createElement("label"); l.className = "ctl";
+    l.textContent = label; l.appendChild(node); host.appendChild(l);
+  };
+  const mk = (opts, val, on) => {
+    const s = document.createElement("select");
+    for (const [v, t] of opts) s.add(new Option(t, v));
+    s.value = String(val); s.onchange = () => on(s.value); return s;
+  };
+  add("wet threshold", mk(WET_THRESHOLDS.map((t) => [t, `${t} m`]), sel.threshold,
+                          async (v) => { sel.threshold = Number(v); await refresh(); }));
+  add("alignment", mk(POLICIES.map((p) => [p, p]), sel.policy,
+                      async (v) => { sel.policy = v; await refresh(); }));
+  add("region", mk([["basin", "whole basin"], ...Object.keys(regions()).map((k) => [k, k])], sel.region,
+                   async (v) => { sel.region = v; await refresh(); }));
+  const op = document.createElement("input");
+  op.type = "range"; op.min = 0; op.max = 1; op.step = 0.05; op.value = sel.opacity;
+  op.oninput = () => { sel.opacity = Number(op.value); diffLayer?.setOpacity(sel.opacity); };
+  add("opacity", op);
+}
+
+async function refresh() {
+  status("scoring…");
+  await drawDiff();
+  renderResults();
+  status("ready", "done");
+}
+
+// ── pipeline ──────────────────────────────────────────────────────────────────────────────────
+async function run() {
+  status("querying the Copernicus EMS activation…");
+  const act = await stage("t_fetch", { dataset: "ems-api", format: "json" }, async () =>
+    (await fetch(`${EMS_API}/public-activations/?code=${EMS_CODE}`)).json());
+  const a = Array.isArray(act) ? act[0] : act.results ? act.results[0] : act;
+  const aoi = a.aois.find((x) => x.number === EMS_AOI);
+  const del = aoi.products.find((p) => p.type === "DEL" && !p.monitoring);
+  const layerUrl = (kind) => del.layers.find((l) => l.name.includes(kind)).json;
+  const img = del.images?.[0] ?? {};
+  log(`${EMS_CODE} · ${aoi.name} · ${img.sensorName ?? "?"} · ${img.acquisitionTime ?? "?"}`);
+
+  status("fetching the delineation vectors…");
+  const vec = async (url, name) => {
+    const buf = await (await fetch(url)).arrayBuffer();
+    return maps.obs.addDataset(new File([buf], name, { type: "application/geo+json" }));
+  };
+  observed = await stage("t_decode", { dataset: "observed", format: "geojson" },
+                         () => vec(layerUrl("observedEventA"), "observed.geojson"));
+  modelled = await stage("t_decode", { dataset: "modelled", format: "geojson" },
+                         () => vec(layerUrl("modelledEventA"), "modelled.geojson"));
+  const of = await observed.features();
+  log(`observed ${of.features.features.length} polygons · crs ${observed.crs ?? "CRS84"}`);
+
+  status("loading the JRC hazard map (EPSG:3035)…");
+  jrc = await stage("t_fetch", { dataset: "jrc", format: "geotiff" }, () => maps.jrc.addDataset(JRC_LOCAL));
+  const native = await stage("t_decode", { dataset: "jrc" }, () => jrc.grid());
+  log(`jrc crs=${jrc.crs} ${native.width}x${native.height}`);
+
+  status("warping EPSG:3035 → EPSG:4326 (GDAL loads ~38 MB on first use)…");
+  warped = await stage("t_op", { dataset: "warp:3035→4326" }, () => jrc.reproject(TARGET_CRS).grid());
+  log(`warped ${warped.width}x${warped.height}`);
+  fitBounds = [[warped.bounds.south, warped.bounds.west], [warped.bounds.north, warped.bounds.east]];
+
+  // Stats describes every raster this study touches — the same read-model the other studies use,
+  // and what makes the warp checkable: a depth distribution that shifts across the reprojection
+  // means the resampling method was wrong, and only the numbers would show it.
+  const statRow = (label, grid, u) => {
+    const s = Stats.raster(grid.pixels, metaOf(grid), { bins: 32 });
+    metrics.push({ study: "1", raster: label, unit: u, width: grid.width, height: grid.height,
+                   crs: grid.crs ?? "", cells_valid: s.count,
+                   min: +s.min.toFixed(4), max: +s.max.toFixed(4), mean: +s.mean.toFixed(4),
+                   median: +s.median.toFixed(4), stddev: +s.stddev.toFixed(4),
+                   p10: +s.percentile(10).toFixed(4), p90: +s.percentile(90).toFixed(4) });
+    log(`  ${label.padEnd(14)} min ${s.min.toFixed(2)}  mean ${s.mean.toFixed(2)}  max ${s.max.toFixed(2)}  n ${s.count}`);
+    return s;
+  };
+  statRow("jrc:native", native, "m");
+  const warpStats = statRow("jrc:warped", warped, "m");
+  metrics.push({ study: "1", raster: "jrc:warp-shape", unit: "", crs: "EPSG:3035→" + TARGET_CRS,
+                 width: `${native.width}→${warped.width}`, height: `${native.height}→${warped.height}` });
+
+  status("rasterizing the delineation onto the warped grid…");
+  obsMask = await rasterizeOnto(observed, warped, "observed");
+  modMask = await rasterizeOnto(modelled, warped, "modelled");
+  log(`observed ${obsMask.wet} wet cells · modelled ${modMask.wet}`);
+
+  // Panels
+  const drawWet = async (mapKey, grid, color, title, unit) => {
+    const shown = new Float32Array(grid.pixels.length);
+    for (let i = 0; i < shown.length; i++) shown[i] = grid.pixels[i] === 1 ? 1 : NaN;
+    const ds = Dataset.fromGrid(new RasterGrid({ ...grid, pixels: shown, noData: null }));
+    maps[mapKey].adoptDataset(ds);
+    const layer = await stage("t_paint", { dataset: title }, () => maps[mapKey].addLayer("raster", {
+      source: ds, colorScale: new ColorScale({ missingColor: "transparent",
+        stops: [{ min: 0.5, max: 1.5, color, label: unit }] }) }));
+    maps[mapKey].map.fitBounds(fitBounds);
+    const host = document.getElementById(`lg-${mapKey}`);
+    host.innerHTML = layer.getLegend().toHtml();
+    host.hidden = false;
+  };
+  await drawWet("obs", obsMask.grid, "#c0392b", "observed", "observed flood");
+  await drawWet("jrc", thresholdWet(warped, 0).grid, "#007704", "jrc", "100-yr hazard");
+  document.getElementById("t-obs").innerHTML =
+    `Observed delineation <small>${img.sensorName ?? ""}, ${(img.acquisitionTime ?? "").slice(0, 10)}</small>`;
+  document.getElementById("t-jrc").innerHTML =
+    `JRC 100-year hazard <small>100 m, warped from EPSG:3035</small>`;
+
+  // Basin-wide sweep: threshold × alignment
+  status("scoring the threshold and alignment sweep…");
+  results.length = 0;
+  for (const th of WET_THRESHOLDS) {
+    const wet = thresholdWet(warped, th);
+    for (const policy of POLICIES) {
+      const { row } = scorePair(wet.grid, obsMask.grid, { policy });
+      results.push({ study: "1", scope: "basin", wet_threshold_m: th, alignment: policy,
+                     pred_wet_cells: wet.wet, obs_wet_cells: obsMask.wet, ...row });
+    }
+  }
+  // Observability, and it should come back a strict subset.
+  const { row: obsv } = scorePair(modMask.grid, obsMask.grid, { policy: "low" });
+  results.push({ study: "1", scope: "observability", wet_threshold_m: "", alignment: "low",
+                 pred_wet_cells: modMask.wet, obs_wet_cells: obsMask.wet, ...obsv });
+  log(`observability: ${(100 * obsv.containment).toFixed(1)}% observed, FN ${obsv.fn}`
+    + (obsv.fn === 0 ? " — strict subset" : ""));
+
+  // Threshold agreement — the sweep as a surface
+  status("aggregating the threshold ensemble…");
+  const { result: agree } = await stage("t_op", { dataset: "ensembleAgreement:thresholds" },
+                                        async () => thresholdAgreement(warped));
+  log(`agreement over ${agree.nLayers} thresholds · histogram ${[...agree.histogram].join(" / ")}`);
+  {
+    const g = agree.grid;
+    const cat = new Float32Array(agree.perPixel.length);
+    for (let i = 0; i < cat.length; i++) cat[i] = agree.perPixel[i] > 0 ? agree.perPixel[i] : NaN;
+    const ds2 = Dataset.fromGrid(new RasterGrid({
+      pixels: cat, width: g.width, height: g.height, noData: null, crs: TARGET_CRS,
+      bounds: { north: g.bn, south: g.bs, east: g.be, west: g.bw } }));
+    maps.agree.adoptDataset(ds2);
+    const layer = await stage("t_paint", { dataset: "agreement" }, () => maps.agree.addLayer("raster", {
+      source: ds2,
+      colorScale: new ColorScale({ missingColor: "transparent", stops: [
+        { min: 0.5, max: 1.5, color: "#cfe3f5", label: "1 of 3 — only ≥ 0 m" },
+        { min: 1.5, max: 2.5, color: "#6aa8dd", label: "2 of 3 — also ≥ 0.5 m" },
+        { min: 2.5, max: 3.5, color: "#1f4e79", label: "3 of 3 — also ≥ 1 m" }] }) }));
+    maps.agree.map.fitBounds(fitBounds);
+    const host = document.getElementById("lg-agree");
+    host.innerHTML = layer.getLegend().toHtml()
+      + `<p class="src">EnsembleAggregationLayer · ${agree.nLayers} members</p>`;
+    host.hidden = false;
+  }
+
+  // Region-scoped
+  status("scoring the sub-regions…");
+  regionRows.length = 0;
+  const wet0 = thresholdWet(warped, sel.threshold);
+  for (const [name, poly] of Object.entries(regions())) {
+    const { row } = scorePair(wet0.grid, obsMask.grid, { policy: "low", mask: poly });
+    regionRows.push({ study: "1", region: name, wet_threshold_m: sel.threshold, ...row });
+  }
+  table("regions", regionRows, ["region", "tp", "fp", "fn", "containment", "csi", "pod", "bias"],
+        ["region", "TP", "FP", "FN", "containment", "CSI", "POD", "bias"]);
+
+  buildControls();
+  await refresh();
+  await loadParity();
+}
+
+document.getElementById("dlp").onclick = () => download(perf, "performance.csv");
+document.getElementById("dlm").onclick = () => download(metrics, "metrics.csv");
+document.getElementById("dlr").onclick = () => download(results, "results.csv");
+
+try { await run(); }
+catch (e) { console.error(e); log(`ERROR  ${e.message}`); status(`failed: ${e.message}`, "fail"); }
+</script>
+</body>
+</html>

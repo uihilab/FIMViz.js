@@ -1,0 +1,2 @@
+# Rasters written by the headless hosts. Regenerate with `node case-studies/case_study4_headless.mjs`.
+*.png

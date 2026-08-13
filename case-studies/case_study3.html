@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — Case Study 3: terrain and regulatory context without a backend</title>
+<link rel="icon" href="../assets/brand/favicon.png" />
+<link rel="stylesheet" href="../site.css" />
+<style>
+  body { max-width: 96ch; margin: 0 auto; padding: 30px 22px 80px; }
+  h1 { font-size: 23px; margin: 0 0 6px; letter-spacing: -.01em; }
+  h2 { font-size: 15px; margin: 28px 0 9px; }
+  h2 .n { color: var(--dim); font: 600 12px/1 var(--mono); margin-right: 8px; }
+  h3 { font-size: 13px; margin: 0 0 6px; font-weight: 600; }
+  h3 small { color: var(--dim); font-weight: 400; margin-left: 6px; }
+  p { margin: 0 0 11px; }
+  ul { margin: 0 0 11px; padding-left: 20px; }
+  li { margin: 0 0 4px; }
+  .lead { color: var(--dim); margin-bottom: 16px; }
+  .q { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; margin: 0 0 16px; }
+
+  #status { font-size: 12.5px; color: var(--dim); margin: 0 0 16px; min-height: 18px; }
+  .spin { width: 11px; height: 11px; border: 2px solid var(--line); border-top-color: var(--accent);
+          border-radius: 50%; display: inline-block; animation: sp .8s linear infinite;
+          vertical-align: -1px; margin-right: 7px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  #status.done .spin, #status.fail .spin { display: none; }
+  #status.fail { color: var(--bad); }
+
+  .panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0 0 8px; }
+  @media (max-width: 780px) { .panels { grid-template-columns: 1fr; } }
+  .panel .map { height: 300px; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  #zones-map { height: 430px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .mapwrap { position: relative; margin: 0 0 6px; }
+  .lg { position: absolute; right: 9px; bottom: 9px; z-index: 1100; background: var(--panel);
+        border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; font-size: 11px;
+        color: var(--fg); box-shadow: 0 1px 5px rgb(0 0 0 / .25); }
+  .lg .title { font-weight: 600; margin: 0 0 4px; }
+  .lg .src { color: var(--dim); font-size: 10px; margin: 4px 0 0; }
+
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0 4px; }
+  .hint { font-size: 12px; color: var(--dim); margin: 0 0 14px; }
+  button { background: transparent; color: var(--accent); border: 1px solid var(--control-line);
+           border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  label.ctl { display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--dim); }
+  label.ctl select, label.ctl input[type=number] { background: var(--bg); color: var(--fg);
+      font: inherit; font-size: 11.5px; border: 1px solid var(--control-line);
+      border-radius: 4px; padding: 2px 5px; }
+  label.ctl input[type=number] { width: 56px; }
+  label.ctl input[type=range] { width: 72px; accent-color: var(--accent); }
+
+  pre.out { background: var(--panel); color: var(--dim); white-space: pre-wrap;
+            max-height: 180px; font-size: 12px; margin: 0 0 14px; }
+  pre.out:empty { display: none; }
+  table { border-collapse: collapse; font-size: 13px; margin: 0 0 8px; width: 100%; }
+  th, td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .swatch { display: inline-block; width: 11px; height: 11px; border: 1px solid #ccc;
+            margin-right: 6px; vertical-align: -1px; }
+  #results:empty { display: none; }
+  .todo { color: var(--warn); }
+</style>
+</head>
+<body>
+
+<h1>Case Study 3 — Terrain and regulatory context without a backend</h1>
+<p class="lead">
+  Derived terrain surfaces, categorical vector styling, data-derived legends and zonal statistics,
+  computed in the browser from a static page with no server-side compute.
+  Protocol: <a href="CASE_STUDY_PROTOCOL.md">CASE_STUDY_PROTOCOL.md</a> §0 and §3.
+</p>
+<p class="q">
+  <b>The question.</b> Over Asheville, NC: how do elevation and slope differ between FEMA's
+  regulatory flood zones? Zone AE should sit lower and flatter than zone X, and the floodway lower
+  and flatter still. The output is the table under <i>Result</i>; the maps exist to make it legible.
+</p>
+
+<p id="status"><span class="spin"></span><span id="status-text">starting…</span></p>
+
+<h2><span class="n">Fig. 3.1</span>Elevation and slope, from one decode</h2>
+<div class="panels">
+  <div class="panel">
+    <h3>Elevation <small>source DEM, m</small></h3>
+    <div class="mapwrap"><div class="map" id="m-elevation"></div><div class="lg" id="lg-elevation" hidden></div></div>
+    <div class="controls" id="p-elevation"></div>
+  </div>
+  <div class="panel">
+    <h3>Slope <small>Horn's method</small></h3>
+    <div class="mapwrap"><div class="map" id="m-slope"></div><div class="lg" id="lg-slope" hidden></div></div>
+    <div class="controls" id="p-slope"></div>
+  </div>
+</div>
+<p class="hint">
+  Both panels are fixed at the study extent — pan and zoom are disabled, because a figure with two
+  panels at different extents is not a comparison. Each legend is built from that layer's own colour
+  scale, whose bounds come from its own pixel statistics; nothing in the legend path is hardcoded.
+  <b>opacity</b> is on both. <b>Slope</b> additionally exposes what goes to <code>slope()</code>:
+  <b>cellsize</b> is the one that matters — <code>metres</code> passes the cell size converted for
+  this latitude, <code>degrees</code> passes nothing and lets the engine default to the grid's own
+  units, which returns ~90° everywhere and still looks entirely plausible. <b>unit</b> switches
+  degrees for percent rise; <b>zFactor</b> exaggerates elevation before the gradient.
+  <i>recompute</i> rebuilds the surface and its <code>metrics.csv</code> row in place.
+</p>
+
+<h2><span class="n">Fig. 3.2</span>Flood zones over the hillshade</h2>
+<div class="mapwrap"><div id="zones-map"></div><div class="lg" id="lg-zones" hidden></div></div>
+<div class="controls" id="p-zones"></div>
+<p class="hint">
+  NFHL zones coloured by <code>FLD_ZONE</code>, with the floodway split out of AE via
+  <code>ZONE_SUBTY</code>, drawn translucent over the hillshade so relief reads through them. This
+  map is interactive — it is the one you inspect rather than photograph. Its controls drive the
+  hillshade's light source (<b>altitude</b>, <b>azimuth</b>) and the zone layer's <b>opacity</b>.
+  The zone legend is built from the classes the query actually returned, but it is built
+  <i>by this page</i>: <code>ColorScale</code> has no class-keyed variant for
+  <code>getLegend()</code> to read.
+</p>
+
+<pre class="out" id="log"></pre>
+
+<h2><span class="n">§</span>Result</h2>
+<div id="results"></div>
+<p class="hint" id="results-note" hidden></p>
+
+<div class="controls">
+  <span class="muted">export —</span>
+  <button id="dlp">performance.csv</button>
+  <button id="dlm">metrics.csv</button>
+  <button id="dlr">results.csv</button>
+</div>
+<p class="hint">
+  <b>performance.csv</b> — timings, one row per stage under the protocol's five fixed boundary names
+  (<code>t_fetch</code>, <code>t_decode</code>, <code>t_op</code>, <code>t_paint</code>,
+  <code>t_total</code>). <b>metrics.csv</b> — one row per computed surface: min, max, mean, median,
+  stddev, p10, p90, valid cells. <b>results.csv</b> — the zonal table above. Timings are split out of
+  <code>metrics.csv</code> because Case Study 1 uses "metric" to mean CSI, POD and FAR.
+  <span class="todo"><code>REPS</code> is 1 and cache state is "warm"; set 5 and run the cold pass
+  before recording.</span>
+</p>
+
+<h2><span class="n">§</span>Method notes</h2>
+<ul>
+  <li><b>Three maps, one decode.</b> The default app throws <code>already-mounted</code> past the
+      first map, so each mounts with <code>isolated: true</code>. The DEM is decoded once and the
+      same <code>Dataset</code> feeds all three — the reuse property, measurable here as one decode
+      against three renders.</li>
+  <li><b>Extent.</b> The full tile is decoded (that is the ingest measurement) and then clipped to
+      the study box before any surface is derived. Deriving on the full 3600² grid would allocate a
+      <code>Float64Array</code> of ~104 MB per surface for terrain nobody is analysing.</li>
+  <li><b>Ingest.</b> Whole-file fetch is the current bound: no range reads, so the tile's four COG
+      overview levels go unused and 44 MB is pulled regardless of viewport. Measure the size at which
+      the page becomes unusable (<code>?dem=ceiling</code> loads a 482 MB tile for that).</li>
+  <li><b>Aspect</b> is computed and timed with the other two — step 2 asks for all three — but has no
+      panel: it is in no figure and answers nothing about elevation or slope by zone. Its
+      <code>metrics.csv</code> row is the record that it ran.</li>
+  <li><b>Zones.</b> NFHL paging is mandatory: omitting <code>resultRecordCount</code> returns HTTP
+      500 rather than a truncated page. The page walks <code>resultOffset</code> until
+      <code>exceededTransferLimit</code> clears.</li>
+  <li><b>Zonal.</b> Interior holes union with outer rings — the engine's documented simplification,
+      so a donut polygon over-counts. Overlapping polygons of one class also double-count. Both
+      belong in the caption.</li>
+  <li><b>Nodata.</b> Fig. 3.3 (<code>missingColor</code> set vs unset) cannot come from this tile:
+      N35/W083 is inland with no declared <code>GDAL_NODATA</code>, so both panels would be
+      identical. <span class="todo">Take it from a coastal tile.</span></li>
+  <li><b>Limitation to evidence.</b> <code>ColorScale</code> has no class-keyed variant. The style
+      seam takes a per-feature callback, so colouring by <code>FLD_ZONE</code> is a few lines — but
+      <code>layer.colorScale</code> stays null, <code>getLegend()</code> returns null, and the zone
+      legend is hand-built. The gap is the read-model, not the styling.</li>
+</ul>
+
+<h2><span class="n">§</span>Data</h2>
+<table>
+  <tr><th>Role</th><th>Source</th><th>Endpoint</th></tr>
+  <tr>
+    <td>Terrain</td>
+    <td>Copernicus DEM GLO-30. EPSG:4326, 3600², ~30 m, 44.2 MB. Mirrored to <code>data/</code>; provenance in <code>data/README.txt</code>.</td>
+    <td><code>https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N35_00_W083_00_DEM/Copernicus_DSM_COG_10_N35_00_W083_00_DEM.tif</code></td>
+  </tr>
+  <tr>
+    <td>Terrain (live)</td>
+    <td>USGS 3DEP 1 arc-second, EPSG:4269. <code>?dem=live</code>; the 1/3 arc-second twin is <code>?dem=ceiling</code>.</td>
+    <td><code>https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1/TIFF/current/n36w083/USGS_1_n36w083.tif</code></td>
+  </tr>
+  <tr>
+    <td>Regulatory</td>
+    <td>FEMA NFHL layer 28, Flood Hazard Zones. Polygon, wkid 4269, <code>maxRecordCount</code> 2000.</td>
+    <td><code>https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query</code></td>
+  </tr>
+</table>
+<p class="hint">
+  Study area: Buncombe County, NC (Asheville, French Broad) — AE, X and a mapped floodway against
+  real relief. Ascension Parish, LA is the flat contrast site. Neither has VE; if that class is
+  needed, substitute a coastal site with relief such as Santa Cruz County, CA.
+</p>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js"
+} }
+</script>
+
+<script type="module">
+import { FimViz, ColorScale, Stats } from "fimviz";
+
+// ── §0 instrumentation ────────────────────────────────────────────────────────────────────────
+const REPS = 1;                       // TODO: 5 before recording.
+const CACHE_STATE = "warm";           // TODO: "cold" for the hard-reload pass.
+const BROWSER = navigator.userAgent;
+
+const perf = [];      // → performance.csv · timings
+const metrics = [];   // → metrics.csv     · one row per computed surface
+const results = [];   // → results.csv     · the zonal table
+
+const log = (...a) => { document.getElementById("log").textContent += a.join(" ") + "\n"; };
+
+const status = (text, state = "") => {
+  document.getElementById("status-text").textContent = text;
+  document.getElementById("status").className = state;
+};
+
+async function stage(name, fields, fn) {
+  const t = `${name}-${perf.length}`;
+  performance.mark(`${t}:start`);
+  const value = await fn();
+  performance.mark(`${t}:end`);
+  const { duration } = performance.measure(t, `${t}:start`, `${t}:end`);
+  perf.push({
+    study: "3", stage: name, dataset: "", format: "", bytes: "", width: "", height: "",
+    cache_state: CACHE_STATE, browser: BROWSER, rep: 1, ms: duration.toFixed(2), ...fields,
+  });
+  log(`${name}  ${(fields.dataset ?? "")}  ${duration.toFixed(1)} ms`);
+  return value;
+}
+
+/** One metrics.csv row: what the surface says, not how long it took. */
+function recordRaster(name, grid, unit) {
+  const s = Stats.raster(grid.pixels, gridMeta(grid), { bins: 64 });
+  const row = {
+    study: "3", surface: name, unit,
+    width: grid.width, height: grid.height, crs: grid.crs ?? "",
+    cells_valid: s.count, cells_total: grid.width * grid.height,
+    min: +s.min.toFixed(4), max: +s.max.toFixed(4), mean: +s.mean.toFixed(4),
+    median: +s.median.toFixed(4), stddev: +s.stddev.toFixed(4),
+    p10: +s.percentile(10).toFixed(4), p90: +s.percentile(90).toFixed(4),
+    area_m2: Math.round(s.area), no_data: grid.noData ?? "",
+  };
+  const at = metrics.findIndex((m) => m.surface === name);
+  if (at >= 0) metrics[at] = row; else metrics.push(row);   // recompute replaces, never appends
+  log(`  ${name.padEnd(9)} ${unit.padEnd(4)} min=${s.min.toFixed(1)} mean=${s.mean.toFixed(1)}`
+    + ` max=${s.max.toFixed(1)} sd=${s.stddev.toFixed(1)} n=${s.count}`);
+  return s;
+}
+
+const transferred = (url) =>
+  performance.getEntriesByType("resource").filter((e) => e.name.includes(url)).pop()?.transferSize ?? "";
+
+const gridMeta = (g) => ({
+  bw: g.bounds.west, bs: g.bounds.south, be: g.bounds.east, bn: g.bounds.north,
+  width: g.width, height: g.height, noData: g.noData,
+});
+
+const toCsv = (rows) => {
+  const cols = Object.keys(rows[0]);
+  return [cols.join(","), ...rows.map((r) => cols.map((c) => JSON.stringify(r[c] ?? "")).join(","))].join("\n");
+};
+
+const download = (rows, name) => {
+  if (!rows.length) return log(`${name}: nothing recorded yet`);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv" }));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+  log(`wrote ${name} (${rows.length} rows)`);
+};
+
+// ── sources ───────────────────────────────────────────────────────────────────────────────────
+// Copernicus is mirrored: the bucket sends no CORS header. 3DEP is live. ?dem= picks.
+const DEM = {
+  mirror:  "./data/Copernicus_DSM_COG_10_N35_00_W083_00_DEM.tif",
+  live:    "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1/TIFF/current/n36w083/USGS_1_n36w083.tif",
+  ceiling: "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/current/n36w083/USGS_13_n36w083.tif",
+};
+const DEM_KEY = new URLSearchParams(location.search).get("dem") || "mirror";
+const DEM_URL = DEM[DEM_KEY] ?? DEM.mirror;
+
+const NFHL = "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query";
+const AOI = { west: -82.60, south: 35.56, east: -82.52, north: 35.62 };   // Asheville, French Broad
+const FIT = [[AOI.south, AOI.west], [AOI.north, AOI.east]];
+
+// ── three maps ────────────────────────────────────────────────────────────────────────────────
+// `isolated: true` gives each its own app — the default app throws `already-mounted` past the first
+// (mount.js: "v0 supports one widget per page"). Datasets are app-agnostic, so one decode still
+// feeds all three.
+const maps = {};
+for (const [key, sel] of [["elevation", "#m-elevation"], ["slope", "#m-slope"], ["zones", "#zones-map"]]) {
+  maps[key] = await FimViz.mount(sel, { provider: "leaflet", isolated: true });
+}
+
+// The two figure panels are fixed: a reader compares them, and a comparison at two different
+// extents is not one. The zones map keeps its handlers — that is the one you inspect.
+for (const key of ["elevation", "slope"]) {
+  const m = maps[key].map;
+  for (const h of ["dragging", "touchZoom", "doubleClickZoom", "scrollWheelZoom", "boxZoom", "keyboard"]) {
+    m[h]?.disable();
+  }
+  m.zoomControl?.remove();
+}
+
+let dem = null, demAoi = null, demGrid = null, aoiGrid = null, zoneFeatures = null;
+const layers = {};        // surface name → its RasterLayer
+const derived = {};       // surface name → the Dataset it was built from
+let zoneLayer = null;
+
+// ── surface parameters ────────────────────────────────────────────────────────────────────────
+const PARAM_SPEC = {
+  elevation: [],
+  slope: [
+    { k: "unit",     type: "select", options: ["degrees", "percent"] },
+    { k: "zFactor",  type: "number", step: 0.1, min: 0 },
+    { k: "cellsize", type: "select", options: ["metres", "degrees"] },
+  ],
+  hillshade: [
+    { k: "altitude", type: "number", step: 1, min: 0, max: 90 },
+    { k: "azimuth",  type: "number", step: 5, min: 0, max: 360 },
+    { k: "cellsize", type: "select", options: ["metres", "degrees"] },
+  ],
+};
+const params = {
+  slope:     { unit: "degrees", zFactor: 1, cellsize: "metres" },
+  hillshade: { altitude: 45, azimuth: 315, cellsize: "metres" },
+};
+
+/** Metres per cell at the grid's centre latitude — what Horn's method needs on a geographic grid. */
+function metreCellSize(grid) {
+  const { north, south, east, west } = grid.bounds;
+  const M_PER_DEG_LAT = 111320;
+  const latC = (north + south) / 2;
+  return {
+    cellsizeX: ((east - west) / grid.width) * M_PER_DEG_LAT * Math.cos(latC * Math.PI / 180),
+    cellsizeY: ((north - south) / grid.height) * M_PER_DEG_LAT,
+  };
+}
+
+/** Opts for slope()/hillshade() from the controls. "degrees" = pass nothing, i.e. the defect. */
+function opsFor(name) {
+  const { cellsize, ...p } = params[name];
+  return cellsize === "metres" ? { ...p, ...metreCellSize(aoiGrid) } : p;
+}
+
+/** Build one labelled control. */
+function control(label, node) {
+  const lab = document.createElement("label");
+  lab.className = "ctl";
+  lab.textContent = label;
+  lab.appendChild(node);
+  return lab;
+}
+
+function opacitySlider(get) {
+  const s = document.createElement("input");
+  s.type = "range"; s.min = 0; s.max = 1; s.step = 0.05; s.value = get() === "zones" ? 0.55 : 1;
+  return s;
+}
+
+/** Panel controls: opacity always, plus the op's own parameters where it has them. */
+function drawParams(hostId, name, layerOf) {
+  const host = document.getElementById(hostId);
+  host.innerHTML = "";
+
+  const slider = opacitySlider(() => hostId === "p-zones" ? "zones" : name);
+  slider.oninput = () => layerOf()?.setOpacity(Number(slider.value));
+  host.appendChild(control("opacity", slider));
+
+  for (const f of PARAM_SPEC[name] ?? []) {
+    let input;
+    if (f.type === "select") {
+      input = document.createElement("select");
+      for (const o of f.options) input.add(new Option(o, o));
+    } else {
+      input = document.createElement("input");
+      input.type = "number";
+      for (const a of ["step", "min", "max"]) if (f[a] != null) input[a] = f[a];
+    }
+    input.value = params[name][f.k];
+    input.onchange = () => { params[name][f.k] = f.type === "number" ? Number(input.value) : input.value; };
+    host.appendChild(control(f.k, input));
+  }
+
+  if ((PARAM_SPEC[name] ?? []).length) {
+    const go = document.createElement("button");
+    go.textContent = "recompute";
+    go.onclick = async () => {
+      go.disabled = true;
+      status(`recomputing ${name}…`);
+      try {
+        await buildSurface(name);
+        status("ready", "done");
+      } catch (e) { status(`${name} failed: ${e.message}`, "fail"); log(`ERROR  ${e.message}`); }
+      go.disabled = false;
+    };
+    host.appendChild(go);
+  }
+}
+
+const LEGEND_FMT = { elevation: (v) => v.toFixed(0), slope: (v) => v.toFixed(1),
+                     hillshade: (v) => v.toFixed(0) };
+
+/** Legend read off the layer — derived from the ColorScale, whose bounds came from the pixels. */
+function drawLegend(name) {
+  const host = document.getElementById(`lg-${name}`);
+  if (!host) return;
+  const legend = layers[name]?.getLegend();
+  if (!legend) { host.hidden = true; return; }
+  legend.formatValue = LEGEND_FMT[name] ?? ((v) => v.toFixed(2));
+  host.innerHTML = legend.toHtml() + `<p class="src">${legend.kind} · from ${legend.source}</p>`;
+  host.hidden = false;
+}
+
+// Every surface derives from the CLIPPED dem: the analysis only covers the study box, and deriving
+// on the full 3600² grid allocates ~104 MB of Float64Array per surface for terrain nobody reads.
+const SURFACE = {
+  elevation: { on: "elevation", derive: () => demAoi,          palette: "terrain",   unit: "m" },
+  slope:     { on: "slope",     derive: () => demAoi.slope(opsFor("slope")), palette: "heat", unit: "deg" },
+  hillshade: { on: "zones",     derive: () => demAoi.hillshade(opsFor("hillshade")), palette: "grayscale", unit: "" },
+  aspect:    { on: null,        derive: () => demAoi.aspect(), palette: null,        unit: "deg" },
+};
+
+/** Force a surface, record its statistics, and draw it on its map (unless it has none). */
+async function buildSurface(name) {
+  const spec = SURFACE[name];
+  const unit = name === "slope" ? (params.slope.unit === "percent" ? "%" : "deg") : spec.unit;
+  const ds = spec.derive();
+  const grid = await stage("t_op", { dataset: name }, () => ds.grid());
+  const s = recordRaster(name, grid, unit);
+  derived[name] = ds;
+  if (!spec.on) return grid;                       // computed and recorded, but not drawn
+
+  const fim = maps[spec.on];
+  layers[name]?.remove();
+  fim.adoptDataset(ds);
+  layers[name] = await stage("t_paint", { dataset: name }, () => fim.addLayer("raster", {
+    source: ds,
+    colorScale: new ColorScale({ palette: spec.palette, min: s.min, max: s.max,
+                                 continuous: true, unit, missingColor: "transparent" }),
+  }));
+  fim.map.fitBounds(FIT);
+  drawLegend(name);
+  // The zones map's controls drive the hillshade, so they live under that map, not this one.
+  if (name !== "hillshade") drawParams(`p-${name}`, name, () => layers[name]);
+  else drawParams("p-zones", "hillshade", () => zoneLayer);
+  return grid;
+}
+
+// ── flood zones ───────────────────────────────────────────────────────────────────────────────
+// Paging is MANDATORY: without resultRecordCount the service returns HTTP 500, not a short page.
+async function fetchZones(pageSize = 100) {
+  const q = new URLSearchParams({
+    where: "1=1",
+    geometry: `${AOI.west},${AOI.south},${AOI.east},${AOI.north}`,
+    geometryType: "esriGeometryEnvelope", spatialRel: "esriSpatialRelIntersects",
+    inSR: "4326", outSR: "4326",
+    outFields: "FLD_ZONE,ZONE_SUBTY,SFHA_TF", returnGeometry: "true",
+    resultRecordCount: String(pageSize), f: "geojson",
+  });
+  const features = [];
+  let offset = 0, pages = 0;
+  for (;;) {
+    q.set("resultOffset", String(offset));
+    const r = await fetch(`${NFHL}?${q}`);
+    if (!r.ok) throw new Error(`NFHL HTTP ${r.status} at offset ${offset}`);
+    const j = await r.json();
+    features.push(...(j.features ?? []));
+    pages++;
+    if (!j.exceededTransferLimit) break;
+    offset = pages * pageSize;
+    if (offset >= 5000) { log("NFHL: hit the 5000-feature guard; narrow the AOI"); break; }
+  }
+  log(`NFHL: ${features.length} features in ${pages} page(s) of ${pageSize}`);
+  return { type: "FeatureCollection", features };
+}
+
+/** A zone's display class: FLD_ZONE, with the floodway split out of AE via ZONE_SUBTY. */
+const classOf = (p) =>
+  /FLOODWAY/i.test(p.ZONE_SUBTY ?? "") ? `${p.FLD_ZONE} / FLOODWAY` : (p.FLD_ZONE || "—");
+
+/** GeoJSON polygon → the ring list SpatialFilter takes. Holes union with outers (documented). */
+const ringsOf = (geom) =>
+  (geom.type === "MultiPolygon" ? geom.coordinates : [geom.coordinates])
+    .flat().map((ring) => ring.map(([lng, lat]) => ({ lat, lng })));
+
+const ZONE_COLOR = { AE: "#4287f5", "AE / FLOODWAY": "#b03a3a", AO: "#7fb2f0",
+                     VE: "#d94f4f", X: "#cfd6dd" };
+const zoneColor = (c) => ZONE_COLOR[c] ?? (c.startsWith("X") ? "#cfd6dd" : "#888888");
+
+// ── the pipeline ──────────────────────────────────────────────────────────────────────────────
+// addDataset fetches and decodes together, so t_fetch/t_decode are not separable through the public
+// surface. TODO: split at the materializer, or report t_total for ingest and say so.
+async function ingest() {
+  status("fetching and decoding the DEM…");
+  dem = await stage("t_total", { dataset: `dem:${DEM_KEY}`, format: "geotiff" },
+                    () => maps.elevation.addDataset(DEM_URL));
+  demGrid = await stage("t_decode", { dataset: `dem:${DEM_KEY}` }, () => dem.grid());
+  const row = perf[perf.length - 1];
+  row.width = demGrid.width; row.height = demGrid.height; row.bytes = transferred(DEM_URL);
+  log(`crs=${dem.crs}  ${demGrid.width}x${demGrid.height}  noData=${demGrid.noData}`);
+  if (dem.warnings.length) log(`warnings: ${dem.warnings.join(" | ")}`);
+
+  demAoi = dem.clip(AOI);
+  aoiGrid = await stage("t_op", { dataset: "dem:clip" }, () => demAoi.grid());
+  const { cellsizeX, cellsizeY } = metreCellSize(aoiGrid);
+  log(`clipped to AOI: ${aoiGrid.width}x${aoiGrid.height}`
+    + `  cell ${cellsizeX.toFixed(1)} x ${cellsizeY.toFixed(1)} m`);
+}
+
+async function surfaces() {
+  // The laziness measurement: three chains built, none forced.
+  const t0 = performance.now();
+  const built = [demAoi.slope(opsFor("slope")), demAoi.aspect(), demAoi.hillshade(opsFor("hillshade"))];
+  const unforced = performance.now() - t0;
+  perf.push({ study: "3", stage: "t_op", dataset: "slope+aspect+hillshade(unforced)",
+              format: "", bytes: 0, width: "", height: "", cache_state: CACHE_STATE,
+              browser: BROWSER, rep: 1, ms: unforced.toFixed(3) });
+  log(`${built.length} ops built, none forced: ${unforced.toFixed(3)} ms, 0 bytes`);
+
+  for (const n of ["elevation", "slope", "hillshade", "aspect"]) {
+    status(`computing ${n}…`);
+    await buildSurface(n);
+  }
+}
+
+async function zones() {
+  status("paging the FEMA NFHL query…");
+  const fc = await stage("t_fetch", { dataset: "nfhl", format: "geojson" }, () => fetchZones());
+  zoneFeatures = fc.features;
+  const file = new File([JSON.stringify(fc)], "nfhl.geojson", { type: "application/geo+json" });
+  const nfhl = await stage("t_decode", { dataset: "nfhl" }, () => maps.zones.addDataset(file));
+
+  const classes = [...new Set(zoneFeatures.map((f) => classOf(f.properties)))].sort();
+  log(`zone classes: ${classes.join(" | ")}`);
+
+  zoneLayer = await stage("t_paint", { dataset: "nfhl" }, () => maps.zones.addLayer("vector", {
+    source: nfhl,
+    // The categorical gap: this callback is the whole mechanism, but layer.colorScale stays null,
+    // so getLegend() returns null and the legend below is hand-built from the returned classes.
+    style: ({ feature }) => ({ fillColor: zoneColor(classOf(feature.properties)),
+                               strokeColor: "#00000055", strokeWidth: 0.5, fillOpacity: 0.55 }),
+  }));
+  maps.zones.map.fitBounds(FIT);
+
+  const host = document.getElementById("lg-zones");
+  host.innerHTML = `<p class="title">flood zone</p>` + classes.map((c) =>
+    `<div><span class="swatch" style="background:${zoneColor(c)}"></span>${c}</div>`).join("")
+    + `<p class="src">classed · hand-built (no categorical ColorScale)</p>`;
+  host.hidden = false;
+}
+
+async function analyse() {
+  status("running zonal statistics…");
+  const zoneList = zoneFeatures.map((f, i) => ({ id: i, polygon: ringsOf(f.geometry) }));
+  const elev = await stage("t_op", { dataset: "zonalStats:elevation" }, () => demAoi.zonalStats(zoneList));
+  const slp  = await stage("t_op", { dataset: "zonalStats:slope" }, () => derived.slope.zonalStats(zoneList));
+
+  const { cellsizeX, cellsizeY } = metreCellSize(aoiGrid);
+  const cellKm2 = (cellsizeX * cellsizeY) / 1e6;
+
+  const agg = new Map();
+  zoneFeatures.forEach((f, i) => {
+    const e = elev[i], s = slp[i];
+    if (!e.count) return;
+    const c = classOf(f.properties);
+    const a = agg.get(c) ?? { n: 0, cells: 0, eSum: 0, eMin: Infinity, eMax: -Infinity, sSum: 0 };
+    a.n++; a.cells += e.count; a.eSum += e.sum; a.sSum += s.sum;
+    if (e.min < a.eMin) a.eMin = e.min;
+    if (e.max > a.eMax) a.eMax = e.max;
+    agg.set(c, a);
+  });
+
+  results.length = 0;
+  for (const [zone_class, a] of [...agg].sort((x, y) => x[0].localeCompare(y[0]))) {
+    results.push({
+      study: "3", zone_class, n_features: a.n, cell_count: a.cells,
+      area_km2: +(a.cells * cellKm2).toFixed(3),
+      elev_min: +a.eMin.toFixed(1), elev_max: +a.eMax.toFixed(1),
+      elev_mean: +(a.eSum / a.cells).toFixed(1),
+      slope_mean: +(a.sSum / a.cells).toFixed(2),
+      elev_p10: "", elev_p90: "",   // TODO: zonalStats returns moments, not a distribution
+    });
+  }
+  renderResults();
+}
+
+function renderResults() {
+  const cols = ["n_features", "area_km2", "elev_min", "elev_mean", "elev_max", "slope_mean"];
+  const head = ["zone", "features", "area km²", "elev min m", "elev mean m", "elev max m", "slope mean °"];
+  document.getElementById("results").innerHTML =
+    `<table><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr>`
+    + results.map((r) => `<tr><td><span class="swatch" style="background:${zoneColor(r.zone_class)}"></span>`
+        + `${r.zone_class}</td>`
+        + cols.map((c) => `<td class="num">${r[c]}</td>`).join("") + `</tr>`).join("")
+    + `</table>`;
+  const note = document.getElementById("results-note");
+  note.textContent = "Polygons covering no valid DEM pixel are dropped. Holes union with outer rings "
+    + "and overlapping polygons of one class double-count, so area is an upper bound. elev_p10/p90 "
+    + "are empty: zonalStats returns moments, not a distribution.";
+  note.hidden = false;
+}
+
+document.getElementById("dlp").onclick = () => download(perf, "performance.csv");
+document.getElementById("dlm").onclick = () => download(metrics, "metrics.csv");
+document.getElementById("dlr").onclick = () => download(results, "results.csv");
+
+// Auto-run. The terrain half stands on its own, so a failing NFHL request degrades the page to
+// Fig. 3.1 plus an error rather than losing everything.
+try {
+  await ingest();
+  await surfaces();
+  try {
+    await zones();
+    await analyse();
+    status("ready", "done");
+  } catch (e) {
+    log(`ERROR  ${e.message}`);
+    status(`terrain ready; flood zones failed: ${e.message}`, "fail");
+  }
+} catch (e) {
+  log(`ERROR  ${e.message}`);
+  status(`failed: ${e.message}`, "fail");
+}
+</script>
+</body>
+</html>

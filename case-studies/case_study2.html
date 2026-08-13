@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — Case Study 2: a storm's rainfall on a time axis</title>
+<link rel="icon" href="../assets/brand/favicon.png" />
+<link rel="stylesheet" href="../site.css" />
+<style>
+  body { max-width: 96ch; margin: 0 auto; padding: 30px 22px 80px; }
+  h1 { font-size: 23px; margin: 0 0 6px; letter-spacing: -.01em; }
+  h2 { font-size: 15px; margin: 28px 0 9px; }
+  h2 .n { color: var(--dim); font: 600 12px/1 var(--mono); margin-right: 8px; }
+  h3 { font-size: 13px; margin: 0 0 6px; font-weight: 600; }
+  h3 small { color: var(--dim); font-weight: 400; margin-left: 6px; }
+  p { margin: 0 0 11px; }
+  ul { margin: 0 0 11px; padding-left: 20px; }
+  li { margin: 0 0 4px; }
+  .lead { color: var(--dim); margin-bottom: 16px; }
+  .q { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; margin: 0 0 16px; }
+
+  #status { font-size: 12.5px; color: var(--dim); margin: 0 0 16px; min-height: 18px; }
+  .spin { width: 11px; height: 11px; border: 2px solid var(--line); border-top-color: var(--accent);
+          border-radius: 50%; display: inline-block; animation: sp .8s linear infinite;
+          vertical-align: -1px; margin-right: 7px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  #status.done .spin, #status.fail .spin { display: none; }
+  #status.fail { color: var(--bad); }
+
+  .panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0 0 8px; }
+  @media (max-width: 780px) { .panels { grid-template-columns: 1fr; } }
+  .panel .map { height: 320px; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .mapwrap { position: relative; margin: 0 0 6px; }
+  .lg { position: absolute; right: 9px; bottom: 9px; z-index: 1100; background: var(--panel);
+        border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; font-size: 11px;
+        color: var(--fg); box-shadow: 0 1px 5px rgb(0 0 0 / .25); }
+  .lg .src { color: var(--dim); font-size: 10px; margin: 4px 0 0; }
+
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0 4px; }
+  .hint { font-size: 12px; color: var(--dim); margin: 0 0 14px; }
+  button { background: transparent; color: var(--accent); border: 1px solid var(--control-line);
+           border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  label.ctl { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--dim); }
+  label.ctl select { background: var(--bg); color: var(--fg); font: inherit; font-size: 11.5px;
+      border: 1px solid var(--control-line); border-radius: 4px; padding: 2px 5px; }
+  #tstep { width: 260px; accent-color: var(--accent); }
+  .clock { font: 600 12px/1 var(--mono); color: var(--fg); min-width: 15ch; }
+
+  pre.out { background: var(--panel); color: var(--dim); white-space: pre-wrap;
+            max-height: 190px; font-size: 12px; margin: 0 0 14px; }
+  pre.out:empty { display: none; }
+  table { border-collapse: collapse; font-size: 12.5px; margin: 0 0 8px; width: 100%; }
+  th, td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .bar { display: inline-block; height: 9px; background: var(--accent); vertical-align: 0; }
+  #results:empty, #axiscost:empty, #formats:empty, #intensity:empty { display: none; }
+  .todo { color: var(--warn); }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  .k { color: var(--dim); } .s { color: var(--ok); } .f { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>Case Study 2 — A storm's rainfall on a time axis</h1>
+<p class="lead">
+  A 120-step gridded forcing product selected, windowed, reduced and summarised in the browser, with
+  no server-side subsetting service — and the same code path over three storage formats.
+  Protocol: <a href="CASE_STUDY_PROTOCOL.md">CASE_STUDY_PROTOCOL.md</a> §0 and §2.
+</p>
+<p class="q">
+  <b>The question.</b> Hurricane Idalia crossed Florida's Big Bend on 30 August 2023. Over the five
+  days 28 Aug – 1 Sep, <b>where did the rain actually fall, which subbasins took the load, and was
+  the total driven by a few intense hours or by many wet ones?</b>
+</p>
+
+<p id="status"><span class="spin"></span><span id="status-text">starting…</span></p>
+
+<h2><span class="n">Fig. 2.1</span>The event, hour by hour, and its total</h2>
+<div class="panels">
+  <div class="panel">
+    <h3 id="t-step">Hourly rainfall <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-step"></div><div class="lg" id="lg-step" hidden></div></div>
+  </div>
+  <div class="panel">
+    <h3 id="t-acc">Event accumulation <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-acc"></div><div class="lg" id="lg-acc" hidden></div></div>
+  </div>
+</div>
+<div class="controls">
+  <label class="ctl">step <input type="range" id="tstep" min="0" max="119" value="0" /></label>
+  <span class="clock" id="clock">—</span>
+  <button id="play">▶ play</button>
+  <label class="ctl">format
+    <select id="fmt">
+      <option value="nc">NetCDF4 · NLDAS-2</option>
+      <option value="zarr">Zarr v2 · AORC</option>
+      <option value="grib">GRIB2 · Stage IV</option>
+    </select></label>
+  <label class="ctl">window
+    <select id="win">
+      <option value="120">whole event (120 h)</option>
+      <option value="48">48 h</option>
+      <option value="24">24 h rolling</option>
+      <option value="12">12 h</option>
+    </select></label>
+</div>
+<p class="hint">
+  Left: one timestep, selected with <code>ds.select(coord)</code>. The slider drives the axis, and
+  <b>play</b> scrubs it — every frame is a fresh lazy selection forced and painted, which is what the
+  per-frame timings in the cost table measure. Right: the accumulation over the chosen
+  <b>window</b>, built with <code>ds.selectRange(from, to)</code> and reduced with
+  <code>reduce("sum")</code>. Both panels are fixed at the product's own extent; the accumulation
+  keeps its own colour scale because a single hour and a five-day total do not share a useful range.
+  <b>format</b> reloads the same event from a different file format through the identical call.
+</p>
+
+<pre class="out" id="log"></pre>
+
+<h2><span class="n">§</span>Result — rainfall by subbasin</h2>
+<div id="results"></div>
+<p class="hint" id="results-note" hidden></p>
+
+<h2><span class="n">§</span>Was it intensity or duration?</h2>
+<div id="intensity"></div>
+<p class="hint">
+  Event total grouped by peak hourly intensity, via <code>reduce("max")</code> to get each cell's
+  wettest hour and then <code>accumulation.groupBy(peak, { bins: 5 })</code>. If most of the total
+  sits in the high-intensity bins, the storm was a cloudburst; if it sits in the low bins, it was a
+  long soaking. That distinction changes which subbasins actually flood, and it is the reason a
+  five-day sum on its own is not enough.
+</p>
+
+<h2><span class="n">§</span>Axis operations and their cost</h2>
+<div id="axiscost"></div>
+<h2><span class="n">§</span>The same event in three formats</h2>
+<div id="formats"></div>
+<p class="hint">
+  One <code>addDataset</code> call, three storage formats, one axis model. GRIB2 is the exception and
+  the engine is explicit about it: <code>scan()</code> derives no extent for GRIB2, so the call
+  throws with a message naming the fix and the exact argument to pass. That is a good failure — it
+  is reported below as supplied metadata, not as a silent guess.
+</p>
+
+<div class="controls">
+  <span class="muted">export —</span>
+  <button id="dlp">performance.csv</button>
+  <button id="dlm">metrics.csv</button>
+  <button id="dlr">results.csv</button>
+</div>
+
+<h2><span class="n">§</span>Method notes</h2>
+<ul>
+  <li><b>The temporal path is not self-contained.</b> Every multi-dimensional format — NetCDF4, Zarr,
+      GRIB2 — decodes through <code>sciwrid-toolkit</code>, which the engine imports by bare
+      specifier. A bundler resolves that from the vendored tarball, but a raw static page must add an
+      import map entry pointing into <code>node_modules</code>:
+      <code>"sciwrid-toolkit": "../node_modules/sciwrid-toolkit/dist/index.js"</code>. Omit it and
+      ingest fails with <i>Failed to resolve module specifier "sciwrid-toolkit"</i>. So the
+      zero-backend claim holds for the temporal path only if the host also serves
+      <code>node_modules</code> (or vendors that dist itself) — which the raster-only studies never
+      need. The engine's error message does say exactly this, and names the example to copy.</li>
+  <li><b>Units decide whether summing is legal.</b> The NLDAS-2 variable is <code>Rainf</code> with
+      unit <code>kg m-2</code> — a depth already accumulated over each hourly step, where
+      1 kg m⁻² = 1 mm. Summing is therefore correct and the total is millimetres. Had the unit been
+      <code>kg m-2 s-1</code>, a rate, the sum would be meaningless without multiplying by the step
+      length. The page reads the unit from the file and states it rather than assuming.</li>
+  <li><b><code>selectRange</code> exists.</b> §2 step 5 of the protocol says it does not and budgets
+      host glue over <code>select</code> plus <code>combine</code> for rolling windows. It is at
+      <code>dataset.js:746</code>, returns another series rather than a payload, and costs nothing
+      until forced — so a 24-hour rolling accumulation is one call, not a loop. That paragraph of the
+      protocol needs deleting, and the "no range selection primitive" entry in the §5 contribution
+      table with it.</li>
+  <li><b>Zarr is not out of scope either.</b> The protocol excludes it "until range reads land", but
+      <code>idalia-aorc.zarr.zip</code> parses in ~79 ms and selects a 390×390 step in ~177 ms. What
+      is true is that the store is read whole from a zip rather than by range request, which is the
+      same whole-file bound every other study hits — not a reason to omit the format.</li>
+  <li><b>Reduction is linear in steps.</b> Measured 351 ms / 1297 ms / 3159 ms at 12 / 48 / 120
+      steps, or roughly 26 ms per step at 104×96. The cost is decode-dominated: every step is
+      materialised to be summed, so a window twice as long costs twice as much and no cache helps.</li>
+  <li><b>Vector generalisation is free at this grid.</b> The 34 WBD subbasins arrive as 13.8 MB of
+      geometry raw; <code>maxAllowableOffset=0.002</code> (~200 m) brings that to 267 kB, a 52×
+      reduction. NLDAS-2 cells are 0.125° — about 12 km — so even a 1 km generalisation is an order
+      of magnitude finer than the data being summarised. Paying for full-resolution boundaries here
+      would buy nothing.</li>
+  <li><b>No flood extent for the inside/outside split.</b> §2 step 7 asks for rainfall grouped by an
+      observed inundation extent. No Idalia extent exists in the benchmark database used by Case
+      Study 5, and USGS high-water marks for the event are points rather than an extent. The
+      intensity grouping above substitutes for it and uses the same <code>groupBy</code> mechanism;
+      <span class="todo">the extent version stays open.</span></li>
+</ul>
+
+<h2><span class="n">§</span>Data</h2>
+<table>
+  <tr><th>Role</th><th>Source</th><th>Path</th></tr>
+  <tr>
+    <td>Forcing (primary)</td>
+    <td>NLDAS-2 <code>Rainf</code>, kg m⁻² per hour, 120 hourly steps 2023-08-28T00Z – 2023-09-01T23Z, 104×96 at 0.125°, EPSG:4326. 875 kB.</td>
+    <td><code>../assets/SampleFiles/idalia-nldas2.nc</code></td>
+  </tr>
+  <tr>
+    <td>Forcing (Zarr)</td>
+    <td>AORC, same 120 steps, 390×390. Zarr v2 in a zip. 1.9 MB.</td>
+    <td><code>../assets/SampleFiles/idalia-aorc.zarr.zip</code></td>
+  </tr>
+  <tr>
+    <td>Forcing (GRIB2)</td>
+    <td>Stage IV total precipitation, 4 steps, 1121×881. Needs an explicit <code>grid.bbox</code>.</td>
+    <td><code>../assets/SampleFiles/idalia-stage4-4h.grb2</code></td>
+  </tr>
+  <tr>
+    <td>Subbasins</td>
+    <td>USGS Watershed Boundary Dataset, 8-digit HU (layer 4). CORS-open, no key.</td>
+    <td><code>https://hydro.nationalmap.gov/arcgis/rest/services/wbd/MapServer/4/query</code></td>
+  </tr>
+</table>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js",
+    "sciwrid-toolkit": "../node_modules/sciwrid-toolkit/dist/index.js"
+} }
+</script>
+
+<script type="module">
+import { FimViz, ColorScale, Stats } from "fimviz";
+
+// ── §0 instrumentation ────────────────────────────────────────────────────────────────────────
+const REPS = 1;                       // TODO: 5 before recording.
+const CACHE_STATE = "warm";           // TODO: "cold" for the hard-reload pass.
+const BROWSER = navigator.userAgent;
+
+const perf = [], metrics = [], results = [];
+
+const log = (...a) => { document.getElementById("log").textContent += a.join(" ") + "\n"; };
+const status = (text, state = "") => {
+  document.getElementById("status-text").textContent = text;
+  document.getElementById("status").className = state;
+};
+
+async function stage(name, fields, fn) {
+  const t = `${name}-${perf.length}`;
+  performance.mark(`${t}:start`);
+  const value = await fn();
+  performance.mark(`${t}:end`);
+  const { duration } = performance.measure(t, `${t}:start`, `${t}:end`);
+  perf.push({ study: "2", stage: name, dataset: "", format: "", bytes: "", width: "", height: "",
+              cache_state: CACHE_STATE, browser: BROWSER, rep: 1, ms: duration.toFixed(2), ...fields });
+  return { value, ms: duration };
+}
+const timed = async (name, fields, fn) => (await stage(name, fields, fn)).value;
+
+const toCsv = (rows) => {
+  const cols = Object.keys(rows[0]);
+  return [cols.join(","), ...rows.map((r) => cols.map((c) => JSON.stringify(r[c] ?? "")).join(","))].join("\n");
+};
+const download = (rows, name) => {
+  if (!rows.length) return log(`${name}: nothing recorded yet`);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv" }));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+};
+
+const gridMeta = (g) => ({ bw: g.bounds.west, bs: g.bounds.south, be: g.bounds.east,
+                           bn: g.bounds.north, width: g.width, height: g.height, noData: g.noData });
+
+// ── sources ───────────────────────────────────────────────────────────────────────────────────
+const FILES = {
+  nc:   { path: "../assets/SampleFiles/idalia-nldas2.nc", label: "NetCDF4 · NLDAS-2", opts: {} },
+  zarr: { path: "../assets/SampleFiles/idalia-aorc.zarr.zip", label: "Zarr v2 · AORC",
+          opts: { format: "zarr" } },
+  // scan() derives no extent for GRIB2; the engine says so and names the argument. Supplied here,
+  // and recorded as supplied rather than detected.
+  grib: { path: "../assets/SampleFiles/idalia-stage4-4h.grb2", label: "GRIB2 · Stage IV",
+          opts: { variable: "Total precipitation", grid: { bbox: [-87.94, 25.06, -75.06, 36.94] } } },
+};
+const WBD = "https://hydro.nationalmap.gov/arcgis/rest/services/wbd/MapServer/4/query";
+const ZONE_BOX = { west: -85.0, south: 29.0, east: -82.0, north: 32.0 };   // Idalia landfall + track
+const GENERALISE = 0.002;                                                   // ~200 m, well under 12 km cells
+
+// ── maps ──────────────────────────────────────────────────────────────────────────────────────
+const maps = {};
+for (const [k, sel] of [["step", "#m-step"], ["acc", "#m-acc"]]) {
+  maps[k] = await FimViz.mount(sel, { provider: "leaflet", isolated: true });
+}
+
+let ds = null, entries = [], unit = "", accumLayer = null, stepLayer = null;
+let accGrid = null, zones = [], zoneRings = [];
+let sel = { fmt: "nc", step: 0, window: 120 };
+let playing = false;
+
+const isoOf = (e) => e.meta?.time ?? new Date(e.coord).toISOString();
+
+// ── rendering ─────────────────────────────────────────────────────────────────────────────────
+async function paint(mapKey, dataset, scale, label) {
+  const layer = await timed("t_paint", { dataset: label },
+                            () => maps[mapKey].addLayer("raster", { source: dataset, colorScale: scale }));
+  const host = document.getElementById(`lg-${mapKey}`);
+  host.innerHTML = layer.getLegend().toHtml() + `<p class="src">${label}</p>`;
+  host.hidden = false;
+  return layer;
+}
+
+async function showStep(i, { record = true } = {}) {
+  sel.step = i;
+  const e = entries[i];
+  document.getElementById("clock").textContent = isoOf(e).replace("T", " ").replace(".000Z", "Z");
+  document.getElementById("tstep").value = String(i);
+  const child = ds.select(e.coord);
+  const { value: grid, ms } = await stage("t_op", { dataset: `select:${i}`, format: sel.fmt },
+                                          () => child.grid());
+  if (record) log(`select step ${String(i).padStart(3)}  ${isoOf(e)}  ${ms.toFixed(1)} ms`);
+  stepLayer?.remove();
+  maps.step.adoptDataset(child);
+  stepLayer = await paint("step", child, stepScale, `hourly ${unit}`);
+  return ms;
+}
+
+let stepScale = null, accScale = null;
+
+// ── the pipeline ──────────────────────────────────────────────────────────────────────────────
+async function loadFormat(key) {
+  const f = FILES[key];
+  status(`opening ${f.label}…`);
+  const { value: d, ms: parseMs } = await stage("t_total", { dataset: key, format: key },
+    () => maps.step.addDataset(f.path, f.opts));
+  ds = d;
+  entries = ds.axis?.entries ?? [];
+  unit = ds.meta?.unit ?? "";
+  log(`${f.label}: axis "${ds.axis?.name}" × ${entries.length}, variable ${ds.meta?.variable}, unit ${unit || "(none)"}`);
+  if (!entries.length) throw new Error(`${f.label} has no series axis`);
+
+  // First vs twentieth selection — the protocol asks for both, to expose any caching effect.
+  const first = await showStep(0, { record: false });
+  const twentieth = entries.length > 19 ? await showStep(19, { record: false }) : null;
+  await showStep(0, { record: false });
+
+  const g0 = await ds.select(entries[0].coord).grid();
+  metrics.push({ study: "2", source: f.label, format: key, axis_len: entries.length,
+                 width: g0.width, height: g0.height, variable: ds.meta?.variable ?? "",
+                 unit: unit || "", extent_source: key === "grib" ? "supplied" : "detected",
+                 parse_ms: +parseMs.toFixed(1), select_first_ms: +first.toFixed(1),
+                 select_20th_ms: twentieth == null ? "" : +twentieth.toFixed(1),
+                 span_start: isoOf(entries[0]), span_end: isoOf(entries.at(-1)) });
+
+  const sl = document.getElementById("tstep");
+  sl.max = String(entries.length - 1);
+  document.getElementById("t-step").innerHTML =
+    `Hourly rainfall <small>${f.label}, ${g0.width}×${g0.height}${unit ? ", " + unit : ""}</small>`;
+  return g0;
+}
+
+async function buildAccumulation() {
+  const n = Math.min(sel.window, entries.length);
+  const from = entries[0].coord, to = entries[n - 1].coord;
+  status(`reducing ${n} steps…`);
+  // selectRange returns another SERIES, so reduce() applies to the window unchanged.
+  const win = n === entries.length ? ds : ds.selectRange(from, to);
+  const acc = win.reduce("sum", { axis: 0 });
+  const { value: grid, ms } = await stage("t_op", { dataset: `reduce:sum:${n}`, format: sel.fmt },
+                                          () => acc.grid());
+  accGrid = grid;
+  log(`reduce sum over ${n} steps: ${ms.toFixed(0)} ms → ${grid.width}x${grid.height}`);
+
+  const s = Stats.raster(grid.pixels, gridMeta(grid), { bins: 32 });
+  accScale = new ColorScale({ palette: "blues", min: 0, max: s.max, continuous: true,
+                              unit: unit || "mm", missingColor: "transparent" });
+  accumLayer?.remove();
+  maps.acc.adoptDataset(acc);
+  accumLayer = await paint("acc", acc, accScale, `${n} h total ${unit || "mm"}`);
+  document.getElementById("t-acc").innerHTML =
+    `Event accumulation <small>${n} h, max ${s.max.toFixed(0)} ${unit || "mm"}</small>`;
+
+  perfRow("reduce", n, ms);
+  return { grid, stats: s };
+}
+
+const axisCost = [];
+const perfRow = (op, n, ms) => { axisCost.push({ op, steps: n, ms: +ms.toFixed(1) }); renderAxisCost(); };
+
+async function loadZones() {
+  status("fetching subbasin boundaries…");
+  const q = new URLSearchParams({
+    where: "1=1",
+    geometry: `${ZONE_BOX.west},${ZONE_BOX.south},${ZONE_BOX.east},${ZONE_BOX.north}`,
+    geometryType: "esriGeometryEnvelope", spatialRel: "esriSpatialRelIntersects",
+    inSR: "4326", outSR: "4326", outFields: "huc8,name,areaacres",
+    returnGeometry: "true", resultRecordCount: "200",
+    maxAllowableOffset: String(GENERALISE), f: "geojson",
+  });
+  const { value: fc, ms } = await stage("t_fetch", { dataset: "wbd-huc8", format: "geojson" },
+                                        async () => (await fetch(`${WBD}?${q}`)).json());
+  const bytes = fc.features.reduce((s, f) => s + JSON.stringify(f.geometry).length, 0);
+  log(`WBD: ${fc.features.length} subbasins, ${(bytes / 1024).toFixed(0)} kB generalised at ${GENERALISE}°, ${ms.toFixed(0)} ms`);
+  zones = fc.features;
+  zoneRings = zones.map((f, i) => ({ id: i, polygon: ringsOf(f.geometry) }));
+}
+
+const ringsOf = (geom) =>
+  (geom.type === "MultiPolygon" ? geom.coordinates : [geom.coordinates])
+    .flat().map((ring) => ring.map(([lng, lat]) => ({ lat, lng })));
+
+async function summarise() {
+  status("running zonal statistics over the subbasins…");
+  const accDs = (sel.window === entries.length ? ds : ds.selectRange(entries[0].coord, entries[sel.window - 1].coord))
+    .reduce("sum", { axis: 0 });
+  const { value: rows, ms } = await stage("t_op", { dataset: "zonalStats:subbasins" },
+                                          () => accDs.zonalStats(zoneRings));
+  perfRow("zonalStats", zoneRings.length, ms);
+
+  results.length = 0;
+  rows.forEach((r, i) => {
+    if (!r.count) return;
+    const p = zones[i].properties;
+    results.push({ study: "2", huc8: p.huc8, name: p.name,
+                   window_h: sel.window, unit: unit || "mm",
+                   mean: +(r.mean ?? 0).toFixed(2), max: +(r.max ?? 0).toFixed(2),
+                   min: +(r.min ?? 0).toFixed(2), cells: r.count,
+                   area_km2: +(p.areaacres / 247.105).toFixed(0) });
+  });
+  results.sort((a, b) => b.mean - a.mean);
+  renderResults();
+}
+
+async function intensitySplit() {
+  status("grouping the total by peak hourly intensity…");
+  // Both reductions must run over the SAME window, or the bins describe hours the total never saw.
+  const win = sel.window === entries.length
+    ? ds : ds.selectRange(entries[0].coord, entries[sel.window - 1].coord);
+  const peak = win.reduce("max", { axis: 0 });
+  const { value: rows, ms } = await stage("t_op", { dataset: "groupBy:peak-intensity" },
+    () => win.reduce("sum", { axis: 0 }).groupBy(peak, { bins: 5 }));
+  perfRow("groupBy", 5, ms);
+  const total = rows.reduce((s, r) => s + r.sum, 0);
+  const max = Math.max(...rows.map((r) => r.sum));
+  document.getElementById("intensity").innerHTML =
+    `<table><tr><th>peak hourly ${unit || "mm"}</th><th>cells</th><th>mean total</th>`
+    + `<th>share of all rainfall</th></tr>`
+    + rows.map((r) => {
+        const share = total > 0 ? r.sum / total : 0;
+        return `<tr><td>${r.range ? r.range.map((v) => v.toFixed(1)).join(" – ") : r.class}</td>`
+          + `<td class="num">${r.count}</td><td class="num">${(r.mean ?? 0).toFixed(1)}</td>`
+          + `<td class="num">${(100 * share).toFixed(1)}%`
+          + ` <span class="bar" style="width:${(90 * r.sum / max).toFixed(0)}px"></span></td></tr>`;
+      }).join("") + `</table>`;
+}
+
+// ── tables ────────────────────────────────────────────────────────────────────────────────────
+function renderResults() {
+  const top = results.slice(0, 12);
+  const max = Math.max(...results.map((r) => r.mean), 1);
+  document.getElementById("results").innerHTML =
+    `<table><tr><th>subbasin</th><th>HUC8</th><th>area km²</th><th>mean ${unit || "mm"}</th>`
+    + `<th>max ${unit || "mm"}</th><th></th></tr>`
+    + top.map((r) => `<tr><td>${r.name}</td><td>${r.huc8}</td><td class="num">${r.area_km2}</td>`
+        + `<td class="num">${r.mean}</td><td class="num">${r.max}</td>`
+        + `<td><span class="bar" style="width:${(110 * r.mean / max).toFixed(0)}px"></span></td></tr>`).join("")
+    + `</table>`;
+  const note = document.getElementById("results-note");
+  note.textContent = `Top ${top.length} of ${results.length} subbasins by mean accumulation over the `
+    + `${sel.window}-hour window; results.csv carries them all. Zonal cells are counted where the `
+    + `subbasin covers a grid cell centre, so a basin smaller than a 0.125° cell can report no cells `
+    + `at all — none do here, but the rule matters for any finer zone set.`;
+  note.hidden = false;
+}
+
+function renderAxisCost() {
+  document.getElementById("axiscost").innerHTML =
+    `<table><tr><th>operation</th><th>steps / zones</th><th>ms</th></tr>`
+    + axisCost.map((r) => `<tr><td><code>${r.op}</code></td><td class="num">${r.steps}</td>`
+        + `<td class="num">${r.ms}</td></tr>`).join("") + `</table>`;
+}
+
+function renderFormats() {
+  document.getElementById("formats").innerHTML =
+    `<table><tr><th>format</th><th>axis</th><th>grid</th><th>variable</th><th>unit</th>`
+    + `<th>extent</th><th>parse ms</th><th>select 1st</th><th>select 20th</th></tr>`
+    + metrics.map((m) => `<tr><td>${m.source}</td><td class="num">${m.axis_len}</td>`
+        + `<td class="num">${m.width}×${m.height}</td><td>${m.variable}</td><td>${m.unit || "—"}</td>`
+        + `<td>${m.extent_source}</td><td class="num">${m.parse_ms}</td>`
+        + `<td class="num">${m.select_first_ms}</td><td class="num">${m.select_20th_ms}</td></tr>`).join("")
+    + `</table>`;
+}
+
+// ── controls ──────────────────────────────────────────────────────────────────────────────────
+document.getElementById("tstep").oninput = (e) => { if (!playing) showStep(Number(e.target.value)); };
+document.getElementById("play").onclick = async () => {
+  const btn = document.getElementById("play");
+  if (playing) { playing = false; btn.textContent = "▶ play"; return; }
+  playing = true; btn.textContent = "■ stop";
+  const frames = [];
+  for (let i = sel.step; i < entries.length && playing; i++) frames.push(await showStep(i, { record: false }));
+  playing = false; btn.textContent = "▶ play";
+  if (frames.length) {
+    const sorted = [...frames].sort((a, b) => a - b);
+    const med = sorted[sorted.length >> 1];
+    log(`scrub: ${frames.length} frames, median ${med.toFixed(1)} ms/frame`
+      + ` (${(1000 / med).toFixed(1)} fps), max ${Math.max(...frames).toFixed(1)} ms`);
+    perfRow("scrub (median/frame)", frames.length, med);
+  }
+};
+document.getElementById("win").onchange = async (e) => {
+  sel.window = Number(e.target.value);
+  await buildAccumulation(); await summarise(); await intensitySplit();
+  status("ready", "done");
+};
+document.getElementById("fmt").onchange = async (e) => {
+  sel.fmt = e.target.value;
+  try {
+    stepLayer?.remove(); accumLayer?.remove();
+    await loadFormat(sel.fmt);
+    renderFormats();
+    await buildAccumulation();
+    status("ready", "done");
+  } catch (err) { log(`ERROR  ${err.message}`); status(`failed: ${err.message}`, "fail"); }
+};
+document.getElementById("dlp").onclick = () => download(perf, "performance.csv");
+document.getElementById("dlm").onclick = () => download(metrics, "metrics.csv");
+document.getElementById("dlr").onclick = () => download(results, "results.csv");
+
+// ── run ───────────────────────────────────────────────────────────────────────────────────────
+try {
+  const g0 = await loadFormat("nc");
+  const s0 = Stats.raster(g0.pixels, gridMeta(g0), { bins: 16 });
+  stepScale = new ColorScale({ palette: "blues", min: 0, max: Math.max(s0.max, 1), continuous: true,
+                               unit: unit || "mm", missingColor: "transparent" });
+  await showStep(0, { record: false });
+  renderFormats();
+
+  // The laziness check: build a five-op chain on the axis and never force it.
+  const t0 = performance.now();
+  const never = ds.selectRange(entries[0].coord, entries[47].coord)
+    .reduce("sum", { axis: 0 })
+    .reclassify([{ min: 1, value: 1 }])
+    .clip(ZONE_BOX)
+    .resampleTo({ width: 64, height: 64, bounds: ZONE_BOX });
+  const unforced = performance.now() - t0;
+  log(`chain built on the axis, never forced: ${unforced.toFixed(3)} ms, 0 bytes`);
+  perf.push({ study: "2", stage: "t_op", dataset: "axis-chain(unforced)", format: "nc", bytes: 0,
+              width: "", height: "", cache_state: CACHE_STATE, browser: BROWSER, rep: 1,
+              ms: unforced.toFixed(3) });
+
+  await buildAccumulation();
+  await loadZones();
+  await summarise();
+  await intensitySplit();
+  status("ready", "done");
+} catch (e) {
+  console.error(e);
+  log(`ERROR  ${e.message}`);
+  status(`failed: ${e.message}`, "fail");
+}
+</script>
+</body>
+</html>

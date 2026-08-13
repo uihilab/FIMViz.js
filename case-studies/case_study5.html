@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — Case Study 5: a regulatory flood map against what was observed</title>
+<link rel="icon" href="../assets/brand/favicon.png" />
+<link rel="stylesheet" href="../site.css" />
+<style>
+  body { max-width: 96ch; margin: 0 auto; padding: 30px 22px 80px; }
+  h1 { font-size: 23px; margin: 0 0 6px; letter-spacing: -.01em; }
+  h2 { font-size: 15px; margin: 28px 0 9px; }
+  h2 .n { color: var(--dim); font: 600 12px/1 var(--mono); margin-right: 8px; }
+  h3 { font-size: 13px; margin: 0 0 6px; font-weight: 600; }
+  h3 small { color: var(--dim); font-weight: 400; margin-left: 6px; }
+  p { margin: 0 0 11px; }
+  ul { margin: 0 0 11px; padding-left: 20px; }
+  li { margin: 0 0 4px; }
+  .lead { color: var(--dim); margin-bottom: 16px; }
+  .q { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; margin: 0 0 16px; }
+
+  #status { font-size: 12.5px; color: var(--dim); margin: 0 0 16px; min-height: 18px; }
+  .spin { width: 11px; height: 11px; border: 2px solid var(--line); border-top-color: var(--accent);
+          border-radius: 50%; display: inline-block; animation: sp .8s linear infinite;
+          vertical-align: -1px; margin-right: 7px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  #status.done .spin, #status.fail .spin { display: none; }
+  #status.fail { color: var(--bad); }
+
+  .panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0 0 8px; }
+  @media (max-width: 780px) { .panels { grid-template-columns: 1fr; } }
+  .panel .map { height: 290px; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  #diff-map { height: 440px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .mapwrap { position: relative; margin: 0 0 6px; }
+  .lg { position: absolute; right: 9px; bottom: 9px; z-index: 1100; background: var(--panel);
+        border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; font-size: 11px;
+        color: var(--fg); box-shadow: 0 1px 5px rgb(0 0 0 / .25); }
+  .lg .title { font-weight: 600; margin: 0 0 4px; }
+  .lg .src { color: var(--dim); font-size: 10px; margin: 4px 0 0; }
+
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0 4px; }
+  .hint { font-size: 12px; color: var(--dim); margin: 0 0 14px; }
+  button { background: transparent; color: var(--accent); border: 1px solid var(--control-line);
+           border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  label.ctl { display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--dim); }
+  label.ctl select { background: var(--bg); color: var(--fg); font: inherit; font-size: 11.5px;
+      border: 1px solid var(--control-line); border-radius: 4px; padding: 2px 5px; }
+  label.ctl input[type=range] { width: 72px; accent-color: var(--accent); }
+
+  pre.out { background: var(--panel); color: var(--dim); white-space: pre-wrap;
+            max-height: 190px; font-size: 12px; margin: 0 0 14px; }
+  pre.out:empty { display: none; }
+  table { border-collapse: collapse; font-size: 12.5px; margin: 0 0 8px; width: 100%; }
+  th, td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.hi td { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+  .swatch { display: inline-block; width: 11px; height: 11px; border: 1px solid #ccc;
+            margin-right: 6px; vertical-align: -1px; }
+  #results:empty, #catalogue:empty { display: none; }
+  .todo { color: var(--warn); }
+  .k { color: var(--dim); } .s { color: var(--ok); } .f { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>Case Study 5 — A regulatory flood map against what was observed</h1>
+<p class="lead">
+  Quantitative flood-map evaluation against a published benchmark database, run entirely in the
+  browser: catalogue query, ingest, reclassification, grid alignment and contingency scoring, with no
+  server-side compute. Protocol: <a href="CASE_STUDY_PROTOCOL.md">CASE_STUDY_PROTOCOL.md</a> §0.
+</p>
+<p class="q">
+  <b>The question.</b> Hurricane Harvey flooded the Lower Colorado near Columbus, Texas on 29–30
+  August 2017. Two satellites observed it independently. FEMA's Base Level Engineering 100-year map
+  says where a 1%-annual-chance flood should reach. <b>How much of what was actually observed did the
+  regulatory map anticipate — and how much does that answer depend on which satellite you believe and
+  how the two grids were aligned?</b>
+</p>
+<p class="hint">
+  This is a <i>containment</i> question, not an accuracy one. A 100-year regulatory map and a single
+  observed event are different objects: the event may be larger or smaller than the 1%-annual-chance
+  flood, so a miss is not automatically an error in the map. What the contingency table measures here
+  is overlap, and the interesting quantity is how much observed water fell outside the regulatory
+  extent — where a resident would have been flooded while outside the mapped hazard zone.
+</p>
+
+<p id="status"><span class="spin"></span><span id="status-text">starting…</span></p>
+
+<h2><span class="n">§</span>Benchmark catalogue</h2>
+<div id="catalogue"></div>
+<p class="hint">
+  Queried live from the SDML benchmark database that backs
+  <a href="https://tethys.ciroh.org/apps/fimbench-gui/">FIMbench</a>, filtered to HUC 12090301. The
+  documented, citable access path is the Python client
+  (<code>pip install fimeval</code> → <code>fe.benchFIMquery(huc8="12090301")</code>), which returns
+  these same records; the browser reads the catalogue JSON and the rasters from the same public S3
+  objects, which is what lets this page run with no backend. <b>Tier</b> grades the
+  <i>benchmark's</i> quality, not a model's: Tier 1–3 and HWM are observations, Tier 4 is FEMA BLE.
+</p>
+
+<h2><span class="n">Fig. 5.1</span>Observed extent and the regulatory map</h2>
+<div class="panels">
+  <div class="panel">
+    <h3 id="t-obs">Observed <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-obs"></div><div class="lg" id="lg-obs" hidden></div></div>
+  </div>
+  <div class="panel">
+    <h3 id="t-ble">FEMA BLE <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-ble"></div><div class="lg" id="lg-ble" hidden></div></div>
+  </div>
+</div>
+<p class="hint">
+  Both panels are fixed at the analysis extent — the intersection of the two footprints, about
+  12 × 15 km — because a two-panel comparison at two extents is not a comparison. Wet cells only;
+  dry and nodata render transparent.
+</p>
+
+<h2><span class="n">Fig. 5.2</span>Where they disagree</h2>
+<div class="mapwrap"><div id="diff-map"></div><div class="lg" id="lg-diff" hidden></div></div>
+<div class="controls" id="diff-controls"></div>
+<p class="hint">
+  Four categories on one grid. <b>observed</b> selects which satellite is treated as truth,
+  <b>return period</b> switches the BLE map between the 1% and 0.2% annual-chance extents, and
+  <b>alignment</b> chooses the grid the two rasters are resampled onto before scoring —
+  <code>low</code> the coarser, <code>high</code> the finer, <code>average</code> between them. The
+  table reports all twelve combinations, so the two sensitivities can be read against each other:
+  alignment changes the cell count by more than an order of magnitude, and the question is whether
+  the metrics move with it. <b>opacity</b> fades the overlay against the basemap.
+</p>
+
+<pre class="out" id="log"></pre>
+
+<h2><span class="n">§</span>Result</h2>
+<div id="results"></div>
+<p class="hint" id="results-note" hidden></p>
+<p class="hint">
+  <b>What the table is for.</b> Three comparisons are available in it, and only the first is the
+  domain question. <i>Containment</i> answers how much observed water the regulatory map anticipated.
+  <i>Across the two observed rows</i> is the benchmark-quality question — whether the answer depends
+  on which satellite is treated as truth, which is the concern Cohen et al. (2025) raise and which
+  the two sensors here, a day apart at 3.1 m and 9.4 m, are well placed to expose. <i>Down the three
+  alignment rows</i> is the engine question: whether a policy that changes the scored cell count by
+  an order of magnitude also changes the metrics. Report all three; a single CSI hides every one
+  of them.
+</p>
+
+<div class="controls">
+  <span class="muted">export —</span>
+  <button id="dlp">performance.csv</button>
+  <button id="dlm">metrics.csv</button>
+  <button id="dlr">results.csv</button>
+</div>
+<p class="hint">
+  <b>performance.csv</b> — timings under the protocol's five fixed stage names. <b>metrics.csv</b> —
+  one row per ingested raster: dimensions, wet-cell fraction, decode cost, compressed and decoded
+  bytes. <b>results.csv</b> — the contingency table above, one row per observed × return-period ×
+  alignment combination. <span class="todo"><code>REPS</code> is 1 and cache state is "warm"; set 5
+  and run the cold pass before recording.</span>
+</p>
+
+<h2><span class="n">§</span>Method notes</h2>
+<ul>
+  <li><b>Wet/dry encoding.</b> The benchmark rasters are classified, not depth: <code>1</code> =
+      flood, <code>2</code> = permanent water, <code>0</code> = dry, <code>-9999</code> = nodata.
+      <code>compareExtentMetrics</code> defines wet as "anything that is not the dry sentinel", which
+      assumes a depth raster — passed these directly it would score nodata and permanent water as
+      flooded. Each raster is therefore rebuilt to a strict 0/1 grid before scoring.</li>
+  <li><b>Permanent water is folded into dry</b>, not excluded from the domain. FIMeval removes it as
+      a separate step, so numbers here will differ slightly from theirs; the permanent-water fraction
+      is reported in <code>metrics.csv</code> so the size of that difference is visible.</li>
+  <li><b>Source order matters.</b> Sources are <code>[BLE, observed]</code>, so a false positive is
+      "regulatory map says wet, satellite says dry" — over-prediction — and a false negative is
+      observed water the map did not anticipate. That second number is the study's headline.</li>
+  <li><b>Compression, not bandwidth, is the ceiling.</b> The BLE raster is 6.4 MB on the wire and
+      116.8 M pixels — 446 MB once decoded, a 67× expansion. Case Study 3's ceiling was download
+      size; this one is decode. Each source is clipped to the analysis extent and its parent released
+      (<code>ds.release()</code>) before the next is fetched, or two rasters would not co-exist.</li>
+  <li><b>Tier 1 does not fit.</b> The 0.3 m aerial benchmarks (HUC 12040101, Harvey) are 535 MB
+      compressed and were rejected on that basis, not chosen against — <code>?site=ceiling</code>
+      attempts one to record where the page fails.</li>
+  <li><b>ComparisonLayer is headless</b>, and its <code>rgba</code> output is a dead end for a host:
+      already colourised, so no <code>ColorScale</code> can re-key it and no <code>Legend</code> can
+      describe it. What is reusable is <code>aligned</code> — the per-source arrays on the common
+      grid — from which this page rebuilds the four categories and renders them through the ordinary
+      raster path. The engine's most differentiated subsystem therefore ships with no renderable
+      read-model of its own; that the workaround is short does not make it unnecessary.</li>
+  <li><b>Dates differ by a day.</b> Sentinel-1A observed 29 Aug, PlanetScope 30 Aug. They are not two
+      views of one instant, and part of any disagreement between them is the flood receding. That is
+      a floor on how precisely either can be called truth.</li>
+</ul>
+
+<h2><span class="n">§</span>Data</h2>
+<table>
+  <tr><th>Role</th><th>Source</th><th>Endpoint</th></tr>
+  <tr>
+    <td>Catalogue</td>
+    <td>SDML benchmark FIM database, 189 records, all public, CC-BY-4.0.</td>
+    <td><code>https://sdmlab.s3.amazonaws.com/FIM_Database/FIM_Viz/catalog_core.json</code></td>
+  </tr>
+  <tr>
+    <td>Observed (Tier 2)</td>
+    <td>PlanetScope scene + gap-fill, 3.1 m, 2017-08-30. 3.0 MB → 4284×5273.</td>
+    <td><code>.../Tier_2/PSS_20170830T162251_964235W294719N/PSS_3_1m_…_BM.tif</code></td>
+  </tr>
+  <tr>
+    <td>Observed (Tier 3)</td>
+    <td>Sentinel-1A + gap-fill, 9.4 m, 2017-08-29. 2.3 MB → 5357×3480.</td>
+    <td><code>.../Tier_3/S1A_20170829T00264_965148W295324N/S1A_9_4m_…_BM.tif</code></td>
+  </tr>
+  <tr>
+    <td>Regulatory (Tier 4)</td>
+    <td>FEMA Base Level Engineering, 10 m, 100-yr and 500-yr. 6.4 / 6.6 MB → 13781×8479.</td>
+    <td><code>.../Tier_4/BLE_{100,500}_970615W300529N/BLE_10_0m_…_BM.tif</code></td>
+  </tr>
+</table>
+<p class="hint">
+  All four are EPSG:4326, so no warp stands between ingest and comparison. Study area: Lower
+  Colorado–Cummins, HUC 12090301, Colorado and Wharton counties, Texas. Citation for the benchmark
+  database: Cohen, S., Baruah, A., Nikrou, P., Tian, D., &amp; Liu, H. (2025), <i>Toward robust
+  evaluations of flood inundation predictions using remote sensing derived benchmark maps</i>, Water
+  Resources Research 61(8), e2024WR039574.
+</p>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js"
+} }
+</script>
+
+<script type="module">
+import { FimViz, ColorScale, Dataset, RasterGrid, ComparisonLayer, resampleGrid } from "fimviz";
+
+// ── §0 instrumentation ────────────────────────────────────────────────────────────────────────
+const REPS = 1;                       // TODO: 5 before recording.
+const CACHE_STATE = "warm";           // TODO: "cold" for the hard-reload pass.
+const BROWSER = navigator.userAgent;
+
+const perf = [];      // → performance.csv · timings
+const metrics = [];   // → metrics.csv     · one row per ingested raster
+const results = [];   // → results.csv     · the contingency table
+
+const log = (...a) => { document.getElementById("log").textContent += a.join(" ") + "\n"; };
+const status = (text, state = "") => {
+  document.getElementById("status-text").textContent = text;
+  document.getElementById("status").className = state;
+};
+
+async function stage(name, fields, fn) {
+  const t = `${name}-${perf.length}`;
+  performance.mark(`${t}:start`);
+  const value = await fn();
+  performance.mark(`${t}:end`);
+  const { duration } = performance.measure(t, `${t}:start`, `${t}:end`);
+  perf.push({
+    study: "5", stage: name, dataset: "", format: "", bytes: "", width: "", height: "",
+    cache_state: CACHE_STATE, browser: BROWSER, rep: 1, ms: duration.toFixed(2), ...fields,
+  });
+  log(`${name}  ${(fields.dataset ?? "")}  ${duration.toFixed(1)} ms`);
+  return value;
+}
+
+const transferred = (url) =>
+  performance.getEntriesByType("resource").filter((e) => e.name.includes(url)).pop()?.transferSize ?? "";
+
+const toCsv = (rows) => {
+  const cols = Object.keys(rows[0]);
+  return [cols.join(","), ...rows.map((r) => cols.map((c) => JSON.stringify(r[c] ?? "")).join(","))].join("\n");
+};
+const download = (rows, name) => {
+  if (!rows.length) return log(`${name}: nothing recorded yet`);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv" }));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+  log(`wrote ${name} (${rows.length} rows)`);
+};
+
+// ── sources ───────────────────────────────────────────────────────────────────────────────────
+const CATALOGUE = "https://sdmlab.s3.amazonaws.com/FIM_Database/FIM_Viz/catalog_core.json";
+const HUC8 = "12090301";
+
+// The analysis extent: the intersection of the two observed footprints. The BLE tile covers far
+// more (1.37° × 0.85°) and is clipped down to this before anything is scored.
+const AOI = { west: -96.7724, south: 29.7290, east: -96.6474, north: 29.8656 };
+const FIT = [[AOI.south, AOI.west], [AOI.north, AOI.east]];
+
+// Classified benchmark encoding — see the method notes.
+const WET = 1, PERMANENT_WATER = 2, DRY = 0, NODATA = -9999;
+
+const arr = (v) => (Array.isArray(v) ? v : v == null ? [] : [String(v)]);
+
+// ── maps ──────────────────────────────────────────────────────────────────────────────────────
+// `isolated: true`: the default app allows one widget per page.
+const maps = {};
+for (const [k, sel] of [["obs", "#m-obs"], ["ble", "#m-ble"], ["diff", "#diff-map"]]) {
+  maps[k] = await FimViz.mount(sel, { provider: "leaflet", isolated: true });
+}
+for (const k of ["obs", "ble"]) {
+  const m = maps[k].map;
+  for (const h of ["dragging", "touchZoom", "doubleClickZoom", "scrollWheelZoom", "boxZoom", "keyboard"]) m[h]?.disable();
+  m.zoomControl?.remove();
+}
+
+// ── ingest ────────────────────────────────────────────────────────────────────────────────────
+/**
+ * Fetch → decode → clip to the AOI → rebuild as a strict 0/1 wet mask.
+ *
+ * The rebuild is not tidying. `compareExtentMetrics` scores every pixel that is not the dry
+ * sentinel as wet, so nodata (NaN after decode) and permanent water would both count as flooded.
+ * A binary grid with noData: null is the only input that makes the contingency table mean what it
+ * says. The parent is released as soon as the clip is forced — the BLE decode alone is ~446 MB.
+ */
+async function loadMask(rec, label) {
+  const ds = await stage("t_fetch", { dataset: label, format: "geotiff" },
+                         () => maps.diff.addDataset(rec.tif_url));
+  const full = await stage("t_decode", { dataset: label }, () => ds.grid());
+  const decodedBytes = full.pixels.byteLength;
+  const clipped = await stage("t_op", { dataset: `${label}:clip` }, () => ds.clip(AOI).grid());
+  ds.release();                                    // free the full-tile decode before the next load
+
+  let wet = 0, pwb = 0, nodata = 0;
+  const px = new Uint8Array(clipped.pixels.length);
+  // Validity travels separately. A cell the sensor never saw is not a dry cell, and folding the two
+  // together is what turns a cloud gap into a false positive against the regulatory map.
+  const valid = new Uint8Array(clipped.pixels.length);
+  for (let i = 0; i < px.length; i++) {
+    const v = clipped.pixels[i];
+    if (v === NODATA || Number.isNaN(v)) { nodata++; continue; }
+    valid[i] = 1;
+    if (v === WET) { px[i] = 1; wet++; }
+    else if (v === PERMANENT_WATER) pwb++;         // folded into dry, and counted so it is visible
+  }
+  const mk = (pixels) => new RasterGrid({ pixels, width: clipped.width, height: clipped.height,
+                                          bounds: clipped.bounds, crs: clipped.crs, noData: null });
+  const grid = mk(px);
+  grid.validity = mk(valid);
+
+  metrics.push({
+    study: "5", raster: label, tier: rec.tier, return_period: rec.return_period ?? "event",
+    date: rec.date_ymd ?? rec.start_date_ymd ?? "", resolution_m: rec.resolution_m,
+    full_width: full.width, full_height: full.height,
+    aoi_width: grid.width, aoi_height: grid.height,
+    bytes_compressed: transferred(rec.tif_url) || "",
+    bytes_decoded: decodedBytes,
+    expansion: (decodedBytes / (transferred(rec.tif_url) || decodedBytes)).toFixed(1),
+    wet_cells: wet, permanent_water_cells: pwb, nodata_cells: nodata,
+    wet_fraction: +(wet / px.length).toFixed(5),
+  });
+  log(`  ${label}: ${grid.width}x${grid.height} in AOI, wet ${(100 * wet / px.length).toFixed(2)}%`
+    + `, pwb ${(100 * pwb / px.length).toFixed(2)}%`);
+  return grid;
+}
+
+// ── rendering ─────────────────────────────────────────────────────────────────────────────────
+const wetScale = (color) => new ColorScale({
+  stops: [{ min: 0.5, max: 1.5, color, label: "wet" }], unit: "", missingColor: "transparent",
+});
+
+async function drawMask(mapKey, grid, color, title) {
+  const fim = maps[mapKey];
+  // 0 is dry; make it absent so only wet cells paint.
+  const shown = new Float32Array(grid.pixels.length);
+  for (let i = 0; i < shown.length; i++) shown[i] = grid.pixels[i] === 1 ? 1 : NaN;
+  const ds = Dataset.fromGrid(new RasterGrid({ ...grid, pixels: shown, noData: null }));
+  fim.adoptDataset(ds);
+  await stage("t_paint", { dataset: title }, () => fim.addLayer("raster", {
+    source: ds, colorScale: wetScale(color),
+  }));
+  fim.map.fitBounds(FIT);
+  const host = document.getElementById(`lg-${mapKey}`);
+  host.innerHTML = `<div><span class="swatch" style="background:${color}"></span>flooded</div>`
+    + `<p class="src">wet cells only · dry and nodata transparent</p>`;
+  host.hidden = false;
+}
+
+const DIFF_COLORS = { both: "#2f6fb5", bleOnly: "#e0b040", obsOnly: "#c0392b" };
+let diffLayer = null;
+
+/**
+ * ComparisonLayer is headless: it returns an `rgba` buffer and emits `computed`, but nothing renders
+ * it, and the buffer is already colourised so a ColorScale cannot re-key it. What the host can reuse
+ * is `aligned` — the per-source pixel arrays on the common grid — from which the four categories are
+ * rebuilt here and handed back to the ordinary raster path as a Dataset. The legend then comes from
+ * the layer, like every other surface in these studies.
+ */
+async function drawDiff(grid, aligned, dryValue, valid, opacity) {
+  const [ble, obs] = aligned;
+  const cat = new Float32Array(ble.length);
+  for (let i = 0; i < ble.length; i++) {
+    // Outside the observation's valid domain nothing is drawn, so the map shows exactly the cells
+    // the table scored.
+    if (!valid[i]) { cat[i] = NaN; continue; }
+    const w1 = ble[i] !== dryValue, w2 = obs[i] !== dryValue;
+    cat[i] = (w1 && w2) ? 1 : w1 ? 2 : w2 ? 3 : NaN;    // NaN → transparent, so dry never paints
+  }
+  const ds = Dataset.fromGrid(new RasterGrid({
+    pixels: cat, width: grid.width, height: grid.height, noData: null,
+    bounds: { north: grid.bn, south: grid.bs, east: grid.be, west: grid.bw }, crs: "EPSG:4326",
+  }));
+  const scale = new ColorScale({
+    missingColor: "transparent",
+    stops: [
+      { min: 0.5, max: 1.5, color: DIFF_COLORS.both,    label: "both" },
+      { min: 1.5, max: 2.5, color: DIFF_COLORS.bleOnly, label: "mapped, not observed" },
+      { min: 2.5, max: 3.5, color: DIFF_COLORS.obsOnly, label: "observed, not mapped" },
+    ],
+  });
+  diffLayer?.remove();
+  maps.diff.adoptDataset(ds);
+  diffLayer = await stage("t_paint", { dataset: "disagreement" },
+                          () => maps.diff.addLayer("raster", { source: ds, colorScale: scale }));
+  diffLayer.setOpacity(opacity);
+  maps.diff.map.fitBounds(FIT);
+  return diffLayer;
+}
+
+// ── scoring ───────────────────────────────────────────────────────────────────────────────────
+const POLICIES = ["low", "high", "average"];
+
+const derive = (tp, fp, fn, tn) => {
+  const n = tp + fp + fn + tn;
+  return {
+    tp, fp, fn, tn, n,
+    csi: +(tp + fp + fn > 0 ? tp / (tp + fp + fn) : 0).toFixed(4),
+    pod: +(tp + fn > 0 ? tp / (tp + fn) : 0).toFixed(4),
+    far: +(tp + fp > 0 ? fp / (tp + fp) : 0).toFixed(4),
+    bias: +(tp + fn > 0 ? (tp + fp) / (tp + fn) : 0).toFixed(4),
+    containment: +(tp + fn > 0 ? tp / (tp + fn) : 0).toFixed(4),
+  };
+};
+
+/**
+ * One contingency row, scored twice.
+ *
+ * The engine's `compareExtentMetrics` is binary — wet is "not the dry sentinel" — so it has no way
+ * to exclude a cell the sensor never saw. PlanetScope carries ~33% nodata over this extent (cloud
+ * and scene edges), and scoring those as dry charges the regulatory map a false positive for every
+ * one of them. The engine's own numbers are kept as `*_all`, and the domain-restricted numbers —
+ * observation-valid cells only, which is what FIMeval's AOI method achieves with the benchmark
+ * polygon — are computed alongside from the same aligned arrays via `resampleGrid`.
+ */
+function score(bleGrid, obsGrid, policy) {
+  // Sources are [prediction, observation]: fp = mapped but not observed, fn = observed but not mapped.
+  const layer = new ComparisonLayer({ sources: [bleGrid, obsGrid] });
+  const r = layer.compute({ policy, method: "nearest", dryValue: 0 });
+  const m = r.metrics;
+  const all = derive(m.tp, m.fp, m.fn, m.tn);
+
+  // Put the observation's validity mask on the same grid the comparison ran on, then re-tally.
+  const src = { bw: obsGrid.bounds.west, bs: obsGrid.bounds.south, be: obsGrid.bounds.east,
+                bn: obsGrid.bounds.north, width: obsGrid.width, height: obsGrid.height };
+  const valid = resampleGrid(obsGrid.validity.pixels, src, r.grid, { method: "nearest", noData: 0 });
+  const [ble, obs] = r.aligned;
+  let tp = 0, fp = 0, fn = 0, tn = 0;
+  for (let i = 0; i < valid.length; i++) {
+    if (!valid[i]) continue;
+    const w1 = ble[i] !== r.dryValue, w2 = obs[i] !== r.dryValue;
+    if (w1 && w2) tp++; else if (w1) fp++; else if (w2) fn++; else tn++;
+  }
+  const scoped = derive(tp, fp, fn, tn);
+
+  return { result: r, valid, row: {
+    ...scoped,
+    csi_all: all.csi, pod_all: all.pod, far_all: all.far, bias_all: all.bias,
+    containment_all: all.containment, n_all: all.n,
+    valid_fraction: +(scoped.n / all.n).toFixed(4),
+    kappa: +m.k.toFixed(4), pc: +m.pc.toFixed(4),
+    grid_w: r.grid.width, grid_h: r.grid.height,
+    warnings: (r.warnings || []).join("; "),
+  } };
+}
+
+// ── the pipeline ──────────────────────────────────────────────────────────────────────────────
+const records = {};
+const grids = {};
+let sel = { obs: "PSS", rp: 100, policy: "low", opacity: 0.8 };
+
+async function loadCatalogue() {
+  status("querying the benchmark catalogue…");
+  const cat = await stage("t_fetch", { dataset: "catalogue", format: "json" },
+                          () => fetch(CATALOGUE).then((r) => r.json()));
+  const site = cat.records.filter((x) => arr(x.huc8).includes(HUC8));
+  for (const r of site) {
+    if (r.tier === "Tier_2") records.PSS = r;
+    else if (r.tier === "Tier_3") records.S1A = r;
+    else if (r.tier === "Tier_4") records[`BLE${r.return_period}`] = r;
+  }
+  log(`catalogue: ${cat.records.length} records, ${site.length} for HUC ${HUC8}`);
+
+  document.getElementById("catalogue").innerHTML =
+    `<table><tr><th>tier</th><th>sensor / product</th><th>date</th><th>res</th><th>return period</th><th>file</th></tr>`
+    + site.map((r) => `<tr><td>${r.tier.replace("_", " ")}</td>`
+      + `<td>${/Planet/i.test(r.description) ? "PlanetScope" : /Sentinel/i.test(r.description) ? "Sentinel-1A"
+        : /Base Level/i.test(r.description) ? "FEMA BLE" : "—"}</td>`
+      + `<td>${(r.date_ymd ?? r.start_date_ymd ?? "—")}</td>`
+      + `<td class="num">${r.resolution_m} m</td>`
+      + `<td class="num">${r.return_period ? r.return_period + " yr" : "event"}</td>`
+      + `<td><code>${r.file_name}</code></td></tr>`).join("") + `</table>`;
+}
+
+async function loadAll() {
+  status("fetching the observed extent (PlanetScope, 3 MB)…");
+  grids.PSS = await loadMask(records.PSS, "PSS");
+  status("fetching the observed extent (Sentinel-1A, 2 MB)…");
+  grids.S1A = await loadMask(records.S1A, "S1A");
+  status("fetching FEMA BLE 100-yr — 6 MB compressed, ~446 MB decoded, this takes a moment…");
+  grids.BLE100 = await loadMask(records.BLE100, "BLE100");
+  status("fetching FEMA BLE 500-yr…");
+  grids.BLE500 = await loadMask(records.BLE500, "BLE500");
+}
+
+async function drawPanels() {
+  const o = records[sel.obs], b = records[`BLE${sel.rp}`];
+  document.getElementById("t-obs").innerHTML =
+    `Observed <small>${sel.obs === "PSS" ? "PlanetScope" : "Sentinel-1A"}, ${o.resolution_m} m, ${o.date_ymd ?? o.start_date_ymd}</small>`;
+  document.getElementById("t-ble").innerHTML =
+    `FEMA BLE <small>${sel.rp}-year, ${b.resolution_m} m</small>`;
+  await drawMask("obs", grids[sel.obs], "#c0392b", `obs:${sel.obs}`);
+  await drawMask("ble", grids[`BLE${sel.rp}`], "#e0b040", `ble:${sel.rp}`);
+}
+
+/** Score every observed × return-period × alignment combination. This is results.csv. */
+function scoreAll() {
+  results.length = 0;
+  for (const obs of ["PSS", "S1A"]) {
+    for (const rp of [100, 500]) {
+      for (const policy of POLICIES) {
+        const { row } = score(grids[`BLE${rp}`], grids[obs], policy);
+        results.push({ study: "5", huc8: HUC8, observed: obs, observed_tier: records[obs].tier,
+                       observed_res_m: records[obs].resolution_m, return_period: rp,
+                       alignment: policy, ...row });
+      }
+    }
+  }
+  renderResults();
+}
+
+function renderResults() {
+  const cols = [["observed", "observed"], ["return_period", "rp"], ["alignment", "align"],
+                ["valid_fraction", "valid"], ["tp", "TP"], ["fp", "FP"], ["fn", "FN"],
+                ["containment", "containment"], ["csi", "CSI"], ["far", "FAR"], ["bias", "bias"],
+                ["csi_all", "CSI unscoped"]];
+  document.getElementById("results").innerHTML =
+    `<table><tr>${cols.map(([, h]) => `<th>${h}</th>`).join("")}</tr>`
+    + results.map((r) => {
+      const on = r.observed === sel.obs && r.return_period === sel.rp && r.alignment === sel.policy;
+      return `<tr class="${on ? "hi" : ""}">`
+        + cols.map(([c], i) => `<td${i > 2 ? ' class="num"' : ""}>${r[c]}</td>`).join("") + `</tr>`;
+    }).join("") + `</table>`;
+  const note = document.getElementById("results-note");
+  note.innerHTML = "<b>containment</b> = TP / (TP + FN): the share of observed flooding that fell "
+    + "inside the regulatory extent. <b>FN</b> is its complement in cells — observed water the map "
+    + "did not anticipate. <b>valid</b> is the fraction of the extent the sensor actually saw; all "
+    + "columns except the last are scored over those cells only. <b>CSI unscoped</b> is what the "
+    + "engine returns when nodata is left folded into dry, and the gap between the two columns is "
+    + "the cost of that shortcut. Source order is [prediction, observation], so FP is regulatory "
+    + "over-prediction. Permanent water is folded into dry; the highlighted row is drawn in Fig. 5.2.";
+  note.hidden = false;
+}
+
+async function recompute() {
+  const { result, valid } = score(grids[`BLE${sel.rp}`], grids[sel.obs], sel.policy);
+  const layer = await drawDiff(result.grid, result.aligned, result.dryValue, valid, sel.opacity);
+  const legend = layer.getLegend();
+  const host = document.getElementById("lg-diff");
+  host.innerHTML = `<p class="title">${sel.rp}-yr BLE vs ${sel.obs}</p>` + legend.toHtml()
+    + `<p class="src">aligned ${sel.policy} · ${result.grid.width}×${result.grid.height}</p>`;
+  host.hidden = false;
+  await drawPanels();
+  renderResults();
+}
+
+function buildControls() {
+  const host = document.getElementById("diff-controls");
+  host.innerHTML = "";
+  const add = (label, node) => {
+    const l = document.createElement("label");
+    l.className = "ctl"; l.textContent = label; l.appendChild(node); host.appendChild(l);
+  };
+  const mk = (opts, val, on) => {
+    const s = document.createElement("select");
+    for (const [v, t] of opts) s.add(new Option(t, v));
+    s.value = val; s.onchange = () => on(s.value); return s;
+  };
+  add("observed", mk([["PSS", "PlanetScope 3.1 m"], ["S1A", "Sentinel-1A 9.4 m"]], sel.obs,
+                     async (v) => { sel.obs = v; await go(); }));
+  add("return period", mk([["100", "100-yr"], ["500", "500-yr"]], String(sel.rp),
+                          async (v) => { sel.rp = Number(v); await go(); }));
+  add("alignment", mk(POLICIES.map((p) => [p, p]), sel.policy,
+                      async (v) => { sel.policy = v; await go(); }));
+  const op = document.createElement("input");
+  op.type = "range"; op.min = 0; op.max = 1; op.step = 0.05; op.value = sel.opacity;
+  op.oninput = () => { sel.opacity = Number(op.value); diffLayer?.setOpacity(sel.opacity); };
+  add("opacity", op);
+}
+
+async function go() {
+  status("scoring…");
+  await recompute();
+  status("ready", "done");
+}
+
+document.getElementById("dlp").onclick = () => download(perf, "performance.csv");
+document.getElementById("dlm").onclick = () => download(metrics, "metrics.csv");
+document.getElementById("dlr").onclick = () => download(results, "results.csv");
+
+try {
+  await loadCatalogue();
+  await loadAll();
+  buildControls();
+  status("scoring 12 combinations…");
+  scoreAll();
+  await recompute();
+  const best = results.find((r) => r.observed === "PSS" && r.return_period === 100 && r.alignment === "low");
+  log(`\ncontainment (PSS × 100yr × low): ${(100 * best.containment).toFixed(1)}%`
+    + ` — ${best.fn.toLocaleString()} observed cells outside the regulatory extent`);
+  status("ready", "done");
+} catch (e) {
+  log(`ERROR  ${e.message}`);
+  console.error(e);
+  status(`failed: ${e.message}`, "fail");
+}
+</script>
+</body>
+</html>

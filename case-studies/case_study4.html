@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — Case Study 4: adopting the engine in pieces</title>
+<link rel="icon" href="../assets/brand/favicon.png" />
+<link rel="stylesheet" href="../site.css" />
+<style>
+  body { max-width: 96ch; margin: 0 auto; padding: 30px 22px 80px; }
+  h1 { font-size: 23px; margin: 0 0 6px; letter-spacing: -.01em; }
+  h2 { font-size: 15px; margin: 28px 0 9px; }
+  h2 .n { color: var(--dim); font: 600 12px/1 var(--mono); margin-right: 8px; }
+  h3 { font-size: 13px; margin: 0 0 6px; font-weight: 600; }
+  h3 small { color: var(--dim); font-weight: 400; margin-left: 6px; }
+  p { margin: 0 0 11px; }
+  ul { margin: 0 0 11px; padding-left: 20px; }
+  li { margin: 0 0 4px; }
+  .lead { color: var(--dim); margin-bottom: 16px; }
+  .q { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; margin: 0 0 16px; }
+
+  #status { font-size: 12.5px; color: var(--dim); margin: 0 0 16px; min-height: 18px; }
+  .spin { width: 11px; height: 11px; border: 2px solid var(--line); border-top-color: var(--accent);
+          border-radius: 50%; display: inline-block; animation: sp .8s linear infinite;
+          vertical-align: -1px; margin-right: 7px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  #status.done .spin, #status.fail .spin { display: none; }
+  #status.fail { color: var(--bad); }
+
+  .scene { display: grid; grid-template-columns: minmax(0,1fr) 220px; gap: 14px; align-items: start; }
+  @media (max-width: 820px) { .scene { grid-template-columns: 1fr; } }
+  #map { height: 440px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .mapwrap { position: relative; }
+  .lg { position: absolute; right: 9px; bottom: 9px; z-index: 1100; background: var(--panel);
+        border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; font-size: 11px;
+        color: var(--fg); box-shadow: 0 1px 5px rgb(0 0 0 / .25); }
+  .lg .src { color: var(--dim); font-size: 10px; margin: 4px 0 0; }
+  /* The host's own layer panel. The engine's UI kit is deliberately not used. */
+  .side { border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; background: var(--panel); }
+  .side h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim);
+             margin: 0 0 8px; font-weight: 600; }
+  .lyr { display: flex; align-items: center; gap: 7px; font-size: 12.5px; margin: 5px 0; }
+  .lyr input[type=range] { width: 58px; accent-color: var(--accent); }
+  .lyr label { flex: 1; cursor: pointer; }
+
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0 4px; }
+  .hint { font-size: 12px; color: var(--dim); margin: 0 0 14px; }
+  button { background: transparent; color: var(--accent); border: 1px solid var(--control-line);
+           border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+
+  pre.out { background: var(--panel); color: var(--dim); white-space: pre-wrap;
+            max-height: 190px; font-size: 12px; margin: 12px 0; }
+  pre.out:empty { display: none; }
+  table { border-collapse: collapse; font-size: 12.5px; margin: 0 0 8px; width: 100%; }
+  th, td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .bar { display: inline-block; height: 9px; background: var(--accent); }
+  .swatch { display: inline-block; width: 11px; height: 11px; border: 1px solid #ccc;
+            margin-right: 6px; vertical-align: -1px; }
+  #reuse:empty, #exposure:empty, #persist:empty, #hosts:empty { display: none; }
+  .todo { color: var(--warn); }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+</style>
+</head>
+<body>
+
+<h1>Case Study 4 — Adopting the engine in pieces</h1>
+<p class="lead">
+  A composed scene built from one decode, an exposure result driven from it, and the same engine
+  measured across four hosts. Protocol: <a href="CASE_STUDY_PROTOCOL.md">CASE_STUDY_PROTOCOL.md</a>
+  §0 and §4.
+</p>
+<p class="q">
+  <b>The claim under test.</b> A comparable library could be generated on demand — so the response
+  cannot be that this was hard to build. It is that the engine is a <i>factored capability envelope
+  with defined seams</i>, and that adoption cost is measurable. This page composes a scene, derives
+  every layer in it from a single decode, drives an exposure choropleth from that, and reports what
+  three other hosts had to write to do the same.
+</p>
+
+<p id="status"><span class="spin"></span><span id="status-text">starting…</span></p>
+
+<h2><span class="n">Fig. 4.1</span>The composed scene</h2>
+<div class="scene">
+  <div class="mapwrap"><div id="map"></div><div class="lg" id="legend" hidden></div></div>
+  <div>
+    <div class="side">
+      <h3>Layers</h3>
+      <div id="panel"></div>
+    </div>
+    <div class="side" style="margin-top:12px">
+      <h3>Scene</h3>
+      <div id="scene-stats" style="font-size:12.5px;color:var(--dim)"></div>
+    </div>
+  </div>
+</div>
+<p class="hint">
+  <b>The layer panel is host markup.</b> The engine ships a UI kit and this page does not use it —
+  each row is a checkbox and a range input the host wrote, wired to <code>layer.hide()</code>,
+  <code>show()</code> and <code>setOpacity()</code>, with the legend read from
+  <code>layer.getLegend()</code>. That is the read-model contract the framework host in this study
+  is supposed to exercise, demonstrated here without a framework.
+</p>
+<p class="hint">
+  <span class="todo"><b>Scope, stated rather than glossed.</b></span> §4 asks for extent, depth,
+  velocity and damage in one view. The bundled samples do not permit it: depth and velocity are
+  Brazos, Texas in EPSG:26914; <code>Ensemble.tif</code> is EPSG:26917 several hundred kilometres
+  away; the damage points are Cedar Rapids, Iowa. Three products, three places. This scene therefore
+  composes what genuinely overlaps — depth, velocity magnitude, and an extent derived by thresholding
+  the depth — all from the Brazos footprint. The ensemble agreement layer of §4 step 2 is not built
+  for the same reason: <code>Ensemble.tif</code> is a single pre-baked raster in a different
+  projection and place, and there are no N ≥ 4 members over this footprint to aggregate.
+</p>
+
+<pre class="out" id="log"></pre>
+
+<h2><span class="n">§</span>Reuse — the number Section 3.2 rests on</h2>
+<div id="reuse"></div>
+<p class="hint">
+  M layers derived from one decode against M naive re-decodes of the same file. The ratio is not a
+  constant: it is bounded by how expensive the decode is relative to the op. On this 698 kB raster it
+  is small; on Case Study 5's 6.4 MB BLE tile, which expands 67× to 446 MB in memory, the same
+  measurement would be dominated entirely by decode. Report the ratio <i>with</i> the decode cost, or
+  it reads as a bigger claim than it is.
+</p>
+
+<h2><span class="n">§</span>Exposure by administrative unit</h2>
+<div id="exposure"></div>
+<p class="hint" id="exposure-note" hidden></p>
+
+<h2><span class="n">§</span>Persistence and provenance</h2>
+<div id="persist"></div>
+<div class="controls">
+  <button id="save">save scene to Storage</button>
+  <button id="reload" disabled>clear and rehydrate</button>
+</div>
+<p class="hint">
+  The recipe is the chain, not the pixels. <span class="todo">One collision the protocol does not
+  anticipate:</span> band math outside <code>combine</code>'s fixed vocabulary
+  (<code>difference/ratio/sum/mean/min/max</code>) needs a callback <code>reclassify</code>, and a
+  callback cannot be structured-cloned, so <code>toRecord()</code> throws on it. Velocity magnitude
+  is exactly such an op — √(x²+y²) — so <b>the composed scene above cannot be fully persisted</b>.
+  The engine throws a clear error naming the op rather than silently dropping it, which is the right
+  behaviour, but composition and persistence are in tension and §4 step 5 assumes they are not.
+</p>
+
+<h2><span class="n">§</span>Integration cost across hosts</h2>
+<div id="hosts"></div>
+<p class="hint">
+  Hosts 1 and 3 are pages in this repository; host 4 is a script you can run. Host 2 is not built —
+  see below.
+</p>
+
+<div class="controls">
+  <span class="muted">export —</span>
+  <button id="dlp">performance.csv</button>
+  <button id="dlh">hosts.csv</button>
+  <button id="dle">exposure.csv</button>
+  <button id="dlr">reuse.csv</button>
+</div>
+
+<h2><span class="n">§</span>Method notes</h2>
+<ul>
+  <li><b>Host 2 (framework) is not built,</b> and no number is invented for it. A credible
+      <code>bundle_kb_gzip</code> delta requires a real Vite/webpack project, a production build with
+      and without the engine, and a measured diff — none of which can be faked from a static page.
+      The React/Vue host is the one remaining piece of §4 Part A.
+      <span class="todo">Stated as outstanding rather than estimated.</span></li>
+  <li><b>Host 4 found three packaging blockers,</b> all reported in
+      <code>case_study4_headless.mjs</code>: the public barrel cannot be imported under Node
+      (<code>export { Loader } from "@googlemaps/js-api-loader"</code> is CJS); the default
+      reprojector resolves gdal3.js to its browser build, though <code>gdal3.node.js</code> ships
+      alongside and works through <code>Dataset.registerReprojector()</code>; and
+      <code>gridToDataURL()</code> needs a DOM, so the host wrote ~40 lines of PNG encoder over
+      <code>colorizeGrid()</code>, which is DOM-free by design. None is a missing capability. All
+      three are packaging.</li>
+  <li><b>A host writing its own reprojector must implement both branches of the seam.</b>
+      <code>reproject()</code> above a plain source hands the reprojector the root bytes; above a
+      real computation it hands a grid instead, which has to be re-encoded before warping. Host 4
+      implemented only the first and had to reorder its chain. The contract is documented in
+      <code>io/reprojector.js</code>, but nothing warns you at registration time.</li>
+  <li><b>Provider swap.</b> <code>registerMapProvider</code> is the seam, and the advanced overlay
+      tier — velocity animation, damage markers, ArcGIS depth — is implemented on the Google backend
+      only. Swapping to Leaflet degrades those specifically.
+      <span class="todo">Measured here only as far as the Leaflet backend goes; the Google run needs
+      an API key and is outstanding.</span></li>
+  <li><b>Nothing on this page loads engine CSS.</b> The layer panel, the legend and the tables are
+      host markup styled by <code>site.css</code>, which is the site's, not the engine's.</li>
+</ul>
+
+<h2><span class="n">§</span>Data</h2>
+<table>
+  <tr><th>Role</th><th>Source</th><th>Path</th></tr>
+  <tr><td>Depth</td><td>Brazos RP100 depth, 539×322, EPSG:26914, 698 kB.</td>
+      <td><code>../assets/SampleFiles/Brazos_RP100_depth.tif</code></td></tr>
+  <tr><td>Velocity</td><td>x and y components, same grid and CRS, 698 kB each.</td>
+      <td><code>../assets/SampleFiles/Velocity/Brazos_Velocity_{x,y}.tif</code></td></tr>
+  <tr><td>Administrative units</td><td>US Census TIGERweb tracts, live query, CORS-open.</td>
+      <td><code>https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/0/query</code></td></tr>
+</table>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js"
+} }
+</script>
+
+<script type="module">
+import { FimViz, ColorScale, Stats, Dataset, Storage } from "fimviz";
+
+// ── §0 instrumentation ────────────────────────────────────────────────────────────────────────
+const CACHE_STATE = "warm";
+const BROWSER = navigator.userAgent;
+const perf = [], hosts = [], exposure = [], reuse = [];
+
+const log = (...a) => { document.getElementById("log").textContent += a.join(" ") + "\n"; };
+const status = (text, state = "") => {
+  document.getElementById("status-text").textContent = text;
+  document.getElementById("status").className = state;
+};
+
+async function stage(name, fields, fn) {
+  const t = `${name}-${perf.length}`;
+  performance.mark(`${t}:start`);
+  const value = await fn();
+  performance.mark(`${t}:end`);
+  const { duration } = performance.measure(t, `${t}:start`, `${t}:end`);
+  perf.push({ study: "4", stage: name, dataset: "", format: "", bytes: "", width: "", height: "",
+              cache_state: CACHE_STATE, browser: BROWSER, rep: 1, ms: duration.toFixed(2), ...fields });
+  return { value, ms: duration };
+}
+const timed = async (n, f, fn) => (await stage(n, f, fn)).value;
+
+const toCsv = (rows) => {
+  const cols = Object.keys(rows[0]);
+  return [cols.join(","), ...rows.map((r) => cols.map((c) => JSON.stringify(r[c] ?? "")).join(","))].join("\n");
+};
+const download = (rows, name) => {
+  if (!rows.length) return log(`${name}: nothing recorded`);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv" }));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+};
+const metaOf = (g) => ({ bw: g.bounds.west, bs: g.bounds.south, be: g.bounds.east, bn: g.bounds.north,
+                         width: g.width, height: g.height, noData: g.noData });
+
+// ── sources ───────────────────────────────────────────────────────────────────────────────────
+const S = "../assets/SampleFiles/";
+const DEPTH = S + "Brazos_RP100_depth.tif";
+const VX = S + "Velocity/Brazos_Velocity_x.tif", VY = S + "Velocity/Brazos_Velocity_y.tif";
+const TIGER = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/0/query";
+const WET = 0.1;
+
+const fim = await FimViz.mount("#map", { provider: "leaflet" });
+const layers = {};
+let depthDs = null, warpedDepth = null, extentDs = null, magDs = null, fitB = null;
+
+// ── the host's own layer panel — the engine's UI kit is deliberately unused ────────────────────
+function addPanelRow(key, label, layer, initial = 1) {
+  const row = document.createElement("div");
+  row.className = "lyr";
+  const cb = document.createElement("input");
+  cb.type = "checkbox"; cb.checked = true;
+  cb.onchange = () => (cb.checked ? layer.show() : layer.hide());
+  const lb = document.createElement("label"); lb.textContent = label;
+  const op = document.createElement("input");
+  op.type = "range"; op.min = 0; op.max = 1; op.step = 0.05; op.value = initial;
+  op.oninput = () => layer.setOpacity(Number(op.value));
+  row.append(cb, lb, op);
+  document.getElementById("panel").appendChild(row);
+  layer.setOpacity(initial);
+}
+
+function showLegend(layer, note) {
+  const host = document.getElementById("legend");
+  const lg = layer.getLegend();
+  if (!lg) return;
+  lg.formatValue = (v) => v.toFixed(1);
+  host.innerHTML = lg.toHtml() + `<p class="src">${note}</p>`;
+  host.hidden = false;
+}
+
+// ── the scene ─────────────────────────────────────────────────────────────────────────────────
+async function buildScene() {
+  status("ingesting depth…");
+  depthDs = await timed("t_total", { dataset: "depth", format: "geotiff" }, () => fim.addDataset(DEPTH));
+  log(`depth crs=${depthDs.crs}`);
+
+  status("warping EPSG:26914 → EPSG:4326 (GDAL loads ~38 MB on first use)…");
+  const { value: wg, ms: warpMs } = await stage("t_op", { dataset: "warp:26914→4326" },
+                                                () => depthDs.reproject("EPSG:4326").grid());
+  warpedDepth = wg;
+  log(`warp ${warpMs.toFixed(0)} ms → ${wg.width}x${wg.height}`);
+  fitB = [[wg.bounds.south, wg.bounds.west], [wg.bounds.north, wg.bounds.east]];
+
+  const s = Stats.raster(wg.pixels, metaOf(wg), { bins: 24 });
+  const warpedDs = depthDs.reproject("EPSG:4326");
+
+  // Layer 1 — depth
+  layers.depth = await timed("t_paint", { dataset: "depth" }, () => fim.addLayer("raster", {
+    source: warpedDs,
+    colorScale: new ColorScale({ palette: "blues", min: 0, max: s.max, continuous: true,
+                                 unit: "m", missingColor: "transparent" }) }));
+  addPanelRow("depth", "Depth (m)", layers.depth, 0.9);
+  showLegend(layers.depth, "depth · derived from one decode");
+
+  // Layer 2 — extent, derived from the SAME decode, not re-read
+  extentDs = warpedDs.reclassify([{ min: WET, value: 1 }]);
+  layers.extent = await timed("t_paint", { dataset: "extent" }, () => fim.addLayer("raster", {
+    source: extentDs,
+    colorScale: new ColorScale({ missingColor: "transparent",
+      stops: [{ min: 0.5, max: 1.5, color: "#c0392b", label: `extent ≥ ${WET} m` }] }) }));
+  addPanelRow("extent", `Extent ≥ ${WET} m`, layers.extent, 0.45);
+
+  // Layer 3 — velocity magnitude. combine() has no hypot, so this is the callback escape hatch,
+  // and it is precisely what makes the scene unsaveable (see the persistence section).
+  status("deriving velocity magnitude…");
+  const vx = await fim.addDataset(VX), vy = await fim.addDataset(VY);
+  magDs = vx.reclassify((v) => v * v)
+    .combine([vy.reclassify((v) => v * v)], { op: "sum" })
+    .reclassify((v) => Math.sqrt(v))
+    .reproject("EPSG:4326");
+  try {
+    const { value: mg, ms } = await stage("t_op", { dataset: "velocity-magnitude" }, () => magDs.grid());
+    const ms2 = Stats.raster(mg.pixels, metaOf(mg), { bins: 16 });
+    layers.velocity = await timed("t_paint", { dataset: "velocity" }, () => fim.addLayer("raster", {
+      source: magDs,
+      colorScale: new ColorScale({ palette: "heat", min: 0, max: ms2.max, continuous: true,
+                                   unit: "m/s", missingColor: "transparent" }) }));
+    addPanelRow("velocity", "Velocity (m/s)", layers.velocity, 0.7);
+    log(`velocity magnitude ${ms.toFixed(0)} ms · max ${ms2.max.toFixed(2)} m/s`);
+  } catch (e) {
+    log(`velocity magnitude unavailable: ${e.message}`);
+  }
+
+  fim.map.fitBounds(fitB);
+  document.getElementById("scene-stats").innerHTML =
+    `<div>${Object.keys(layers).length} layers</div><div>1 decode of ${DEPTH.split("/").pop()}</div>`
+    + `<div>grid ${wg.width}×${wg.height}</div><div>depth max ${s.max.toFixed(2)} m</div>`;
+  return s;
+}
+
+// ── reuse ─────────────────────────────────────────────────────────────────────────────────────
+async function measureReuse() {
+  status("measuring reuse…");
+  const THRESHOLDS = [0.1, 0.5, 1, 2, 3, 4];
+  const t0 = performance.now();
+  const src = await fim.addDataset(DEPTH);
+  await src.grid();
+  for (const th of THRESHOLDS) await src.reclassify([{ min: th, value: 1 }]).grid();
+  const one = performance.now() - t0;
+
+  const t1 = performance.now();
+  for (const th of THRESHOLDS) {
+    const fresh = await fim.addDataset(DEPTH);
+    await fresh.reclassify([{ min: th, value: 1 }]).grid();
+  }
+  const naive = performance.now() - t1;
+
+  const decoded = (await src.grid()).pixels.byteLength;
+  reuse.push({ study: "4", n_layers: THRESHOLDS.length, one_decode_ms: +one.toFixed(1),
+               naive_redecode_ms: +naive.toFixed(1), ratio: +(naive / one).toFixed(2),
+               decoded_bytes: decoded });
+  document.getElementById("reuse").innerHTML =
+    `<table><tr><th>measure</th><th>value</th></tr>`
+    + [[`${THRESHOLDS.length} layers, one decode`, `${one.toFixed(1)} ms`],
+       [`${THRESHOLDS.length} layers, ${THRESHOLDS.length} decodes`, `${naive.toFixed(1)} ms`],
+       ["ratio", `${(naive / one).toFixed(2)}×`],
+       ["decoded buffer", `${(decoded / 1024).toFixed(0)} kB`]]
+      .map(([k, v]) => `<tr><td>${k}</td><td class="num">${v}</td></tr>`).join("") + `</table>`;
+  log(`reuse ${(naive / one).toFixed(2)}× (${one.toFixed(0)} ms vs ${naive.toFixed(0)} ms)`);
+}
+
+// ── exposure ──────────────────────────────────────────────────────────────────────────────────
+const ringsOf = (geom) =>
+  (geom.type === "MultiPolygon" ? geom.coordinates : [geom.coordinates])
+    .flat().map((r) => r.map(([lng, lat]) => ({ lat, lng })));
+
+async function measureExposure() {
+  status("fetching administrative units…");
+  const b = warpedDepth.bounds;
+  const q = new URLSearchParams({
+    where: "1=1", geometry: `${b.west},${b.south},${b.east},${b.north}`,
+    geometryType: "esriGeometryEnvelope", spatialRel: "esriSpatialRelIntersects",
+    inSR: "4326", outSR: "4326", outFields: "GEOID,NAME,AREALAND",
+    returnGeometry: "true", resultRecordCount: "200", f: "geojson",
+  });
+  const fc = await timed("t_fetch", { dataset: "tigerweb-tracts", format: "geojson" },
+                         async () => (await fetch(`${TIGER}?${q}`)).json());
+  if (!fc.features?.length) { log("exposure: no administrative units returned"); return; }
+  log(`tracts: ${fc.features.length}`);
+
+  status("running zonal statistics for exposure…");
+  const zones = fc.features.map((f, i) => ({ id: i, polygon: ringsOf(f.geometry) }));
+  const rows = await timed("t_op", { dataset: "zonalStats:exposure" }, () => extentDs.zonalStats(zones));
+
+  // Cell area in km², from the warped grid's own geometry at its centre latitude.
+  const latC = (b.north + b.south) / 2, M = 111320;
+  const cellKm2 = (((b.east - b.west) / warpedDepth.width) * M * Math.cos(latC * Math.PI / 180))
+                * (((b.north - b.south) / warpedDepth.height) * M) / 1e6;
+
+  exposure.length = 0;
+  rows.forEach((r, i) => {
+    const p = fc.features[i].properties;
+    const flooded = (r.count || 0) * cellKm2;
+    const land = p.AREALAND ? p.AREALAND / 1e6 : null;
+    exposure.push({ study: "4", admin_unit: p.NAME ?? p.GEOID, geoid: p.GEOID,
+                    area_km2: land == null ? "" : +land.toFixed(3),
+                    flooded_area_km2: +flooded.toFixed(4),
+                    pct_flooded: land ? +(100 * flooded / land).toFixed(2) : "",
+                    exposed_count: "", cells: r.count || 0 });
+  });
+  exposure.sort((a, b2) => b2.flooded_area_km2 - a.flooded_area_km2);
+  const max = Math.max(...exposure.map((e) => e.flooded_area_km2), 1e-9);
+  document.getElementById("exposure").innerHTML =
+    `<table><tr><th>tract</th><th>GEOID</th><th>land km²</th><th>flooded km²</th><th>% flooded</th><th></th></tr>`
+    + exposure.slice(0, 12).map((e) => `<tr><td>${e.admin_unit}</td><td>${e.geoid}</td>`
+        + `<td class="num">${e.area_km2}</td><td class="num">${e.flooded_area_km2}</td>`
+        + `<td class="num">${e.pct_flooded}</td>`
+        + `<td><span class="bar" style="width:${(100 * e.flooded_area_km2 / max).toFixed(0)}px"></span></td></tr>`).join("")
+    + `</table>`;
+  const note = document.getElementById("exposure-note");
+  note.innerHTML = `Flooded area is the extent layer's wet cells inside each tract, at `
+    + `${cellKm2.toFixed(5)} km² per cell. <b>exposed_count is empty,</b> and deliberately so: layer 0 `
+    + `of this service carries geometry and land area but no population. The same MapServer does `
+    + `expose an ACS layer (id 3), so a population-weighted exposure is a GEOID join away — `
+    + `<span class="todo">outstanding, not impossible</span>. The column is left blank rather than `
+    + `filled with a guess.`;
+  note.hidden = false;
+}
+
+// ── persistence ───────────────────────────────────────────────────────────────────────────────
+function measurePersistence() {
+  const out = [];
+  const tryRecord = (label, ds) => {
+    try {
+      const rec = ds.toRecord();
+      const bytes = JSON.stringify(rec).length;
+      out.push([label, `${bytes} B`, "<span class='ok'>saved</span>"]);
+      return bytes;
+    } catch (e) {
+      out.push([label, "—", `<span class='bad'>${e.message.split(":").slice(1).join(":").trim().slice(0, 64)}…</span>`]);
+      return null;
+    }
+  };
+  const decoded = warpedDepth.pixels.byteLength;
+  const dBytes = tryRecord("depth → extent (range rules)", extentDs);
+  tryRecord("velocity magnitude (callback)", magDs);
+  document.getElementById("persist").innerHTML =
+    `<table><tr><th>chain</th><th>recipe</th><th>toRecord()</th></tr>`
+    + out.map((r) => `<tr><td>${r[0]}</td><td class="num">${r[1]}</td><td>${r[2]}</td></tr>`).join("")
+    + (dBytes ? `<tr><td>decoded buffer, for comparison</td><td class="num">${decoded} B</td>`
+        + `<td>${(decoded / dBytes).toFixed(0)}× the recipe</td></tr>` : "")
+    + `</table>`;
+}
+
+// ── hosts table ───────────────────────────────────────────────────────────────────────────────
+function renderHosts(firstRenderMs) {
+  hosts.push(
+    { host: "1 · static page (this file)", loc: "~330", deps_added: 0, bundle_kb_gzip: "n/a (no bundler)",
+      time_to_first_render_ms: Math.round(firstRenderMs), engine_css_used: "no",
+      registries_touched: "none", capabilities_degraded: "none" },
+    { host: "2 · framework (React/Vue)", loc: "—", deps_added: "—", bundle_kb_gzip: "—",
+      time_to_first_render_ms: "—", engine_css_used: "—", registries_touched: "—",
+      capabilities_degraded: "NOT BUILT — needs a real bundler project" },
+    { host: "3 · partial adoption in Leaflet", loc: "~60", deps_added: 0,
+      bundle_kb_gzip: "n/a (no bundler)", time_to_first_render_ms: "see page",
+      engine_css_used: "no", registries_touched: "none",
+      capabilities_degraded: "no engine rendering used at all" },
+    { host: "4 · headless Node", loc: "~185", deps_added: 0, bundle_kb_gzip: "n/a",
+      time_to_first_render_ms: "n/a (writes PNG)", engine_css_used: "no",
+      registries_touched: "reprojector",
+      capabilities_degraded: "barrel import, GDAL default, gridToDataURL" });
+  document.getElementById("hosts").innerHTML =
+    `<table><tr><th>host</th><th>host LOC</th><th>deps</th><th>bundle Δ</th><th>first render</th>`
+    + `<th>engine CSS</th><th>registries</th><th>degraded</th></tr>`
+    + hosts.map((h) => `<tr><td>${h.host}</td><td class="num">${h.loc}</td>`
+        + `<td class="num">${h.deps_added}</td><td class="num">${h.bundle_kb_gzip}</td>`
+        + `<td class="num">${h.time_to_first_render_ms}</td><td>${h.engine_css_used}</td>`
+        + `<td>${h.registries_touched}</td><td>${h.capabilities_degraded}</td></tr>`).join("")
+    + `</table>`;
+}
+
+// ── run ───────────────────────────────────────────────────────────────────────────────────────
+document.getElementById("dlp").onclick = () => download(perf, "performance.csv");
+document.getElementById("dlh").onclick = () => download(hosts, "hosts.csv");
+document.getElementById("dle").onclick = () => download(exposure, "exposure.csv");
+document.getElementById("dlr").onclick = () => download(reuse, "reuse.csv");
+
+document.getElementById("save").onclick = async () => {
+  try {
+    const rec = extentDs.toRecord();
+    await Storage.set?.("scene", "extent", rec) ?? localStorage.setItem("cs4.extent", JSON.stringify(rec));
+    log(`saved recipe (${JSON.stringify(rec).length} B)`);
+    document.getElementById("reload").disabled = false;
+  } catch (e) { log(`save failed: ${e.message}`); }
+};
+document.getElementById("reload").onclick = async () => {
+  const raw = localStorage.getItem("cs4.extent");
+  if (!raw) return log("nothing stored");
+  const t0 = performance.now();
+  const back = Dataset.fromRecord(JSON.parse(raw));
+  const g = await back.grid();
+  log(`rehydrated ${g.width}x${g.height} in ${(performance.now() - t0).toFixed(1)} ms`);
+};
+
+const t0 = performance.now();
+try {
+  await buildScene();
+  const firstRender = performance.now() - t0;
+  await measureReuse();
+  await measureExposure();
+  measurePersistence();
+  renderHosts(firstRender);
+  status("ready", "done");
+} catch (e) {
+  console.error(e);
+  log(`ERROR  ${e.message}`);
+  status(`failed: ${e.message}`, "fail");
+}
+</script>
+</body>
+</html>
