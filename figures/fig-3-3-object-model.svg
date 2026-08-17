@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="830" viewBox="0 0 1180 830"
+     font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
+  <title>FIMViz.js object model — Dataset and Layer</title>
+  <desc>Dataset is a lazy, immutable node in an operation chain; eleven operations derive a new node
+        and compute nothing. Five terminal calls force the chain and are where the decode happens,
+        once, memoized. A Layer is one rendering of one or more Datasets: one Dataset backs many
+        Layers, and the N-ary layers take several Datasets onto a common grid.</desc>
+
+  <defs>
+    <marker id="lazy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#94a3b8"/>
+    </marker>
+    <marker id="force" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#ea580c"/>
+    </marker>
+    <marker id="render" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#475569"/>
+    </marker>
+  </defs>
+
+  <rect width="1180" height="830" fill="#ffffff"/>
+
+  <!-- ═══════════════ DATASET ═══════════════════════════════════════════════════════════ -->
+  <rect x="24" y="26" width="1132" height="264" rx="9" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="40" y="48" font-size="13.5" font-weight="700" fill="#0f172a">DATASET <tspan font-weight="400" font-size="11.5" fill="#475569">— a lazy, immutable node in an operation chain</tspan></text>
+  <text x="40" y="65" font-size="11" fill="#475569">A root wraps a source; a derived node is a parent plus one operation. Nothing below computes until something forces it.</text>
+
+  <!-- root -->
+  <rect x="48" y="78" width="186" height="88" rx="7" fill="#dbeafe" stroke="#60a5fa" stroke-width="1.5"/>
+  <text x="58" y="96" font-size="12" font-weight="700" fill="#0f172a">root</text>
+  <text x="58" y="113" font-size="9.5" fill="#475569">source: bytes · features · URI</text>
+  <text x="58" y="127" font-size="9.5" fill="#475569">crs — never assumed</text>
+  <text x="58" y="141" font-size="9.5" fill="#475569">bounds · selection axes</text>
+  <text x="58" y="155" font-size="9.5" fill="#475569">warnings from parsing</text>
+
+  <!-- branch A -->
+  <line x1="238" y1="106" x2="270" y2="106" stroke="#94a3b8" stroke-width="1.4"
+        stroke-dasharray="4 3" marker-end="url(#lazy)"/>
+  <rect x="274" y="80" width="168" height="52" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+  <text x="284" y="98" font-size="11" font-weight="700" fill="#0f172a">.clip(aoi)</text>
+  <text x="284" y="114" font-size="9.5" fill="#64748b">parent + one op</text>
+
+  <line x1="446" y1="106" x2="478" y2="106" stroke="#94a3b8" stroke-width="1.4"
+        stroke-dasharray="4 3" marker-end="url(#lazy)"/>
+  <rect x="482" y="80" width="168" height="52" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+  <text x="492" y="98" font-size="11" font-weight="700" fill="#0f172a">.reclassify(≥ 0.1 m)</text>
+  <text x="492" y="114" font-size="9.5" fill="#64748b">parent + one op</text>
+
+  <!-- branch B: the same parent, a second child -->
+  <path d="M238,140 C256,140 256,168 270,168" fill="none" stroke="#94a3b8" stroke-width="1.4"
+        stroke-dasharray="4 3" marker-end="url(#lazy)"/>
+  <rect x="274" y="142" width="168" height="52" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+  <text x="284" y="160" font-size="11" font-weight="700" fill="#0f172a">.slope()</text>
+  <text x="284" y="176" font-size="9.5" fill="#64748b">same parent, untouched</text>
+
+  <line x1="446" y1="168" x2="478" y2="168" stroke="#94a3b8" stroke-width="1.4"
+        stroke-dasharray="4 3" marker-end="url(#lazy)"/>
+  <rect x="482" y="142" width="168" height="52" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+  <text x="492" y="160" font-size="11" font-weight="700" fill="#0f172a">.hillshade()</text>
+  <text x="492" y="176" font-size="9.5" fill="#64748b">parent + one op</text>
+
+  <!-- immutability note -->
+  <rect x="686" y="78" width="446" height="116" rx="7" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="700" y="97" font-size="11.5" font-weight="700" fill="#0f172a">Why immutability buys reuse</text>
+  <text x="700" y="115" font-size="10" fill="#475569">The root above has two children and is mutated by neither. A chain</text>
+  <text x="700" y="130" font-size="10" fill="#475569">can therefore be shared between renderings, cached, serialized with</text>
+  <text x="700" y="145" font-size="10" fill="#475569">toRecord() and rehydrated with fromRecord() — no node ever has to</text>
+  <text x="700" y="160" font-size="10" fill="#475569">defend itself against modification by another holder.</text>
+  <text x="700" y="181" font-size="10" font-weight="700" fill="#0f172a">The decode is memoized, so the branch costs one read, not two.</text>
+
+  <!-- lazy operation inventory -->
+  <text x="48" y="216" font-size="11" font-weight="700" fill="#0f172a">LAZY OPERATIONS <tspan font-weight="400" fill="#475569">— each returns a new Dataset and computes nothing (11)</tspan></text>
+  <g font-size="10" fill="#334155" text-anchor="middle">
+    <rect x="48"  y="224" width="118" height="22" rx="11" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="3 2"/><text x="107" y="239">reproject</text>
+    <rect x="176" y="224" width="118" height="22" rx="11" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="3 2"/><text x="235" y="239">clip</text>
+    <rect x="304" y="224" width="118" height="22" rx="11" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="3 2"/><text x="363" y="239">mask</text>
+    <rect x="432" y="224" width="118" height="22" rx="11" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="3 2"/><text x="491" y="239">reclassify</text>
+    <rect x="560" y="224" width="118" height="22" rx="11" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="3 2"/><text x="619" y="239">combine</text>
+    <rect x="688" y="224" width="118" height="22" rx="11" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="3 2"/><text x="747" y="239">resampleTo</text>
+    <rect x="48"  y="254" width="118" height="22" rx="11" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="3 2"/><text x="107" y="269">slope</text>
+    <rect x="176" y="254" width="118" height="22" rx="11" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="3 2"/><text x="235" y="269">aspect</text>
+    <rect x="304" y="254" width="118" height="22" rx="11" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="3 2"/><text x="363" y="269">hillshade</text>
+    <rect x="432" y="254" width="118" height="22" rx="11" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="3 2"/><text x="491" y="269">rasterize</text>
+    <rect x="560" y="254" width="118" height="22" rx="11" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="3 2"/><text x="619" y="269">reduce</text>
+  </g>
+  <text x="700" y="269" font-size="10" fill="#64748b">dashed = nothing has been read or computed yet</text>
+
+  <!-- ═══════════════ TERMINAL BOUNDARY ═════════════════════════════════════════════════ -->
+  <line x1="141" y1="200" x2="141" y2="298" stroke="#ea580c" stroke-width="1.6" marker-end="url(#force)"/>
+
+  <rect x="24" y="302" width="1132" height="80" rx="9" fill="#fff7ed" stroke="#ea580c"
+        stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="40" y="324" font-size="12.5" font-weight="700" fill="#9a3412">TERMINAL CALLS <tspan font-weight="400" font-size="11" fill="#c2410c">— the only calls that force the chain. The decode happens here, once, and is memoized on the node.</tspan></text>
+  <g font-size="10.5" fill="#9a3412" text-anchor="middle">
+    <rect x="48"  y="338" width="130" height="24" rx="6" fill="#ffedd5" stroke="#ea580c"/><text x="113" y="354">grid()</text>
+    <rect x="188" y="338" width="130" height="24" rx="6" fill="#ffedd5" stroke="#ea580c"/><text x="253" y="354">load()</text>
+    <rect x="328" y="338" width="130" height="24" rx="6" fill="#ffedd5" stroke="#ea580c"/><text x="393" y="354">features()</text>
+    <rect x="468" y="338" width="130" height="24" rx="6" fill="#ffedd5" stroke="#ea580c"/><text x="533" y="354">zonalStats()</text>
+    <rect x="608" y="338" width="130" height="24" rx="6" fill="#ffedd5" stroke="#ea580c"/><text x="673" y="354">groupBy()</text>
+  </g>
+  <text x="756" y="348" font-size="10" fill="#9a3412">release() frees the memoized decode.</text>
+  <text x="756" y="362" font-size="10" fill="#9a3412">toRecord() serialises the recipe without forcing it.</text>
+
+  <!-- ═══════════════ LAYER ═════════════════════════════════════════════════════════════ -->
+  <rect x="24" y="394" width="1132" height="238" rx="9" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="40" y="416" font-size="13.5" font-weight="700" fill="#0f172a">LAYER <tspan font-weight="400" font-size="11.5" fill="#475569">— one rendering of one or more Datasets</tspan></text>
+  <text x="40" y="433" font-size="11" fill="#475569">A Layer holds no pixels of its own. The cardinality runs both ways, and both directions are what the reuse claim rests on.</text>
+
+  <line x1="590" y1="446" x2="590" y2="614" stroke="#e2e8f0" stroke-width="1.5"/>
+
+  <!-- left: one dataset, many layers -->
+  <text x="48" y="460" font-size="11" font-weight="700" fill="#0f172a">One Dataset → many Layers <tspan font-weight="400" fill="#64748b">— one decode, several renderings</tspan></text>
+  <rect x="216" y="470" width="168" height="38" rx="6" fill="#dbeafe" stroke="#60a5fa"/>
+  <text x="300" y="494" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">one forced Dataset</text>
+
+  <path d="M264,510 C264,532 132,530 132,552" fill="none" stroke="#475569" stroke-width="1.3" marker-end="url(#render)"/>
+  <path d="M300,510 L300,552" fill="none" stroke="#475569" stroke-width="1.3" marker-end="url(#render)"/>
+  <path d="M336,510 C336,532 468,530 468,552" fill="none" stroke="#475569" stroke-width="1.3" marker-end="url(#render)"/>
+
+  <rect x="60" y="556" width="144" height="52" rx="6" fill="#e6edf5" stroke="#a8bdd4"/>
+  <text x="132" y="576" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">raster</text>
+  <text x="132" y="592" font-size="9.5" fill="#475569" text-anchor="middle">its own ColorScale</text>
+
+  <rect x="228" y="556" width="144" height="52" rx="6" fill="#e6edf5" stroke="#a8bdd4"/>
+  <text x="300" y="576" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">depth</text>
+  <text x="300" y="592" font-size="9.5" fill="#475569" text-anchor="middle">its own opacity</text>
+
+  <rect x="396" y="556" width="144" height="52" rx="6" fill="#e6edf5" stroke="#a8bdd4"/>
+  <text x="468" y="576" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">vector</text>
+  <text x="468" y="592" font-size="9.5" fill="#475569" text-anchor="middle">its own visibility</text>
+
+  <!-- right: many datasets, one layer -->
+  <text x="614" y="460" font-size="11" font-weight="700" fill="#0f172a">Many Datasets → one Layer <tspan font-weight="400" fill="#64748b">— N-ary, aligned onto a common grid</tspan></text>
+  <rect x="614" y="470" width="150" height="38" rx="6" fill="#dbeafe" stroke="#60a5fa"/>
+  <text x="689" y="494" font-size="10.5" fill="#0f172a" text-anchor="middle">Dataset · 3.1 m</text>
+  <rect x="778" y="470" width="150" height="38" rx="6" fill="#dbeafe" stroke="#60a5fa"/>
+  <text x="853" y="494" font-size="10.5" fill="#0f172a" text-anchor="middle">Dataset · 9.4 m</text>
+  <rect x="942" y="470" width="150" height="38" rx="6" fill="#dbeafe" stroke="#60a5fa"/>
+  <text x="1017" y="494" font-size="10.5" fill="#0f172a" text-anchor="middle">Dataset · 10 m</text>
+
+  <path d="M689,510 C689,534 853,528 853,552" fill="none" stroke="#475569" stroke-width="1.3" marker-end="url(#render)"/>
+  <path d="M853,510 L853,552" fill="none" stroke="#475569" stroke-width="1.3" marker-end="url(#render)"/>
+  <path d="M1017,510 C1017,534 853,528 853,552" fill="none" stroke="#475569" stroke-width="1.3" marker-end="url(#render)"/>
+
+  <rect x="700" y="556" width="306" height="64" rx="6" fill="#e6edf5" stroke="#a8bdd4"/>
+  <text x="853" y="575" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">comparison · ensembleAgreement</text>
+  <text x="853" y="592" font-size="9.5" fill="#475569" text-anchor="middle">members are Datasets, not renderings</text>
+  <text x="853" y="607" font-size="9.5" fill="#475569" text-anchor="middle">so one base decode is shared, not re-read per member</text>
+
+  <!-- ═══════════════ REGISTERED TYPES ══════════════════════════════════════════════════ -->
+  <text x="24" y="662" font-size="11.5" font-weight="700" fill="#0f172a">REGISTERED LAYER TYPES <tspan font-weight="400" font-size="10.5" fill="#475569">— all seven go through the public seam, Layer.registerType(). A host adds an eighth the same way.</tspan></text>
+  <g>
+    <rect x="24"  y="670" width="148" height="46" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+    <text x="34" y="688" font-size="11" font-weight="700" fill="#0f172a">raster</text>
+    <text x="34" y="703" font-size="9" fill="#64748b">1 source</text>
+
+    <rect x="180" y="670" width="148" height="46" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+    <text x="190" y="688" font-size="11" font-weight="700" fill="#0f172a">vector</text>
+    <text x="190" y="703" font-size="9" fill="#64748b">1 source</text>
+
+    <rect x="336" y="670" width="148" height="46" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+    <text x="346" y="688" font-size="11" font-weight="700" fill="#0f172a">comparison</text>
+    <text x="346" y="703" font-size="9" fill="#64748b">2–8 sources</text>
+
+    <rect x="492" y="670" width="148" height="46" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+    <text x="502" y="688" font-size="11" font-weight="700" fill="#0f172a">ensembleAgreement</text>
+    <text x="502" y="703" font-size="9" fill="#64748b">N sources</text>
+
+    <rect x="648" y="670" width="148" height="46" rx="6" fill="#fffbeb" stroke="#d97706"/>
+    <circle cx="784" cy="681" r="4" fill="#d97706"/>
+    <text x="658" y="688" font-size="11" font-weight="700" fill="#0f172a">depth</text>
+    <text x="658" y="703" font-size="9" fill="#92400e">1 source · from layers/</text>
+
+    <rect x="804" y="670" width="148" height="46" rx="6" fill="#fffbeb" stroke="#d97706"/>
+    <circle cx="940" cy="681" r="4" fill="#d97706"/>
+    <text x="814" y="688" font-size="11" font-weight="700" fill="#0f172a">ensemble</text>
+    <text x="814" y="703" font-size="9" fill="#92400e">N sources · from layers/</text>
+
+    <rect x="960" y="670" width="148" height="46" rx="6" fill="#fffbeb" stroke="#d97706"/>
+    <circle cx="1096" cy="681" r="4" fill="#d97706"/>
+    <text x="970" y="688" font-size="11" font-weight="700" fill="#0f172a">velocity</text>
+    <text x="970" y="703" font-size="9" fill="#92400e">1 source · from layers/</text>
+  </g>
+
+  <!-- ═══════════════ legend + claim ════════════════════════════════════════════════════ -->
+  <g>
+    <line x1="30" y1="740" x2="58" y2="740" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#lazy)"/>
+    <text x="66" y="744" font-size="10.5" fill="#475569">lazy — derives a node</text>
+    <line x1="216" y1="740" x2="244" y2="740" stroke="#ea580c" stroke-width="1.6" marker-end="url(#force)"/>
+    <text x="252" y="744" font-size="10.5" fill="#475569">terminal — forces the decode</text>
+    <line x1="450" y1="740" x2="478" y2="740" stroke="#475569" stroke-width="1.3" marker-end="url(#render)"/>
+    <text x="486" y="744" font-size="10.5" fill="#475569">renders</text>
+    <circle cx="586" cy="740" r="4" fill="#d97706"/>
+    <text x="598" y="744" font-size="10.5" fill="#475569">registered from layers/, which sits above the app tier — the same path a host would use</text>
+  </g>
+
+  <text x="24" y="778" font-size="11.5" font-weight="700" fill="#0f172a">A source is not a rendering, and that is the whole of it.</text>
+  <text x="24" y="795" font-size="11.5" fill="#475569">Eleven operations derive without reading; five calls read. Because a comparison or ensemble layer takes <tspan font-style="italic">Datasets</tspan> rather than renderings, its</text>
+  <text x="24" y="812" font-size="11.5" fill="#475569">members share one decoded base grid instead of one read per member — measured at 2.44× for six derived layers over a single source (Study 4).</text>
+</svg>

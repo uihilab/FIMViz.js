@@ -60,6 +60,9 @@
   .swatch { display: inline-block; width: 11px; height: 11px; border: 1px solid #ccc;
             margin-right: 6px; vertical-align: -1px; }
   #results:empty, #catalogue:empty { display: none; }
+  /* Fifteen columns do not fit 96ch; let the table scroll rather than crush every heading. */
+  #results { overflow-x: auto; }
+  #results table { width: auto; min-width: 100%; white-space: nowrap; }
   .todo { color: var(--warn); }
   .k { color: var(--dim); } .s { color: var(--ok); } .f { color: var(--accent); }
 </style>
@@ -112,17 +115,27 @@
     <div class="mapwrap"><div class="map" id="m-ble"></div><div class="lg" id="lg-ble" hidden></div></div>
   </div>
 </div>
+<div class="controls" id="panel-controls"></div>
 <p class="hint">
-  Both panels are fixed at the analysis extent — the intersection of the two footprints, about
-  12 × 15 km — because a two-panel comparison at two extents is not a comparison. Wet cells only;
-  dry and nodata render transparent.
+  Both panels open at the analysis extent — the intersection of the two footprints, about
+  12 × 15 km — and pan and zoom <b>together</b>, because a two-panel comparison at two extents is
+  not a comparison. Changing a control below redraws them in place rather than snapping the view
+  back; <b>reset to analysis extent</b> restores it. Wet cells only;
+  dry renders transparent, and so does the selected sensor's blind spot — cloud, scene edge, or no
+  radar return. <b>Both panels are masked to that same domain</b>, the regulatory one included,
+  even though FEMA BLE has no gaps of its own: those cells are excluded from every number in the
+  results table, and a panel that painted mapped extent across them would not agree with Fig. 5.2.
+  Its size is the <code>valid</code> column below — under PlanetScope it is about a third of the
+  extent — and switching the observed sensor redraws both panels against the new domain.
 </p>
 
 <h2><span class="n">Fig. 5.2</span>Where they disagree</h2>
 <div class="mapwrap"><div id="diff-map"></div><div class="lg" id="lg-diff" hidden></div></div>
 <div class="controls" id="diff-controls"></div>
 <p class="hint">
-  Four categories on one grid. <b>observed</b> selects which satellite is treated as truth,
+  Four categories on one grid, over the same domain as Fig. 5.1 — cells the sensor never saw draw
+  nothing in either figure, so the regulatory extent in the two is directly comparable.
+  <b>observed</b> selects which satellite is treated as truth,
   <b>return period</b> switches the BLE map between the 1% and 0.2% annual-chance extents, and
   <b>alignment</b> chooses the grid the two rasters are resampled onto before scoring —
   <code>low</code> the coarser, <code>high</code> the finer, <code>average</code> between them. The
@@ -146,6 +159,17 @@
   an order of magnitude also changes the metrics. Report all three; a single CSI hides every one
   of them.
 </p>
+<p class="hint">
+  <b>Why accuracy is reported next to the chance term.</b> Flood extent is a rare class: most of any
+  study area is dry, so a map that predicted nothing at all would still score a high
+  <code>pc</code>. The <b>chance</b> column is that free agreement made explicit — the proportion
+  two maps with these marginal totals would match on at random — and κ is what survives once it is
+  subtracted. The gap between the two is the reason accuracy is reported here for completeness
+  rather than as a finding, and it is the same reason the flood-evaluation literature scores CSI:
+  both κ and CSI discount the dry background, where <code>pc</code> is dominated by it. Where κ and
+  CSI disagree, κ is the more forgiving of the two, because it still gives the map credit for
+  correctly identifying dry ground and CSI gives none.
+</p>
 
 <div class="controls">
   <span class="muted">export —</span>
@@ -157,7 +181,8 @@
   <b>performance.csv</b> — timings under the protocol's five fixed stage names. <b>metrics.csv</b> —
   one row per ingested raster: dimensions, wet-cell fraction, decode cost, compressed and decoded
   bytes. <b>results.csv</b> — the contingency table above, one row per observed × return-period ×
-  alignment combination. <span class="todo"><code>REPS</code> is 1 and cache state is "warm"; set 5
+  alignment combination, each metric in both a validity-scoped and an <code>_all</code> (whole-grid)
+  form. <span class="todo"><code>REPS</code> is 1 and cache state is "warm"; set 5
   and run the cold pass before recording.</span>
 </p>
 
@@ -187,6 +212,17 @@
       grid — from which this page rebuilds the four categories and renders them through the ordinary
       raster path. The engine's most differentiated subsystem therefore ships with no renderable
       read-model of its own; that the workaround is short does not make it unnecessary.</li>
+  <li><b>Accuracy and kappa come from the engine where the engine can supply them.</b>
+      <code>compareExtentMetrics</code> returns <code>pc</code> and <code>k</code>, and the
+      <code>_all</code> columns are those values verbatim. The domain-restricted columns cannot be:
+      the function scores every pixel of the grid it is given, and the only scoping it accepts is a
+      polygon ring (<code>compute({ mask })</code>, <code>metricsForMask()</code>), not the
+      per-pixel validity mask this study needs — and the function is not exported from the barrel
+      either, so it cannot simply be called on the scoped counts. Both are therefore recomputed from
+      those counts, and <code>score()</code> asserts on every call that the recomputation reproduces
+      the engine's own <code>pc</code> and <code>k</code> when fed the engine's own counts. A
+      <code>domain</code> or per-pixel <code>weights</code> option on <code>compute()</code> would
+      remove the workaround entirely.</li>
   <li><b>Dates differ by a day.</b> Sentinel-1A observed 29 Aug, PlanetScope 30 Aug. They are not two
       views of one instant, and part of any disagreement between them is the flood receding. That is
       a floor on how precisely either can be called truth.</li>
@@ -298,10 +334,19 @@ const maps = {};
 for (const [k, sel] of [["obs", "#m-obs"], ["ble", "#m-ble"], ["diff", "#diff-map"]]) {
   maps[k] = await FimViz.mount(sel, { provider: "leaflet", isolated: true });
 }
-for (const k of ["obs", "ble"]) {
-  const m = maps[k].map;
-  for (const h of ["dragging", "touchZoom", "doubleClickZoom", "scrollWheelZoom", "boxZoom", "keyboard"]) m[h]?.disable();
-  m.zoomControl?.remove();
+// Fig. 5.1's panels pan and zoom, but only in lockstep. Freezing them kept the two extents equal —
+// the property the comparison depends on — at the cost of making anything under the legend or near
+// the panel edge unreachable. Syncing the views keeps the property and returns the ability to look.
+const panelMaps = ["obs", "ble"].map((k) => maps[k].map);
+let syncing = false;
+for (const m of panelMaps) {
+  m.on("move zoom", () => {
+    if (syncing) return;                       // the guard: each setView below re-fires this handler
+    syncing = true;
+    const c = m.getCenter(), z = m.getZoom();
+    for (const other of panelMaps) if (other !== m) other.setView(c, z, { animate: false });
+    syncing = false;
+  });
 }
 
 // ── ingest ────────────────────────────────────────────────────────────────────────────────────
@@ -355,29 +400,68 @@ async function loadMask(rec, label) {
 }
 
 // ── rendering ─────────────────────────────────────────────────────────────────────────────────
-const wetScale = (color) => new ColorScale({
-  stops: [{ min: 0.5, max: 1.5, color, label: "wet" }], unit: "", missingColor: "transparent",
-});
 
-async function drawMask(mapKey, grid, color, title) {
+// Cells the sensor never saw render transparent everywhere. What matters is that every figure drops
+// the SAME cells: the earlier defect was Fig. 5.1 drawing regulatory extent over ground Fig. 5.2 had
+// excluded, which made one layer look like it had two extents. Agreeing on the domain fixes that;
+// painting the excluded region grey only traded a quiet inconsistency for a loud one.
+
+// resample.js's meta shape, from either a RasterGrid (bounds object) or an already-flat grid meta.
+const gridMeta = (g) => (g.bounds
+  ? { bw: g.bounds.west, bs: g.bounds.south, be: g.bounds.east, bn: g.bounds.north,
+      width: g.width, height: g.height }
+  : g);
+
+/** The observation's validity mask, carried onto some other grid's geometry. */
+const validityOn = (obsGrid, target) =>
+  resampleGrid(obsGrid.validity.pixels, gridMeta(obsGrid), gridMeta(target),
+               { method: "nearest", noData: 0 });
+
+// Layers are replaced, not stacked. Without this the panels accumulate: switching the return period
+// to 500 and back to 100 leaves the 500-year extent painted under the 100-year one, and Fig. 5.1
+// then shows a larger BLE extent than Fig. 5.2 scored.
+const panelLayers = {};
+
+async function drawMask(mapKey, grid, color, title, validity = null) {
   const fim = maps[mapKey];
-  // 0 is dry; make it absent so only wet cells paint.
+  // 1 = wet, NaN = everything else (transparent): dry, and — when a validity mask is supplied — every
+  // cell the sensor never saw. Dropping the second group is what puts this panel on the same domain
+  // as Fig. 5.2, which scores only those cells.
   const shown = new Float32Array(grid.pixels.length);
-  for (let i = 0; i < shown.length; i++) shown[i] = grid.pixels[i] === 1 ? 1 : NaN;
-  const ds = Dataset.fromGrid(new RasterGrid({ ...grid, pixels: shown, noData: null }));
+  for (let i = 0; i < shown.length; i++) {
+    shown[i] = (grid.pixels[i] === 1 && (!validity || validity[i])) ? 1 : NaN;
+  }
+  const scale = new ColorScale({
+    unit: "", missingColor: "transparent",
+    stops: [{ min: 0.5, max: 1.5, color, label: "flooded" }],
+  });
+  // `validity` is dropped rather than spread through: this grid is a display copy that gets released
+  // on the next render, and it has no business holding a reference to the source mask.
+  const { validity: _drop, ...base } = grid;
+  const ds = Dataset.fromGrid(new RasterGrid({ ...base, pixels: shown, noData: null }));
+
+  const prev = panelLayers[mapKey];
   fim.adoptDataset(ds);
-  await stage("t_paint", { dataset: title }, () => fim.addLayer("raster", {
-    source: ds, colorScale: wetScale(color),
-  }));
-  fim.map.fitBounds(FIT);
+  const layer = await stage("t_paint", { dataset: title },
+                            () => fim.addLayer("raster", { source: ds, colorScale: scale }));
+  // Swap after the replacement is up, so the panel never blanks between renders.
+  if (prev) { prev.layer.remove(); fim.removeDataset(prev.ds, { force: true }); }
+  panelLayers[mapKey] = { layer, ds };
+
+  // Fit ONCE, on the panel's first layer. Re-fitting on every render would throw away whatever the
+  // reader had panned to the moment they touched a control — the "reset to analysis extent" button
+  // is how the view comes back, on request rather than behind their back.
+  if (!prev) fim.map.fitBounds(FIT);
   const host = document.getElementById(`lg-${mapKey}`);
-  host.innerHTML = `<div><span class="swatch" style="background:${color}"></span>flooded</div>`
-    + `<p class="src">wet cells only · dry and nodata transparent</p>`;
+  host.innerHTML = layer.getLegend().toJSON().stops.map((s) =>
+    `<div><span class="swatch" style="background:${s.color}"></span>${s.label ?? ""}</div>`).join("")
+    + `<p class="src">dry and unobserved render transparent</p>`;
   host.hidden = false;
 }
 
 const DIFF_COLORS = { both: "#2f6fb5", bleOnly: "#e0b040", obsOnly: "#c0392b" };
 let diffLayer = null;
+let diffFitted = false;   // same rule as the panels: fit on the first render, never again unasked
 
 /**
  * ComparisonLayer is headless: it returns an `rgba` buffer and emits `computed`, but nothing renders
@@ -390,8 +474,9 @@ async function drawDiff(grid, aligned, dryValue, valid, opacity) {
   const [ble, obs] = aligned;
   const cat = new Float32Array(ble.length);
   for (let i = 0; i < ble.length; i++) {
-    // Outside the observation's valid domain nothing is drawn, so the map shows exactly the cells
-    // the table scored.
+    // The observation's blind spot — cloud, scene edge, no radar return — draws nothing, so the map
+    // shows exactly the cells the table scored. Fig. 5.1 drops the same cells, which is what keeps
+    // the regulatory extent in the two figures comparable.
     if (!valid[i]) { cat[i] = NaN; continue; }
     const w1 = ble[i] !== dryValue, w2 = obs[i] !== dryValue;
     cat[i] = (w1 && w2) ? 1 : w1 ? 2 : w2 ? 3 : NaN;    // NaN → transparent, so dry never paints
@@ -413,7 +498,7 @@ async function drawDiff(grid, aligned, dryValue, valid, opacity) {
   diffLayer = await stage("t_paint", { dataset: "disagreement" },
                           () => maps.diff.addLayer("raster", { source: ds, colorScale: scale }));
   diffLayer.setOpacity(opacity);
-  maps.diff.map.fitBounds(FIT);
+  if (!diffFitted) { maps.diff.map.fitBounds(FIT); diffFitted = true; }
   return diffLayer;
 }
 
@@ -422,6 +507,17 @@ const POLICIES = ["low", "high", "average"];
 
 const derive = (tp, fp, fn, tn) => {
   const n = tp + fp + fn + tn;
+  // `accuracy` and `kappa` are `compareExtentMetrics`' `pc` and `k`, recomputed rather than read off
+  // the layer: the layer scores the whole grid, and there is no per-pixel domain mask to restrict it
+  // to the cells the sensor saw — `compute({ mask })` and `metricsForMask()` take a polygon ring
+  // only, and `compareExtentMetrics` itself is not exported from the barrel to be called directly on
+  // the scoped counts. `score()` checks these formulas against the engine's on every call.
+  //
+  // `chance` is the expected-agreement term the engine folds inside `k`. Reporting it is the point:
+  // kappa = (accuracy − chance) / (1 − chance) is the engine's formula rearranged, so the two columns
+  // side by side show how much of the raw agreement was available for free from the class imbalance.
+  const agree = n > 0 ? (tp + tn) / n : 0;
+  const chance = n > 0 ? ((tp + fp) * (tp + fn) + (fp + tn) * (fn + tn)) / (n * n) : 0;
   return {
     tp, fp, fn, tn, n,
     csi: +(tp + fp + fn > 0 ? tp / (tp + fp + fn) : 0).toFixed(4),
@@ -429,6 +525,9 @@ const derive = (tp, fp, fn, tn) => {
     far: +(tp + fp > 0 ? fp / (tp + fp) : 0).toFixed(4),
     bias: +(tp + fn > 0 ? (tp + fp) / (tp + fn) : 0).toFixed(4),
     containment: +(tp + fn > 0 ? tp / (tp + fn) : 0).toFixed(4),
+    accuracy: +agree.toFixed(4),
+    chance: +chance.toFixed(4),
+    kappa: +(chance < 1 ? (agree - chance) / (1 - chance) : 0).toFixed(4),
   };
 };
 
@@ -449,10 +548,17 @@ function score(bleGrid, obsGrid, policy) {
   const m = r.metrics;
   const all = derive(m.tp, m.fp, m.fn, m.tn);
 
+  // Parity check, run on every score: fed the engine's OWN counts, the host's accuracy and kappa must
+  // reproduce the engine's pc and k to the printed precision. If this ever fires, the two definitions
+  // have drifted and every scoped accuracy/kappa below is suspect. It is cheap, and it is the reason
+  // the recomputation above is acceptable rather than a second, unverified definition of the metric.
+  if (Math.abs(all.accuracy - m.pc) > 5e-5 || Math.abs(all.kappa - m.k) > 5e-5) {
+    log(`  WARNING metric parity: host ${all.accuracy}/${all.kappa}`
+      + ` vs engine ${m.pc.toFixed(4)}/${m.k.toFixed(4)}`);
+  }
+
   // Put the observation's validity mask on the same grid the comparison ran on, then re-tally.
-  const src = { bw: obsGrid.bounds.west, bs: obsGrid.bounds.south, be: obsGrid.bounds.east,
-                bn: obsGrid.bounds.north, width: obsGrid.width, height: obsGrid.height };
-  const valid = resampleGrid(obsGrid.validity.pixels, src, r.grid, { method: "nearest", noData: 0 });
+  const valid = validityOn(obsGrid, r.grid);
   const [ble, obs] = r.aligned;
   let tp = 0, fp = 0, fn = 0, tn = 0;
   for (let i = 0; i < valid.length; i++) {
@@ -466,8 +572,9 @@ function score(bleGrid, obsGrid, policy) {
     ...scoped,
     csi_all: all.csi, pod_all: all.pod, far_all: all.far, bias_all: all.bias,
     containment_all: all.containment, n_all: all.n,
+    // Straight from the engine — over the whole grid, which is the one domain it can score.
+    accuracy_all: +m.pc.toFixed(4), kappa_all: +m.k.toFixed(4),
     valid_fraction: +(scoped.n / all.n).toFixed(4),
-    kappa: +m.k.toFixed(4), pc: +m.pc.toFixed(4),
     grid_w: r.grid.width, grid_h: r.grid.height,
     warnings: (r.warnings || []).join("; "),
   } };
@@ -514,12 +621,17 @@ async function loadAll() {
 
 async function drawPanels() {
   const o = records[sel.obs], b = records[`BLE${sel.rp}`];
+  const obsGrid = grids[sel.obs], bleGrid = grids[`BLE${sel.rp}`];
   document.getElementById("t-obs").innerHTML =
     `Observed <small>${sel.obs === "PSS" ? "PlanetScope" : "Sentinel-1A"}, ${o.resolution_m} m, ${o.date_ymd ?? o.start_date_ymd}</small>`;
   document.getElementById("t-ble").innerHTML =
     `FEMA BLE <small>${sel.rp}-year, ${b.resolution_m} m</small>`;
-  await drawMask("obs", grids[sel.obs], "#c0392b", `obs:${sel.obs}`);
-  await drawMask("ble", grids[`BLE${sel.rp}`], "#e0b040", `ble:${sel.rp}`);
+  // BOTH panels are masked to the selected observation's valid domain — the BLE panel too, even
+  // though the regulatory map has no blind spots of its own. It is the domain the comparison runs
+  // on, and a panel that paints regulatory extent where nothing was scored cannot be read against
+  // Fig. 5.2. The BLE mask is the 3.1 m or 9.4 m validity resampled onto the 10 m BLE grid.
+  await drawMask("obs", obsGrid, "#c0392b", `obs:${sel.obs}`, obsGrid.validity.pixels);
+  await drawMask("ble", bleGrid, "#e0b040", `ble:${sel.rp}`, validityOn(obsGrid, bleGrid));
 }
 
 /** Score every observed × return-period × alignment combination. This is results.csv. */
@@ -540,8 +652,11 @@ function scoreAll() {
 
 function renderResults() {
   const cols = [["observed", "observed"], ["return_period", "rp"], ["alignment", "align"],
-                ["valid_fraction", "valid"], ["tp", "TP"], ["fp", "FP"], ["fn", "FN"],
+                // TN completes the 2×2. CSI/POD/FAR/bias/containment never needed it; accuracy and
+                // κ do, so without it those two columns cannot be reconstructed or checked.
+                ["valid_fraction", "valid"], ["tp", "TP"], ["fp", "FP"], ["fn", "FN"], ["tn", "TN"],
                 ["containment", "containment"], ["csi", "CSI"], ["far", "FAR"], ["bias", "bias"],
+                ["accuracy", "accuracy"], ["chance", "chance"], ["kappa", "κ"],
                 ["csi_all", "CSI unscoped"]];
   document.getElementById("results").innerHTML =
     `<table><tr>${cols.map(([, h]) => `<th>${h}</th>`).join("")}</tr>`
@@ -553,11 +668,20 @@ function renderResults() {
   const note = document.getElementById("results-note");
   note.innerHTML = "<b>containment</b> = TP / (TP + FN): the share of observed flooding that fell "
     + "inside the regulatory extent. <b>FN</b> is its complement in cells — observed water the map "
-    + "did not anticipate. <b>valid</b> is the fraction of the extent the sensor actually saw; all "
-    + "columns except the last are scored over those cells only. <b>CSI unscoped</b> is what the "
-    + "engine returns when nodata is left folded into dry, and the gap between the two columns is "
-    + "the cost of that shortcut. Source order is [prediction, observation], so FP is regulatory "
-    + "over-prediction. Permanent water is folded into dry; the highlighted row is drawn in Fig. 5.2.";
+    + "did not anticipate. <b>TN</b> is dry in both, and is there because accuracy and κ cannot be "
+    + "checked without it — but read it as a measure of how much dry ground the analysis extent "
+    + "happens to enclose, not as a result. Redraw the AOI larger and TN, accuracy and chance all "
+    + "rise while CSI does not move. <b>valid</b> is the fraction of the extent the sensor actually "
+    + "saw; all columns except the last are scored over those cells only. <b>accuracy</b> = "
+    + "(TP + TN) / N is "
+    + "the engine's <code>pc</code>, and <b>chance</b> is the agreement two maps with these marginal "
+    + "totals would reach at random — read the pair together, because accuracy alone is mostly a "
+    + "restatement of how much of the extent is dry. <b>κ</b> = (accuracy − chance) / (1 − chance) is "
+    + "the engine's <code>k</code>, and is what is left after that free agreement is removed. "
+    + "<b>CSI unscoped</b> is what the engine returns when nodata is left folded into dry, and the "
+    + "gap between the two columns is the cost of that shortcut. Source order is [prediction, "
+    + "observation], so FP is regulatory over-prediction. Permanent water is folded into dry; the "
+    + "highlighted row is drawn in Fig. 5.2.";
   note.hidden = false;
 }
 
@@ -571,6 +695,21 @@ async function recompute() {
   host.hidden = false;
   await drawPanels();
   renderResults();
+}
+
+function buildPanelControls() {
+  const host = document.getElementById("panel-controls");
+  const b = document.createElement("button");
+  b.textContent = "reset to analysis extent";
+  // All three maps, not just the two panels — Fig. 5.2 is on the same extent and drifts for the
+  // same reason, so one control returns every view in the study to the ground the table scored.
+  b.onclick = () => { for (const k of ["obs", "ble", "diff"]) maps[k].map.fitBounds(FIT); };
+  host.appendChild(b);
+  const note = document.createElement("span");
+  note.className = "hint";
+  note.style.margin = "0";
+  note.textContent = "the two panels pan and zoom together";
+  host.appendChild(note);
 }
 
 function buildControls() {
@@ -610,6 +749,7 @@ document.getElementById("dlr").onclick = () => download(results, "results.csv");
 try {
   await loadCatalogue();
   await loadAll();
+  buildPanelControls();
   buildControls();
   status("scoring 12 combinations…");
   scoreAll();

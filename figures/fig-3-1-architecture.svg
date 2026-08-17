@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="780" viewBox="0 0 1160 780"
+     font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
+  <title>FIMViz.js layered architecture and its external boundary</title>
+  <desc>The FIMViz.js engine as layered tiers — kernel, data primitives, read models, map-provider
+        seam, layer model, app and mount, public API — with the optional interface kit beside it and
+        the host application above. Everything outside the engine is dashed: the user, the host, the
+        browser runtime (DOM, IndexedDB, fetch), the Node runtime, and the network services reached
+        through the registries. Registries are the insertion points where external systems attach.</desc>
+
+  <defs>
+    <!-- Arrowheads point along +x. `orient="auto"` aligns a marker's +x axis to the path direction,
+         so a triangle drawn pointing up would render sideways on a vertical line. -->
+    <marker id="up" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#2563eb"/>
+    </marker>
+    <marker id="gy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#64748b"/>
+    </marker>
+    <marker id="gr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#0f766e"/>
+    </marker>
+  </defs>
+
+  <rect width="1160" height="780" fill="#ffffff"/>
+
+  <!-- ═══ outside the engine: user and host ══════════════════════════════════════════════ -->
+  <rect x="24" y="22" width="96" height="42" rx="7" fill="#ffffff" stroke="#334155"
+        stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="72" y="41" font-size="12.5" font-weight="700" fill="#0f172a" text-anchor="middle">USER</text>
+  <text x="72" y="56" font-size="10" fill="#64748b" text-anchor="middle">clicks, draws, uploads</text>
+  <line x1="122" y1="43" x2="140" y2="43" stroke="#64748b" stroke-width="1.5" marker-end="url(#gy)"/>
+
+  <rect x="144" y="22" width="700" height="42" rx="7" fill="#ffffff" stroke="#94a3b8"
+        stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="160" y="41" font-size="13" font-weight="700" fill="#0f172a">HOST APPLICATION</text>
+  <text x="160" y="56" font-size="11" fill="#475569">owns the DOM, the styling and the component framework — the engine knows nothing of it</text>
+
+  <!-- ═══ the engine ═════════════════════════════════════════════════════════════════════ -->
+  <rect x="190" y="88" width="600" height="384" rx="9" fill="#fbfcfd" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="200" y="104" font-size="10" font-weight="700" fill="#94a3b8" letter-spacing="1.2">ENGINE</text>
+
+  <rect x="202" y="110" width="340" height="44" rx="6" fill="#dbeafe" stroke="#60a5fa"/>
+  <text x="214" y="128" font-size="12.5" font-weight="700" fill="#0f172a">Public API</text>
+  <text x="214" y="145" font-size="11" fill="#475569">lib.js — one import surface</text>
+
+  <rect x="550" y="110" width="228" height="44" rx="6" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="4 3"/>
+  <text x="562" y="128" font-size="12.5" font-weight="700" fill="#0f172a">Interface kit <tspan font-weight="400" font-size="10" fill="#64748b">optional</tspan></text>
+  <text x="562" y="145" font-size="11" fill="#475569">ui/ — 13 modules, host-styled</text>
+
+  <rect x="202" y="162" width="576" height="44" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+  <text x="214" y="180" font-size="12.5" font-weight="700" fill="#0f172a">App &amp; mount</text>
+  <text x="214" y="197" font-size="11" fill="#475569">FimViz · FimMap · mount() — instance isolation, dataset registry, layer lifecycle</text>
+
+  <rect x="202" y="214" width="576" height="44" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+  <text x="214" y="232" font-size="12.5" font-weight="700" fill="#0f172a">Layer model</text>
+  <text x="214" y="249" font-size="11" fill="#475569">Layer · RasterLayer · VectorLayer · ComparisonLayer · EnsembleAggregationLayer</text>
+
+  <rect x="202" y="266" width="576" height="38" rx="6" fill="#e6edf5" stroke="#a8bdd4"/>
+  <text x="214" y="283" font-size="12.5" font-weight="700" fill="#0f172a">Map-provider seam</text>
+  <text x="214" y="298" font-size="11" fill="#475569">mapProvider · createMap — one interface, no SDK named above it</text>
+
+  <rect x="202" y="312" width="576" height="44" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+  <text x="214" y="330" font-size="12.5" font-weight="700" fill="#0f172a">Read models</text>
+  <text x="214" y="347" font-size="11" fill="#475569">ColorScale · Legend · Stats · SpatialFilter — data first; toJSON() before toHtml()</text>
+
+  <rect x="202" y="364" width="576" height="56" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+  <text x="214" y="382" font-size="12.5" font-weight="700" fill="#0f172a">Data primitives</text>
+  <text x="214" y="398" font-size="11" fill="#475569">Dataset (lazy op chain) · RasterGrid · VectorFeatures · rasterOps · comparisonMetrics</text>
+  <text x="214" y="413" font-size="11" fill="#475569">parse &amp; decode · resample · crs · mercator · warp</text>
+
+  <rect x="202" y="428" width="364" height="28" rx="6" fill="#e2e8f0" stroke="#cbd5e1"/>
+  <text x="214" y="446" font-size="11.5" font-weight="700" fill="#0f172a">Kernel <tspan font-weight="400" fill="#475569">events · config · dom</tspan></text>
+
+  <rect x="574" y="428" width="204" height="28" rx="6" fill="#e2e8f0" stroke="#cbd5e1"/>
+  <text x="586" y="446" font-size="11.5" font-weight="700" fill="#0f172a">Persistence <tspan font-weight="400" fill="#475569">Storage</tspan></text>
+
+  <!-- host reaches in through the public API only -->
+  <line x1="372" y1="66" x2="372" y2="106" stroke="#64748b" stroke-width="1.5" marker-end="url(#gy)"/>
+
+  <!-- ═══ the event bus: outward, past every tier, into the host ═════════════════════════ -->
+  <rect x="136" y="110" width="38" height="346" rx="9" fill="#eff6ff" stroke="#93c5fd"/>
+  <line x1="166" y1="444" x2="166" y2="46" stroke="#2563eb" stroke-width="2" marker-end="url(#up)"/>
+  <text x="150" y="283" font-size="10.5" font-weight="700" fill="#1d4ed8" text-anchor="middle"
+        transform="rotate(-90 150 283)">EVENT BUS — outward only</text>
+
+  <!-- ═══ registries: the sockets on the engine boundary ═════════════════════════════════ -->
+  <text x="812" y="104" font-size="10" font-weight="700" fill="#92400e" letter-spacing="1.1">REGISTRIES</text>
+  <g font-size="10" fill="#92400e">
+    <line x1="778" y1="184" x2="812" y2="184" stroke="#d97706"/>
+    <rect x="812" y="174" width="150" height="20" rx="10" fill="#fef3c7" stroke="#d97706"/>
+    <text x="821" y="188">registerRuntime</text>
+
+    <line x1="778" y1="236" x2="812" y2="236" stroke="#d97706"/>
+    <rect x="812" y="226" width="150" height="20" rx="10" fill="#fef3c7" stroke="#d97706"/>
+    <text x="821" y="240">registerLayerType</text>
+
+    <line x1="778" y1="285" x2="812" y2="285" stroke="#d97706"/>
+    <rect x="812" y="275" width="150" height="20" rx="10" fill="#fef3c7" stroke="#d97706"/>
+    <text x="821" y="289">registerMapProvider</text>
+
+    <line x1="778" y1="334" x2="812" y2="334" stroke="#d97706"/>
+    <rect x="812" y="324" width="150" height="20" rx="10" fill="#fef3c7" stroke="#d97706"/>
+    <text x="821" y="338">registerPalette</text>
+
+    <line x1="778" y1="376" x2="812" y2="376" stroke="#d97706"/>
+    <rect x="812" y="366" width="150" height="20" rx="10" fill="#fef3c7" stroke="#d97706"/>
+    <text x="821" y="380">registerMaterializer</text>
+
+    <line x1="778" y1="398" x2="812" y2="398" stroke="#d97706"/>
+    <rect x="812" y="388" width="150" height="20" rx="10" fill="#fef3c7" stroke="#d97706"/>
+    <text x="821" y="402">registerReprojector</text>
+
+    <line x1="778" y1="420" x2="812" y2="420" stroke="#d97706"/>
+    <rect x="812" y="410" width="150" height="20" rx="10" fill="#fef3c7" stroke="#d97706"/>
+    <text x="821" y="424">registerResampler</text>
+  </g>
+
+  <!-- ═══ what plugs into those sockets: external, over the network ══════════════════════ -->
+  <text x="980" y="104" font-size="10" font-weight="700" fill="#0f766e" letter-spacing="1.1">EXTERNAL SERVICES</text>
+
+  <line x1="962" y1="285" x2="980" y2="285" stroke="#0f766e" stroke-width="1.2" marker-end="url(#gr)"/>
+  <rect x="980" y="258" width="156" height="56" rx="7" fill="#ecfdf5" stroke="#0f766e"
+        stroke-dasharray="4 3"/>
+  <text x="990" y="275" font-size="11" font-weight="700" fill="#065f46">Map provider APIs</text>
+  <text x="990" y="290" font-size="9.5" fill="#047857">Google Maps JS API (key)</text>
+  <text x="990" y="303" font-size="9.5" fill="#047857">Leaflet + tiles — default</text>
+
+  <line x1="962" y1="398" x2="980" y2="398" stroke="#0f766e" stroke-width="1.2" marker-end="url(#gr)"/>
+  <rect x="980" y="370" width="156" height="56" rx="7" fill="#ecfdf5" stroke="#0f766e"
+        stroke-dasharray="4 3"/>
+  <text x="990" y="387" font-size="11" font-weight="700" fill="#065f46">gdal3.js WASM</text>
+  <text x="990" y="402" font-size="9.5" fill="#047857">jsDelivr CDN, ~38 MB</text>
+  <text x="990" y="415" font-size="9.5" fill="#047857">lazy — first warp only</text>
+
+  <!-- ═══ the substrate: two runtimes, the same engine ═══════════════════════════════════ -->
+  <line x1="288" y1="520" x2="288" y2="476" stroke="#64748b" stroke-width="1.4" marker-end="url(#gy)"/>
+  <text x="288" y="502" font-size="9.5" fill="#475569" text-anchor="middle">3 call sites, all exporters</text>
+
+  <line x1="456" y1="520" x2="456" y2="476" stroke="#64748b" stroke-width="1.4" marker-end="url(#gy)"/>
+  <text x="456" y="502" font-size="9.5" fill="#475569" text-anchor="middle">Storage</text>
+
+  <line x1="600" y1="520" x2="600" y2="476" stroke="#64748b" stroke-width="1.4" marker-end="url(#gy)"/>
+  <text x="600" y="502" font-size="9.5" fill="#475569" text-anchor="middle">remote sources</text>
+
+  <rect x="196" y="520" width="500" height="116" rx="8" fill="#fafafa" stroke="#94a3b8"
+        stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="208" y="539" font-size="11.5" font-weight="700" fill="#0f172a">BROWSER RUNTIME</text>
+
+  <rect x="208" y="548" width="160" height="76" rx="6" fill="#f1f5f9" stroke="#94a3b8"/>
+  <text x="218" y="565" font-size="10.5" font-weight="700" fill="#0f172a">Window · DOM · Canvas</text>
+  <text x="218" y="580" font-size="9.5" fill="#475569">gridToDataURL()</text>
+  <text x="218" y="593" font-size="9.5" fill="#475569">Dataset#download()</text>
+  <text x="218" y="606" font-size="9.5" fill="#475569">Stats#download()</text>
+  <text x="218" y="619" font-size="9.5" fill="#64748b">nothing on the compute path</text>
+
+  <rect x="376" y="548" width="160" height="76" rx="6" fill="#f1f5f9" stroke="#94a3b8"/>
+  <text x="386" y="565" font-size="10.5" font-weight="700" fill="#0f172a">IndexedDB</text>
+  <text x="386" y="580" font-size="9.5" fill="#475569">object stores, cursors</text>
+  <text x="386" y="593" font-size="9.5" fill="#475569">reached only through</text>
+  <text x="386" y="606" font-size="9.5" fill="#475569">io/storage.js</text>
+
+  <rect x="544" y="548" width="140" height="76" rx="6" fill="#f1f5f9" stroke="#94a3b8"/>
+  <text x="554" y="565" font-size="10.5" font-weight="700" fill="#0f172a">fetch / HTTP</text>
+  <text x="554" y="580" font-size="9.5" fill="#475569">COG, NetCDF, SHP</text>
+  <text x="554" y="593" font-size="9.5" fill="#475569">whole-file reads</text>
+  <text x="554" y="606" font-size="9.5" fill="#475569">CORS is the gate</text>
+
+  <rect x="712" y="520" width="424" height="116" rx="8" fill="#fafafa" stroke="#94a3b8"
+        stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="724" y="539" font-size="11.5" font-weight="700" fill="#0f172a">NODE RUNTIME <tspan font-weight="400" font-size="10" fill="#64748b">— the same engine, no map surface</tspan></text>
+  <text x="724" y="559" font-size="10" fill="#166534">✓ decode, raster ops, statistics and metrics run unchanged</text>
+  <text x="724" y="575" font-size="10" fill="#b45309">✗ no DOM — gridToDataURL() and the download() helpers are unavailable</text>
+  <text x="724" y="591" font-size="10" fill="#b45309">✗ no IndexedDB — Storage is unavailable</text>
+  <text x="724" y="607" font-size="10" fill="#b45309">✗ lib.js will not import (CJS Loader re-export) — deep imports only</text>
+  <text x="724" y="623" font-size="10" fill="#b45309">✗ warps need registerReprojector — the CDN build is browser-only</text>
+
+  <!-- ═══ legend ════════════════════════════════════════════════════════════════════════ -->
+  <g>
+    <line x1="30" y1="676" x2="30" y2="662" stroke="#2563eb" stroke-width="2" marker-end="url(#up)"/>
+    <text x="42" y="675" font-size="10.5" fill="#475569">events flow outward</text>
+    <line x1="176" y1="662" x2="176" y2="676" stroke="#64748b" stroke-width="1.5" marker-end="url(#gy)"/>
+    <text x="188" y="675" font-size="10.5" fill="#475569">imports point down — no tier imports the one above it</text>
+    <rect x="490" y="664" width="20" height="11" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="4 3"/>
+    <text x="518" y="675" font-size="10.5" fill="#475569">dashed = outside the engine, or optional</text>
+    <rect x="782" y="664" width="20" height="11" rx="3" fill="#fef3c7" stroke="#d97706"/>
+    <text x="810" y="675" font-size="10.5" fill="#475569">registry — where an external system attaches</text>
+  </g>
+
+  <!-- ═══ the claim ═════════════════════════════════════════════════════════════════════ -->
+  <text x="24" y="708" font-size="11.5" font-weight="700" fill="#0f172a">Every crossing of the engine boundary is a registry, an event, or a fetch.</text>
+  <text x="24" y="725" font-size="11.5" fill="#475569">No map SDK is named above the seam, no markup is emitted, and the DOM is touched at three call sites — all of them exporters, none on the</text>
+  <text x="24" y="741" font-size="11.5" fill="#475569">compute path. That is what lets the right-hand column be swapped and the lower slab be replaced by Node. io/materializers.js and io/reprojector.js</text>
+  <text x="24" y="757" font-size="11.5" fill="#475569">import <tspan font-style="italic">into</tspan> the primitives to register themselves; the primitives import neither — the inversion that keeps 57 modules and 110 edges a DAG (Fig. 3.2).</text>
+</svg>

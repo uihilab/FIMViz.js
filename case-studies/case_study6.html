@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — Case Study 6: a snowpack that emptied in three days</title>
+<link rel="icon" href="../assets/brand/favicon.png" />
+<link rel="stylesheet" href="../site.css" />
+<style>
+  body { max-width: 96ch; margin: 0 auto; padding: 30px 22px 80px; }
+  h1 { font-size: 23px; margin: 0 0 6px; letter-spacing: -.01em; }
+  h2 { font-size: 15px; margin: 28px 0 9px; }
+  h2 .n { color: var(--dim); font: 600 12px/1 var(--mono); margin-right: 8px; }
+  h3 { font-size: 13px; margin: 0 0 6px; font-weight: 600; }
+  h3 small { color: var(--dim); font-weight: 400; margin-left: 6px; }
+  p { margin: 0 0 11px; }
+  ul { margin: 0 0 11px; padding-left: 20px; }
+  li { margin: 0 0 5px; }
+  .lead { color: var(--dim); margin-bottom: 16px; }
+  .q { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; margin: 0 0 16px; }
+
+  #status { font-size: 12.5px; color: var(--dim); margin: 0 0 16px; min-height: 18px; }
+  .spin { width: 11px; height: 11px; border: 2px solid var(--line); border-top-color: var(--accent);
+          border-radius: 50%; display: inline-block; animation: sp .8s linear infinite;
+          vertical-align: -1px; margin-right: 7px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  #status.done .spin, #status.fail .spin { display: none; }
+  #status.fail { color: var(--bad); }
+
+  .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 16px; margin: 0 0 6px; }
+  @media (max-width: 860px) { .pair { grid-template-columns: 1fr; } }
+  .panel .map { height: 300px; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  /* Every panel carries its own reading — what the surface is, and what to look for in it — so no
+     panel depends on a paragraph three screens away to be intelligible. */
+  .cap { font-size: 11.5px; color: var(--dim); margin: 5px 0 0; line-height: 1.45; }
+  .cap b { color: var(--fg); font-weight: 600; }
+  .mapwrap { position: relative; margin: 0 0 6px; }
+  .lg { position: absolute; right: 9px; bottom: 9px; z-index: 1100; background: var(--panel);
+        border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; font-size: 11px;
+        color: var(--fg); box-shadow: 0 1px 5px rgb(0 0 0 / .25); }
+  .lg .src { color: var(--dim); font-size: 10px; margin: 4px 0 0; }
+
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 8px 0 6px; }
+  .hint { font-size: 12px; color: var(--dim); margin: 0 0 14px; }
+  button { background: transparent; color: var(--accent); border: 1px solid var(--control-line);
+           border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  #tstep { flex: 1 1 260px; accent-color: var(--accent); }
+  #clock { font: 600 12.5px var(--mono); color: var(--fg); min-width: 15ch; }
+
+  pre.out { background: var(--panel); color: var(--dim); white-space: pre-wrap;
+            max-height: 170px; font-size: 12px; margin: 0 0 14px; }
+  pre.out:empty { display: none; }
+  table { border-collapse: collapse; font-size: 12.5px; margin: 0 0 8px; width: 100%; }
+  th, td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .swatch { display: inline-block; width: 11px; height: 11px; border: 1px solid #ccc;
+            margin-right: 6px; vertical-align: -1px; }
+  #headline:empty, #series:empty { display: none; }
+  #headline { border: 1px solid var(--accent); border-radius: 8px; padding: 12px 14px; margin: 0 0 14px;
+              background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  #headline .big { font-size: 25px; font-weight: 700; letter-spacing: -.02em; }
+  .warn { color: var(--warn); }
+  #spark { width: 100%; height: 116px; border: 1px solid var(--line); border-radius: 7px;
+           background: var(--panel); display: block; margin: 0 0 6px; }
+</style>
+</head>
+<body>
+
+<h1>Case Study 6 — A snowpack that emptied in three days</h1>
+<p class="lead">
+  A temporal flood-generation study run entirely in the browser: multi-dimensional ingest, axis
+  selection, per-step reduction and derived surfaces, with no server-side compute. Protocol:
+  <a href="CASE_STUDY_PROTOCOL.md">CASE_STUDY_PROTOCOL.md</a> §0.
+</p>
+<p class="q">
+  <b>The question.</b> Between 7 and 16 March 2019 a bomb cyclone crossed the central Plains and fell
+  as rain onto a ripe snowpack over frozen ground. Eastern Nebraska flooded catastrophically. Rain on
+  snow is not simply a lot of rain: the snowpack is a reservoir that empties on the same day the rain
+  arrives, so the water reaching the soil is rain <i>plus</i> melt, against soil that is already at
+  capacity. <b>How much of the water was melt rather than rain, and how long did the soil stay
+  saturated afterwards?</b>
+</p>
+<p class="hint">
+  This study reports a water balance and a duration, not a flood extent. The National Water Model's
+  terrain-routing fields — the ones that would carry a modelled inundation depth — are
+  <b>unpopulated</b> in the v2.1 retrospective (<code>sfcheadsubrt</code> is a constant 0 and
+  <code>zwattablrt</code> a constant 2 across the entire record), so there is no modelled water
+  surface in this dataset to threshold. What there is, and what is used here, is the forcing, the
+  snowpack, and the soil column.
+</p>
+
+<p id="status"><span class="spin"></span><span id="status-text">starting…</span></p>
+
+<div id="headline"></div>
+
+<h2><span class="n">Fig. 6.1</span>The reservoir emptying, and the column filling</h2>
+<div class="pair">
+  <div class="panel">
+    <h3>Snow water equivalent <small>SNEQV, mm</small></h3>
+    <div class="mapwrap"><div class="map" id="m-snow"></div><div class="lg" id="lg-snow" hidden></div></div>
+    <p class="cap">
+      <b>The reservoir.</b> Depth of water held as snow, if the pack melted where it lies. On
+      10 March it covers almost the whole domain; by the 14th it is gone. This is not snow
+      <i>depth</i> — it is the water inside the snow, which is what reaches the soil.
+    </p>
+  </div>
+  <div class="panel">
+    <h3>Top-layer soil moisture <small>SOIL_M, m³/m³</small></h3>
+    <div class="mapwrap"><div class="map" id="m-soil"></div><div class="lg" id="lg-soil" hidden></div></div>
+    <p class="cap">
+      <b>The receiver.</b> Water per unit volume in the top 10 cm. Around 0.45 the pores are full and
+      further input runs off rather than infiltrating. Watch it brighten as the left panel empties —
+      the two are the same water, three hours apart.
+    </p>
+  </div>
+</div>
+<div class="controls">
+  <button id="play">▶ play</button>
+  <input type="range" id="tstep" min="0" max="0" value="0" step="1" disabled />
+  <span id="clock">—</span>
+</div>
+<canvas id="spark" width="1600" height="232"></canvas>
+<p class="hint">
+  <b>The controls.</b> The slider moves both panels through the <span id="nsteps">—</span>
+  three-hourly steps of 10–17 March; <b>play</b> runs it at roughly four steps a second. Each panel
+  is one lazy <code>Dataset</code>, and moving the slider calls <code>ds.select(coord)</code> — only
+  the step you are looking at is ever decoded, which is why an 8-day series costs no more to open
+  than a single map. Dragging never queues work: a decode already in flight suppresses the next
+  request rather than stacking behind it. All five maps on this page share one view, so panning or
+  zooming any of them moves the rest.
+  <br><br>
+  <b>The strip</b> plots the domain mean of both variables across the whole window — snow water
+  equivalent in blue against soil moisture in amber, each scaled to its own range so the shapes can
+  be compared rather than the magnitudes. The red rule marks where the slider is. It is drawn from
+  the same single pass that produced Fig. 6.2, not from a second reading of the data.
+</p>
+
+<h2><span class="n">Fig. 6.2</span>What the event left behind</h2>
+<p class="hint">
+  Four surfaces, all from the <b>single pass</b> over the series that also drew the strip above —
+  the page walks the 57 steps once and accumulates everything on the way through, rather than
+  re-reading the data per product. Each answers a different question about the same event: how much
+  water the snowpack released, how wet the ground got, how long it stayed that way, and when it
+  happened. The last is the one that separates cause from coincidence.
+</p>
+<div class="pair">
+  <div class="panel">
+    <h3>Cumulative melt <small>ACSNOM, mm over the window</small></h3>
+    <div class="mapwrap"><div class="map" id="m-melt"></div><div class="lg" id="lg-melt" hidden></div></div>
+    <p class="cap">
+      <b>How much water the snowpack gave up</b>, per cell, summed over 10–17 March. This is the
+      headline number made spatial: the bright areas delivered a second rainfall's worth of water to
+      ground that was already full. Summed from positive increments because the source accumulator
+      resets mid-record — differencing its endpoints returns a negative total.
+    </p>
+  </div>
+  <div class="panel">
+    <h3>Peak soil moisture <small>max over the window</small></h3>
+    <div class="mapwrap"><div class="map" id="m-peak"></div><div class="lg" id="lg-peak" hidden></div></div>
+    <p class="cap">
+      <b>The wettest each cell ever got.</b> Identical to what
+      <code>ds.reduce("max", { axis: 0 })</code> returns — the page computes it both ways and reports
+      the largest disagreement between them in the table below, because a hand-rolled reduction that
+      nothing checks is an assertion rather than a result.
+    </p>
+  </div>
+  <div class="panel">
+    <h3>Saturation duration <small>hours ≥ 0.40 m³/m³</small></h3>
+    <div class="mapwrap"><div class="map" id="m-dur"></div><div class="lg" id="lg-dur" hidden></div></div>
+    <p class="cap">
+      <b>How long the ground stayed full</b> — steps at or above 0.40 m³/m³, times three hours.
+      <span class="warn">These are floors, not residence times.</span> The window opens with much of
+      the domain already wet and closes with much of it still wet, so a cell reading the full 168 h
+      was saturated before 10 March and probably after the 17th too. The table counts how many.
+    </p>
+  </div>
+  <div class="panel">
+    <h3>Time of peak <small>hours from 10 March 00Z</small></h3>
+    <div class="mapwrap"><div class="map" id="m-time"></div><div class="lg" id="lg-time" hidden></div></div>
+    <p class="cap">
+      <b>When each cell reached its own maximum.</b> The most diagnostic of the four: cells peaking
+      early responded to melt, cells peaking late to the rain that followed. A domain that peaked all
+      at once would point to rainfall alone; the spread here is what implicates the snowpack.
+    </p>
+  </div>
+</div>
+
+<h2><span class="n">§</span>Result</h2>
+<div id="series"></div>
+<p class="hint" id="series-note" hidden></p>
+
+<div class="controls">
+  <span class="muted">export —</span>
+  <button id="dlp">performance.csv</button>
+  <button id="dlm">metrics.csv</button>
+  <button id="dlr">results.csv</button>
+</div>
+<p class="hint">
+  <b>performance.csv</b> — timings under the protocol's fixed stage names. <b>metrics.csv</b> — one
+  row per ingested variable: steps, dimensions, decode cost, bytes. <b>results.csv</b> — the per-step
+  series behind Fig. 6.1's strip and the table above.
+</p>
+
+<pre class="out" id="log"></pre>
+
+<h2><span class="n">§</span>Method notes</h2>
+<ul>
+  <li><b>Melt is summed, not differenced.</b> <code>ACSNOM</code> is a running accumulator and it
+      <i>resets</i> inside the record, so taking the difference of its endpoints returns a negative
+      melt total. The page accumulates positive per-cell increments instead, and reports the number
+      of reset cell-steps it saw. Per <i>cell</i>, not per domain mean: cells reset at different
+      steps, and a domain-mean series smears one cell's reset across the whole field.</li>
+  <li><b>A projected grid silently collapses, and the engine's own advice does not fix it.</b> NWM is
+      Lambert Conformal Conic and its coordinate arrays are in metres. <code>extractGrid</code>
+      samples using those arrays while the engine supplies a bbox in degrees, so every sample point
+      falls outside the source range and nearest-neighbour clamps them all to one cell — yielding a
+      <b>spatially uniform grid with no error raised</b>, whose values still vary over time so it
+      reads as working code. The engine rejects the metre bbox with a good message ending <i>"pass one
+      explicitly: <code>grid: { bbox: [...] }</code>"</i> — but that relabels the extent without
+      changing the sampling. The mirrors here rewrite x/y into degrees at build time; that is the
+      actual fix, and it is why <code>grid.bbox</code> below is a label rather than a rescue.</li>
+  <li><b>Chunking, not volume, decides what a page can do.</b> The source chunks time in blocks of
+      224 — right for "one cell, forty years", wrong for "one map, next map". Every
+      <code>select()</code> decompresses the whole chunk to return one slice, measured at ~776 ms per
+      step, so a full walk of the hourly series took 8.7 minutes headless. The page mirrors re-chunk
+      to <code>[1, ny, nx]</code>, one step per chunk, which is the single change that makes a slider
+      viable. Same bytes, same engine, three orders of magnitude of interactive difference.</li>
+  <li><b>Live Zarr stores cannot be read.</b> The reader is Zarr v2 <i>in a zip</i>;
+      <code>scan()</code> against a store URL range-requests the directory and S3 answers 416. The
+      bucket is CORS-open and serves ranges, so the limit is the reader, not the host — but it means
+      every Zarr study is a mirrored study.</li>
+  <li><b><code>.zarr.zip</code> needs its format stated.</b> <code>detectFormat()</code> reads the
+      last extension, and <code>.zip</code> routes to the shapefile reader — the failure is
+      <i>"not a valid shapefile"</i>, which names the wrong subsystem entirely.</li>
+  <li><b>Rain is integrated at 3 h from an hourly rate.</b> The page samples <code>RAINRATE</code>
+      every third hour to share the 3-hourly axis of the other three variables, so its total is a
+      sampled integral, not an hourly one. The headless run integrates all 672 hourly steps; the two
+      totals appear side by side in the table so the size of that shortcut is visible rather than
+      assumed.</li>
+  <li><b>The window is the event, not the record.</b> The page carries 10–17 March. The analysis
+      mirrors carry the full 28-day chunk and the headless run reports over all of it — including the
+      recession to zero snow water equivalent on 22 March, which this page ends too early to show.</li>
+</ul>
+
+<h2><span class="n">§</span>Data</h2>
+<table>
+  <tr><th>Role</th><th>Source</th><th>Page mirror</th></tr>
+  <tr><td>Snowpack</td><td>NWM v2.1 <code>ldasout/SNEQV</code>, snow water equivalent, mm, 1 km 3-hourly</td>
+      <td><code>data/cs6-SNEQV.zarr.zip</code></td></tr>
+  <tr><td>Melt</td><td>NWM v2.1 <code>ldasout/ACSNOM</code>, accumulated snowmelt, mm</td>
+      <td><code>data/cs6-ACSNOM.zarr.zip</code></td></tr>
+  <tr><td>Response</td><td>NWM v2.1 <code>ldasout/SOIL_M</code>, top soil layer, m³/m³</td>
+      <td><code>data/cs6-SOIL_M.zarr.zip</code></td></tr>
+  <tr><td>Driver</td><td>NWM v2.1 <code>precip/RAINRATE</code>, mm s⁻¹, sampled 3-hourly</td>
+      <td><code>data/cs6-RAINRATE.zarr.zip</code></td></tr>
+</table>
+<p class="hint">
+  Source: NOAA National Water Model retrospective v2.1, CORS-open and credential-free at
+  <code>https://noaa-nwm-retrospective-2-1-zarr-pds.s3.amazonaws.com</code>. Native grid is Lambert
+  Conformal Conic on a 6 370 000 m sphere; the mirrors carry the same pixels re-expressed on a
+  geographic axis. Cut and re-chunked by <code>build_case_study6_data.mjs</code> and
+  <code>build_case_study6_page_data.mjs</code>; provenance in <code>data/README.txt</code> (protocol
+  §0.4). Study area: eastern Nebraska and northern Kansas — the Platte, Elkhorn and Republican
+  basins — 350 × 350 km at 1 km, 122,500 cells per step.
+</p>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js",
+    "sciwrid-toolkit": "../node_modules/sciwrid-toolkit/dist/index.js"
+} }
+</script>
+
+<script type="module">
+import { FimViz, ColorScale, Dataset, RasterGrid, Stats } from "fimviz";
+
+// ── §0 instrumentation ────────────────────────────────────────────────────────────────────────
+const REPS = 1;                       // TODO: 5 before recording.
+const CACHE_STATE = "warm";           // TODO: "cold" for the hard-reload pass.
+const BROWSER = navigator.userAgent;
+
+const perf = [];      // → performance.csv
+const metrics = [];   // → metrics.csv
+const results = [];   // → results.csv
+
+const log = (...a) => { document.getElementById("log").textContent += a.join(" ") + "\n"; };
+const status = (text, state = "") => {
+  document.getElementById("status-text").textContent = text;
+  document.getElementById("status").className = state;
+};
+
+async function stage(name, fields, fn) {
+  const t = `${name}-${perf.length}`;
+  performance.mark(`${t}:start`);
+  const value = await fn();
+  performance.mark(`${t}:end`);
+  const { duration } = performance.measure(t, `${t}:start`, `${t}:end`);
+  perf.push({ study: "6", stage: name, dataset: "", variable: "", steps: "",
+              cache_state: CACHE_STATE, browser: BROWSER, rep: 1, ms: duration.toFixed(2), ...fields });
+  return { value, ms: duration };
+}
+
+const toCsv = (rows) => {
+  const cols = Object.keys(rows[0]);
+  return [cols.join(","), ...rows.map((r) => cols.map((c) => JSON.stringify(r[c] ?? "")).join(","))].join("\n");
+};
+const download = (rows, name) => {
+  if (!rows.length) return log(`${name}: nothing recorded yet`);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv" }));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+  log(`wrote ${name} (${rows.length} rows)`);
+};
+
+// ── sources ───────────────────────────────────────────────────────────────────────────────────
+// The mirrors' own x/y are already degrees (see the method notes), so this bbox LABELS the extent —
+// it is not the rescue the engine's error message suggests it is.
+const BBOX = [-99.4600, 38.3379, -95.2409, 41.5726];
+const FIT = [[BBOX[1], BBOX[0]], [BBOX[3], BBOX[2]]];
+
+const VARS = {
+  SNEQV:    { file: "data/cs6-SNEQV.zarr.zip",    unit: "mm",    label: "snow water equivalent" },
+  ACSNOM:   { file: "data/cs6-ACSNOM.zarr.zip",   unit: "mm",    label: "accumulated snowmelt" },
+  SOIL_M:   { file: "data/cs6-SOIL_M.zarr.zip",   unit: "m³/m³", label: "top-layer soil moisture" },
+  RAINRATE: { file: "data/cs6-RAINRATE.zarr.zip", unit: "mm/s",  label: "precipitation rate" },
+};
+
+const SAT = 0.40;            // m³/m³ — "saturated" for the duration surface
+const STEP_S = 3 * 3600;     // one step is three hours
+const CELL_KM2 = 1;
+
+// ── maps ──────────────────────────────────────────────────────────────────────────────────────
+// `isolated: true`: the default app allows one widget per page.
+const maps = {};
+for (const [k, sel] of [["snow", "#m-snow"], ["soil", "#m-soil"], ["melt", "#m-melt"],
+                        ["peak", "#m-peak"], ["dur", "#m-dur"], ["time", "#m-time"]]) {
+  maps[k] = await FimViz.mount(sel, { provider: "leaflet", isolated: true });
+}
+// The five panels pan and zoom together — five views of one extent that can drift apart is not a
+// comparison. Guarded against re-entry, since each setView re-fires the handler.
+const allMaps = Object.values(maps).map((m) => m.map);
+let syncing = false;
+for (const m of allMaps) {
+  m.on("move zoom", () => {
+    if (syncing) return;
+    syncing = true;
+    const c = m.getCenter(), z = m.getZoom();
+    for (const o of allMaps) if (o !== m) o.setView(c, z, { animate: false });
+    syncing = false;
+  });
+}
+
+// ── rendering ─────────────────────────────────────────────────────────────────────────────────
+const layers = {};
+async function paint(key, source, scale, caption, { fit = false } = {}) {
+  const fim = maps[key];
+  const prev = layers[key];
+  fim.adoptDataset(source);
+  const { value: layer } = await stage("t_paint", { dataset: key },
+    () => fim.addLayer("raster", { source, colorScale: scale }));
+  if (prev) { prev.layer.remove(); if (prev.ds !== source) fim.removeDataset(prev.ds, { force: true }); }
+  layers[key] = { layer, ds: source };
+  if (fit) fim.map.fitBounds(FIT);
+  const host = document.getElementById(`lg-${key}`);
+  host.innerHTML = layer.getLegend().toHtml() + `<p class="src">${caption}</p>`;
+  host.hidden = false;
+  return layer;
+}
+
+const gridFrom = (pixels, w, h) => new RasterGrid({
+  pixels, width: w, height: h, noData: null, crs: "EPSG:4326",
+  bounds: { west: BBOX[0], south: BBOX[1], east: BBOX[2], north: BBOX[3] },
+});
+
+// ── the pipeline ──────────────────────────────────────────────────────────────────────────────
+const ds = {}, entries = {};
+let N = 0, W = 0, H = 0, CELLS = 0;
+let sweSeries = [], soilSeries = [];
+let playing = null;
+
+const finite = (v) => Number.isFinite(v) && v > -9990;
+const isoOf = (c) => new Date(c).toISOString().replace("T", " ").slice(0, 16) + "Z";
+
+async function openAll() {
+  for (const [name, v] of Object.entries(VARS)) {
+    status(`opening ${name}…`);
+    const { value: d, ms } = await stage("t_fetch", { dataset: name, variable: name, format: "zarr" },
+      () => maps.snow.addDataset(v.file, { format: "zarr", variable: name, grid: { bbox: BBOX } }));
+    ds[name] = d;
+    entries[name] = d.axis?.entries ?? [];
+    if (!entries[name].length) throw new Error(`${name}: no series axis`);
+    log(`${name}: ${entries[name].length} steps, axis "${d.axis?.name}", ${ms.toFixed(0)} ms`);
+  }
+  N = entries.SOIL_M.length;
+  const g0 = await ds.SOIL_M.select(entries.SOIL_M[0].coord).grid();
+  W = g0.width; H = g0.height; CELLS = W * H;
+  log(`grid ${W}×${H} @ 1 km, ${N} steps, ${isoOf(entries.SOIL_M[0].coord)} .. ${isoOf(entries.SOIL_M[N - 1].coord)}`);
+  document.getElementById("nsteps").textContent = String(N);
+}
+
+/** One pass over every series, accumulating everything Fig. 6.2 and the table need. */
+async function walk() {
+  const maxSoil = new Float32Array(CELLS).fill(-Infinity);
+  const peakStep = new Int16Array(CELLS).fill(-1);
+  const satSteps = new Int16Array(CELLS);
+  const meltCum = new Float32Array(CELLS);
+  let rainMm = 0, resets = 0, prevMelt = null;
+
+  const t0 = performance.now();
+  for (let s = 0; s < N; s++) {
+    if (s % 8 === 0) status(`walking the series… ${s}/${N}`);
+
+    const soil = await ds.SOIL_M.select(entries.SOIL_M[s].coord).grid();
+    let sSum = 0, sN = 0, satCells = 0;
+    for (let i = 0; i < soil.pixels.length; i++) {
+      const v = soil.pixels[i];
+      if (!finite(v)) continue;
+      sN++; sSum += v;
+      if (v > maxSoil[i]) { maxSoil[i] = v; peakStep[i] = s; }
+      if (v >= SAT) { satSteps[i]++; satCells++; }
+    }
+    soilSeries.push({ coord: entries.SOIL_M[s].coord, mean: sN ? sSum / sN : 0, satCells });
+
+    const snow = await ds.SNEQV.select(entries.SNEQV[s].coord).grid();
+    let wSum = 0, wN = 0, covered = 0;
+    for (const v of snow.pixels) { if (!finite(v)) continue; wN++; wSum += v; if (v > 0) covered++; }
+    sweSeries.push({ coord: entries.SNEQV[s].coord, mean: wN ? wSum / wN : 0, covered });
+
+    // ACSNOM resets inside the record — accumulate positive per-cell increments, never endpoints.
+    const melt = await ds.ACSNOM.select(entries.ACSNOM[s].coord).grid();
+    if (prevMelt) {
+      for (let i = 0; i < melt.pixels.length; i++) {
+        const v = melt.pixels[i];
+        if (!finite(v)) continue;
+        const d = v - prevMelt[i];
+        if (d > 0) meltCum[i] += d;
+        else if (d < -1) resets++;
+      }
+    }
+    prevMelt = Float32Array.from(melt.pixels);
+
+    // RAINRATE is mm s⁻¹ sampled every third hour, so a step stands for STEP_S seconds of it.
+    const rain = await ds.RAINRATE.select(entries.RAINRATE[s].coord).grid();
+    let rSum = 0, rN = 0;
+    for (const v of rain.pixels) { if (!finite(v)) continue; rN++; rSum += v; }
+    rainMm += (rN ? rSum / rN : 0) * STEP_S;
+
+    results.push({
+      study: "6", step: s, time: new Date(entries.SOIL_M[s].coord).toISOString(),
+      swe_mean_mm: +sweSeries[s].mean.toFixed(3), swe_covered_km2: sweSeries[s].covered * CELL_KM2,
+      soil_mean: +soilSeries[s].mean.toFixed(4), soil_saturated_km2: satCells * CELL_KM2,
+      rain_cum_mm: +rainMm.toFixed(3),
+    });
+  }
+  const walkMs = performance.now() - t0;
+  perf.push({ study: "6", stage: "t_op", dataset: "walk", variable: "all", steps: N,
+              cache_state: CACHE_STATE, browser: BROWSER, rep: 1, ms: walkMs.toFixed(2) });
+  log(`walked ${N} steps × 4 variables in ${(walkMs / 1000).toFixed(1)} s `
+    + `(${(walkMs / (N * 4)).toFixed(1)} ms per select)`);
+  return { maxSoil, peakStep, satSteps, meltCum, rainMm, resets, walkMs };
+}
+
+const meanOf = (a) => { let s = 0, n = 0; for (const v of a) { if (Number.isFinite(v)) { s += v; n++; } } return n ? s / n : 0; };
+
+async function renderDerived({ maxSoil, peakStep, satSteps, meltCum }) {
+  // Cumulative melt — the headline quantity, spatially. Drawn first because it is the cause; the
+  // three panels after it are the consequence.
+  const meltGrid = gridFrom(Float32Array.from(meltCum, (v) => (v > 0 ? v : NaN)), W, H);
+  const meltSt = Stats.raster(meltGrid.pixels, {
+    bw: BBOX[0], bs: BBOX[1], be: BBOX[2], bn: BBOX[3], width: W, height: H, noData: null, unit: "mm",
+  }, { bins: 32 });
+  await paint("melt", Dataset.fromGrid(meltGrid), new ColorScale({
+    palette: "blues", min: 0, max: meltSt.percentile(99) ?? meltSt.max, continuous: true,
+    unit: "mm", missingColor: "transparent",
+  }), `summed increments · median ${meltSt.median.toFixed(1)} mm`, { fit: true });
+
+  // Peak — the same surface ds.reduce("max") returns. Both are computed and compared, because a
+  // hand-rolled reduction that nothing checks is just an assertion.
+  const peakGrid = gridFrom(Float32Array.from(maxSoil, (v) => (Number.isFinite(v) ? v : NaN)), W, H);
+  const st = Stats.raster(peakGrid.pixels, {
+    bw: BBOX[0], bs: BBOX[1], be: BBOX[2], bn: BBOX[3], width: W, height: H, noData: null, unit: "m³/m³",
+  }, { bins: 32 });
+  await paint("peak", Dataset.fromGrid(peakGrid), new ColorScale({
+    palette: "viridis", min: Math.max(st.min, 0.1), max: st.max, continuous: true,
+    unit: "m³/m³", missingColor: "transparent",
+  }), `max over ${N} steps · median ${st.median.toFixed(3)}`);
+
+  const { value: reduced, ms: reduceMs } = await stage("t_op", { dataset: "reduce:max", variable: "SOIL_M", steps: N },
+    () => ds.SOIL_M.reduce("max", { axis: 0 }).grid());
+  let worst = 0, checked = 0;
+  for (let i = 0; i < reduced.pixels.length; i++) {
+    const a = reduced.pixels[i], b = maxSoil[i];
+    if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+    checked++;
+    const d = Math.abs(a - b);
+    if (d > worst) worst = d;
+  }
+  log(`reduce("max") ${reduceMs.toFixed(0)} ms — max |Δ| ${worst.toExponential(2)} over `
+    + `${checked.toLocaleString()} cells ${worst < 1e-6 ? "(identical)" : "(MISMATCH)"}`);
+
+  // Duration, in hours. Censored by the window — counted and reported, not smoothed over.
+  const durH = Float32Array.from(satSteps, (v) => (v > 0 ? v * 3 : NaN));
+  const maxH = N * 3;
+  await paint("dur", Dataset.fromGrid(gridFrom(durH, W, H)), new ColorScale({
+    palette: "blues", min: 0, max: maxH, continuous: true, unit: "h", missingColor: "transparent",
+  }), `hours ≥ ${SAT} m³/m³ · window is ${maxH} h`);
+
+  const timeH = Float32Array.from(peakStep, (v, i) => (satSteps[i] > 0 && v >= 0 ? v * 3 : NaN));
+  await paint("time", Dataset.fromGrid(gridFrom(timeH, W, H)), new ColorScale({
+    palette: "plasma", min: 0, max: maxH, continuous: true, unit: "h", missingColor: "transparent",
+  }), `hours from ${isoOf(entries.SOIL_M[0].coord)}`);
+
+  return { st, meltSt, worst, checked, reduceMs };
+}
+
+// ── Fig. 6.1: the slider ──────────────────────────────────────────────────────────────────────
+let snowScale = null, soilScale = null;
+
+async function showStep(i) {
+  const cs = entries.SNEQV[i].coord, cm = entries.SOIL_M[i].coord;
+  document.getElementById("clock").textContent = isoOf(cm);
+  document.getElementById("tstep").value = String(i);
+  const a = ds.SNEQV.select(cs), b = ds.SOIL_M.select(cm);
+  await paint("snow", a, snowScale, `${isoOf(cs)} · SNEQV`);
+  await paint("soil", b, soilScale, `${isoOf(cm)} · SOIL_M`);
+  drawSpark(i);
+}
+
+function drawSpark(cur) {
+  const cv = document.getElementById("spark");
+  const ctx = cv.getContext("2d");
+  const cs = getComputedStyle(document.body);
+  const dim = cs.getPropertyValue("--dim") || "#888";
+  const line = cs.getPropertyValue("--line") || "#333";
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const PADL = 8, PADR = 8, PADT = 14, PADB = 20;
+  const w = cv.width - PADL - PADR, h = cv.height - PADT - PADB;
+  const sweMax = Math.max(...sweSeries.map((d) => d.mean), 1e-6);
+  const soilMax = Math.max(...soilSeries.map((d) => d.mean), 1e-6);
+  const soilMin = Math.min(...soilSeries.map((d) => d.mean));
+  const X = (i) => PADL + (i / Math.max(N - 1, 1)) * w;
+
+  ctx.strokeStyle = line; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(PADL, PADT + h); ctx.lineTo(PADL + w, PADT + h); ctx.stroke();
+
+  const plot = (series, val, color, lw) => {
+    ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.beginPath();
+    series.forEach((d, i) => {
+      const y = PADT + h - val(d) * h;
+      i ? ctx.lineTo(X(i), y) : ctx.moveTo(X(i), y);
+    });
+    ctx.stroke();
+  };
+  plot(sweSeries, (d) => d.mean / sweMax, "#5aa9e6", 4);
+  plot(soilSeries, (d) => (d.mean - soilMin) / Math.max(soilMax - soilMin, 1e-9), "#d97706", 4);
+
+  ctx.strokeStyle = "#e5484d"; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(X(cur), PADT - 6); ctx.lineTo(X(cur), PADT + h + 4); ctx.stroke();
+
+  ctx.fillStyle = dim; ctx.font = "20px system-ui, sans-serif";
+  ctx.fillText("snow water equivalent", PADL + 6, PADT + 18);
+  ctx.fillStyle = "#d97706";
+  ctx.fillText("soil moisture", PADL + 6, PADT + 42);
+  ctx.fillStyle = dim; ctx.textAlign = "right";
+  ctx.fillText(isoOf(soilSeries[N - 1].coord).slice(0, 10), PADL + w, cv.height - 4);
+  ctx.textAlign = "left";
+  ctx.fillText(isoOf(soilSeries[0].coord).slice(0, 10), PADL, cv.height - 4);
+}
+
+// ── result ────────────────────────────────────────────────────────────────────────────────────
+function renderResult({ meltCum, rainMm, resets, satSteps, st, meltSt, worst, walkMs }) {
+  const melt = meanOf(meltCum);
+  const share = 100 * melt / Math.max(melt + rainMm, 1e-9);
+
+  let everSat = 0, sumDur = 0, censored = 0;
+  for (const v of satSteps) {
+    if (v > 0) { everSat++; sumDur += v; if (v === N) censored++; }
+  }
+  const swe0 = sweSeries[0], sweMin = sweSeries.reduce((a, b) => (b.mean < a.mean ? b : a));
+  const soilPeak = soilSeries.reduce((a, b) => (b.mean > a.mean ? b : a));
+  const satPeak = soilSeries.reduce((a, b) => (b.satCells > a.satCells ? b : a));
+
+  document.getElementById("headline").innerHTML =
+    `<div class="big">${share.toFixed(0)}% of the water was melt</div>`
+    + `<div class="hint" style="margin:4px 0 0">${melt.toFixed(1)} mm from the snowpack against `
+    + `${rainMm.toFixed(1)} mm of rain, domain mean, 10–17 March 2019. The snowpack held `
+    + `${swe0.mean.toFixed(1)} mm over ${(swe0.covered * CELL_KM2).toLocaleString()} km² on 10 March `
+    + `and ${sweMin.mean.toFixed(1)} mm by ${isoOf(sweMin.coord).slice(0, 10)}.</div>`;
+
+  const rows = [
+    ["snow water equivalent, 10 March", `${swe0.mean.toFixed(1)} mm`, `over ${(swe0.covered * CELL_KM2).toLocaleString()} km² (${(100 * swe0.covered / CELLS).toFixed(1)}% of domain)`],
+    ["snow water equivalent, minimum", `${sweMin.mean.toFixed(1)} mm`, isoOf(sweMin.coord)],
+    ["melt, domain mean", `${melt.toFixed(1)} mm`, `summed positive increments; ${resets.toLocaleString()} reset cell-steps skipped`],
+    ["rain, domain mean", `${rainMm.toFixed(1)} mm`, `3-hourly sample of an hourly rate — see method notes`],
+    ["melt share", `${share.toFixed(1)}%`, "melt ÷ (melt + rain)"],
+    ["melt surface", `${meltSt.median.toFixed(1)} mm median`, `p10 ${meltSt.percentile(10)?.toFixed(1)} · p90 ${meltSt.percentile(90)?.toFixed(1)} · max ${meltSt.max.toFixed(1)} mm — Fig. 6.2, top left`],
+    ["peak domain-mean soil moisture", `${soilPeak.mean.toFixed(3)} m³/m³`, isoOf(soilPeak.coord)],
+    ["peak saturated area", `${(satPeak.satCells * CELL_KM2).toLocaleString()} km²`, `${(100 * satPeak.satCells / CELLS).toFixed(1)}% of domain at ${isoOf(satPeak.coord)}`],
+    ["cells ever ≥ 0.40 m³/m³", `${everSat.toLocaleString()}`, `${(100 * everSat / CELLS).toFixed(1)}% of domain`],
+    ["mean saturation, where saturated", `${everSat ? (3 * sumDur / everSat).toFixed(0) : 0} h`, "censored — see below"],
+    ["saturated at every step", `${censored.toLocaleString()} cells`, `${(100 * censored / Math.max(everSat, 1)).toFixed(0)}% of saturated cells — duration is a floor, not a residence time`],
+    ["peak-surface median", `${st.median.toFixed(3)} m³/m³`, `p10 ${st.percentile(10)?.toFixed(3)} · p90 ${st.percentile(90)?.toFixed(3)}`],
+    ["reduce('max') agreement", worst < 1e-6 ? "identical" : `|Δ| ${worst.toExponential(2)}`, "hand-rolled maximum vs the library reducer"],
+    ["walk cost", `${(walkMs / 1000).toFixed(1)} s`, `${N} steps × 4 variables, ${(walkMs / (N * 4)).toFixed(1)} ms per select`],
+  ];
+  document.getElementById("series").innerHTML =
+    `<table><tr><th>quantity</th><th>value</th><th>note</th></tr>`
+    + rows.map(([k, v, n]) => `<tr><td>${k}</td><td class="num">${v}</td><td>${n}</td></tr>`).join("")
+    + `</table>`;
+  const note = document.getElementById("series-note");
+  note.innerHTML = "<b>Melt share</b> is the study's headline: the fraction of water delivered to the "
+    + "soil column that came out of the snowpack rather than the sky. It is not a flood metric and it "
+    + "is not an extent — it is the reason the same rainfall on bare ground would not have produced "
+    + "this event. <b>Duration figures are floors.</b> The window opens on 10 March with much of the "
+    + "domain already wet and closes on the 17th with much of it still wet, so every duration is "
+    + "truncated at both ends; the row above counts how often.";
+  note.hidden = false;
+
+  metrics.push(...Object.entries(VARS).map(([name, v]) => ({
+    study: "6", variable: name, unit: v.unit, description: v.label,
+    steps: entries[name].length, width: W, height: H,
+    resolution_m: 1000, crs: "EPSG:4326 (from LCC, see notes)",
+  })));
+}
+
+// ── controls ──────────────────────────────────────────────────────────────────────────────────
+function wire() {
+  const slider = document.getElementById("tstep");
+  slider.max = String(N - 1);
+  slider.disabled = false;
+  let pending = false;
+  slider.oninput = async () => {
+    if (pending) return;                       // one decode in flight at a time; drags stay responsive
+    pending = true;
+    await showStep(Number(slider.value));
+    pending = false;
+  };
+  const play = document.getElementById("play");
+  play.onclick = async () => {
+    if (playing) { clearInterval(playing); playing = null; play.textContent = "▶ play"; return; }
+    play.textContent = "❚❚ pause";
+    playing = setInterval(async () => {
+      const next = (Number(slider.value) + 1) % N;
+      slider.value = String(next);
+      await showStep(next);
+    }, 260);
+  };
+}
+
+document.getElementById("dlp").onclick = () => download(perf, "performance.csv");
+document.getElementById("dlm").onclick = () => download(metrics, "metrics.csv");
+document.getElementById("dlr").onclick = () => download(results, "results.csv");
+
+// ── run ───────────────────────────────────────────────────────────────────────────────────────
+try {
+  status("opening the four series…");
+  await openAll();
+
+  status("walking the series…");
+  const acc = await walk();
+
+  status("building the derived surfaces…");
+  snowScale = new ColorScale({ palette: "blues", min: 0,
+    max: Math.max(...sweSeries.map((d) => d.mean)) * 2.6 || 1, continuous: true,
+    unit: "mm", missingColor: "transparent" });
+  soilScale = new ColorScale({ palette: "viridis", min: 0.15, max: 0.56, continuous: true,
+    unit: "m³/m³", missingColor: "transparent" });
+
+  const derived = await renderDerived(acc);
+  await showStep(0);
+  maps.snow.map.fitBounds(FIT); maps.soil.map.fitBounds(FIT);
+  renderResult({ ...acc, ...derived });
+  wire();
+
+  status("ready", "done");
+} catch (e) {
+  log(`ERROR  ${e.message}`);
+  console.error(e);
+  status(`failed: ${e.message}`, "fail");
+}
+</script>
+</body>
+</html>

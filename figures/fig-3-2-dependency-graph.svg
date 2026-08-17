@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="734" viewBox="0 0 1000 734"
+     font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
+  <title>FIMViz.js module dependency graph</title>
+  <desc>Import graph of src/, collapsed from 57 modules to 14 architectural components. Acyclic.
+        Levels are longest-path depth in the dependency DAG; an arrow means "imports".</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#64748b"/>
+    </marker>
+    <marker id="af" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#cbd5e1"/>
+    </marker>
+  </defs>
+  <rect width="1000" height="734" fill="#ffffff"/>
+  <text x="30" y="30" font-size="14" font-weight="700" fill="#0f172a">Module dependency graph — 57 modules in 14 components, 42 component edges</text>
+  <text x="30" y="49" font-size="11.5" fill="#475569">An arrow means "imports". Rows are longest-path depth in the dependency DAG. Solid = transitively essential; faint = implied by a longer path.</text>
+  <text x="30" y="65" font-size="11.5" font-weight="700" fill="#166534">The graph is acyclic: every arrow points down. No component imports anything above it.</text>
+  <path d="M288.0,492.0 C288.0,513.0 394.0,513.0 394.0,534.0" fill="none" stroke="#64748b" stroke-width="1.35" marker-end="url(#a)" opacity="0.85"/>
+  <path d="M500.0,492.0 C500.0,513.0 394.0,513.0 394.0,534.0" fill="none" stroke="#64748b" stroke-width="1.35" marker-end="url(#a)" opacity="0.85"/>
+  <path d="M500.0,400.0 C500.0,467.0 606.0,467.0 606.0,534.0" fill="none" stroke="#64748b" stroke-width="2.05" marker-end="url(#a)" opacity="0.85"/>
+  <path d="M500.0,400.0 C500.0,467.0 182.0,467.0 182.0,534.0" fill="none" stroke="#64748b" stroke-width="1.70" marker-end="url(#a)" opacity="0.85"/>
+  <path d="M500.0,400.0 C500.0,421.0 288.0,421.0 288.0,442.0" fill="none" stroke="#64748b" stroke-width="1.70" marker-end="url(#a)" opacity="0.85"/>
+  <path d="M500.0,400.0 C500.0,467.0 394.0,467.0 394.0,534.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M288.0,308.0 C288.0,375.0 288.0,375.0 288.0,442.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M288.0,308.0 C288.0,421.0 182.0,421.0 182.0,534.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M288.0,308.0 C288.0,329.0 500.0,329.0 500.0,350.0" fill="none" stroke="#64748b" stroke-width="1.70" marker-end="url(#a)" opacity="0.85"/>
+  <path d="M288.0,308.0 C288.0,421.0 394.0,421.0 394.0,534.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M712.0,308.0 C712.0,421.0 394.0,421.0 394.0,534.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M712.0,308.0 C712.0,375.0 288.0,375.0 288.0,442.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M712.0,308.0 C712.0,329.0 500.0,329.0 500.0,350.0" fill="none" stroke="#64748b" stroke-width="1.35" marker-end="url(#a)" opacity="0.85"/>
+  <path d="M712.0,308.0 C712.0,421.0 182.0,421.0 182.0,534.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M500.0,308.0 C500.0,375.0 288.0,375.0 288.0,442.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M500.0,308.0 C500.0,329.0 500.0,329.0 500.0,350.0" fill="none" stroke="#64748b" stroke-width="1.70" marker-end="url(#a)" opacity="0.85"/>
+  <path d="M500.0,308.0 C500.0,421.0 394.0,421.0 394.0,534.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M500.0,308.0 C500.0,375.0 500.0,375.0 500.0,442.0" fill="none" stroke="#64748b" stroke-width="1.35" marker-end="url(#a)" opacity="0.85"/>
+  <path d="M500.0,308.0 C500.0,421.0 606.0,421.0 606.0,534.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M500.0,216.0 C500.0,237.0 288.0,237.0 288.0,258.0" fill="none" stroke="#64748b" stroke-width="1.70" marker-end="url(#a)" opacity="0.85"/>
+  <path d="M500.0,216.0 C500.0,375.0 394.0,375.0 394.0,534.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M500.0,216.0 C500.0,237.0 500.0,237.0 500.0,258.0" fill="none" stroke="#64748b" stroke-width="1.35" marker-end="url(#a)" opacity="0.85"/>
+  <path d="M500.0,216.0 C500.0,329.0 500.0,329.0 500.0,442.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M500.0,216.0 C500.0,375.0 606.0,375.0 606.0,534.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M500.0,216.0 C500.0,375.0 818.0,375.0 818.0,534.0" fill="none" stroke="#64748b" stroke-width="1.35" marker-end="url(#a)" opacity="0.85"/>
+  <path d="M606.0,124.0 C606.0,329.0 394.0,329.0 394.0,534.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M606.0,124.0 C606.0,283.0 288.0,283.0 288.0,442.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M606.0,124.0 C606.0,329.0 606.0,329.0 606.0,534.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M606.0,124.0 C606.0,191.0 500.0,191.0 500.0,258.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M606.0,124.0 C606.0,145.0 500.0,145.0 500.0,166.0" fill="none" stroke="#64748b" stroke-width="2.40" marker-end="url(#a)" opacity="0.85"/>
+  <path d="M606.0,124.0 C606.0,283.0 500.0,283.0 500.0,442.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M394.0,124.0 C394.0,145.0 500.0,145.0 500.0,166.0" fill="none" stroke="#64748b" stroke-width="1.35" marker-end="url(#a)" opacity="0.85"/>
+  <path d="M394.0,124.0 C394.0,283.0 500.0,283.0 500.0,442.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M394.0,124.0 C394.0,237.0 500.0,237.0 500.0,350.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M394.0,124.0 C394.0,191.0 712.0,191.0 712.0,258.0" fill="none" stroke="#64748b" stroke-width="1.35" marker-end="url(#a)" opacity="0.85"/>
+  <path d="M394.0,124.0 C394.0,329.0 818.0,329.0 818.0,534.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M394.0,124.0 C394.0,191.0 288.0,191.0 288.0,258.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M394.0,124.0 C394.0,329.0 182.0,329.0 182.0,534.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M394.0,124.0 C394.0,329.0 606.0,329.0 606.0,534.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M394.0,124.0 C394.0,191.0 500.0,191.0 500.0,258.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M394.0,124.0 C394.0,283.0 288.0,283.0 288.0,442.0" fill="none" stroke="#e2e8f0" stroke-width="0.8" marker-end="url(#af)" opacity="0.9"/>
+  <path d="M712.0,492.0 C712.0,513.0 606.0,513.0 606.0,534.0" fill="none" stroke="#64748b" stroke-width="1.70" marker-end="url(#a)" opacity="0.85"/>
+  <rect x="89" y="534" width="186" height="50" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+  <text x="100" y="555" font-size="12.5" font-weight="700" fill="#0f172a">Grids &amp; features</text>
+  <text x="100" y="572" font-size="10.5" fill="#475569">materialize</text>
+  <text x="264" y="555" font-size="10" fill="#94a3b8" text-anchor="end">1</text>
+  <rect x="301" y="534" width="186" height="50" rx="6" fill="#e2e8f0" stroke="#cbd5e1"/>
+  <text x="312" y="555" font-size="12.5" font-weight="700" fill="#0f172a">Kernel</text>
+  <text x="312" y="572" font-size="10.5" fill="#475569">events · config · dom</text>
+  <text x="476" y="555" font-size="10" fill="#94a3b8" text-anchor="end">3</text>
+  <rect x="513" y="534" width="186" height="50" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+  <text x="524" y="555" font-size="12.5" font-weight="700" fill="#0f172a">Read models</text>
+  <text x="524" y="572" font-size="10.5" fill="#475569">ColorScale · Legend · Stats · Filter</text>
+  <text x="688" y="555" font-size="10" fill="#94a3b8" text-anchor="end">4</text>
+  <rect x="725" y="534" width="186" height="50" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+  <text x="736" y="555" font-size="12.5" font-weight="700" fill="#0f172a">Persistence</text>
+  <text x="736" y="572" font-size="10.5" fill="#475569">storage</text>
+  <text x="900" y="555" font-size="10" fill="#94a3b8" text-anchor="end">1</text>
+  <rect x="195" y="442" width="186" height="50" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+  <text x="206" y="463" font-size="12.5" font-weight="700" fill="#0f172a">Projection</text>
+  <text x="206" y="480" font-size="10.5" fill="#475569">resample · crs · mercator · tif meta</text>
+  <text x="370" y="463" font-size="10" fill="#94a3b8" text-anchor="end">6</text>
+  <rect x="407" y="442" width="186" height="50" rx="6" fill="#e6edf5" stroke="#a8bdd4"/>
+  <text x="418" y="463" font-size="12.5" font-weight="700" fill="#0f172a">Map-provider seam</text>
+  <text x="418" y="480" font-size="10.5" fill="#475569">mapProvider</text>
+  <text x="582" y="463" font-size="10" fill="#94a3b8" text-anchor="end">1</text>
+  <rect x="619" y="442" width="186" height="50" rx="6" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="4 3"/>
+  <text x="630" y="463" font-size="12.5" font-weight="700" fill="#0f172a">Interface kit</text>
+  <text x="630" y="480" font-size="10.5" fill="#475569">ui/ — optional</text>
+  <text x="794" y="463" font-size="10" fill="#94a3b8" text-anchor="end">13</text>
+  <rect x="407" y="350" width="186" height="50" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+  <text x="418" y="371" font-size="12.5" font-weight="700" fill="#0f172a">Dataset &amp; ops</text>
+  <text x="418" y="388" font-size="10.5" fill="#475569">Dataset · rasterOps · metrics</text>
+  <text x="582" y="371" font-size="10" fill="#94a3b8" text-anchor="end">4</text>
+  <rect x="195" y="258" width="186" height="50" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+  <text x="206" y="279" font-size="12.5" font-weight="700" fill="#0f172a">Ingest &amp; decode</text>
+  <text x="206" y="296" font-size="10.5" fill="#475569">parse · materializers · sciwrid</text>
+  <text x="370" y="279" font-size="10" fill="#94a3b8" text-anchor="end">6</text>
+  <rect x="407" y="258" width="186" height="50" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+  <text x="418" y="279" font-size="12.5" font-weight="700" fill="#0f172a">Layer model</text>
+  <text x="418" y="296" font-size="10.5" fill="#475569">Layer · Comparison · Ensemble</text>
+  <text x="582" y="279" font-size="10" fill="#94a3b8" text-anchor="end">5</text>
+  <rect x="619" y="258" width="186" height="50" rx="6" fill="#fef3c7" stroke="#d97706"/>
+  <text x="630" y="279" font-size="12.5" font-weight="700" fill="#0f172a">GDAL warp provider</text>
+  <text x="630" y="296" font-size="10.5" fill="#475569">warp · gdal · reprojector</text>
+  <text x="794" y="279" font-size="10" fill="#94a3b8" text-anchor="end">3</text>
+  <rect x="407" y="166" width="186" height="50" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+  <text x="418" y="187" font-size="12.5" font-weight="700" fill="#0f172a">App &amp; mount</text>
+  <text x="418" y="204" font-size="10.5" fill="#475569">FimViz · FimMap · mount</text>
+  <text x="582" y="187" font-size="10" fill="#94a3b8" text-anchor="end">3</text>
+  <rect x="301" y="74" width="186" height="50" rx="6" fill="#dbeafe" stroke="#60a5fa"/>
+  <text x="312" y="95" font-size="12.5" font-weight="700" fill="#0f172a">Public API</text>
+  <text x="312" y="112" font-size="10.5" fill="#475569">lib.js</text>
+  <text x="476" y="95" font-size="10" fill="#94a3b8" text-anchor="end">1</text>
+  <rect x="513" y="74" width="186" height="50" rx="6" fill="#eef2f6" stroke="#cbd5e1"/>
+  <text x="524" y="95" font-size="12.5" font-weight="700" fill="#0f172a">Domain layers</text>
+  <text x="524" y="112" font-size="10.5" fill="#475569">depthMap · ensemble · velocity</text>
+  <text x="688" y="95" font-size="10" fill="#94a3b8" text-anchor="end">6</text>
+  <text x="30" y="660" font-size="11.5" fill="#475569">Components, not directories. <tspan font-weight="700">src/package/</tspan> spans three tiers, so collapsing by directory yields edges in both directions between</text>
+  <text x="30" y="677" font-size="11.5" fill="#475569">package↔geo and package↔io and hides that the graph is a DAG. The <tspan font-weight="700" fill="#92400e">GDAL warp provider</tspan> is drawn amber because it depends on the</text>
+  <text x="30" y="694" font-size="11.5" fill="#475569">primitives and registers itself back into them — the inversion that keeps the seam one-directional (Fig. 3.1).</text>
+  <text x="30" y="715" font-size="10.5" fill="#94a3b8">Generated by figures/build-fig-3-2.mjs from src/ — re-run to regenerate.</text>
+</svg>
