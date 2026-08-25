@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>FIMViz console scratchpad</title>
+<script type="importmap">
+{ "imports": {
+    "fimviz": "./dist/fimviz.js",
+    "fimviz/ui": "./dist/ui.js"
+} }
+</script>
+<script type="module">
+import * as fimviz from "fimviz";
+import * as ui from "fimviz/ui";
+
+// expose for poking at from the DevTools console
+window.fimviz = fimviz;
+window.ui = ui;
+// Object.assign(window, fimviz);   // FimViz, ColorScale, Layer, ... as bare globals
+
+console.log("fimviz ready:", Object.keys(fimviz).sort().join(", "));
+</script>
+</head>
+<body>
+  <p>Open DevTools. <code>fimviz</code>, <code>ui</code>, and the named exports are on <code>window</code>.</p>
+  <div id="container" style="width: 1000px; height: 1000px; border: 1px solid black;"></div>
+</body>
+</html>
