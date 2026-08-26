@@ -8,11 +8,15 @@
 
 > **createToolsPanel**(`root`, `opts?`): `object`
 
-Defined in: [ui/toolsPanel.js:130](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/ui/toolsPanel.js#L130)
+Defined in: [ui/toolsPanel.js:288](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/toolsPanel.js#L288)
 
 Mount a tools panel for `layer` into `root`. `controls` overrides the preset — an array or a
 `(layer) => Control[]` function. `pretty:true` injects a scoped stylesheet; otherwise the panel is
 bare structure the host styles.
+
+`reactive:true` keeps the panel in step with changes made anywhere else — `layer.set()`, another
+panel, a preset button. See the focus rule below; it is the reason this is opt-in rather than
+always on.
 
 ## Parameters
 
@@ -31,6 +35,10 @@ bare structure the host styles.
 [`Layer`](../../../package/layer/classes/Layer.md)
 
 #### pretty?
+
+`boolean` = `false`
+
+#### reactive?
 
 `boolean` = `false`
 

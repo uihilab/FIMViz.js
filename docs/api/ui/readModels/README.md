@@ -8,5 +8,7 @@
 
 ## Functions
 
+- [bindLegend](functions/bindLegend.md)
+- [bindStats](functions/bindStats.md)
 - [renderLegend](functions/renderLegend.md)
 - [renderStats](functions/renderStats.md)

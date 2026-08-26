@@ -8,9 +8,9 @@
 
 > **createMap**(`el`, `options?`): `Promise`\<`any`\>
 
-Defined in: [package/mapProvider.js:711](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/mapProvider.js#L711)
+Defined in: [package/mapProvider.js:772](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mapProvider.js#L772)
 
-Create a map in `el` using the configured provider.
+Creates a map in `el` using the configured provider.
 
 ## Parameters
 

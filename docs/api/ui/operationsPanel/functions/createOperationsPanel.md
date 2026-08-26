@@ -8,7 +8,7 @@
 
 > **createOperationsPanel**(`root`, `opts?`): `object`
 
-Defined in: [ui/operationsPanel.js:36](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/ui/operationsPanel.js#L36)
+Defined in: [ui/operationsPanel.js:245](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/operationsPanel.js#L245)
 
 Mount an operations panel for `layer` into `root`.
 
@@ -20,13 +20,29 @@ Mount an operations panel for `layer` into `root`.
 
 ### opts?
 
+#### fim?
+
+[`FimMap`](../../../package/fimMap/classes/FimMap.md)
+
 #### layer
 
-[`RasterLayer`](../../../package/layer/classes/RasterLayer.md)
+[`Layer`](../../../package/layer/classes/Layer.md)
+
+#### layers?
+
+() => [`Layer`](../../../package/layer/classes/Layer.md)[]
 
 #### onApply?
 
 (`layer`, `err?`) => `void`
+
+#### onResult?
+
+(`id`, `data`) => `void`
+
+#### open?
+
+`string`[] = `...`
 
 #### pretty?
 
@@ -51,3 +67,7 @@ Mount an operations panel for `layer` into `root`.
 ### el
 
 > **el**: `Element`
+
+### ops
+
+> **ops**: `string`[]

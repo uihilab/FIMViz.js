@@ -454,15 +454,37 @@ when you want the result right away.
 
 ## Vendored primitives
 
-Re-exported so the engine stays the single owner of these third-party dependencies — a host never
-imports `geotiff`/`@tmcw/togeojson`/`shpjs`/`@googlemaps/js-api-loader` directly:
+`parseFile` decodes geotiff, kml, kmz and shp already, so reach for these only for the cases it does
+not cover. They are not on the `fimviz` barrel. Import them from the parse module:
 
 ```js
-fromArrayBuffer   // geotiff's buffer → GeoTIFF image accessor (pixel-level access beyond parseFile)
-kml               // @tmcw/togeojson's KML XML DOM → GeoJSON
-shp               // shpjs's zipped shapefile buffer → GeoJSON
-Loader            // @googlemaps/js-api-loader's script loader class
+import { fromArrayBuffer, kml, shp } from 'fimviz/src/io/parsePrimitives.js';
 ```
+
+Only this package's `package.json` declares `geotiff`, `@tmcw/togeojson` and `shpjs`, so a host does
+not add its own copy. That matters most for geotiff: two copies mean two typed-array classes, and a
+decoded grid stops passing `instanceof` in host code.
+
+```js
+fromArrayBuffer   // geotiff's buffer → GeoTIFF image accessor
+kml               // @tmcw/togeojson's KML XML DOM → GeoJSON
+shp               // shpjs's zipped shapefile buffer → GeoJSON (async; imports shpjs on first call)
+```
+
+What each is for:
+
+- **`fromArrayBuffer`** — `io/materializers.js` keeps band 0 of image 0 and discards the rest. Use
+  this for a second band, a second image, a windowed read of a large COG, or the TIFF tag
+  dictionary.
+- **`shp`** — `io/parse.js` flattens a multi-layer zip into one `FeatureCollection`. Use this to
+  keep the layers apart.
+- **`kml`** — takes a DOM `Document`, not bytes, so it helps only when you already hold a parsed
+  Document.
+
+`Loader` from `@googlemaps/js-api-loader` was on this list and is gone. It is provider-specific on a
+provider-neutral API, `mapProvider.js` imports it dynamically rather than through the barrel, and
+re-exporting it made `fimviz` unimportable under Node, since that package is CommonJS with no named
+ESM export.
 
 
 

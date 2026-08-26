@@ -8,11 +8,11 @@
 
 > **rangeOf**(`grid`): `object`
 
-Defined in: [package/rasterImage.js:17](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/rasterImage.js#L17)
+Defined in: [package/rasterImage.js:17](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/rasterImage.js#L17)
 
-Min/max over a grid's pixels, skipping noData/NaN — to seed a default continuous scale when the
-caller attaches none. Exported so a caller building its own default ColorScale (e.g.
-RasterLayer._draw's precedence chain) matches colorizeGrid's own fallback ranging exactly.
+Min and max over a grid's pixels, skipping noData and NaN, used to seed a default continuous
+scale when colorizeGrid is given none. Exported so that code building its own default ColorScale,
+such as RasterLayer._draw, ranges exactly the way colorizeGrid's fallback does.
 
 ## Parameters
 

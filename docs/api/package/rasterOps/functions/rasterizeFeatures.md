@@ -8,12 +8,13 @@
 
 > **rasterizeFeatures**(`featureCollection`, `bounds`, `opts?`): [`RasterGrid`](../../materialize/classes/RasterGrid.md)
 
-Defined in: [package/rasterOps.js:422](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/rasterOps.js#L422)
+Defined in: [package/rasterOps.js:431](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/rasterOps.js#L431)
 
-Rasterize vector features onto a new grid (vector→raster, the kind-changing op). Each pixel
-centre is point-tested against every feature's polygon; `field` burns the feature's property value,
-omit for a constant `burnValue`. Later features in the collection win where they overlap (burn order
-= draw order). Polygon/MultiPolygon geometry only — point/line features are ignored.
+Rasterizes vector features onto a new grid, the one op that changes a Dataset's kind. Each pixel
+center is point-tested against the features' polygons. `field` burns that feature property's
+value; omit it to burn a constant `burnValue`. Where features overlap, the later one in the
+collection wins, so burn order follows draw order. Reads Polygon and MultiPolygon geometry only,
+ignoring point and line features.
 
 ## Parameters
 

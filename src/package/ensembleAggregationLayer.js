@@ -1,27 +1,28 @@
 // ensembleAggregationLayer.js — a Layer that aggregates N member extent rasters into an agreement map.
 //
-// The ensemble twin of ComparisonLayer: same "align N rasters onto one grid, then reduce" shape, a
-// different reduction. Comparison asks WHICH members are wet (per-subset, 2^N-1 colours); the ensemble
-// asks HOW MANY are wet — a per-pixel agreement count 0..N over an N-colour ramp
-// (comparisonMetrics.ensembleAgreementRgba). Headless (pixels+meta in, data out); emits `computed`
-// (→ map bus `ensembleAgreement:computed`) for a ui/*Tools binder to render (event inversion).
+// Aligns N rasters onto one grid and reduces them, the way ComparisonLayer does, but with a
+// different reduction. Comparison asks which members are wet, giving 2^N-1 subset colors. This asks
+// how many are wet, giving a per-pixel count of 0..N over an N-color ramp
+// (comparisonMetrics.ensembleAgreementRgba). Headless: pixels and meta in, data out. Emits
+// `computed`, which reaches the map bus as `ensembleAgreement:computed`, for a ui/*Tools binder.
 //
-// NOTE this is DISTINCT from layers/ensemble.js, which renders a single PRE-BAKED ensemble GeoTIFF.
-// This one is the multi-member aggregation the single-file path never did.
+// Not the same as layers/ensemble.js, which renders one pre-baked ensemble GeoTIFF. This aggregates
+// several members, which the single-file path never did.
 
 import { Layer, registerLayerType } from "./layer.js";
 import { alignRasters, GRID_POLICY, RESAMPLE_METHODS } from "../geo/resample.js";
 import { ensembleAgreementRgba, DRY_DEFAULT } from "./comparisonMetrics.js";
 import { gridToRaster } from "./comparisonLayer.js";
+import { Legend } from "./legend.js";
 
 const DEFAULT_POLICY = GRID_POLICY.HIGH;
 const DEFAULT_METHOD = "nearest";
 
-// A source may be a plain { pixels, meta }, a RasterLayer (rasterData + meta), or a materialized
-// RasterGrid (a forced Dataset). A raw Dataset needs `await layer.prepare()` first (forcing is async).
+// A source is a plain { pixels, meta }, a RasterLayer carrying rasterData and meta, or a RasterGrid
+// from a forced Dataset. A raw Dataset needs `await layer.prepare()` first, since forcing is async.
 function toRaster(src) {
   if (!src) throw new Error("EnsembleAggregationLayer: a source is missing");
-  // RasterGrid FIRST — it carries an opaque `.meta` that would falsely match the {pixels,meta} branch.
+  // RasterGrid first: its opaque `.meta` would otherwise match the {pixels,meta} branch.
   if (src.pixels && src.bounds && src.width) return gridToRaster(src);   // RasterGrid
   if (src.pixels && src.meta) return { pixels: src.pixels, meta: src.meta };
   if (src.rasterData && src.meta) return { pixels: src.rasterData, meta: src.meta };
@@ -34,22 +35,23 @@ function toRaster(src) {
 
 export class EnsembleAggregationLayer extends Layer {
   /**
-   * @param {Object} [opts] - see `Layer`'s constructor; `sources` here are `{pixels, meta}` or `RasterLayer`
+   * @param {Object} [opts] - as `Layer`, except `sources` take `{pixels, meta}` or a `RasterLayer`
    */
   constructor(opts = {}) {
     super({ ...opts, type: opts.type || "ensembleAgreement" });
     this.result = null;
     this._aligned = null;
     this._grid = null;
+    this._colors = null;   // the agreement ramp the last compute() drew with
   }
 
   /**
-   * Align the members → agreement count → N-colour ramp. Emits `computed` with
-   * { grid, rgba, perPixel, histogram, nLayers, policy, method, warnings } and returns it.
+   * Aligns the members, counts agreement per pixel, and maps the count onto an N-color ramp.
+   * Emits `computed` with the returned object.
    *
-   * `policy`/`method` default (high/nearest) with a warning when omitted/unknown; `colors` is the
-   * N-colour agreement ramp (omitted → a viridis ramp + a warning, from the reducer). All warnings —
-   * resampling + colour — are merged so the host surfaces one list.
+   * An omitted or unknown `policy` or `method` falls back to high and nearest, each with a warning.
+   * An omitted `colors` falls back to a viridis ramp, also with a warning. Resampling and color
+   * warnings arrive merged in one list.
    * @param {Object} [o]
    * @param {'low'|'high'|'average'} [o.policy]
    * @param {string} [o.method]
@@ -66,21 +68,22 @@ export class EnsembleAggregationLayer extends Layer {
     const rasters = this.sources.map(toRaster);
     const { grid, rasters: aligned } = alignRasters(rasters, { policy, method, noData: dryValue });
     const pixelArrays = aligned.map((r) => r.pixels);
-    const { rgba, perPixel, histogram, nLayers, warnings: colourWarnings } =
+    const { rgba, perPixel, histogram, nLayers, warnings: colorWarnings, colors: ramp } =
       ensembleAgreementRgba(pixelArrays, { colors, dryValue });
 
     this._aligned = pixelArrays;
     this._grid = grid;
+    this._colors = ramp;
     this.visible = true;
     this.result = { grid, rgba, perPixel, histogram, nLayers, policy, method,
-      warnings: [...warnings, ...colourWarnings] };
+      warnings: [...warnings, ...colorWarnings] };
     this.emit("computed", this.result);
     return this.result;
   }
 
   /**
-   * Materialize any Dataset members into RasterGrids so the synchronous compute() can consume them
-   * (`await layer.prepare(); layer.compute(opts)`). Non-Dataset members pass through untouched.
+   * Forces any Dataset members into RasterGrids so the synchronous compute() can read them:
+   * `await layer.prepare(); layer.compute(opts)`. Other members pass through untouched.
    * @returns {Promise<EnsembleAggregationLayer>}
    */
   async prepare() {
@@ -89,8 +92,27 @@ export class EnsembleAggregationLayer extends Layer {
     return this;
   }
 
-  /** The aligned per-member pixel arrays from the last compute() (all on `result.grid`). @returns {Array|null} */
+  /** Per-member pixel arrays from the last compute(), all on `result.grid`. @returns {Array|null} */
   getAligned() { return this._aligned; }
+
+  /**
+   * A Legend for the agreement ramp the last compute() drew, or null before one has run.
+   *
+   * One row per agreement level, 1 through N. Count 0 means every member is dry, which draws
+   * transparent, so it gets no row. `value` on each stop is the count, so a UI can match a row
+   * against `result.histogram`.
+   * @returns {import('./legend.js').Legend|null}
+   */
+  getLegend() {
+    if (!this._colors || !this.result) return null;
+    const n = this.result.nLayers;
+    const stops = this._colors.map((c, i) => ({
+      value: i + 1,
+      color: `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${(c[3] ?? 255) / 255})`,
+      label: `${i + 1} of ${n} wet`,
+    }));
+    return new Legend({ kind: "classed", source: "custom", stops });
+  }
 }
 
 // addLayer('ensembleAgreement', { sources: [{pixels,meta}, …], policy?, method?, colors? }).

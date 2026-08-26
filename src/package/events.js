@@ -33,46 +33,45 @@ export function fimError(code, message) {
   return err;
 }
 
-// ---- the host sink (engine → host, one direction) --------------------------------------
+// ---- the host sink, engine to host, one direction ---------------------------------------
 //
-// A single active sink lets deep engine modules (gdal.js, io/fileUpload.js, Google Maps'
-// gm_authFailure, …) report to the mounted app's emitter without threading a ctx through every
-// call. Same ambient-active-pointer pattern as setActiveDom().
+// One active sink lets deep engine modules such as gdal.js or io/fileUpload.js report to the
+// mounted app's emitter without threading a context through each call. setActiveDom() uses the
+// same ambient-pointer approach.
 //
-// THIS IS THE ENGINE'S ONLY OUTBOUND CHANNEL TO A HOST. The engine must never call an app
-// function — not by import, and not through `window.*` either. A `window.pushNotification(...)`
-// in library code is the same coupling as an import, minus the ability of any tool to see it, and
-// it throws a TypeError in any host that doesn't happen to define that global. So: the engine
-// EMITS, the host SUBSCRIBES and decides what (if anything) to render.
+// This is the engine's only outbound channel to a host. The engine must not call an app function,
+// by import or through `window.*`. A `window.pushNotification(...)` in library code couples as
+// tightly as an import, no tool can see it, and it throws a TypeError in a host that never defined
+// that global. The engine emits; the host subscribes and decides what to render.
 //
-// Nothing here assumes a listener exists — an unhandled event is a silent no-op, which is what
-// makes the engine embeddable headlessly.
+// Nothing assumes a listener exists. An unhandled event does nothing, which is what lets the engine
+// run headless.
 
 let _sink = null;
 
-/** Point the engine's outbound events at a host emitter (the app's bus). null to detach. */
+/** Points the engine's outbound events at a host emitter. Pass null to detach. */
 export function setHostSink(emitter) {
   _sink = emitter;
 }
 
-/** @deprecated Use setHostSink — the sink carries more than errors now. */
+/** @deprecated Use setHostSink. The sink carries more than errors now. */
 export const setErrorSink = setHostSink;
 
-/** Emit an arbitrary engine→host event. Returns true if a sink was attached. */
+/** Emits an engine event to the host. Returns true when a sink is attached. */
 export function emitHost(evt, payload) {
   if (!_sink) return false;
   _sink.emit(evt, payload);
   return true;
 }
 
-/** Report a coded error (docs/usage/USAGE.md error codes) → 'error'. */
+/** Emits 'error' with a coded Error. Codes are listed in docs/usage/USAGE.md. */
 export function reportError(code, message) {
   emitHost("error", fimError(code, message));
 }
 
 /**
- * A user-facing message the host may surface however it likes (toast, console, nothing).
- * Replaces the engine's direct `window.pushNotification(...)` calls → 'notify'.
+ * Emits 'notify' with a user-facing message. The host renders it as a toast, a console line or
+ * nothing. Replaces the engine's direct `window.pushNotification(...)` calls.
  * @param {string} message
  * @param {{level?: 'info'|'warn'|'error', detail?: object}} [opts]
  */
@@ -81,29 +80,28 @@ export function notify(message, { level = "info", detail = null } = {}) {
 }
 
 /**
- * Stored data for `store` changed (upload, delete, rename), so any host list showing it is stale.
- * Replaces `window.loadFileViewerOptions()` / `loadFloodExtentFileOptions()` /
- * `loadComparisonLoaderOptions()` / `loadEnsembleDisplayOptions()` → 'storage:changed'.
- * `store` is the logical collection name the host knows ('userFiles', 'floodExtent', …).
+ * Emits 'storage:changed' after an upload, delete or rename, so a host list showing `store` knows
+ * it is stale. `store` is the collection name the host uses, i.e. 'userFiles'. Replaces the four
+ * `window.load*Options()` globals.
  */
 export function notifyStorageChanged(store, detail = null) {
   emitHost("storage:changed", { store, detail });
 }
 
 /**
- * An upload finished successfully — the host may dismiss whatever upload affordance it showed.
- * Replaces `window.hideUploadOverlay()` / `hideComparisonUploadOverlay()` → 'upload:complete'.
- * `target` names which inlet finished ('default' | 'comparison' | …).
+ * Emits 'upload:complete' so the host can dismiss whatever upload UI it showed. `target` names the
+ * inlet that finished, i.e. 'comparison'. Replaces `window.hideUploadOverlay()` and
+ * `hideComparisonUploadOverlay()`.
  */
 export function notifyUploadComplete(target = "default", detail = null) {
   emitHost("upload:complete", { target, detail });
 }
 
 /**
- * Long-running work started (`active: true`) or finished (`active: false`). Replaces the engine
- * toggling a specific `#loading-indicator` — whether that means a spinner, a cursor or nothing is
- * the host's decision. `source` names the subsystem ('depth' | 'ensemble' | …) so a host can tell
- * overlapping work apart; a host with one indicator can ignore it.
+ * Emits 'busy' when long-running work starts or finishes. The host decides whether that means a
+ * spinner, a cursor or nothing, instead of the engine toggling a specific `#loading-indicator`.
+ * `source` names the subsystem, i.e. 'depth', so a host can tell overlapping work apart. A host
+ * with one indicator can ignore it.
  * @param {boolean} active @param {string} [source]
  */
 export function notifyBusy(active, source = "default") {

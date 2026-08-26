@@ -6,7 +6,7 @@
 
 # Class: Stats
 
-Defined in: [package/stats.js:23](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/stats.js#L23)
+Defined in: [package/stats.js:23](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/stats.js#L23)
 
 ## Constructors
 
@@ -14,9 +14,9 @@ Defined in: [package/stats.js:23](https://github.com/uihilab/FIMViz.js/blob/af34
 
 > **new Stats**(`fields?`): `Stats`
 
-Defined in: [package/stats.js:25](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/stats.js#L25)
+Defined in: [package/stats.js:25](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/stats.js#L25)
 
-Not usually called directly — use the `Stats.raster()`/`Stats.vector()` factories.
+Use `Stats.raster()` or `Stats.vector()` instead of calling this.
 
 #### Parameters
 
@@ -34,7 +34,7 @@ Not usually called directly — use the `Stats.raster()`/`Stats.vector()` factor
 
 > **describe**(): `string`
 
-Defined in: [package/stats.js:204](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/stats.js#L204)
+Defined in: [package/stats.js:204](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/stats.js#L204)
 
 #### Returns
 
@@ -46,9 +46,9 @@ Defined in: [package/stats.js:204](https://github.com/uihilab/FIMViz.js/blob/af3
 
 > **diff**(`other`): `object`
 
-Defined in: [package/stats.js:194](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/stats.js#L194)
+Defined in: [package/stats.js:194](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/stats.js#L194)
 
-Deltas between two Stats of the same kind (this − other) over shared numeric fields.
+Subtracts `other` from this, field by field, over the numeric fields both kinds share.
 
 #### Parameters
 
@@ -66,7 +66,7 @@ Deltas between two Stats of the same kind (this − other) over shared numeric f
 
 > **download**(`name?`): `void`
 
-Defined in: [package/stats.js:241](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/stats.js#L241)
+Defined in: [package/stats.js:241](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/stats.js#L241)
 
 #### Parameters
 
@@ -84,9 +84,9 @@ Defined in: [package/stats.js:241](https://github.com/uihilab/FIMViz.js/blob/af3
 
 > **percentile**(`p`): `number`
 
-Defined in: [package/stats.js:174](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/stats.js#L174)
+Defined in: [package/stats.js:174](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/stats.js#L174)
 
-Approximate percentile p (0–100) from the histogram. Raster only.
+Approximates percentile p, from 0 to 100, from the histogram. Raster only.
 
 #### Parameters
 
@@ -104,7 +104,7 @@ Approximate percentile p (0–100) from the histogram. Raster only.
 
 > **toCSV**(): `string`
 
-Defined in: [package/stats.js:221](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/stats.js#L221)
+Defined in: [package/stats.js:221](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/stats.js#L221)
 
 #### Returns
 
@@ -116,7 +116,7 @@ Defined in: [package/stats.js:221](https://github.com/uihilab/FIMViz.js/blob/af3
 
 > **toJSON**(): `any`
 
-Defined in: [package/stats.js:218](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/stats.js#L218)
+Defined in: [package/stats.js:218](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/stats.js#L218)
 
 #### Returns
 
@@ -128,9 +128,9 @@ Defined in: [package/stats.js:218](https://github.com/uihilab/FIMViz.js/blob/af3
 
 > `static` **raster**(`pixelData`, `meta`, `opts?`): `Stats`
 
-Defined in: [package/stats.js:38](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/stats.js#L38)
+Defined in: [package/stats.js:38](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/stats.js#L38)
 
-Raster statistics over pixelData, optionally scoped by a Filter and classified by a ColorScale.
+Raster statistics over pixelData. A Filter scopes it and a ColorScale classifies it.
 
 #### Parameters
 
@@ -200,12 +200,12 @@ Raster statistics over pixelData, optionally scoped by a Filter and classified b
 
 > `static` **vector**(`source`, `opts?`): `Stats`
 
-Defined in: [package/stats.js:118](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/stats.js#L118)
+Defined in: [package/stats.js:118](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/stats.js#L118)
 
 Vector statistics over any feature source.
 
-Accepts **GeoJSON** (a FeatureCollection, a single Feature, a Feature[], or the engine's
-`VectorFeatures`) — what a headless caller and `VectorLayer.getStats()` have — **or** a
+Takes GeoJSON as a FeatureCollection, a Feature, a Feature array or the engine's
+`VectorFeatures`, which is what `VectorLayer.getStats()` and headless code hold. Also takes a
 `google.maps.Data`-shaped layer.
 
 #### Parameters
@@ -222,10 +222,10 @@ GeoJSON FeatureCollection|Feature|Feature[]|VectorFeatures, or a `google.maps.Da
 
 [`ColorScale`](../../colorScale/classes/ColorScale.md) = `null`
 
-bucket features into `byClass`
-  by the SAME scale that colours them. Needs `classifyBy` to know which property carries the
-  value; `VectorLayer.getStats()` passes both from the layer, so the buckets line up with the
-  legend exactly as they do for a raster.
+buckets features into
+  `byClass` by the scale that colors them, so they line up with the legend as a raster's do.
+  Needs `classifyBy` to know which property holds the value. `VectorLayer.getStats()` passes
+  both from the layer.
 
 ###### classifyBy?
 

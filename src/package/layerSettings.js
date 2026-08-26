@@ -1,25 +1,23 @@
 // layerSettings.js — the Layer change-model (docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1 "Settings vs. Operations").
 //
-// A SETTING is a declarative parameter applied while rendering the CURRENT source (palette, opacity,
-// noData, hover). It is NOT an OPERATION (swap/reproject/select/reload — those replace the data and
-// are Layer/Dataset methods, not knobs). Mutating a setting classifies its EFFECT and emits the
-// matching event on the layer; both settings AND operations feed ONE effect-event stream so any UI
-// reacts uniformly:
-//   'restyle'    — recolor the memoized grid (palette/opacity/label). No data re-force.
-//   'recomputed' — the derived grid changed (noData). Re-colorize + hover meta changes.
+// A setting is a declarative parameter applied while rendering the current source: palette, opacity,
+// noData or hover. An operation replaces the data instead, so swap, reproject, select and reload are
+// Layer and Dataset methods rather than knobs. Writing a setting classifies its effect and emits the
+// matching event on the layer. Settings and operations share one event stream, so a UI reacts to
+// both the same way:
+//   'restyle'    recolor the memoized grid for palette, opacity or label. No re-force.
+//   'recomputed' the derived grid changed, from noData. Re-colorize, and the hover meta changes.
 //
-// LayerSettings holds NO duplicate state: RasterSettings routes STYLE knobs to the layer's existing
-// ColorScale (whose onChange already emits 'restyle' and repaints — see RasterLayer._setColorScale),
-// so the ColorScale stays the single source of truth for colour. The bag stores only the opacity/hover/noData
-// mirrors a UI reads back.
+// LayerSettings duplicates no state. RasterSettings routes style knobs to the layer's ColorScale,
+// whose onChange already emits 'restyle' and repaints (see RasterLayer._setColorScale), so the
+// ColorScale alone decides color. This bag stores only the opacity, hover and noData values a UI
+// reads back.
 
-/**
- * The declarative knob bag for a Layer. Subclasses implement `_apply(key, value)`.
- */
+/** The declarative knob bag for a Layer. Subclasses implement `_apply(key, value)`. */
 export class LayerSettings {
   /**
    * @param {import('./layer.js').Layer} layer
-   * @param {Object} [defaults] - initial knob values (also the reset() target unless overridden)
+   * @param {Object} [defaults] - initial knob values, and the reset() target unless overridden
    */
   constructor(layer, defaults = {}) {
     this._layer = layer;
@@ -27,27 +25,25 @@ export class LayerSettings {
     this._defaults = { opacity: 1, hover: false };
   }
 
-  /** Read one knob, or the whole state object (a copy) when called with no key. */
+  /** Reads one knob, or a copy of the whole state object when given no key. */
   get(key) { return key == null ? { ...this._state } : this._state[key]; }
 
   /**
-   * Batch write. Applies each known knob, re-renders if any change needs a redraw, then emits the
-   * distinct effect events (restyle/recomputed) once each plus a 'settings' summary.
+   * Writes a batch of knobs. Applies each known one, re-renders if any needs a redraw, then emits
+   * each distinct effect event once plus a 'settings' summary. Synchronous and chainable: it returns
+   * the Layer, not a Promise.
    *
-   * SYNC AND CHAINABLE — returns the Layer, not a Promise.
+   * Across Raster and Vector settings, only `noData` triggers a redraw. When it does, the render
+   * runs and the effect events fire after it, so a subscriber never reads a half-updated grid. Await
+   * it with `await layer.settled()`, or subscribe to 'recomputed' or 'rendered'. A render failure
+   * arrives on the layer's 'error' event.
    *
-   * Of every knob across Raster and Vector settings, exactly ONE (`noData`) triggers a redraw. When
-   * it does, the render runs and the effect events fire AFTER it, so a subscriber never reads a
-   * half-updated grid. To await that, use `await layer.settled()`, or subscribe to the
-   * 'recomputed'/'rendered' event. A render failure is reported via the layer's 'error' event.
-   *
-   * PARTIAL, BEST-EFFORT: one key throwing (e.g. an invalid palette name failing `ColorScale`'s
-   * validation) does not abort the rest of the batch — every OTHER key still
-   * gets applied, committed to `_state`, and its effect event still fires. Failures are collected and,
-   * if any occurred, thrown together as ONE aggregate error at the end — after the successful keys
-   * have already taken effect — naming every failed key with its own message, plus which keys DID
-   * succeed. This is deliberate: a caller sees exactly what went wrong and what didn't, rather than
-   * either silently swallowing errors or having one bad key block unrelated ones in the same call.
+   * Partial and best-effort: one key throwing, i.e. an invalid palette name failing ColorScale's
+   * validation, does not abort the batch. The other keys still apply, commit to `_state` and fire
+   * their effect events. Failures are collected and thrown together as one error at the end, after
+   * the successful keys have taken effect, naming each failed key with its message and listing the
+   * keys that succeeded. The user then sees exactly what went wrong and what did not, instead of
+   * silent failure or one bad key blocking unrelated ones.
    * @param {Object} partial
    * @returns {import('./layer.js').Layer} the layer, for chaining
    */
@@ -57,15 +53,14 @@ export class LayerSettings {
     let redraw = false;
     const emits = new Set();
 
-    // GROUP PASS. A subclass may coalesce a set of related knobs into ONE underlying call —
-    // RasterSettings routes every ColorScale-bound knob (palette/continuous/min/max/unit/…) through a
-    // single `colorScale.set(patch)`, so one `layer.set({palette, continuous})` produces ONE onChange
-    // and ONE 'restyle', matching what `colorScale.set({palette, continuous})` already did. Applying
-    // them key-by-key fired one restyle PER key, so the same patch behaved differently depending on
-    // which object you handed it to — exactly the inconsistency this model exists to remove.
+    // Group pass. A subclass may fold related knobs into one underlying call. RasterSettings sends
+    // the ColorScale-bound knobs through a single `colorScale.set(patch)`, so
+    // `layer.set({palette, continuous})` produces one onChange and one 'restyle', matching what
+    // `colorScale.set({palette, continuous})` already did. Applying them key by key fired one
+    // restyle per key, so the same patch behaved differently depending on which object received it.
     //
-    // If the grouped call throws (e.g. one invalid palette name), fall back to per-key application so
-    // the PARTIAL, BEST-EFFORT contract below still holds: only the genuinely bad key fails.
+    // If the grouped call throws, fall back to per-key application so only the genuinely bad key
+    // fails, keeping the partial best-effort behavior described above.
     let claimed = null;
     try { claimed = this._applyGroup?.(partial) || null; }
     catch { claimed = null; }   // fall through to the per-key loop, which isolates the bad key
@@ -77,7 +72,7 @@ export class LayerSettings {
         r = this._apply(k, v);
       } catch (e) {
         failed[k] = e?.message || String(e);
-        continue;   // one bad knob doesn't block the rest of the batch
+        continue;   // one bad knob does not block the rest of the batch
       }
       if (!r) continue;                 // unknown knob → ignore
       changed[k] = v; this._state[k] = v;
@@ -90,9 +85,9 @@ export class LayerSettings {
         this._layer.emit("settings", { changed });
       };
       if (redraw && this._layer.visible && typeof this._layer.render === "function") {
-        // Redraw first, THEN emit — a 'recomputed' subscriber must not read a half-updated grid.
-        // Tracked on _pending so layer.settled() can await it; errors go to the layer's event bus
-        // rather than surfacing as an unhandled rejection on a now-synchronous call.
+        // Redraw before emitting, so a 'recomputed' subscriber cannot read a half-updated grid.
+        // Held on _pending so layer.settled() can await it. Errors go to the layer's event bus
+        // rather than becoming an unhandled rejection on a synchronous call.
         this._pending = Promise.resolve(this._layer.render({ render: "in-place" }))
           .then(fire)
           .catch((e) => { this._layer.emit("error", { error: e, phase: "settings", changed }); })
@@ -113,28 +108,28 @@ export class LayerSettings {
   }
 
   /**
-   * Resolves once any redraw a `set()` kicked off has finished (and its effect events have fired).
-   * Resolves immediately when nothing is pending — so `await layer.settled()` is always safe.
+   * Resolves once any redraw `set()` started has finished and its effect events have fired.
+   * Resolves immediately when nothing is pending, so `await layer.settled()` is always safe.
    * @returns {Promise<import('./layer.js').Layer>}
    */
   async settled() { await this._pending; return this._layer; }
 
-  /** Restore the reset defaults. @returns {import('./layer.js').Layer} */
+  /** Restores the reset defaults. @returns {import('./layer.js').Layer} */
   reset() { return this.set(this._defaults); }
 
   /**
-   * Apply one knob and report its effect. Return `null` for an unknown knob (ignored), else
-   * `{ redraw, emit }` — `redraw:true` to re-render in place, `emit` the effect event name (or null
-   * when another mechanism already emits it, e.g. ColorScale.onChange for palette).
+   * Applies one knob and reports its effect. Returns `null` for an unknown knob, which set()
+   * ignores. Otherwise `redraw:true` asks for an in-place re-render, and `emit` names the effect
+   * event, or is null when something else already emits it, i.e. ColorScale.onChange for palette.
    * @param {string} key @param {*} value @returns {{redraw: boolean, emit: string|null}|null}
    */
   _apply(key, value) { return null; }   // eslint-disable-line no-unused-vars
 }
 
 /**
- * Raster knobs: palette/continuous route to the layer's ColorScale (style axis → 'restyle', which the
- * ColorScale's own onChange emits + repaints); noData is the data axis (→ 'recomputed' + a redraw);
- * opacity is placement (provider opacity, no redraw); hover is interaction-only (no map change).
+ * Raster knobs. `palette` and `continuous` go to the layer's ColorScale, whose onChange emits
+ * 'restyle' and repaints. `noData` changes the data, so it emits 'recomputed' and forces a redraw.
+ * `opacity` sets provider opacity with no redraw. `hover` affects interaction only.
  */
 export class RasterSettings extends LayerSettings {
   constructor(layer) {
@@ -142,14 +137,14 @@ export class RasterSettings extends LayerSettings {
     this._defaults = { opacity: 1, hover: true };   // a raster shows hover values by default
   }
   /**
-   * Every knob that belongs to the attached ColorScale. Kept in one place so the group pass and the
-   * per-key fallback below can't drift apart.
+   * The knobs belonging to the attached ColorScale. One list, so the group pass and the per-key
+   * fallback below cannot drift apart.
    */
   static SCALE_KEYS = ["palette", "continuous", "min", "max", "unit", "stops", "colorStops"];
 
   /**
-   * Coalesce all ColorScale-bound knobs into ONE `colorScale.set(patch)` — one onChange, one
-   * 'restyle', one repaint, no matter how many of them are in the patch.
+   * Folds the ColorScale-bound knobs into one `colorScale.set(patch)`, giving one onChange, one
+   * 'restyle' and one repaint however many of them the patch holds.
    * @param {Object} partial @returns {{keys: Set<string>, redraw: boolean, emit: string|null}|null}
    */
   _applyGroup(partial) {
@@ -157,8 +152,8 @@ export class RasterSettings extends LayerSettings {
     if (!present.length) return null;
     const keys = new Set(present);
     const cs = this._layer.colorScale;
-    // No scale attached yet → the knobs are inert, but still recorded in _state so a later attach or
-    // a UI reading settings.get() sees what the caller asked for.
+    // With no scale attached the knobs do nothing, but _state still records them, so a later attach
+    // or a UI reading settings.get() sees what the user asked for.
     if (!cs) return { keys, redraw: false, emit: null };
     const patch = {};
     for (const k of present) patch[k] = k === "continuous" ? !!partial[k] : partial[k];
@@ -169,8 +164,8 @@ export class RasterSettings extends LayerSettings {
   _apply(key, v) {
     const L = this._layer;
     switch (key) {
-      // The ColorScale-bound knobs. Normally handled as a GROUP by _applyGroup above; these
-      // per-key cases are the isolate-the-bad-key fallback when the grouped call throws.
+      // The ColorScale-bound knobs. _applyGroup above normally handles them together; these per-key
+      // cases isolate the bad key when that grouped call throws.
       case "palette":
       case "continuous":
       case "min":
@@ -179,20 +174,19 @@ export class RasterSettings extends LayerSettings {
       case "stops":
       case "colorStops":
         if (L.colorScale) L.colorScale.set({ [key]: key === "continuous" ? !!v : v });
-        return { redraw: false, emit: null };   // no scale attached → nothing to repaint
+        return { redraw: false, emit: null };   // no scale attached, so nothing to repaint
       case "colorScale":
-        // Swapping the whole scale, vs. `palette`/`continuous` which edit the attached one. Folding
-        // it in here is what makes layer.set() the SINGLE recolour path: the three that existed
-        // (layer.setColorScale / layer.settings.set / layer.colorScale.setPalette) are now one.
-        // emit:null for the same reason as palette/continuous above — the attached ColorScale's own
-        // onChange owns the 'restyle' emit, so emitting here too would double-fire it.
+        // Swaps the whole scale, where `palette` and `continuous` edit the attached one. Handling
+        // it here makes layer.set() the single recolor path, replacing layer.setColorScale,
+        // layer.settings.set and layer.colorScale.setPalette. emit is null because the attached
+        // ColorScale's own onChange emits 'restyle', and emitting here too would double-fire it.
         L._setColorScale?.(v); return { redraw: false, emit: null };
       case "noData":
         L.setNoData?.(v); return { redraw: true, emit: "recomputed" };
       case "opacity":
         L.setOpacity?.(v); return { redraw: false, emit: "restyle" };
       case "hover":
-        return { redraw: false, emit: null };   // a tooltip reads settings.get('hover')
+        return { redraw: false, emit: null };   // a tooltip reads settings.get('hover') itself
       default:
         return null;
     }
@@ -200,16 +194,16 @@ export class RasterSettings extends LayerSettings {
 }
 
 /**
- * Vector knobs: colour/opacity re-style the overlay (VectorLayer.setStyle re-adds with a merged
- * neutral style — no provider setVectorStyle in the contract); hover is interaction-only.
+ * Vector knobs. `color` and `opacity` restyle the overlay: no provider implements setVectorStyle,
+ * so VectorLayer.setStyle re-adds it with a merged neutral style. `hover` affects interaction only.
  */
 export class VectorSettings extends LayerSettings {
   constructor(layer) {
     super(layer, {
       opacity: 1, hover: false, color: null, useFileColors: false,
-      // Colour-by-property: the same ColorScale a raster uses, reading a feature property instead of
-      // a pixel. `colorBy` alone (or a scale alone) does nothing — both are needed to grade features,
-      // and until then `color` keeps applying flatly.
+      // Color by property, using the same ColorScale a raster uses but reading a feature property
+      // rather than a pixel. Grading features needs both `colorBy` and a scale; with only one of
+      // them set, `color` keeps applying flatly.
       colorScale: null, colorBy: null, missingColor: null,
     });
   }
@@ -223,14 +217,13 @@ export class VectorSettings extends LayerSettings {
       case "useFileColors":
         return { redraw: false, emit: "restyle" };
       case "colorScale":
-        // Validates before mutating, then re-adds the overlay through the new resolution.
+        // Validates before mutating, then re-adds the overlay using the new scale.
         L._setColorScale?.(v); L.setStyle?.({}); return { redraw: false, emit: "restyle" };
       case "colorBy":
         L.colorBy = v || null; L.setStyle?.({}); return { redraw: false, emit: "restyle" };
-      // palette/continuous/missingColor route to the attached scale, exactly as they do on a raster
-      // — so one UI control writes the same knob whichever kind of layer it is bound to.
-      // missingColor is what a feature with no usable `colorBy` value is painted; leave it null to
-      // keep such features at their base style instead.
+      // palette, continuous and missingColor go to the attached scale exactly as they do on a
+      // raster, so one UI control writes the same knob on either kind of layer. missingColor paints
+      // a feature whose `colorBy` value is unusable; leave it null to keep that feature's base style.
       case "palette":
       case "continuous":
       case "missingColor":

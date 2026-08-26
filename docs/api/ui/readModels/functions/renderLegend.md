@@ -8,7 +8,7 @@
 
 > **renderLegend**(`legend`, `opts?`): `any`
 
-Defined in: [ui/readModels.js:17](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/ui/readModels.js#L17)
+Defined in: [ui/readModels.js:22](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/readModels.js#L22)
 
 A Legend as data (default) or an HTML swatch list (`{ html: true }`, via Legend.toHtml() when
 present, else a built-in fallback).

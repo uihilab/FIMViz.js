@@ -140,7 +140,6 @@ export const derive = (tp, fp, fn, tn) => ({
   pod: +(tp + fn > 0 ? tp / (tp + fn) : 0).toFixed(6),
   far: +(tp + fp > 0 ? fp / (tp + fp) : 0).toFixed(6),
   bias: +(tp + fn > 0 ? (tp + fp) / (tp + fn) : 0).toFixed(6),
-  containment: +(tp + fn > 0 ? tp / (tp + fn) : 0).toFixed(6),
 });
 
 /** [prediction, observation] → contingency. `mask` scopes it to a SpatialFilter polygon. */
@@ -148,7 +147,13 @@ export function scorePair(predGrid, obsGrid, { policy = "low", mask = null } = {
   const layer = new ComparisonLayer({ sources: [predGrid, obsGrid] });
   const r = layer.compute({ policy, method: "nearest", dryValue: DRY, ...(mask ? { mask } : {}) });
   const m = mask ? layer.metricsForMask(mask) : r.metrics;
-  return { result: r, row: { ...derive(m.tp, m.fp, m.fn, m.tn), kappa: +m.k.toFixed(6),
+  // kappa is null when both rasters put every pixel in one class; keep the null rather than
+  // printing a 0 that reads as a real score.
+  // containment is TP/(TP+FN), which is POD under another name, so take the engine's `h` rather
+  // than recomputing it. kappa is null when both rasters put every pixel in one class.
+  return { result: r, row: { ...derive(m.tp, m.fp, m.fn, m.tn),
+                             containment: m.h == null ? null : +m.h.toFixed(6),
+                             kappa: m.k == null ? null : +m.k.toFixed(6),
                              grid_w: r.grid.width, grid_h: r.grid.height } };
 }
 
@@ -202,8 +207,10 @@ async function main() {
     const { row } = scorePair(wet.grid, obs.grid, { policy: "low" });
     rows.push({ study: "1", environment: `node ${process.version}`, scope: "basin",
                 wet_threshold_m: th, pred_wet_cells: wet.wet, obs_wet_cells: obs.wet, ...row });
+    // POD and containment are the same number by definition, so print POD once and let the CSV
+    // carry both columns.
     console.log(`  th=${th}m  CSI ${row.csi.toFixed(4)}  POD ${row.pod.toFixed(4)}`
-      + `  containment ${row.containment.toFixed(4)}  bias ${row.bias.toFixed(4)}`);
+      + `  bias ${row.bias.toFixed(4)}`);
   }
 
   // Observability: is the EMS observed extent a strict subset of its modelled extent?

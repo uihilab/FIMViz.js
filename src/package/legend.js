@@ -1,8 +1,8 @@
 // legend.js — the read-model twin of a ColorScale, for display (docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1).
 //
-// A Legend is data first: { unit, kind, source, stops[] } + formatLabel/formatValue host hooks.
-// `toHtml()` is a faithful default renderer; a host that wants its own markup reads `toJSON()`
-// (which is data-complete) and renders from that instead.
+// A Legend is data first: { unit, kind, source, stops[] } plus the formatLabel and formatValue
+// hooks a host can set. `toHtml()` is a default renderer. A host wanting its own markup reads
+// `toJSON()`, which carries everything, and renders from that.
 
 /**
  * @typedef {Object} LegendStop
@@ -48,14 +48,12 @@ export class Legend {
   }
 
   /**
-   * Resolve one stop's row label: `formatLabel` wins if set; gdal/custom legends show their own
-   * stored label as-is; palette/default legends auto-build a "lo–hi unit" label.
+   * Builds one stop's row label. `formatLabel` takes precedence. A gdal or custom legend shows the
+   * label it already carries, while a palette or default legend builds a "lo–hi unit" label.
    * @internal @param {LegendStop} stop @returns {string}
    */
   _label(stop) {
     if (this.formatLabel) return this.formatLabel(stop);
-    // gdal/custom legends carry their own labels (show as-is); palette/default auto-build a
-    // "lo–hi unit" label. Mirrors the old buildOriginalLegendHtml vs buildPaletteLegendHtml split.
     const auto = this.source === "palette" || this.source === "default";
     if (!auto && stop.label != null) return stop.label;
     const sfx = this.unit ? ` ${this.unit}` : "";
@@ -65,7 +63,8 @@ export class Legend {
   }
 
   /**
-   * HTML for the legend. Continuous → a gradient bar with min/max; classed → coloured rows.
+   * Renders the legend as HTML: a gradient bar with min and max when continuous, colored rows
+   * when classed.
    * @returns {string}
    */
   toHtml() {

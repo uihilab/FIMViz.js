@@ -6,7 +6,7 @@
 
 # Interface: Runtime
 
-Defined in: [package/mount.js:35](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/mount.js#L35)
+Defined in: [package/mount.js:32](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mount.js#L32)
 
 ## Properties
 
@@ -14,9 +14,10 @@ Defined in: [package/mount.js:35](https://github.com/uihilab/FIMViz.js/blob/af34
 
 > **bootstrap**: (`fim`) => `Promise`\<`void`\>
 
-Defined in: [package/mount.js:36](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/mount.js#L36)
+Defined in: [package/mount.js:33](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mount.js#L33)
 
-boot the map; called by create() instead of its default createMap() path, with the FimMap being mounted
+boots the map. create() calls it with
+  the FimMap being mounted, instead of taking its own createMap() path.
 
 #### Parameters
 
@@ -34,7 +35,7 @@ boot the map; called by create() instead of its default createMap() path, with t
 
 > **createPanel**: (`root`) => `any`
 
-Defined in: [package/mount.js:39](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/mount.js#L39)
+Defined in: [package/mount.js:37](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mount.js#L37)
 
 per-instance Layer Panel factory
 
@@ -54,9 +55,9 @@ per-instance Layer Panel factory
 
 > **getMountedMap**: () => `any`
 
-Defined in: [package/mount.js:37](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/mount.js#L37)
+Defined in: [package/mount.js:35](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mount.js#L35)
 
-reported once bootstrap() resolves
+read once bootstrap() resolves
 
 #### Returns
 
@@ -68,7 +69,7 @@ reported once bootstrap() resolves
 
 > **markup**: `string`
 
-Defined in: [package/mount.js:40](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/mount.js#L40)
+Defined in: [package/mount.js:38](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mount.js#L38)
 
 widget HTML injected into the container
 
@@ -78,9 +79,9 @@ widget HTML injected into the container
 
 > **teardownMap**: () => `void`
 
-Defined in: [package/mount.js:38](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/mount.js#L38)
+Defined in: [package/mount.js:36](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mount.js#L36)
 
-detach listeners on destroy()
+detaches listeners on destroy()
 
 #### Returns
 

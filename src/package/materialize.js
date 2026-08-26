@@ -1,35 +1,33 @@
-// materialize.js — the decoded-data seam for Dataset.
+// materialize.js — what a forced Dataset decodes into, and who decodes it.
 //
-// Two things live here and NOTHING heavy: (1) the two materialized representations a forced Dataset
-// produces — RasterGrid and VectorFeatures — and (2) the REGISTRIES that map a format to the code
-// that decodes it and a target CRS to the code that warps it.
+// Holds two value classes, RasterGrid and VectorFeatures, plus the registries mapping a format to
+// its decoder and a target CRS to its warp. Nothing heavy.
 //
-// The whole point of this module is to keep `Dataset` headless. `Dataset` imports THIS (registries +
-// value classes only, zero infrastructure), NOT geotiff/GDAL. The actual decoders live in
-// `io/materializers.js` (node-safe: geotiff decodes in Node) and register themselves on import; the
-// GDAL reprojector is registered by the app/browser boot (GDAL is browser-only). A Node test either
-// imports the real materializers or registers a stub — either way `new Dataset()` stays constructible
-// without dragging in the toolchain, which is the property docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1 protects.
+// This keeps `Dataset` headless: it imports these registries and value classes, never geotiff or
+// GDAL. The decoders live in `io/materializers.js` and register themselves on import; geotiff
+// decodes under Node, so that file is node-safe. The app's browser boot registers the GDAL
+// reprojector, since GDAL is browser-only. A Node test imports the real materializers or registers
+// a stub, and either way `new Dataset()` stays constructible without the toolchain, which is what
+// docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1 protects.
 //
-// Same registered-seam inversion the codebase already uses for registerMapProvider / registerLayerType
-// / registerRuntime: the model names a mechanism, the host supplies the implementation.
+// registerMapProvider, registerLayerType and registerRuntime invert the same way: this file names
+// the mechanism, the host supplies the implementation.
 
 /**
- * A decoded raster: the pixel grid plus the geometry needed to place and read it. This is what a
- * RasterLayer draws and what alignRasters/comparison consume — the anonymous `{ pixels, meta }` shape
- * that was already passed around everywhere, now a named value type.
+ * A decoded raster: the pixel grid plus the geometry needed to place and read it. RasterLayer draws
+ * one, and alignRasters and the comparison path consume one.
  */
 export class RasterGrid {
   /**
    * @param {Object} init
-   * @param {ArrayBufferView} init.pixels - the decoded band-0 pixel array (typed array)
+   * @param {ArrayBufferView} init.pixels - decoded band-0 pixels
    * @param {number} init.width
    * @param {number} init.height
    * @param {{north:number,south:number,east:number,west:number}|null} [init.bounds] - in `crs`
    * @param {string|null} [init.crs]
    * @param {number|string|null} [init.noData]
    * @param {number} [init.bands]
-   * @param {Object} [init.meta] - carried through from the Dataset (GDAL legend/unit, …)
+   * @param {Object} [init.meta] - carried through from the Dataset, i.e. a GDAL legend
    */
   constructor({ pixels, width, height, bounds = null, crs = null, noData = null, bands = 1, meta = {} } = {}) {
     this.kind = "raster";
@@ -45,12 +43,12 @@ export class RasterGrid {
 }
 
 /**
- * A decoded vector: a GeoJSON FeatureCollection plus its frame. What a VectorLayer draws.
+ * A decoded vector: a GeoJSON FeatureCollection plus its bounds and CRS. VectorLayer draws one.
  */
 export class VectorFeatures {
   /**
    * @param {Object} init
-   * @param {Object} init.features - a GeoJSON FeatureCollection (or Feature)
+   * @param {Object} init.features - a GeoJSON FeatureCollection or Feature
    * @param {{north:number,south:number,east:number,west:number}|null} [init.bounds]
    * @param {string|null} [init.crs]
    * @param {Object} [init.meta]
@@ -64,9 +62,9 @@ export class VectorFeatures {
   }
 
   /**
-   * The features as a plain array, whatever shape the payload arrived in — a FeatureCollection, a
-   * lone Feature, or an array. Without this, reading them means knowing which of those you got and
-   * writing `(await ds.features()).features.features` for the common case.
+   * The features as a plain array, whether the payload arrived as a FeatureCollection, a lone
+   * Feature or an array. Without it, the user must know which of the three it got, and write
+   * `(await ds.features()).features.features` in the common case.
    * @returns {Object[]} GeoJSON Features, in document order
    */
   toArray() {
@@ -92,9 +90,9 @@ export class VectorFeatures {
 const _materializers = new Map();
 
 /**
- * Register the decoder for a `format` (e.g. 'geotiff', 'geojson'). Called by io/materializers.js on
- * import (and by tests). The decoder fetches (for a URL root) and decodes into a RasterGrid/
- * VectorFeatures. Keeping this out of Dataset's import graph is what preserves headlessness.
+ * Registers the decoder for a `format`, i.e. 'geotiff'. io/materializers.js calls this on import,
+ * and so do tests. The decoder fetches a URL root when it has one, then decodes into a RasterGrid
+ * or VectorFeatures. Keeping it out of Dataset's import graph is what keeps Dataset headless.
  * @param {string} format
  * @param {Materializer} fn
  * @returns {void}
@@ -105,29 +103,29 @@ export function registerMaterializer(format, fn) {
 }
 
 /**
- * The decoder for `format`, or null. Dataset.#force uses this; a null result becomes a clear
- * "no materializer registered for '<format>' — import fimviz/src/io/materializers.js" error.
+ * The decoder for `format`, or null. Dataset.#force calls this and turns a null into a "no
+ * materializer registered for '<format>'" error naming fimviz/src/io/materializers.js.
  * @param {string} format
  * @returns {Materializer|null}
  */
 export function getMaterializer(format) { return _materializers.get(format) || null; }
 
-/** Registered materializer format names (introspection/tests). @returns {string[]} */
+/** Registered format names, for introspection and tests. @returns {string[]} */
 export function materializerFormats() { return [..._materializers.keys()]; }
 
 // ---- reprojector registry: async (grid, targetCrs) => RasterGrid ----
 //
-// Exactly ONE warp implementation (GDAL), so this is a single slot, not a keyed map. It is a registry
-// rather than a direct import purely so Dataset stays GDAL-free: the app registers the real warp at
-// boot (browser-only), tests register a stub. reproject() as a Dataset OP builds a lazy node with no
-// dependency here; only FORCING a reproject node reaches for this.
+// One warp implementation, GDAL, so this is a single slot rather than a keyed map. It stays a
+// registry instead of a direct import so Dataset never pulls in GDAL: the app registers the real
+// warp at boot, which is browser-only, and tests register a stub. ds.reproject() builds a lazy node
+// that touches none of this. Only forcing that node reads the slot.
 
 /** @typedef {(grid: RasterGrid, targetCrs: string) => Promise<RasterGrid>} Reprojector */
 
 let _reprojector = null;
 
 /**
- * Register the raster reprojector (the GDAL warp). Called by the app/browser boot.
+ * Registers the raster reprojector, the GDAL warp. The app's browser boot calls this.
  * @param {Reprojector} fn
  * @returns {void}
  */
@@ -136,25 +134,24 @@ export function registerReprojector(fn) {
   _reprojector = fn;
 }
 
-/** The registered reprojector, or null (forcing a reproject node then throws a clear error). @returns {Reprojector|null} */
+/** The registered reprojector, or null, in which case forcing a reproject node throws. @returns {Reprojector|null} */
 export function getReprojector() { return _reprojector; }
 
-// ---- lazy default (JIT-load the built-in GDAL warp only when actually needed) ----
+// ---- lazy default: load the built-in GDAL warp only when needed ----
 //
-// A host can call registerReprojector directly, but nothing requires that anymore: lib.js registers
-// the built-in GDAL warp here as a LOADER — a closure that dynamically import()s io/reprojector.js —
-// not the warp itself. Storing a closure is free (no import happens yet); resolveReprojector() only
-// invokes it, at most once, the first time a force finds `_reprojector` still null. That import is
-// what actually pulls in geo/gdal.js/gdal3.js, so a consumer who never reprojects anything never pays
-// for GDAL at all, and one who does pays for it exactly once, exactly when it's first needed.
+// A host may still call registerReprojector directly, but nothing requires it. lib.js registers a
+// loader here rather than the warp itself: a closure that dynamically imports io/reprojector.js.
+// Storing the closure imports nothing. resolveReprojector() invokes it at most once, the first time
+// a force finds `_reprojector` null, and that import is what pulls in geo/gdal.js and gdal3.js. A
+// app that never reprojects never loads GDAL; one that does loads it once, when first needed.
 
 /** @type {(() => Promise<void>)|null} */
 let _defaultLoader = null;
 let _defaultLoaderPromise = null;
 
 /**
- * Register the fallback used when a force finds no reprojector registered yet. `fn` is invoked AT
- * MOST ONCE (memoized) and is expected to call registerReprojector() itself before resolving.
+ * Registers the fallback used when a force finds no reprojector. `fn` runs at most once, memoized,
+ * and must call registerReprojector() itself before it resolves.
  * @param {(() => Promise<void>)|null} fn
  * @returns {void}
  */
@@ -166,9 +163,9 @@ export function registerDefaultReprojectorLoader(fn) {
 }
 
 /**
- * The reprojector to warp with, running the default loader (once, memoized) if nothing is registered
- * yet. Dataset's reproject force calls this instead of getReprojector() so the JIT default gets a
- * chance before giving up.
+ * The reprojector to warp with, running the default loader once if nothing is registered yet.
+ * Dataset's reproject force calls this rather than getReprojector(), so the lazy default gets a
+ * chance before the force gives up.
  * @returns {Promise<Reprojector|null>}
  */
 export async function resolveReprojector() {

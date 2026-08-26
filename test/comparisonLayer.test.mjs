@@ -159,6 +159,132 @@ describe("ComparisonLayer.compute", () => {
     assert.deepEqual(good.warnings, []);
   });
 
+  // { prediction, observation } names the two sources instead of ordering them. Order decides the
+  // metrics — sources[0] is the prediction — so the named form exists to make that unmissable.
+  test("{ prediction, observation } builds the same sources as [pred, obs]", () => {
+    const g = { width: 2, height: 1, bw: 0, bs: 0, be: 2, bn: 1 };
+    const pred = { pixels: Float32Array.from([1, DRY]), meta: g };   // wet, dry
+    const obs = { pixels: Float32Array.from([1, 1]), meta: g };      // wet, wet
+
+    const named = new ComparisonLayer({ prediction: pred, observation: obs }).compute();
+    const positional = new ComparisonLayer({ sources: [pred, obs] }).compute();
+    assert.deepEqual(named.metrics, positional.metrics);
+    assert.equal(named.metrics.tp, 1);
+    assert.equal(named.metrics.fn, 1, "wet in the observation only");
+    assert.equal(named.metrics.fp, 0);
+  });
+
+  test("swapping the two names inverts fp and fn, as swapping the array does", () => {
+    const g = { width: 2, height: 1, bw: 0, bs: 0, be: 2, bn: 1 };
+    const pred = { pixels: Float32Array.from([1, DRY]), meta: g };
+    const obs = { pixels: Float32Array.from([1, 1]), meta: g };
+    const m = new ComparisonLayer({ prediction: obs, observation: pred }).compute().metrics;
+    assert.equal(m.fp, 1, "the roles swap with the names");
+    assert.equal(m.fn, 0);
+  });
+
+  test("`sources` wins when both forms are given", () => {
+    const g = { width: 2, height: 1, bw: 0, bs: 0, be: 2, bn: 1 };
+    const a = { pixels: Float32Array.from([1, 1]), meta: g };
+    const b = { pixels: Float32Array.from([DRY, DRY]), meta: g };
+    const layer = new ComparisonLayer({ sources: [a, b], prediction: b, observation: a });
+    assert.equal(layer.sources[0], a);
+  });
+
+  test("no sources at all still yields an empty array, not undefined", () => {
+    assert.deepEqual(new ComparisonLayer().sources, []);
+  });
+
+  test("addLayer('comparison', { prediction, observation }) reaches the constructor", () => {
+    const g = { width: 2, height: 1, bw: 0, bs: 0, be: 2, bn: 1 };
+    const layer = createLayer({ emit() {}, _unregisterLayer() {} }, "comparison", {
+      prediction: { pixels: Float32Array.from([1, DRY]), meta: g },
+      observation: { pixels: Float32Array.from([1, 1]), meta: g },
+    });
+    assert.equal(layer.sources.length, 2);
+    assert.equal(layer.result.metrics.fn, 1);
+  });
+
+  // `counts` totals the categories; `categories` is the per-pixel answer behind that total.
+  // combineExtentRgba always computed it and compute() used to drop it on the floor.
+  test("result.categories is the per-pixel bitmask, and counts totals it", () => {
+    const g = { width: 4, height: 1, bw: 0, bs: 0, be: 4, bn: 1 };
+    // per pixel: both wet, only-1, only-2, neither
+    const layer = new ComparisonLayer({
+      sources: [
+        { pixels: Float32Array.from([1, 1, DRY, DRY]), meta: g },
+        { pixels: Float32Array.from([1, DRY, 1, DRY]), meta: g },
+      ],
+    });
+    const r = layer.compute({ policy: "low", method: "nearest" });
+    assert.deepEqual([...r.categories], [0b11, 0b01, 0b10, 0b00]);
+    assert.equal(r.categories.length, r.grid.width * r.grid.height, "one entry per pixel");
+    for (let cat = 0; cat < 4; cat++) {
+      const tally = [...r.categories].filter((c) => c === cat).length;
+      assert.equal(r.counts[cat], tally, `counts[${cat}] totals the categories`);
+    }
+  });
+
+  test("a categories value matches the `value` on the legend stop that drew it", () => {
+    const g = { width: 2, height: 1, bw: 0, bs: 0, be: 2, bn: 1 };
+    const layer = new ComparisonLayer({
+      sources: [
+        { pixels: Float32Array.from([1, DRY]), meta: g },
+        { pixels: Float32Array.from([1, 1]), meta: g },
+      ],
+    });
+    const r = layer.compute({ policy: "low", method: "nearest" });
+    const stop = layer.getLegend().stops.find((x) => x.value === r.categories[0]);
+    assert.equal(stop.label, "layers 1 + 2");
+  });
+
+  // A comparison overlay was drawable but not labelable: both layers inherit Layer.getLegend(),
+  // which returns null, and the palettes are not exported. These give them a real legend.
+  test("getLegend() is null before compute(), and one row per non-empty category after", () => {
+    const g = { width: 2, height: 1, bw: 0, bs: 0, be: 2, bn: 1 };
+    const layer = new ComparisonLayer({
+      sources: [
+        { pixels: Float32Array.from([1, DRY]), meta: g },
+        { pixels: Float32Array.from([1, 1]), meta: g },
+      ],
+    });
+    assert.equal(layer.getLegend(), null, "nothing drawn yet");
+    layer.compute({ policy: "low", method: "nearest" });
+
+    const legend = layer.getLegend();
+    assert.equal(legend.stops.length, 3, "2 layers -> 2^2-1 categories, 0 excluded");
+    assert.deepEqual(legend.stops.map((x) => x.value), [1, 2, 3], "bitmask order");
+    assert.deepEqual(legend.stops.map((x) => x.label),
+      ["layer 1 only", "layer 2 only", "layers 1 + 2"]);
+    // the built-in 2-layer palette: only-1 orange, only-2 yellow, both red
+    assert.equal(legend.stops[0].color, "rgba(247, 127, 0, 1)");
+    assert.equal(legend.stops[2].color, "rgba(214, 40, 40, 1)");
+  });
+
+  test("getLegend() reports the `colors` override that was actually drawn", () => {
+    const g = { width: 2, height: 1, bw: 0, bs: 0, be: 2, bn: 1 };
+    const layer = new ComparisonLayer({
+      sources: [
+        { pixels: Float32Array.from([1, DRY]), meta: g },
+        { pixels: Float32Array.from([1, 1]), meta: g },
+      ],
+    });
+    layer.compute({ policy: "low", method: "nearest", colors: ["#111111", "#222222", "#333333"] });
+    assert.deepEqual(layer.getLegend().stops.map((x) => x.color),
+      ["rgba(17, 17, 17, 1)", "rgba(34, 34, 34, 1)", "rgba(51, 51, 51, 1)"]);
+  });
+
+  test("a 3-layer comparison labels the subsets", () => {
+    const g = { width: 1, height: 1, bw: 0, bs: 0, be: 1, bn: 1 };
+    const px = () => ({ pixels: Float32Array.from([1]), meta: g });
+    const layer = new ComparisonLayer({ sources: [px(), px(), px()] });
+    layer.compute({ policy: "low", method: "nearest", colors: Array(7).fill("#123456") });
+    assert.deepEqual(layer.getLegend().stops.map((x) => x.label), [
+      "layer 1 only", "layer 2 only", "layers 1 + 2",
+      "layer 3 only", "layers 1 + 3", "layers 2 + 3", "layers 1 + 2 + 3",
+    ]);
+  });
+
   test("registered as a Layer type: createLayer('comparison', …) computes at construction", () => {
     const g = { width: 2, height: 1, bw: 0, bs: 0, be: 2, bn: 1 };
     const layer = createLayer({ emit() {}, _unregisterLayer() {} }, "comparison", {

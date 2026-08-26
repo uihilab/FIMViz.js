@@ -1,22 +1,23 @@
 // layer.js — abstract base for a rendered visualization of Dataset(s) on the map.
 //
-// A Layer is one rendering of a Dataset (or several — comparison/velocity take two). This base
-// defines the shared contract and registry identity; subclasses implement the actual map render.
+// A Layer is one rendering of a Dataset, or of several, since comparison and velocity take two.
+// This base class defines what they share and their registry identity; a subclass does the actual
+// map render.
 //
-// A subclass registers a factory via registerLayerType(type, fn), so FimMap.addLayer dispatches by
-// type without importing every subsystem. An unregistered type throws, naming the registered ones,
-// rather than silently doing nothing.
+// A subclass registers a factory with registerLayerType(type, fn), so FimMap.addLayer dispatches by
+// type without importing every subsystem. An unregistered type throws and names the registered ones
+// rather than doing nothing.
 //
-// A Layer is an EVENT EMITTER (like Leaflet's L.Evented): it fires lifecycle events and UI
-// subscribes. This inversion is what keeps the package embeddable — a Layer NEVER imports, names,
-// or calls a UI panel or DOM element. Dependencies flow UI → Layer, never back. A layer that
-// called a panel directly would weld one app's UI to the map layer and race its teardown.
+// A Layer emits events, the way Leaflet's L.Evented does, and a UI subscribes. That inversion is
+// what keeps the package embeddable: a Layer never imports, names or calls a UI panel or a DOM
+// element. Dependencies flow from UI to Layer and never back. A layer calling a panel directly would
+// weld one app's UI onto the map layer and race its teardown.
 //
-// Lifecycle event contract (payload always carries { layer, ...extra }):
-//   'rendered' — the overlay is on the map and its data is ready (extra = what a UI needs to draw
-//                tools: pixel data, meta, image, type, filename, …). Fired by the subclass/overlay.
-//   'removed'  — the layer has been torn down. Fired SYNCHRONOUSLY by remove(), so a UI reacting to
-//                it does not depend on the map SDK's asynchronous removal timing.
+// The two events, whose payload always carries { layer, ...extra }:
+//   'rendered'  the overlay is on the map and its data is ready. `extra` holds what a UI needs to
+//               draw tools: pixel data, meta, image, type and filename. The subclass fires it.
+//   'removed'   the layer has been torn down. remove() fires it synchronously, so a UI reacting to
+//               it does not wait on the map SDK's own asynchronous removal.
 
 import { createEmitter, emitHost } from "./events.js";
 import { getMapProvider, providerAcceptsCRS, DEFAULT_PROVIDER } from "./mapProvider.js";
@@ -31,9 +32,9 @@ let _seq = 0;
 const nextId = () => `layer_${Date.now().toString(36)}_${(++_seq).toString(36)}`;
 
 /**
- * Guard for every `set({ colorScale })` path (raster and vector alike). Validated BEFORE anything is
- * mutated, so a bad argument — classically a palette-name string meant for `set({ palette })` —
- * throws cleanly instead of leaving `layer.colorScale` half-set.
+ * Guards the `set({ colorScale })` paths on raster and vector alike. Validates before mutating, so
+ * a bad argument, usually a palette-name string meant for `set({ palette })`, throws cleanly rather
+ * than leaving `layer.colorScale` half set.
  * @param {*} cs
  * @returns {void}
  */
@@ -60,27 +61,26 @@ export class Layer {
     this.sources = sources;        // Dataset[] — 1 for most; 2 for comparison/velocity
     this._map = map;               // the owning FimMap (up-chain ref)
     this.visible = false;
-    // A "display-claiming" layer owns the whole map exclusively (velocity/ensemble): activating one
-    // deactivates the prior claimant, enforced by FimMap._claimExclusive. Formalizes ui/
-    // activeDisplayLayer.js. Most layers coexist, so the default is false.
+    // A display-claiming layer owns the whole map, i.e. velocity, so activating one deactivates the
+    // previous claimant. FimMap._claimExclusive enforces it, replacing ui/activeDisplayLayer.js.
+    // Most layers coexist, so this defaults to false.
     this.exclusive = exclusive;
     this._name = null;             // filename key when registered in FimMap's named-layer index
     this._teardown = null;         // optional render-teardown hook (see remove())
     this._emitter = null;          // lazily created on first on()/emit() — costs nothing unused
-    // Ref-count the initial sources so the map's Dataset lifecycle is balanced from birth (setSources
-    // acquires/releases on every later swap). Best-effort + optional-chained: a fake map or a non-
-    // Dataset source (comparison's {pixels,meta}) is a harmless no-op.
+    // Reference-count the initial sources so the app's count is balanced from the start; setSources
+    // acquires and releases on each later swap. Optional-chained, so a fake map or a non-Dataset
+    // source such as comparison's {pixels,meta} does nothing.
     for (const ds of this.sources) this._map?._acquireDataset?.(ds);
   }
 
   // ---- the layer-type registry, as statics on the type it serves ---------------------------
   //
-  // `fim.addLayer(type, opts)` dispatches through this. It hangs off Layer because the owner was
-  // never in question — a factory registered here builds a Layer — and one import (the class you
-  // already have) beats two loose barrel functions.
+  // `fim.addLayer(type, opts)` dispatches through this. It lives on Layer because a factory
+  // registered here builds a Layer, and one import of the class beats two loose exports.
 
   /**
-   * Register the factory `fim.addLayer('<type>')` dispatches to.
+   * Registers the factory `fim.addLayer('<type>')` dispatches to.
    * @param {string} type
    * @param {(fim: import('./fimMap.js').FimMap, opts: Object) => Layer|Promise<Layer>} factory
    * @returns {void}
@@ -88,8 +88,8 @@ export class Layer {
   static registerType(type, factory) { return registerLayerType(type, factory); }
 
   /**
-   * Every type `addLayer` can currently construct — built-ins plus anything a host registered.
-   * REGISTRY KEYS, not `layer.type` values (see `getLayerTypes`).
+   * The types `addLayer` can construct, built-in and host-registered. These are registry keys, not
+   * `layer.type` values; see `getLayerTypes`.
    * @returns {string[]}
    */
   static types() { return getLayerTypes(); }
@@ -99,7 +99,7 @@ export class Layer {
   /** Convenience = sources[0]. @returns {import('./dataset.js').Dataset|null} */
   get dataset() { return this.sources[0] || null; }
 
-  // ---- events (Evented contract — layers fire, UI subscribes; a Layer never names a UI) ----
+  // ---- events: a Layer fires, a UI subscribes, and a Layer never names a UI ----
   /** @param {string} evt @param {(payload: Object) => void} fn @returns {Layer} */
   on(evt, fn) {
     (this._emitter ??= createEmitter()).on(evt, fn);
@@ -120,19 +120,19 @@ export class Layer {
     return this.on(evt, wrap);
   }
   /**
-   * Fire `evt`. Listeners receive `{ ...payload, layer: this }`.
+   * Fires `evt`. A listener receives `{ ...payload, layer: this }`.
    *
-   * The event goes to TWO places, so these two subscriptions see the same event:
+   * The event reaches two places, so both of these see it:
    *
-   *   layer.on('rendered')              — this ONE layer's lifecycle (per-object subscription)
-   *   fim.on('userRaster:rendered')     — ANY layer of that type on this map (per-map subscription)
+   *   layer.on('rendered')              this one layer
+   *   fim.on('userRaster:rendered')     any layer of that type on this map
    *
-   * The per-map form is derived from the per-layer one by forwarding under `${type}:${evt}`, so a new
-   * layer type gets it with no extra wiring.
+   * The second comes from the first, forwarded under `${type}:${evt}`, so a new layer type gets it
+   * with no extra work.
    *
-   * Forwarding is skipped when the layer has no `type` (nothing to namespace with) or no owning map.
-   * Subsystems that emit on the map bus directly (velocity/ensemble/depth emit their own
-   * `*:activated` names) are unaffected — those are distinct event names, so nothing double-fires.
+   * Forwarding is skipped when the layer has no `type` to namespace with, or no owning map.
+   * Subsystems emitting on the map bus themselves, i.e. velocity's `*:activated` names, are
+   * unaffected, since those are different event names and nothing double-fires.
    * @param {string} evt
    * @param {Object} [payload]
    * @returns {Layer}
@@ -144,7 +144,7 @@ export class Layer {
     return this;
   }
 
-  // ---- lifecycle (subclasses override the render half) ----
+  // ---- setup and teardown; a subclass overrides the render half ----
   /** @returns {void} */
   show() { this.visible = true; }
   /** @returns {void} */
@@ -154,19 +154,21 @@ export class Layer {
 
   // ---- the render/compute pipeline ----
   //
-  // ONE public verb. Casual callers `await layer.render()` — it computes implicitly, checks the map
-  // provider can render the source CRS, then draws. Power users call `compute()` for the result
-  // without drawing. The "two families" are just a difference of degree in compute(): a single-source
-  // layer materializes one Dataset; a derived layer (comparison/ensemble) aligns+reduces N. No
-  // presentation/derived class split. `_draw()` is the ONLY provider-touching part; the base is a
-  // no-op (headless subsystems render via an event-inversion binder off the emitted data instead).
+  // One public verb. `await layer.render()` computes if needed, checks the map provider can render
+  // the source CRS, then draws. `compute()` returns the result without drawing.
   //
-  // NOTE: VectorLayer overrides this with a SYNCHRONOUS render() — adding vector features to a
-  // provider needs no decode step. Callers can `await` either uniformly.
+  // A single-source layer materializes one Dataset and a derived layer such as comparison aligns and
+  // reduces several, but that is a difference inside compute() rather than two class hierarchies.
+  // `_draw()` is the only part touching a provider, and the base version does nothing, since the
+  // headless subsystems render from the emitted data through a binder instead.
+  //
+  // VectorLayer overrides render() with a synchronous one, because adding vector features to a
+  // provider needs no decode. Awaiting either works.
 
   /**
-   * Compute this layer's render-ready result. Default: force the primary source Dataset into its
-   * decoded grid/features and memoize it on `this.result`. Subclasses override to align+reduce.
+   * Computes this layer's render-ready result. By default it forces the primary source Dataset into
+   * its decoded grid or features and memoizes that on `this.result`. A derived subclass overrides
+   * this to align and reduce several sources.
    * @param {Object} [opts]
    * @returns {Promise<*>}
    */
@@ -177,11 +179,12 @@ export class Layer {
   }
 
   /**
-   * Render this layer: compute if needed, enforce the provider CRS precondition, then draw. `opts.render`
-   * picks the update mechanism — `'in-place'` (swap the overlay's image, no flicker, keeps z-order/
-   * identity), `'recreate'` (teardown + redraw), or `'auto'` (default: in-place when the provider + this
-   * layer's render type support it, else recreate). Claims the exclusive
-   * display slot on success when `this.exclusive`.
+   * Renders this layer: computes if needed, checks the provider CRS precondition, then draws.
+   *
+   * `opts.render` picks the update mechanism. `'in-place'` swaps the overlay's image, avoiding a
+   * flicker and keeping z-order and identity. `'recreate'` tears down and redraws. `'auto'`, the
+   * default, goes in-place when the provider and this layer's render type allow it and recreates
+   * otherwise. On success it claims the exclusive display slot when `this.exclusive`.
    * @param {Object} [opts] - { render?: 'auto'|'in-place'|'recreate' }
    * @returns {Promise<Layer>}
    */
@@ -189,9 +192,9 @@ export class Layer {
     if (this.result == null) await this.compute(opts);
     this._checkProviderCRS();
     const mode = this._resolveRenderMode(opts.render || "auto");
-    // this._draw resolves through the prototype chain, so this is only true when NO subclass
-    // overrode it — a bare `Layer` (or one whose subclass forgot to). render() will otherwise
-    // succeed silently and draw nothing, which looks indistinguishable from a real bug.
+    // this._draw resolves through the prototype chain, so this is true only when no subclass
+    // overrode it: a bare `Layer`, or one whose subclass forgot. Otherwise render() succeeds and
+    // draws nothing, which looks exactly like a bug.
     if (this._draw === Layer.prototype._draw) {
       console.warn(
         `Layer.render(): "${this.type || this.id}" has no _draw() override, so this will draw ` +
@@ -206,17 +209,17 @@ export class Layer {
   }
 
   /**
-   * Replace this layer's source Datasets and, if the layer is already live, re-render. Immutable data
-   * means "the data changed" == "point at a new Dataset" — never mutate. Drives the FimMap's Dataset
-   * ref-count (acquire the new before releasing the old, so a Dataset shared with another layer is not
-   * evicted mid-swap). `opts.render` chooses the update mechanism (see render()).
+   * Replaces this layer's source Datasets, re-rendering when the layer is live. Data is immutable,
+   * so changing it means pointing at a new Dataset rather than mutating one. It acquires the new
+   * sources before releasing the old, so a Dataset another layer shares is not evicted mid-swap.
+   * `opts.render` chooses the update mechanism (see render()).
    *
-   * ATOMIC: if the re-render throws (e.g. the new sources have an unrenderable CRS, or a materializer
-   * fetch fails), the swap is rolled back — `sources`/`result` revert to their previous values, the
-   * new sources' ref-count acquire is undone, and the error rethrows. What's actually on screen never
-   * changed either way (a failed render draws nothing new), so this keeps the layer's own state
-   * truthful to that: either the swap fully succeeded, or the layer is left exactly as it was before
-   * the call — never pointing at broken new sources with the working old ones already let go.
+   * Atomic. If the re-render throws, because the new sources have an unrenderable CRS or a
+   * materializer fetch failed, the swap rolls back: `sources` and `result` return to their previous
+   * values, the new sources' acquire is undone, and the error rethrows. The screen never changed
+   * either way, since a failed render draws nothing, so the layer's state matches it. The swap fully
+   * succeeded, or the layer is exactly as it was, never pointing at broken sources with the working
+   * ones already released.
    * @param {import('./dataset.js').Dataset|import('./dataset.js').Dataset[]} sources
    * @param {Object} [opts] - { render?: 'auto'|'in-place'|'recreate' }
    * @returns {Promise<Layer>}
@@ -244,9 +247,9 @@ export class Layer {
   }
 
   /**
-   * "Hot-modify": derive new sources FROM the current ones and swap them in. Because the derived
-   * Dataset shares memoized ancestors with the old, only the changed tail recomputes — a cheap live
-   * tweak (e.g. re-classify with a new threshold) versus a cold source swap. Sugar over setSources.
+   * Derives new sources from the current ones and swaps them in. The derived Dataset shares memoized
+   * ancestors with the old one, so only the changed tail recomputes, which makes a live tweak such as
+   * reclassifying with a new threshold much cheaper than a cold swap. Shorthand for setSources.
    * @param {(current: import('./dataset.js').Dataset[]) => (import('./dataset.js').Dataset|import('./dataset.js').Dataset[])} fn
    * @param {Object} [opts]
    * @returns {Promise<Layer>}
@@ -257,27 +260,27 @@ export class Layer {
 
   // ---- chainable ops -----------------------------------------------------------------------
   //
-  // The same Dataset ops, reachable from the layer you already have:
+  // The Dataset ops, reachable from a layer:
   //
   //     await layer.clip(bbox).mask(poly).reclassify(rules).render();
   //
-  // THREE timings are at play here and only the first is what "immediate" refers to:
-  //   1. sources are rewritten  → NOW, synchronously, at each call (this is the choice);
-  //   2. the map redraws        → at the explicit render(), so a 4-op chain repaints once, not 4x;
-  //   3. data is computed       → unchanged: at a terminal, inside compute(). Dataset stays lazy.
+  // Three timings matter, and only the first is immediate. The sources are rewritten now,
+  // synchronously, at each call. The map redraws at the explicit render(), so a four-op chain
+  // repaints once rather than four times. The data is computed at a terminal inside compute(), so
+  // Dataset stays lazy.
   //
-  // Immediate application is what keeps `layer.dataset`/`getStats()`/`fit()` truthful mid-chain and
-  // puts a bad argument's throw at the call that made it. Its cost is that a chain failing partway
-  // leaves the earlier ops applied — nothing is corrupted (every op is a pure new node), and
-  // `reset()` returns to the sources the layer was built from.
+  // Rewriting the sources immediately keeps `layer.dataset`, `getStats()` and `fit()` truthful
+  // mid-chain, and puts a bad argument's throw at the call that made it. The cost is that a chain
+  // failing partway leaves the earlier ops applied. Nothing is corrupted, since each op is a pure
+  // new node, and `reset()` returns to the sources the layer was built from.
   //
-  // Ops apply across ALL sources, so a comparison/ensemble layer clips every member. N-ary ops
-  // (combine/difference) are deliberately absent: "which source is the left operand" has no
-  // sensible answer on a layer — call them on the Datasets.
+  // An op applies across all sources, so a comparison layer clips each member. The N-ary ops such as
+  // combine are absent on purpose: which source is the left operand has no sensible answer on a
+  // layer, so call them on the Datasets.
 
   /**
-   * Apply one Dataset op across every source, immediately. Invalidates the memoized compute and
-   * marks the layer dirty; draws nothing until `render()`.
+   * Applies one Dataset op across the sources immediately. Invalidates the memoized compute and
+   * marks the layer dirty, drawing nothing until `render()`.
    * @param {string} name - the op, for error messages
    * @param {(ds: import('./dataset.js').Dataset) => import('./dataset.js').Dataset} fn
    * @returns {Layer}
@@ -285,8 +288,8 @@ export class Layer {
   _op(name, fn) {
     if (!this.sources.length) throw new Error(`layer.${name}(): the layer has no source Dataset`);
     const prev = this.sources;
-    // Build ALL the derived nodes before touching anything: a kind mismatch (e.g. clip on a vector)
-    // throws here, at the call site, leaving the layer exactly as it was.
+    // Build the derived nodes before touching anything, so a kind mismatch such as clip on a vector
+    // throws here, at the call site, leaving the layer as it was.
     const next = prev.map((ds) => {
       if (typeof ds?.[name] !== "function") {
         throw new Error(`layer.${name}(): source "${ds?.name ?? "?"}" is not a Dataset with a ${name}() op`);
@@ -306,8 +309,8 @@ export class Layer {
   get dirty() { return !!this._dirty; }
 
   /**
-   * Point the layer back at the sources it held before its first op. Async and atomic, like any
-   * source swap — a live layer re-renders. A no-op if nothing has been applied.
+   * Points the layer back at the sources it held before its first op. Async and atomic like any
+   * source swap, so a live layer re-renders. Does nothing when no op has been applied.
    * @param {Object} [opts] - { render?: 'auto'|'in-place'|'recreate' }
    * @returns {Promise<Layer>}
    */
@@ -341,9 +344,9 @@ export class Layer {
   reduce(op, opts) { return this._op("reduce", (ds) => ds.reduce(op, opts)); }
 
   /**
-   * NOT chainable, on purpose. `rasterize` changes a Dataset's kind (vector → raster), and this
-   * layer draws the kind it was built for — returning `this` would leave a VectorLayer pointing at a
-   * raster it cannot draw. Do it on the Dataset and add the result as its own layer.
+   * Not chainable, deliberately. `rasterize` turns a vector Dataset into a raster one, and this
+   * layer draws the kind it was built for, so returning `this` would leave a VectorLayer pointing at
+   * a raster it cannot draw. Call it on the Dataset and add the result as its own layer.
    * @returns {never}
    */
   rasterize() {
@@ -354,9 +357,9 @@ export class Layer {
   }
 
   /**
-   * Resolve the render update mode. An explicit 'in-place'/'recreate' wins; 'auto' asks provider
-   * CAPABILITY (does it expose setRasterImageUrl?) + layer TYPE (does this layer render a swappable
-   * raster image?). Vector layers and providers without in-place swap fall back to recreate.
+   * Resolves the render update mode. An explicit 'in-place' or 'recreate' wins. 'auto' checks
+   * whether the provider exposes setRasterImageUrl and whether this layer draws a swappable raster
+   * image. A vector layer, or a provider without in-place swap, falls back to recreate.
    * @param {string} requested
    * @returns {'in-place'|'recreate'}
    */
@@ -375,10 +378,10 @@ export class Layer {
   _draw(opts) {}   // eslint-disable-line no-unused-vars
 
   /**
-   * Strict CRS precondition: every source Dataset whose native CRS the active provider CANNOT render
-   * blocks the render with an actionable error, AND emits a host event so the app can react (toast, or
-   * auto-reproject as an app-tier policy). Mechanism here; policy in the host — the engine never
-   * silently reprojects.
+   * Blocks the render when a source Dataset's native CRS is one the active provider cannot draw,
+   * throwing an actionable error and emitting a host event so the app can react with a toast or an
+   * auto-reproject. The mechanism lives here and the policy lives in the host: the engine never
+   * reprojects on its own.
    * @returns {void}
    */
   _checkProviderCRS() {
@@ -395,12 +398,11 @@ export class Layer {
   }
 
   /**
-   * Tear down render, emit 'removed', then unregister from the owning FimMap. Subclasses
-   * super.remove() last. If a `_teardown` hook was assigned (transitional: user-file Layers built
-   * inline in floodExtent carry their google.maps teardown here instead of in a dedicated
-   * subclass), it runs once before the event. 'removed' fires SYNCHRONOUSLY here — a subscriber
-   * (the tools panel) reacts now, not on google.maps' later onRemove() frame, which is what makes
-   * layer switches deterministic instead of racing.
+   * Tears down the render, emits 'removed', then unregisters from the owning FimMap. A subclass
+   * calls super.remove() last. Any assigned `_teardown` hook runs once before the event; user-file
+   * Layers built inline in floodExtent carry their google.maps teardown there rather than in a
+   * subclass. 'removed' fires synchronously, so the tools panel reacts now rather than on
+   * google.maps' later onRemove() frame, which makes layer switches deterministic.
    * @returns {void}
    */
   remove({ purgeSource = false } = {}) {
@@ -412,14 +414,14 @@ export class Layer {
     if (typeof teardown === "function") teardown();
     this.emit("removed");
     this._map?._unregisterLayer?.(this);
-    // Balance the acquire the constructor did for each source. Without this the count never returns
-    // to zero, so a Dataset's memoized decode — the whole pixel array for a raster — stays pinned
-    // for the life of the page even after every Layer using it is gone. Released LAST, so anything
-    // reacting to 'removed' still sees a live decode.
+    // Balance the acquire the constructor did per source. Without it the count never reaches zero,
+    // so a Dataset's memoized decode, the whole pixel array for a raster, stays pinned for the life
+    // of the page after the last Layer using it is gone. Released last, so anything reacting to
+    // 'removed' still sees a live decode.
     for (const ds of this.sources) this._map?._releaseDataset?.(ds);
-    // `purgeSource` additionally FORGETS each source — unregistering it from the app so it no longer
-    // shows up in `fim.datasets`. Skipped for any source another layer still holds: the app owns the
-    // registry, and a layer must not evict data a sibling is rendering.
+    // `purgeSource` also forgets each source, unregistering it from the app so it leaves
+    // `fim.datasets`. Skipped for a source another layer still holds: the app owns the registry, and
+    // a layer must not evict data a sibling is rendering.
     if (purgeSource) {
       for (const ds of this.sources) {
         if (this._map?.app?._datasetRefCount?.(ds) === 0) this._map.removeDataset?.(ds);
@@ -428,18 +430,17 @@ export class Layer {
   }
 
   /**
-   * A plain, structured-cloneable DESCRIPTION of this layer — its type, its sources, and the
-   * display state needed to rebuild an equivalent one, e.g. on a different map or provider:
+   * A structured-cloneable description of this layer: its type, its sources and the display state
+   * needed to rebuild an equivalent one, i.e. on a different map or provider:
    *
    *   map2.addLayer(layer1.toSpec());
    *
-   * This is deliberately a COPY, not a handle. `addLayer(spec)` builds a NEW ColorScale from the
-   * description, so the two layers diverge rather than silently sharing mutable colour state —
-   * which is exactly the question a `clone()` API cannot answer for the caller. The layer's `id`
+   * The result is a copy, not a handle. `addLayer(spec)` builds a new ColorScale from the
+   * description, so the two layers diverge rather than sharing mutable color state. The layer's `id`
    * and its event subscribers are not carried either.
    *
-   * `sources` are the live `Dataset` objects (free values, safe to share and already decoded). To
-   * persist a spec instead of transferring it in-page, swap them for `ds.toRecord()`.
+   * `sources` are the live `Dataset` objects, which are safe to share and already decoded. To
+   * persist a spec rather than move it within a page, replace them with `ds.toRecord()`.
    * @returns {{type: string|null, visible: boolean, settings: Object, colorScale: Object|null, sources: Array}}
    */
   toSpec() {
@@ -452,17 +453,17 @@ export class Layer {
     };
   }
 
-  // ---- data-first read-models — subclasses specialize ----
+  // ---- read models; a subclass specializes them ----
   /** @returns {import('./legend.js').Legend|null} */
   getLegend() { return null; }
   /** @returns {Promise<import('./stats.js').Stats|null>} */
   async getStats() { return null; }
 
-  // ---- settings — the declarative change-model; subclasses specialize ----
+  // ---- settings: the declarative change model; a subclass specializes it ----
   /**
-   * This layer's settings knobs. Lazily built; subclasses override
-   * _makeSettings() to supply Raster/Vector knobs. Mutating a knob (`layer.set({...})`)
-   * emits the effect event (restyle/recomputed) and re-renders when live.
+   * This layer's settings knobs, built lazily. A subclass overrides _makeSettings() to supply raster
+   * or vector knobs. Writing one with `layer.set({...})` emits 'restyle' or 'recomputed' and
+   * re-renders when the layer is live.
    * @returns {import('./layerSettings.js').LayerSettings}
    */
   get settings() { return (this._settings ??= this._makeSettings()); }
@@ -470,18 +471,17 @@ export class Layer {
   _makeSettings() { return new LayerSettings(this); }
 
   /**
-   * THE way to change how this layer looks. Sync and chainable — returns the layer.
+   * Changes how this layer looks. Synchronous and chainable, returning the layer.
    *
    *   layer.set({ palette: 'viridis', continuous: true, opacity: 0.8 });
    *
    * Raster knobs: `palette`, `continuous`, `colorScale`, `noData`, `opacity`, `hover`.
    * Vector knobs: `color`, `opacity`, `useFileColors`, `hover`.
    *
-   * This is the single path for changing a layer's appearance. `layer.colorScale` stays readable,
-   * and `ColorScale` keeps its own `set()` for building a scale before you hand it over.
+   * This is the one path for changing a layer's appearance. `layer.colorScale` stays readable, and
+   * `ColorScale` keeps its own `set()` for building a scale before attaching it.
    *
-   * A knob that needs a redraw (only `noData`) redraws; `await layer.settled()` if you need to know
-   * it finished.
+   * Only `noData` forces a redraw. Await `layer.settled()` to know when that finished.
    * @param {Object} partial @returns {Layer}
    */
   set(partial) { return partial ? this.settings.set(partial) : this; }
@@ -491,23 +491,24 @@ export class Layer {
   settled() { return this.settings.settled(); }
 
   /**
-   * Does the point fall on this layer? Base: no geometry → false. RasterLayer tests its footprint;
-   * VectorLayer tests feature geometry. The map event dispatch uses this to route hover/click.
+   * True when the point falls on this layer. The base class has no geometry and returns false.
+   * RasterLayer tests its footprint and VectorLayer tests feature geometry. The map event dispatch
+   * uses this to route hover and click.
    * @param {number} lat @param {number} lng @returns {boolean}
    */
   hitTest(lat, lng) { return false; }   // eslint-disable-line no-unused-vars
 
   /**
-   * The ONE opaque provider handle this layer currently owns, or null when it is not on the map.
+   * The one opaque provider handle this layer owns, or null when it is not on the map.
    *
-   * Subclasses keep their handle under a name that reads well for them (`overlay` for a raster,
-   * `dataLayer` for a vector); this pair is the type-agnostic view of it, so `FimMap.applyLayerOrder`
-   * can restack a mixed stack without knowing what kind of layer each one is.
+   * A subclass stores its handle under a name that suits it, `overlay` for a raster and `dataLayer`
+   * for a vector. This pair is the type-agnostic view, so `FimMap.applyLayerOrder` can restack a
+   * mixed stack without knowing what each layer is.
    * @returns {*|null}
    */
   get _providerHandle() { return null; }
 
-  /** Adopt a handle the provider REPLACED (Google recreates ground overlays to restack them). */
+  /** Adopts a handle the provider replaced, since Google recreates ground overlays to restack. */
   _adoptProviderHandle(handle) { void handle; }
 
   /** @returns {{id: string, type: string|null, visible: boolean, sources: Array<string|null>}} */
@@ -519,11 +520,11 @@ export class Layer {
   }
 }
 
-// Shared-mechanism siblings carry a `type`; divergent renderers get their own subclass.
-// RasterLayer is ONE class for extent/userRaster/depth/ensemble — they differ only by `type`
-// and which of these common palette-canvas fields they use. The subsystem owns the actual
-// google.maps render; these hold the handles it manages so state lives on the Layer, not in
-// module scope. (Kept google-free here — the model layer stays provider-neutral)
+// Siblings sharing a mechanism carry a `type`; a renderer that diverges gets its own subclass.
+// RasterLayer is one class covering extent, userRaster, depth and ensemble, which differ only in
+// `type` and in which of the common palette-canvas fields they use. The subsystem does the actual
+// render, and these fields hold the handles it manages, so the state lives on the Layer rather than
+// in module scope. Nothing here names google, so the model stays provider-neutral.
 export class RasterLayer extends Layer {
   constructor(opts = {}) {
     super(opts);
@@ -532,18 +533,18 @@ export class RasterLayer extends Layer {
     this.loadSeq = 0;           // monotonic — drops stale async loads
     this.rasterData = null;     // pixel array (for hover lookups)
     this.meta = null;           // { bw, bs, be, bn, width, height, noData, unit }
-    // The "no data" sentinel for colorize + hover/metrics (transparent, excluded from stats). Settable:
-    // pass `{ noData }` here or assign `layer.noData` later. Overrides the grid's own noData when set;
-    // null falls back to the decoded grid's noData. Some sources declare no nodata tag, so a host that
-    // knows the convention (e.g. FIM's -99999) sets it explicitly.
+    // The no-data sentinel for colorizing, hover and metrics: drawn transparent and excluded from
+    // stats. Pass `{ noData }` here or assign `layer.noData` later. It overrides the grid's own
+    // noData when set, and null falls back to the decoded grid's. Some sources declare no nodata tag,
+    // so a host knowing the convention, i.e. FIM's -99999, sets it explicitly.
     this.noData = opts.noData ?? null;
     this.opacity = opts.opacity ?? 1;   // overlay opacity (0..1) — a placement setting
-    // How this raster is turned into something the map can draw: the Mercator row remap and the
-    // image-vs-tiles budget. Defaults live in geo/mercator.js's RASTER_LIMITS; anything set here
-    // overrides them for this layer, and `render({ raster })` overrides again for one draw.
+    // How this raster becomes something the map can draw: the Mercator row remap and the budget
+    // deciding image against tiles. The defaults are in geo/mercator.js's RASTER_LIMITS, anything
+    // set here overrides them for this layer, and `render({ raster })` overrides again for one draw.
     // { strategy, mercator, maxPixels, maxDimension, tileSize, resample }
     this.raster = opts.raster ?? {};
-    this.colorScale = null;     // the ColorScale that maps pixel value → colour
+    this.colorScale = null;     // the ColorScale that maps a pixel value to a color
     this._onScaleChange = null; // bound onChange listener (so _setColorScale can detach the old one)
   }
 
@@ -559,9 +560,9 @@ export class RasterLayer extends Layer {
   }
 
   /**
-   * Hide the overlay on the map (opacity → 0 via the provider; the overlay itself is NOT torn down,
-   * so show() is instant). The base Layer.hide() only flips `.visible` — that alone doesn't touch
-   * anything the provider drew, so a raster overlay stayed visible on the map through it. Chainable.
+   * Hides the overlay by setting its provider opacity to 0. The overlay stays on the map, so show()
+   * is instant. The base Layer.hide() only flips `.visible`, which touches nothing the provider
+   * drew, so a raster overlay stayed visible through it. Chainable.
    * @returns {RasterLayer}
    */
   hide() {
@@ -593,9 +594,9 @@ export class RasterLayer extends Layer {
   }
 
   /**
-   * PIXEL-LEVEL hit-test (PACKAGE_ROADMAP §1): true only where a real (non-noData) pixel sits under the
-   * point. A click over a transparent/noData part of the footprint therefore falls THROUGH to the
-   * layers below, instead of the whole bounding rectangle absorbing it.
+   * A pixel-level hit test (PACKAGE_ROADMAP §1), true only where a real pixel sits under the point.
+   * A click over a transparent or noData part of the footprint falls through to the layers below,
+   * rather than the whole bounding rectangle absorbing it.
    * @param {number} lat @param {number} lng @returns {boolean}
    */
   hitTest(lat, lng) { return this.valueAt(lat, lng) != null; }
@@ -605,15 +606,14 @@ export class RasterLayer extends Layer {
   _adoptProviderHandle(handle) { this.overlay = handle ?? null; }
 
   /**
-   * The pixel value at a lat/lng (nearest cell), or null when outside the footprint / no data / no
-   * pixels loaded. The hover read-model a tooltip (or enableHover(), below) consumes.
+   * The pixel value at a lat/lng, from the nearest cell. Null outside the footprint, at a no-data
+   * pixel, or before pixels load. A tooltip, or enableHover() below, reads it.
    * @param {number} lat @param {number} lng
    * @param {{noDataTolerance?: number}} [opts] - widen the noData check to `|v - noData| <=
-   *   tolerance` instead of exact equality — for a raster whose sentinel can drift slightly after
-   *   resampling (e.g. a GDAL bilinear warp blending a real value with an adjacent nodata pixel near
-   *   an edge). Default 0 = exact match, this method's original behavior; hitTest() always uses the
-   *   default, so widening this does not change what a click resolves to unless you call valueAt()
-   *   directly.
+   *   tolerance` rather than exact equality, for a raster whose sentinel drifts after resampling,
+   *   i.e. a GDAL bilinear warp blending a real value with an adjacent nodata pixel near an edge.
+   *   Defaults to 0, an exact match. hitTest() always uses the default, so widening this changes
+   *   nothing about what a click resolves to unless valueAt() is called directly.
    * @returns {number|null}
    */
   valueAt(lat, lng, { noDataTolerance = 0 } = {}) {
@@ -632,22 +632,21 @@ export class RasterLayer extends Layer {
   }
 
   /**
-   * Wire a live hover readout: subscribes to the map provider's mouse-move, looks up valueAt() on
-   * every move, and emits 'hover' with a ready-to-display `{lat, lng, value, text}`. Idempotent —
-   * calling again replaces the previous subscription rather than stacking listeners. Opt-in, not
-   * wired automatically on render — a layer nobody hovers shouldn't pay for a mousemove listener.
-   * Torn down automatically on remove() (see _draw()'s _teardown).
+   * Starts a live hover readout: it subscribes to the map provider's mouse-move, calls valueAt() on
+   * each move, and emits 'hover' with a displayable `{lat, lng, value, text}`. Idempotent, so
+   * calling it again replaces the previous subscription rather than stacking listeners. Opt-in
+   * rather than automatic on render, since a layer nobody hovers should not pay for a mousemove
+   * listener. remove() tears it down (see _draw()'s _teardown).
    *
-   * Standardizes what layers/depthMap.js's DepthLayer used to hand-roll inline — its own copy of the
-   * bounds/row/col lookup this method now shares via valueAt(). The one thing this does NOT
-   * generalize: treating an otherwise-valid VALUE as "nothing to report" (depth's `v === 0` domain
-   * rule — zero depth reads as no flooding) is a caller concern, not the mechanism's — pass `isEmpty`
-   * for that.
+   * This replaces the bounds and row/column lookup DepthLayer hand-rolled in layers/depthMap.js,
+   * which valueAt() now shares. It does not generalize one thing: treating an otherwise valid value
+   * as nothing to report, i.e. depth's rule that zero means no flooding, is domain knowledge, so
+   * pass `isEmpty` for that.
    * @param {Object} [opts]
    * @param {number} [opts.noDataTolerance=0] - forwarded to valueAt().
    * @param {(v: number) => boolean} [opts.isEmpty] - an in-range value to ALSO treat as absent
-   *   (event.value becomes null, same as outside the footprint) — e.g. a domain "zero means nothing"
-   *   rule that isn't really about noData.
+   *   so event.value becomes null, as it does outside the footprint. Use it for a domain rule such
+   *   as zero meaning nothing, which is not really about noData.
    * @param {(v: number) => string} [opts.formatValue] - value → display text. Defaults to `String(v)`.
    * @returns {RasterLayer}
    */
@@ -676,18 +675,21 @@ export class RasterLayer extends Layer {
   _usesRasterImage() { return true; }
 
   /**
-   * Resolve the ColorScale to colorize with, in precedence order — (1) EXPLICIT: already attached
-   * (a host called set({ colorScale }), or passed { colorScale } to the "raster" factory) — untouched;
-   * (2) GDAL-EMBEDDED: a GDAL_METADATA legend in the file, auto-detected via ColorScale's registered
-   * parser (layers/depthMap.js supplies it — see registerGdalLegendParser); (3) DEFAULT: a continuous
-   * scale (ColorScale's own default palette) ranged to the grid's own min/max. Whichever is chosen is
-   * attached to the layer, so getLegend()/getStats() reflect what's actually drawn in EVERY case
-   * — never a silently-discarded fallback. This runs synchronously within the current render pass
-   * (before the image is drawn), not reactively after — so there is no window where a generic default
-   * draws first and a correct GDAL legend never gets applied because nothing repaints on its own.
+   * Resolves which ColorScale colors this raster, trying three sources in order.
+   *
+   * An already-attached scale wins and is left alone; a host attaches one with set({ colorScale }) or
+   * by passing { colorScale } to the "raster" factory. Failing that, a GDAL_METADATA legend embedded
+   * in the file is detected through ColorScale's registered parser, which layers/depthMap.js supplies
+   * (see registerGdalLegendParser). Failing that, a continuous scale on ColorScale's default palette,
+   * ranged to the grid's own min and max.
+   *
+   * Whichever is chosen is attached to the layer, so getLegend() and getStats() always describe what
+   * is drawn rather than a discarded fallback. This runs synchronously inside the current render
+   * pass, before the image is drawn, so there is no window where a generic default draws first and a
+   * correct GDAL legend never arrives because nothing repaints on its own.
    * @param {import('./materialize.js').RasterGrid} grid
    * @returns {Array|null} the raw parsed GDAL legend, if one was detected (for the 'rendered' event's
-   *   `originalLegend`) — null in the explicit or default cases.
+   *   `originalLegend`. Null when an explicit or default scale was used instead.
    */
   _resolveColorScale(grid) {
     if (this.colorScale) return null;   // case 1: explicit — already attached, leave it alone
@@ -702,13 +704,14 @@ export class RasterLayer extends Layer {
   }
 
   /**
-   * Draw this raster on the map: resolve a ColorScale (see _resolveColorScale) if none is attached
-   * yet, colorize the materialized grid with it → a canvas data URL → position it over the grid's
-   * bounds through the map provider. `mode === 'in-place'` swaps the existing overlay's image (no
-   * flicker); otherwise it removes-and-re-adds. Provider-neutral — the SDK-specific work is all
-   * behind addRasterImage/setRasterImageUrl. Populates `rasterData`/`meta` (hover read-model) from
-   * the grid and installs a teardown that removes the overlay. Fires `rendered` with the grid + data
-   * URL.
+   * Draws this raster on the map. It resolves a ColorScale when none is attached (see
+   * _resolveColorScale), colorizes the materialized grid into a canvas data URL, then positions that
+   * over the grid's bounds through the map provider. `mode === 'in-place'` swaps the existing
+   * overlay's image without a flicker; otherwise it removes and re-adds. Provider-neutral, since the
+   * SDK-specific work sits behind addRasterImage and setRasterImageUrl.
+   *
+   * It also fills `rasterData` and `meta` from the grid for hover, installs a teardown that removes
+   * the overlay, and fires `rendered` with the grid and the data URL.
    * @param {Object} [opts] - { mode?: 'in-place'|'recreate', raster?: Object } — `raster` overrides
    *   this layer's projection/budget options for one draw (see `RasterLayer#raster`)
    * @returns {void}
@@ -724,32 +727,32 @@ export class RasterLayer extends Layer {
       throw new Error(`RasterLayer: the "${providerName}" provider has no addRasterImage`);
     }
     const noData = this.noData ?? grid.noData ?? null;
-    // PROJECTION. The provider stretches the image linearly in Web Mercator, but a grid's rows are
-    // evenly spaced in latitude — so the rows are resampled before colorizing. Only the IMAGE is
-    // reprojected: `grid` (and therefore rasterData/meta below, and Stats/filters/hover everywhere
-    // else) stays the real data at real coordinates. See geo/mercator.js.
+    // The provider stretches the image linearly in Web Mercator, but a grid's rows are evenly spaced
+    // in latitude, so the rows are resampled before colorizing. Only the image is reprojected:
+    // `grid`, and so rasterData, meta, Stats, filters and hover, stays the real data at real
+    // coordinates. See geo/mercator.js.
     const rasterOpts = { ...this.raster, ...(rasterOverride || {}) };
     const plan = rasterRenderPlan(grid, rasterOpts);
     const display = toMercatorRows(grid, plan, { method: rasterOpts.resample ?? "nearest", noData });
     const dataURL = gridToDataURL({ ...grid, ...display }, { colorScale: this.colorScale, noData });
     const bounds = display.bounds;
-    // The heuristic firing means a single baked image can no longer carry this raster's detail — it is
-    // still drawn, correctly placed but downsampled, and the host is told rather than left to wonder
-    // why a zoomed-in field looks soft. Tiles are the real answer; see geo/mercator.js.
+    // When this fires, one baked image can no longer carry the raster's detail. It is still drawn,
+    // correctly placed but downsampled, and the host is told rather than left wondering why a
+    // zoomed-in field looks soft. Tiles are the real answer; see geo/mercator.js.
     if (plan.mode === "tiles") {
       console.warn(`RasterLayer: ${plan.reason}. Drawn downsampled — a tile backend is not yet ` +
         "implemented (docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md).");
       emitHost("layer:raster-oversized", { layer: this, plan, datasetName: this._name });
     }
     if (mode === "in-place" && this.overlay && typeof provider.setRasterImageUrl === "function") {
-      // Reassign to the RETURNED handle — Google recreates, Leaflet swaps in place (mapProvider.js).
+      // Reassign to the returned handle: Google recreates and Leaflet swaps in place (mapProvider.js).
       this.overlay = provider.setRasterImageUrl(fim.map, this.overlay, dataURL, bounds, { opacity: this.opacity }) ?? this.overlay;
     } else {
       if (this.overlay) provider.removeRasterImage(fim.map, this.overlay);
       this.overlay = provider.addRasterImage(fim.map, dataURL, bounds, { opacity: this.opacity });
     }
-    // Hover read fields from the source grid. Still assignable (the transitional app path sets them
-    // directly); they become getters off sources[0] once no caller assigns them.
+    // Hover fields from the source grid. Still assignable, since the transitional app path sets them
+    // directly. They become getters off sources[0] once nothing assigns them.
     this.rasterData = grid.pixels;
     this.meta = { bw: bounds.west, bs: bounds.south, be: bounds.east, bn: bounds.north,
       width: grid.width, height: grid.height, noData, unit: grid.meta?.unit ?? null };
@@ -758,11 +761,11 @@ export class RasterLayer extends Layer {
       this.overlay = null;
       this.disableHover();
     };
-    // 'rendered' carries what a tools binder (ui/rasterTools.js bindRasterLayerTools) needs to build the
-    // Image Tools panel — per the Layer 'rendered' contract (pixel data, meta, image, type, filename).
-    // `originalLegend` is the raw parsed GDAL legend when _resolveColorScale auto-detected one, else
-    // null (explicit host-attached scale, or the plain default — neither has a "raw legend" to show);
-    // `gmap` is the map for the hover listener.
+    // 'rendered' carries what bindRasterLayerTools in ui/rasterTools.js needs to build the Image
+    // Tools panel: pixel data, meta, image, type and filename, as the event's payload promises.
+    // `originalLegend` is the raw parsed GDAL legend when _resolveColorScale detected one, and null
+    // otherwise, since neither an attached scale nor the default has a raw legend to show. `gmap` is
+    // the map, for the hover listener.
     this.emit("rendered", {
       grid, dataURL, bounds, type: this.type,
       pixelData: grid.pixels, meta: this.meta, overlayHandle: this.overlay,
@@ -779,14 +782,14 @@ export class RasterLayer extends Layer {
   }
 
   /**
-   * Attach the ColorScale that colours this raster. Wiring its `onChange` to a `restyle` event is the
-   * live-repaint seam (docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1 "Settings vs. Operations"): a UI/render subscribes to
-   * `restyle` (or `${type}:restyle` on the map bus) and repaints when the user edits the palette —
-   * the Layer still names no UI. Passing a new scale detaches the previous listener. `cs` must be a
-   * real ColorScale instance (or `null` to detach) — validated BEFORE anything is mutated, so a bad
-   * argument (e.g. a palette-name string, meant for `layer.set({ palette })`
-   * instead) throws cleanly without leaving `this.colorScale` in a half-set, corrupted
-   * state.
+   * Attaches the ColorScale that colors this raster, and connects its `onChange` to a `restyle`
+   * event. A UI subscribes to `restyle`, or to `${type}:restyle` on the map bus, and repaints when
+   * the user edits the palette, so the Layer still names no UI
+   * (docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1 "Settings vs. Operations").
+   *
+   * Passing a new scale detaches the previous listener. `cs` must be a real ColorScale, or `null` to
+   * detach, and is validated before anything is mutated, so a bad argument such as a palette-name
+   * string meant for `layer.set({ palette })` throws without leaving `this.colorScale` half set.
    * @internal Use `layer.set({ colorScale })` — the one public mutation path. This stays as the
    * implementation that `RasterSettings._apply` routes to, and for engine-internal attach points
    * (`_ensureColorScale`, the "raster" factory, depthMap/ensemble).
@@ -799,9 +802,9 @@ export class RasterLayer extends Layer {
     this.colorScale = cs || null;
     this._onScaleChange = null;
     if (cs) {
-      // A scale edit (palette/continuous/band) emits 'restyle' AND repaints the memoized grid in
-      // place when live — so `layer.set({ palette })` shows on
-      // the map with no data re-force. Fire-and-forget: render() skips compute() since result is set.
+      // A scale edit emits 'restyle' and repaints the memoized grid in place when the layer is
+      // live, so `layer.set({ palette })` shows on the map with no re-force. Not awaited: render()
+      // skips compute() because result is already set.
       this._onScaleChange = () => {
         this.emit("restyle", { colorScale: cs });
         if (this.visible && this.result != null) this.render({ render: "in-place" });
@@ -812,7 +815,7 @@ export class RasterLayer extends Layer {
   }
 
   /**
-   * The display read-model, derived from the ColorScale (null until one is attached).
+   * The legend, derived from the ColorScale. Null until one is attached.
    * @returns {import('./legend.js').Legend|null}
    */
   getLegend() {
@@ -820,8 +823,8 @@ export class RasterLayer extends Layer {
   }
 
   /**
-   * Statistics over this raster's pixels, classified by the attached ColorScale when present (so the
-   * histogram buckets line up with the legend). Null until pixels are loaded.
+   * Statistics over this raster's pixels, classified by the attached ColorScale when there is one,
+   * so the histogram buckets match the legend. Null until pixels load.
    * @param {Object} [opts]
    * @returns {Promise<import('./stats.js').Stats|null>}
    */
@@ -831,30 +834,30 @@ export class RasterLayer extends Layer {
   }
 }
 
-// VectorLayer renders a vector Dataset (ds.data = a GeoJSON FeatureCollection) onto the map. It
-// still names NO map SDK — it delegates to the active provider's addVector/removeVector/fitBounds
-// (mapProvider.js), so the same layer works on any provider that implements the vector contract.
-// The app tier ALSO constructs VectorLayer for its user-file overlays and drives rendering itself
-// (setting .dataLayer + a _teardown), so render() here is additive and does not disturb that path.
+// VectorLayer draws a vector Dataset, whose `ds.data` is a GeoJSON FeatureCollection, onto the map.
+// It names no map SDK, calling the active provider's addVector, removeVector and fitBounds
+// (mapProvider.js), so the same layer works on any provider implementing those three. The app also
+// constructs VectorLayer for its user-file overlays and renders them itself, setting .dataLayer and
+// a _teardown, so render() here adds to that path rather than disturbing it.
 export class VectorLayer extends Layer {
   /**
    * @param {Object} [opts] - the base Layer options, plus:
-   * @param {import('./colorScale.js').ColorScale|null} [opts.colorScale] - value → colour for `colorBy`
+   * @param {import('./colorScale.js').ColorScale|null} [opts.colorScale] - maps a `colorBy` value to a color
    * @param {string|null} [opts.colorBy] - the feature property whose value the scale reads
    */
   constructor(opts = {}) {
     super(opts);
-    // The SAME ColorScale a RasterLayer uses. Nothing about the class is pixel-specific: it maps a
-    // value to a colour, and a feature property is as good a value as a pixel. What differs is only
-    // where the value comes from — hence `colorBy`, the property name to read per feature.
+    // The same ColorScale a RasterLayer uses. Nothing in that class is pixel-specific: it maps a
+    // value to a color, and a feature property is as good a value as a pixel. Only the source of the
+    // value differs, which is what `colorBy` names.
     this.colorScale = null;
     this.colorBy = opts.colorBy ?? null;
     if (opts.colorScale) this._setColorScale(opts.colorScale);
   }
 
   /**
-   * Attach the ColorScale that colours features by `colorBy`. Its `onChange` drives a live restyle,
-   * the same seam RasterLayer uses for palette edits — the layer still names no UI.
+   * Attaches the ColorScale that colors features by `colorBy`. Its `onChange` drives a live restyle,
+   * as it does for a RasterLayer's palette edits, and the layer still names no UI.
    * @internal Use `layer.set({ colorScale })`.
    * @param {import('./colorScale.js').ColorScale|null} cs
    * @returns {VectorLayer}
@@ -867,8 +870,8 @@ export class VectorLayer extends Layer {
     if (cs) {
       this._onScaleChange = () => {
         this.emit("restyle", { colorScale: cs });
-        // A vector overlay has no in-place restyle in the provider contract, so a live layer is
-        // re-added with the new resolution — the same remove-then-add setStyle() already does.
+        // No provider implements an in-place vector restyle, so a live layer is re-added with the
+        // new scale, the same remove-then-add setStyle() already does.
         if (this.visible && this._map?.map) this.setStyle({});
       };
       cs.onChange(this._onScaleChange);
@@ -877,14 +880,14 @@ export class VectorLayer extends Layer {
   }
 
   /**
-   * The style handed to the provider. With a ColorScale + `colorBy` attached this is a per-feature
-   * FUNCTION — each feature's `properties[colorBy]` goes through the scale — merged over whatever
-   * flat style `setStyle()`/`render({style})` set, so an explicit `strokeWidth` still applies. With
-   * no scale (or no `colorBy`) it is just that flat style, exactly as before.
+   * The style passed to the provider. With a ColorScale and `colorBy` attached it is a per-feature
+   * function, sending each feature's `properties[colorBy]` through the scale, merged over whatever
+   * flat style `setStyle()` or `render({style})` set, so an explicit `strokeWidth` still applies.
+   * Without a scale or without `colorBy` it is that flat style alone.
    *
-   * A feature whose property is missing or non-numeric is coloured by the scale's `missingColor`
-   * when one is set, and otherwise keeps the base style — never a value from the ramp, since
-   * "no data for this feature" must not be able to look like a real reading.
+   * A feature whose property is missing or non-numeric takes the scale's `missingColor` when one is
+   * set, and otherwise keeps the base style. It never takes a value from the ramp, so no data for a
+   * feature cannot look like a real reading.
    * @returns {Object|Function|null}
    */
   _resolveStyle() {
@@ -901,8 +904,8 @@ export class VectorLayer extends Layer {
   }
 
   /**
-   * The display read-model, derived from the ColorScale (null until one is attached) — so a vector
-   * layer coloured by a property gets the same legend a raster does.
+   * The legend, derived from the ColorScale and null until one is attached, so a vector layer
+   * colored by a property gets the same legend a raster does.
    * @returns {import('./legend.js').Legend|null}
    */
   getLegend() {
@@ -910,7 +913,7 @@ export class VectorLayer extends Layer {
   }
 
   /**
-   * Draw this layer's Dataset on the map via the owning FimMap's provider.
+   * Draws this layer's Dataset on the map through the owning FimMap's provider.
    * @param {{ style?: object }} [opts]  provider-native style (e.g. google.maps.Data style)
    * @returns {VectorLayer}
    */
@@ -934,7 +937,7 @@ export class VectorLayer extends Layer {
     this.dataLayer = provider.addVector(fim.map, geojson, { ...opts, style: this._resolveStyle() });
     this.visible = true;
     this._dirty = false;   // VectorLayer.render() is synchronous — it does not go through the base
-    // Base remove() runs this before emitting 'removed'.
+    // The base remove() runs this before emitting 'removed'.
     this._teardown = () => provider.removeVector(fim.map, this.dataLayer);
     this.emit("rendered", { dataset: this.dataset });
     return this;
@@ -949,10 +952,10 @@ export class VectorLayer extends Layer {
   }
 
   /**
-   * Remove the vector overlay from the map (the provider contract has no vector "invisible" primitive
-   * short of removing it). The base Layer.hide() only flips `.visible` — that alone doesn't touch
-   * anything the provider drew, so the features stayed visible on the map through it. `show()` rebuilds
-   * via `addVector` — the same remove-then-recreate shape `setStyle()` already uses. Chainable.
+   * Removes the vector overlay from the map, since no provider offers a way to make a vector
+   * invisible short of removing it. The base Layer.hide() only flips `.visible`, which touches
+   * nothing the provider drew, so the features stayed visible through it. `show()` rebuilds through
+   * `addVector`, the same remove-then-recreate `setStyle()` uses. Chainable.
    * @returns {VectorLayer}
    */
   hide() {
@@ -982,10 +985,11 @@ export class VectorLayer extends Layer {
   _makeSettings() { return new VectorSettings(this); }
 
   /**
-   * Feature statistics over this layer's GeoJSON — counts by geometry type, total area/length, bbox.
+   * Feature statistics over this layer's GeoJSON: counts by geometry type, total area and length,
+   * and the bbox.
    *
-   * Computed from the SOURCE (`dataset.data`), not from the provider's overlay handle, so it works
-   * on every provider and before/without a render.
+   * Computed from the source in `dataset.data` rather than from the provider's overlay handle, so it
+   * works on either provider and before any render.
    *
    * @param {Object} [opts]
    * @param {import('./filter.js').Filter|Function|Array|null} [opts.filter] - scope to a region/predicate
@@ -994,21 +998,20 @@ export class VectorLayer extends Layer {
   async getStats(opts = {}) {
     const ds = this.dataset;
     if (!ds) return null;
-    // Prefer the lazy terminal (it forces a URL-backed or op-chained Dataset); fall back to the
-    // already-parsed inline GeoJSON that render() draws from.
+    // Prefer the lazy terminal, which forces a URL-backed or op-chained Dataset, and fall back to
+    // the already-parsed inline GeoJSON render() draws from.
     let features = ds.data ?? null;
     if (!features && typeof ds.features === "function") features = await ds.features();
     if (!features) return null;
-    // Default the classification to whatever is actually colouring the features, so `byClass` and
-    // the legend agree — the same guarantee RasterLayer.getStats() gives for pixels. Explicit opts
-    // still win.
+    // Default the classification to whatever is coloring the features, so `byClass` and the legend
+    // agree, as RasterLayer.getStats() does for pixels. An explicit option still wins.
     return Stats.vector(features, {
       classify: this.colorScale, classifyBy: this.colorBy, ...opts,
     });
   }
 
   /**
-   * Restyle: merge a neutral style patch and re-render (remove + re-add — the provider contract has
+   * Merges a neutral style patch and re-renders by removing and re-adding, since no provider has
    * no in-place setVectorStyle). @param {Object} patch @returns {VectorLayer}
    */
   setStyle(patch = {}) {
@@ -1030,8 +1033,8 @@ export class VectorLayer extends Layer {
   _adoptProviderHandle(handle) { this.dataLayer = handle ?? null; }
 
   /**
-   * The first feature whose geometry contains the point (polygons with holes; points within a small
-   * epsilon), or null. Drives a marker/feature info window.
+   * The first feature whose geometry contains the point, honoring polygon holes and matching a point
+   * within a small epsilon. Null when none does. Drives a feature info window.
    * @param {number} lat @param {number} lng @returns {Object|null}
    */
   featureAt(lat, lng) {
@@ -1043,7 +1046,7 @@ export class VectorLayer extends Layer {
   }
 }
 
-// ---- geometry (vector hit-test) + map-event dispatch --------------------------------------------
+// ---- vector hit-test geometry and map-event dispatch --------------------------------------------
 
 function pointInRing(x, y, ring) {
   let inside = false;
@@ -1059,8 +1062,9 @@ function polyContains(rings, x, y) {
   return true;
 }
 /**
- * Point-in-geometry for GeoJSON (x=lng, y=lat). Polygon/MultiPolygon exact; Point within ~0.0005°;
- * GeometryCollection recurses; lines/others → false. Exported for tests.
+ * Point-in-geometry for GeoJSON, where x is lng and y is lat. Polygon and MultiPolygon are exact, a
+ * Point matches within ~0.0005 degrees, a GeometryCollection recurses, and anything else is false.
+ * Exported for tests.
  * @param {Object} geom @param {number} x @param {number} y @returns {boolean}
  */
 export function geomContains(geom, x, y) {
@@ -1075,11 +1079,11 @@ export function geomContains(geom, x, y) {
 }
 
 /**
- * Dispatch a normalized map event to the layers TOP-DOWN in z-order (last = top), hit-testing each.
- * Default (precedence): stop when a handler absorbs it (`evt.stopPropagation()`). With
- * `{ simultaneous: true }`: precedence/absorption is bypassed — EVERY hit-tested layer receives it,
- * `stopPropagation` is inert. Only visible layers with a listener for `type` and a passing hitTest
- * receive it either way. Pure over a layers array — FimMap wraps it. (PACKAGE_ROADMAP §1)
+ * Dispatches a normalized map event to the layers top down in z-order, where the last entry is
+ * topmost, hit-testing each. By default it stops once a handler absorbs the event with
+ * `evt.stopPropagation()`. With `{ simultaneous: true }` each hit layer receives it and
+ * `stopPropagation` does nothing. Either way, only a visible layer with a listener for `type` and a
+ * passing hitTest receives it. Pure over a layers array, and FimMap wraps it. (PACKAGE_ROADMAP §1)
  * @param {import('./layer.js').Layer[]} layers @param {string} type @param {{lat:number,lng:number}} base
  * @param {{ simultaneous?: boolean }} [opts]
  * @returns {Object} the event object (carries `stopPropagation`)
@@ -1097,14 +1101,14 @@ export function dispatchMapEventToLayers(layers, type, base, { simultaneous = fa
   return evt;
 }
 
-// ---- type registry (subsystems populate this as they migrate) ----
+// ---- type registry, filled in by each subsystem as it migrates ----
 
 /** @typedef {(fim: import('./fimMap.js').FimMap, opts: Object) => (Layer|Promise<Layer>)} LayerFactory */
 
 const _factories = new Map();   // type -> (fim, opts) => Layer
 
 /**
- * Register a Layer factory for a `type`. Called by each subsystem module as it migrates.
+ * Registers a Layer factory for a `type`. Each subsystem module calls it as it migrates.
  * @param {string} type
  * @param {LayerFactory} factory
  * @returns {void}
@@ -1112,32 +1116,31 @@ const _factories = new Map();   // type -> (fim, opts) => Layer
 export function registerLayerType(type, factory) { _factories.set(type, factory); }
 
 /**
- * True if a factory is registered for `type`.
+ * True when a factory is registered for `type`.
  * @param {string} type
  * @returns {boolean}
  */
 export function hasLayerType(type) { return _factories.has(type); }
 
 /**
- * Every layer type `fim.addLayer(type, …)` can currently construct — the built-ins plus anything a
- * host registered. The public query, mirroring `mapProviderNames()`/`materializerFormats()`.
+ * The layer types `fim.addLayer(type, ...)` can construct, built-in and host-registered. The public
+ * query, matching `mapProviderNames()` and `materializerFormats()`.
  *
- * NOTE these are REGISTRY KEYS, not `layer.type` values. The two overlap confusingly: 'depth' and
- * 'ensemble' appear here as constructible types AND as `RasterLayer.type` discriminators among
- * sibling rasters ('extent'|'userRaster'|'depth'|'ensemble'), where they mean "which kind of raster
- * is this", not "which factory built it". This function only ever answers the first question.
+ * These are registry keys, not `layer.type` values, and the two overlap. 'depth' and 'ensemble'
+ * appear here as constructible types and also as `RasterLayer.type` values among sibling rasters,
+ * alongside 'extent' and 'userRaster', where they say which kind of raster this is rather than which
+ * factory built it. This function answers only the first question.
  * @returns {string[]}
  */
 export function getLayerTypes() { return [..._factories.keys()]; }
 
 /**
- * Construct a Layer of `type` for `fim`. `type` is normally a registry string ('vector', 'raster',
- * …), but a bare source works too: pass a Dataset (or anything else) in the `type` slot and it is
- * treated as `{ source: type }` — `fim.addLayer(ds)` needs no type argument at all. Either way, when
- * a type ends up unresolved it is inferred from `opts.source`/`opts.sources[0]`'s `Dataset.kind`
- * ('raster'|'vector') — only when there is EXACTLY one source, since a multi-source type
- * (comparison/ensemble) can't be guessed. Throws a clear error if a type can't be resolved, or if
- * the resolved type has no registered factory.
+ * Constructs a Layer of `type` for `fim`. `type` is normally a registry string such as 'vector', but
+ * a bare source works too: a Dataset in the `type` slot is read as `{ source: type }`, so
+ * `fim.addLayer(ds)` needs no type at all. When the type is still unresolved it comes from
+ * `opts.source` or `opts.sources[0]`'s `Dataset.kind`, raster or vector, and only when there is
+ * exactly one source, since a multi-source type such as comparison cannot be guessed. Throws when
+ * the type cannot be resolved, or when the resolved type has no registered factory.
  * @param {import('./fimMap.js').FimMap} fim
  * @param {string|Object} [type] - a registry name, OR a bare source (Dataset) to infer from
  * @param {Object} [opts]
@@ -1172,9 +1175,9 @@ export function createLayer(fim, type, opts = {}) {
   return factory(fim, opts);
 }
 
-// The engine's built-in vector layer type. `fim.addLayer('vector', { source: ds, style })` parses
-// nothing — it renders an already-parsed Dataset — so it resolves synchronously. Registered after
-// the registry is defined (module-load order).
+// The built-in vector layer type. `fim.addLayer('vector', { source: ds, style })` parses nothing,
+// rendering an already-parsed Dataset, so it resolves synchronously. Registered after the registry
+// is defined, which module-load order requires.
 registerLayerType("vector", (fim, opts = {}) => {
   const layer = new VectorLayer({
     map: fim,
@@ -1184,10 +1187,10 @@ registerLayerType("vector", (fim, opts = {}) => {
   return layer.render({ style: opts.style });
 });
 
-// The engine's built-in raster layer type. `fim.addLayer('raster', { source: ds, colorScale?, noData?,
-// opacity? })` forces the Dataset (base Layer.compute()) and draws it (RasterLayer._draw). Unlike
-// VectorLayer, RasterLayer does not override the base render(), which is async — so, unlike 'vector'
-// above, this factory returns a Promise<Layer> and callers (addLayer) must await it.
+// The built-in raster layer type. `fim.addLayer('raster', { source: ds, colorScale?, noData?,
+// opacity? })` forces the Dataset through the base Layer.compute() and draws it in
+// RasterLayer._draw. RasterLayer does not override the base render(), which is async, so unlike
+// 'vector' above this factory returns a Promise<Layer> that addLayer must await.
 registerLayerType("raster", (fim, opts = {}) => {
   const layer = new RasterLayer({
     map: fim,

@@ -8,28 +8,27 @@
 
 > **groupByGrid**(`grid`, `by`, `opts?`): `object`[]
 
-Defined in: [package/rasterOps.js:196](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/rasterOps.js#L196)
+Defined in: [package/rasterOps.js:202](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/rasterOps.js#L202)
 
-Group a raster's pixels by **another raster's values** and reduce each group — the third kind of
-reduction, alongside `reduce()` (collapse a selection axis) and `zonalStats()` (collapse space by
-geometry). This one collapses space by *value*: "mean depth per land-use class", "rainfall binned
-by elevation", a rating curve of one variable against another.
+Groups a raster's pixels by another raster's values and reduces each group. It is the third kind
+of reduction here: `reduce()` collapses a selection axis, `zonalStats()` collapses space by
+geometry, and this collapses space by value. That gives mean depth per land-use class, rainfall
+binned by elevation, or a rating curve of one variable against another.
 
-It is deliberately NOT `select`/`reduce`, and not an overload of `zonalStats`: the grouping key
-comes from DATA rather than from the axis model or from geometry, so it earns its own verb rather
-than making an existing one mean two things.
+It is neither `select`/`reduce` nor an overload of `zonalStats`, because the grouping key comes
+from data rather than from the axis model or from geometry.
 
-`by` is conformed to `grid` (resampled onto its cells) exactly as `combineGrids` conforms its
-inputs — same LHS-conform rule, same resampler, so the two agree on what "aligned" means.
+`by` is resampled onto `grid`'s cells the same way `combineGrids` conforms its inputs, using the
+same rule and resampler, so both agree on what aligned means.
 
-Two grouping modes:
-- **discrete** (default) — every distinct value of `by` is a class. For classification rasters
-  (land use, soil type) where the values ARE the categories.
-- **binned** — `bins: [0, 100, 500]` uses those edges; `bins: 5` cuts `by`'s finite range into five
-  equal-width bands. For continuous `by` (elevation, discharge), where distinct values are useless.
+Two grouping modes. Discrete, the default, makes each distinct value of `by` a class, which suits
+a classification raster such as land use where the values are already the categories. Binned takes
+`bins: [0, 100, 500]` as explicit edges, or `bins: 5` to cut `by`'s finite range into five
+equal-width bands, which suits a continuous `by` such as elevation where distinct values are
+useless.
 
-A pixel is skipped when EITHER raster is absent there (NaN or the respective noData), so the result
-only covers cells where both rasters actually have a value.
+A pixel is skipped when either raster is absent there, so the result covers only cells where both
+hold a value.
 
 ## Parameters
 

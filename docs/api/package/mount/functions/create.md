@@ -8,13 +8,13 @@
 
 > **create**(`target`, `options?`): `Promise`\<[`FimMap`](../../fimMap/classes/FimMap.md)\> & `object`
 
-Defined in: [package/mount.js:85](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/mount.js#L85)
+Defined in: [package/mount.js:83](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mount.js#L83)
 
-create(target, options) — boot a FimMap on the ambient default app.
+Boots a FimMap on the default app.
 
-Applies host config (set-once), validates it, injects the widget markup unless the page
-already provides it, boots the map, and resolves to the FimMap once it is ready. On mount
-failure the map is released so the single-instance guard does not stay stuck.
+Applies the host config once, validates it, injects the widget markup unless the page already
+has it, boots the map, then resolves to the FimMap. A mount failure releases the map so the
+single-instance guard does not stay stuck.
 
 ## Parameters
 

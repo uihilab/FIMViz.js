@@ -8,11 +8,11 @@
 
 > **registerMaterializer**(`format`, `fn`): `void`
 
-Defined in: [package/materialize.js:102](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L102)
+Defined in: [package/materialize.js:100](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L100)
 
-Register the decoder for a `format` (e.g. 'geotiff', 'geojson'). Called by io/materializers.js on
-import (and by tests). The decoder fetches (for a URL root) and decodes into a RasterGrid/
-VectorFeatures. Keeping this out of Dataset's import graph is what preserves headlessness.
+Registers the decoder for a `format`, i.e. 'geotiff'. io/materializers.js calls this on import,
+and so do tests. The decoder fetches a URL root when it has one, then decodes into a RasterGrid
+or VectorFeatures. Keeping it out of Dataset's import graph is what keeps Dataset headless.
 
 ## Parameters
 

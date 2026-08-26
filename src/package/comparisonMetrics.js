@@ -1,30 +1,31 @@
 // comparisonMetrics.js — headless flood-extent comparison (classification, visualization, stats).
 //
-// Three pure operations over aligned extent rasters, where a pixel is "wet" when its value is not
-// `dryValue`. All are DOM-free and google.maps-free, extracted from the layers/comparison.js UI
-// controller so the valuable math STAYS in the engine while the controller lives in the ui/ tier:
+// Four pure operations over aligned extent rasters, where a pixel is wet when its value is not
+// `dryValue`. All are free of DOM and google.maps, so the math lives in the engine while
+// layers/comparison.js stays a UI controller:
 //
-//   1. classifyExtents(pixelArrays)      — per-pixel bitmask of WHICH layers are wet (N-ary).
-//   2. extentCategoriesToRgba(cats, pal) — that classification → an RGBA overlay buffer (N-ary).
-//   3. compareExtentMetrics(a, b, meta)  — 2×2 confusion-matrix agreement (2-ary; PC/B/H/K/F/MI).
-//   4. agreementCounts / ensembleAgreementRgba — the ENSEMBLE reducer: HOW MANY members are wet per
-//      pixel (0..N) → an N-colour agreement ramp. Same aligned-rasters input as comparison, a
-//      different reduction: "which subset" (2^N-1 colours) collapses to "how many" (N colours).
+//   1. classifyExtents(pixelArrays)      per-pixel bitmask of which layers are wet, 2 to 8 layers
+//   2. extentCategoriesToRgba(cats, pal) that classification as an RGBA overlay buffer
+//   3. compareExtentMetrics(a, b, meta)  2x2 confusion-matrix agreement, exactly 2 layers
+//   4. agreementCounts, ensembleAgreementRgba
+//                                        how many members are wet per pixel, 0..N, over an N-color
+//                                        ramp. Same input as 1, a different reduction: "which
+//                                        subset" needs 2^N-1 colors, "how many" needs N.
 //
-// (1)+(2) generalize the controller's inlined "combine two rasters into a coloured overlay" loop to
-// any number of layers; (3) is deliberately 2-ary — the confusion matrix is a two-class construct,
-// which is where an N-way statistic gets ambiguous. All three assume the inputs share ONE grid
-// (same length / same meta): the controller enforces equal raster dimensions before calling in.
+// 1 and 2 generalize the controller's inlined two-raster combine loop to any number of layers. 3
+// takes exactly 2 because a confusion matrix is a two-class construct, and an N-way version of it is
+// ambiguous. All four require the inputs to share one grid, meaning equal length and equal meta.
+// layers/comparison.js checks the raster dimensions before calling in.
 import { SpatialFilter } from "./filter.js";
 import { hexToRgb, ColorScale } from "./colorScale.js";
 
-// Value meaning "no data / dry" in the lab's extent rasters. Kept as the shared default so the
-// classification, the RGBA combine, and the metrics all agree on what counts as wet.
+// Value meaning dry, or no data, in the lab's extent rasters. Shared so classifyExtents,
+// combineExtentRgba and compareExtentMetrics agree on what counts as wet.
 export const DRY_DEFAULT = -99999;
 
-// The built-in 2-layer palette, keyed by bitmask category, reproducing the controller's long-standing
-// colours EXACTLY: neither → transparent, layer-0-only → orange, layer-1-only → yellow, both → red.
-// (bit i set ⇔ layer i is wet, so 0b01 = first raster only, 0b10 = second only, 0b11 = both.)
+// The built-in 2-layer palette, keyed by bitmask category, matching the colors layers/comparison.js
+// has always used: neither transparent, layer 0 only orange, layer 1 only yellow, both red.
+// Bit i is set when layer i is wet, so 0b01 is the first raster only and 0b11 is both.
 export const EXTENT_COMPARE_PALETTE_2 = {
   0b00: [0, 0, 0, 0],
   0b01: [247, 127, 0, 255],
@@ -33,12 +34,11 @@ export const EXTENT_COMPARE_PALETTE_2 = {
 };
 
 /**
- * Classify N aligned extent rasters pixel-by-pixel. Returns `categories[i]` = a bitmask where bit L
- * is set when `pixelArrays[L][i]` is wet (!== dryValue), plus `counts[cat]` = how many pixels fell in
- * each category. This is the generalized form of the two-raster "both / only-1 / only-2 / neither"
- * split: with 2 layers the categories are exactly 0b00/0b01/0b10/0b11.
+ * Classifies N aligned extent rasters pixel by pixel. `categories[i]` is a bitmask with bit L set
+ * when `pixelArrays[L][i]` is wet, and `counts[cat]` is how many pixels fell in each category.
+ * Generalizes the two-raster both/only-1/only-2/neither split, which is 0b00 through 0b11.
  *
- * @param {ArrayLike<number>[]} pixelArrays  2–8 equal-length band arrays sharing one grid.
+ * @param {ArrayLike<number>[]} pixelArrays  2-8 equal-length band arrays sharing one grid
  * @param {{ dryValue?: number }} [opts]
  * @returns {{ categories: Uint8Array, counts: Uint32Array, nLayers: number }}
  */
@@ -66,24 +66,24 @@ export function classifyExtents(pixelArrays, { dryValue = DRY_DEFAULT } = {}) {
   return { categories, counts, nLayers: n };
 }
 
-// Coerce one colour (hex string | [r,g,b] | [r,g,b,a]) → [r,g,b,a].
+// Converts one color, given as a hex string or an [r,g,b] or [r,g,b,a] array, into [r,g,b,a].
 function toRgba(c) {
   if (typeof c === "string") return [...hexToRgb(c), 255];
   if (Array.isArray(c) && c.length >= 3) return [c[0], c[1], c[2], c[3] ?? 255];
-  throw new Error(`comparison colour must be a hex string or [r,g,b(,a)] — got ${JSON.stringify(c)}`);
+  throw new Error(`comparison color must be a hex string or [r,g,b(,a)] — got ${JSON.stringify(c)}`);
 }
 
 /**
- * Build a bitmask palette from a flat list of `2^n - 1` colours — one per NON-EMPTY category, in
- * bitmask order (category 1, 2, 3, … up to 2^n-1). Category 0 (no layer wet) is always transparent,
- * which is why the list omits it. So a 2-layer override is 3 colours [only-1, only-2, both]; 3 layers
- * is 7; etc. Colours may be hex strings or [r,g,b(,a)] arrays.
+ * Builds a bitmask palette from a flat list of `2^n - 1` colors, one per non-empty category, in
+ * bitmask order from 1 upward. Category 0 means no layer is wet and is always transparent, so the
+ * list omits it. Two layers take 3 colors ordered [only-1, only-2, both], three layers take 7. A
+ * color is a hex string or an [r,g,b(,a)] array.
  */
 export function paletteFromColors(colors) {
   const len = colors?.length ?? 0;
   const n = Math.log2(len + 1);
   if (!Number.isInteger(n) || n < 2) {
-    throw new Error(`comparison palette: expected 2^n - 1 colours (3, 7, 15, …) for n≥2 layers, got ${len}`);
+    throw new Error(`comparison palette: expected 2^n - 1 colors (3, 7, 15, …) for n≥2 layers, got ${len}`);
   }
   const palette = { 0: [0, 0, 0, 0] };
   for (let k = 1; k <= len; k++) palette[k] = toRgba(colors[k - 1]);
@@ -91,27 +91,28 @@ export function paletteFromColors(colors) {
 }
 
 /**
- * Turn a `classifyExtents` result into an RGBA buffer (4 bytes/pixel, `Uint8ClampedArray` ready for
- * `new ImageData(...)`). `palette` maps a category (bitmask) → `[r,g,b,a]`; any category absent from
- * the palette is left transparent.
+ * Turns a `classifyExtents` result into an RGBA buffer of 4 bytes per pixel, ready for
+ * `new ImageData(...)`. `palette` maps a bitmask category to `[r,g,b,a]`. A category missing from
+ * the palette stays transparent.
  */
 export function extentCategoriesToRgba(categories, palette = EXTENT_COMPARE_PALETTE_2) {
   const rgba = new Uint8ClampedArray(categories.length * 4);
   for (let i = 0; i < categories.length; i++) {
     const c = palette[categories[i]];
-    if (!c) continue;   // unmapped → transparent (a === 0)
+    if (!c) continue;   // unmapped stays transparent
     rgba[i * 4] = c[0]; rgba[i * 4 + 1] = c[1]; rgba[i * 4 + 2] = c[2]; rgba[i * 4 + 3] = c[3];
   }
   return rgba;
 }
 
 /**
- * One-call combine for the overlay: classify `pixelArrays` and colour them. Returns the RGBA buffer
- * plus the raw classification so a caller can drive both the canvas and a legend from one pass.
+ * Classifies `pixelArrays` and colors them in one call. Returns the RGBA buffer and the raw
+ * classification, so ComparisonLayer can draw the canvas and a legend from one pass.
  *
- * Colours, in priority order: `colors` (a flat `2^n - 1` list, the caller-facing override) →
- * `palette` (an explicit category→[r,g,b,a] map) → the built-in 2-layer palette. For N>2 with none
- * supplied it throws — the engine will not invent colours for a comparison it can't name.
+ * Colors are taken from `colors` first, a flat `2^n - 1` list, then `palette`, an explicit
+ * category-to-[r,g,b,a] map, then the built-in 2-layer palette. With more than 2 layers and neither
+ * given, it throws rather than inventing colors for a comparison it cannot name. The resolved map
+ * comes back as `palette`, so ComparisonLayer.getLegend() can label what was drawn.
  */
 export function combineExtentRgba(pixelArrays, { dryValue = DRY_DEFAULT, palette = null, colors = null } = {}) {
   const { categories, counts, nLayers } = classifyExtents(pixelArrays, { dryValue });
@@ -119,7 +120,7 @@ export function combineExtentRgba(pixelArrays, { dryValue = DRY_DEFAULT, palette
   if (colors) {
     const need = (1 << nLayers) - 1;
     if (colors.length !== need) {
-      throw new Error(`combineExtentRgba: comparing ${nLayers} layers needs ${need} colours ` +
+      throw new Error(`combineExtentRgba: comparing ${nLayers} layers needs ${need} colors ` +
         `(one per non-empty category), got ${colors.length}.`);
     }
     pal = paletteFromColors(colors);
@@ -129,19 +130,19 @@ export function combineExtentRgba(pixelArrays, { dryValue = DRY_DEFAULT, palette
     throw new Error(`combineExtentRgba: comparing ${nLayers} layers needs an explicit palette/colors ` +
       "(only the 2-layer case has a built-in one).");
   }
-  return { rgba: extentCategoriesToRgba(categories, pal), categories, counts, nLayers };
+  return { rgba: extentCategoriesToRgba(categories, pal), categories, counts, nLayers, palette: pal };
 }
 
-// ---- ensemble reducer: agreement count (the "n colours" reduction) --------------------------------
+// ---- ensemble reducer: agreement count -----------------------------------------------------------
 //
-// Where classifyExtents asks "WHICH members are wet" (2^N-1 non-empty subsets), the ensemble asks
-// "HOW MANY are wet" — a count 0..N per pixel. That is why an ensemble of N members needs only N
-// colours (an agreement ramp for counts 1..N; count 0 = dry = transparent), not 2^N-1. Same aligned
-// input as comparison (align the members with geo/resample.js first), a different reduction.
+// classifyExtents asks which members are wet, giving 2^N-1 non-empty subsets. This asks how many are
+// wet, giving a count of 0..N per pixel, so N members need only N colors: an agreement ramp for
+// counts 1..N, with count 0 dry and transparent. Align the members with geo/resample.js first, the
+// same input comparison takes.
 
 /**
- * Per-pixel agreement over N aligned member rasters: `perPixel[i]` = how many members are wet at i
- * (0..N), plus a `histogram` of counts (index 0..N). All members must share one grid.
+ * Counts agreement over N aligned member rasters. `perPixel[i]` is how many members are wet at i,
+ * from 0 to N, and `histogram` indexes those counts from 0 to N. All members must share one grid.
  */
 export function agreementCounts(pixelArrays, { dryValue = DRY_DEFAULT } = {}) {
   const n = pixelArrays?.length ?? 0;
@@ -164,7 +165,7 @@ export function agreementCounts(pixelArrays, { dryValue = DRY_DEFAULT } = {}) {
   return { perPixel, histogram, nLayers: n };
 }
 
-/** N colours for agreement counts 1..N (count 0 is transparent) — a viridis ramp, the default. */
+/** The default ramp: N viridis colors for agreement counts 1..N. Count 0 is transparent. */
 export function defaultAgreementColors(n) {
   const cs = new ColorScale({ palette: "viridis", min: 1, max: Math.max(2, n), continuous: true });
   const out = [];
@@ -172,7 +173,7 @@ export function defaultAgreementColors(n) {
   return out;
 }
 
-/** Colour an agreement map: count k (1..N) → colours[k-1]; count 0 → transparent. */
+/** Colors an agreement map. Count k from 1 to N takes colors[k-1]; count 0 stays transparent. */
 export function agreementToRgba(perPixel, colors) {
   const rgba = new Uint8ClampedArray(perPixel.length * 4);
   for (let i = 0; i < perPixel.length; i++) {
@@ -186,10 +187,11 @@ export function agreementToRgba(perPixel, colors) {
 }
 
 /**
- * One-call ensemble combine: agreement count → RGBA over an N-colour ramp. `colors` is N colours
- * (hex or [r,g,b(,a)]) for agreement 1..N; omitted → a default viridis ramp AND a warning (a silent
- * default hides that the caller never chose one — same contract as ComparisonLayer). Returns the
- * RGBA plus the raw `perPixel` counts and `histogram` so a caller can drive a legend too.
+ * Counts agreement and colors it over an N-color ramp in one call. `colors` is N colors, hex or
+ * [r,g,b(,a)], for agreement levels 1 to N. Omitting it falls back to a viridis ramp and adds a
+ * warning, since a silent default would hide that EnsembleAggregationLayer never chose one. Returns
+ * the RGBA with the raw `perPixel` counts and `histogram`, plus the resolved `colors` as
+ * [r,g,b,a] rows, so EnsembleAggregationLayer.getLegend() can label what was drawn.
  */
 export function ensembleAgreementRgba(pixelArrays, { dryValue = DRY_DEFAULT, colors = null } = {}) {
   const { perPixel, histogram, nLayers } = agreementCounts(pixelArrays, { dryValue });
@@ -197,17 +199,55 @@ export function ensembleAgreementRgba(pixelArrays, { dryValue = DRY_DEFAULT, col
   let cols;
   if (colors) {
     if (colors.length !== nLayers) {
-      throw new Error(`ensembleAgreementRgba: ${nLayers} members need ${nLayers} colours ` +
+      throw new Error(`ensembleAgreementRgba: ${nLayers} members need ${nLayers} colors ` +
         `(one per agreement level 1..N), got ${colors.length}.`);
     }
     cols = colors.map(toRgba);
   } else {
-    warnings.push(`No ensemble colours provided; defaulting to an ${nLayers}-step viridis agreement ramp.`);
+    warnings.push(`No ensemble colors provided; defaulting to an ${nLayers}-step viridis agreement ramp.`);
     cols = defaultAgreementColors(nLayers);
   }
-  return { rgba: agreementToRgba(perPixel, cols), perPixel, histogram, nLayers, warnings };
+  return { rgba: agreementToRgba(perPixel, cols), perPixel, histogram, nLayers, warnings, colors: cols };
 }
 
+/**
+ * Scores two aligned extent rasters against each other with a 2x2 confusion matrix.
+ *
+ * The two arguments are not interchangeable. `pixels1` is treated as the prediction and `pixels2` as
+ * the observation, so swapping them inverts `fp` and `fn` and changes every derived score except
+ * `pc` and `f`. A pixel is wet when its value is not `dryValue`.
+ *
+ * The four counts:
+ *   tp  wet in both
+ *   fp  wet in `pixels1` only, so predicted wet where the observation is dry
+ *   fn  wet in `pixels2` only, so predicted dry where the observation is wet
+ *   tn  dry in both
+ *
+ * The five scores. `pc` is always a number; the rest are null when undefined, never 0:
+ *   pc  (tp+tn)/n, the proportion of pixels both rasters agree on
+ *   b   (tp+fp)/(tp+fn), predicted wet area over observed wet area; 1 is unbiased, above 1
+ *       over-predicts. Null when the observation has no wet pixels.
+ *   h   tp/(tp+fn), the fraction of observed wet pixels the prediction also calls wet. Null on
+ *       the same condition as `b`.
+ *   k   Cohen's kappa, agreement corrected for what chance alone would produce. Null when both
+ *       rasters put every pixel in one class, where kappa is 0/0.
+ *   f   tp/(tp+fp+fn), wet pixels both agree on over wet pixels either one claims. Null when
+ *       neither raster has a wet pixel.
+ *   mi  h + k + f, a combined score with no separate normalization. Null when any of the three is.
+ *
+ * @param {ArrayLike<number>} pixels1 - the prediction, on the same grid as `pixels2`
+ * @param {ArrayLike<number>} pixels2 - the observation
+ * @param {{width: number, height: number, bw: number, bs: number, be: number, bn: number}} meta -
+ *   the grid both rasters sit on
+ * @param {Object} [opts]
+ * @param {Array|null} [opts.mask] - a polygon confining the scoring to the pixels inside it. Needs
+ *   at least 3 points; anything shorter is ignored.
+ * @param {number} [opts.dryValue] - the value meaning dry, -99999 by default
+ * @returns {{pc: number, b: number|null, h: number|null, k: number|null, f: number|null,
+ *   mi: number|null, tp: number, fp: number, fn: number, tn: number, n: number}|null} null when an
+ *   argument is missing or no pixel was scored, i.e. the mask covers nothing. `n` is the number of
+ *   pixels scored.
+ */
 export function compareExtentMetrics(pixels1, pixels2, meta, { mask = null, dryValue = DRY_DEFAULT } = {}) {
   if (!pixels1 || !pixels2 || !meta) return null;
   const { width, height, bw, bs, be, bn } = meta;
@@ -236,10 +276,14 @@ export function compareExtentMetrics(pixels1, pixels2, meta, { mask = null, dryV
   const n = tp + fn + fp + tn;
   if (n === 0) return null;
   const pc = (tp + tn) / n;
-  const b = tp + fn > 0 ? (tp + fp) / (tp + fn) : 0;
-  const h = tp + fn > 0 ? tp / (tp + fn) : 0;
+  // A zero denominator means the score has no value here, not that it scored zero. Returning 0
+  // would read as "predicted nothing where there was flooding" when the truth is "there was no
+  // flooding to score against", and nothing downstream could tell the two apart.
+  const b = tp + fn > 0 ? (tp + fp) / (tp + fn) : null;
+  const h = tp + fn > 0 ? tp / (tp + fn) : null;
   const d = n * n - ((tp + fp) * (tp + fn) + (fp + tn) * (fn + tn));
-  const k = d !== 0 ? (n * (tp + tn) - ((tp + fp) * (tp + fn) + (fp + tn) * (fn + tn))) / d : 0;
-  const f = tp + fp + fn > 0 ? tp / (tp + fp + fn) : 0;
-  return { pc, b, h, k, f, mi: h + k + f, tp, fp, fn, tn, n };
+  const k = d !== 0 ? (n * (tp + tn) - ((tp + fp) * (tp + fn) + (fp + tn) * (fn + tn))) / d : null;
+  const f = tp + fp + fn > 0 ? tp / (tp + fp + fn) : null;
+  const mi = h == null || k == null || f == null ? null : h + k + f;
+  return { pc, b, h, k, f, mi, tp, fp, fn, tn, n };
 }

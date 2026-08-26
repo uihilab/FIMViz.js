@@ -1,23 +1,24 @@
-// rasterOps.js — pure raster-grid transforms backing the lazy Dataset ops clip / mask / reclassify
-// (docs/PACKAGE_ROADMAP.md §2). PURE + node-testable: no DOM, no GDAL. Each takes a decoded
-// RasterGrid and returns a NEW RasterGrid (the source is never mutated). The heavy GDAL variants
-// (gdalwarp -cutline, gdal_calc) are a later optimisation for large rasters — these decoded-grid
-// transforms cover the immediate FIM analysis needs and run anywhere.
+// rasterOps.js — pure grid transforms behind the lazy Dataset ops ds.clip, ds.mask and
+// ds.reclassify (docs/PACKAGE_ROADMAP.md §2). No DOM and no GDAL, so they run under node. Each takes
+// a decoded RasterGrid and returns a new one, never mutating the source. The GDAL equivalents,
+// gdalwarp -cutline and gdal_calc, are a later optimization for large rasters. These cover the FIM
+// analysis needs today and run anywhere.
 //
-// Masked / unmatched pixels become NaN in a Float64Array copy, which colorizeGrid (rasterImage.js)
-// and Stats already treat as transparent / excluded — so "reduce to the cut" needs no new sentinel.
+// A masked or unmatched pixel becomes NaN in a Float64Array copy. colorizeGrid (rasterImage.js)
+// already draws NaN as transparent and Stats already excludes it, so cutting a grid needs no new
+// sentinel value.
 
 import { RasterGrid } from "./materialize.js";
 import { SpatialFilter } from "./filter.js";
 import { resampleGrid } from "../geo/resample.js";
 
 const asFilter = (p) => (p instanceof SpatialFilter ? p : new SpatialFilter(p));
-// RasterGrid.bounds{north,south,east,west} → the {bw,bs,be,bn,width,height} meta resample/pixelBbox use.
+// Converts RasterGrid.bounds to the {bw,bs,be,bn,width,height} meta resample and pixelBbox read.
 const gridMeta = (g) => ({ bw: g.bounds.west, bs: g.bounds.south, be: g.bounds.east, bn: g.bounds.north, width: g.width, height: g.height });
 
 /**
- * Mask a grid by a polygon: pixels OUTSIDE the polygon become NaN (or inside, with `invert`). The
- * footprint/bounds are unchanged. Restricts the point-in-polygon scan to the polygon's pixel bbox.
+ * Masks a grid by a polygon. Pixels outside it become NaN, or inside it with `invert`. The bounds
+ * do not change. Scans only the polygon's pixel bbox rather than the whole grid.
  * @param {RasterGrid} grid
  * @param {SpatialFilter|Array} polygon - a SpatialFilter, or a ring/multi-ring of {lat,lng}|[lat,lng]
  * @param {{ invert?: boolean }} [opts]
@@ -46,8 +47,8 @@ export function maskGrid(grid, polygon, { invert = false } = {}) {
 }
 
 /**
- * Crop a grid to a bbox (intersected with the grid footprint), snapped to pixel edges → a smaller
- * grid with new bounds. Preserves the pixel array's type.
+ * Crops a grid to a bbox, intersected with the grid's own footprint and snapped to pixel edges,
+ * giving a smaller grid with new bounds. Keeps the pixel array's type.
  * @param {RasterGrid} grid
  * @param {{north:number,south:number,east:number,west:number}} bbox
  * @returns {RasterGrid}
@@ -73,23 +74,29 @@ export function clipGrid(grid, bbox) {
 }
 
 /**
- * Value remap. `rules` is EITHER an array of `{ min?, max?, value? }` range rules (a pixel v matches
- * the first rule whose `(min==null||v>=min) && (max==null||v<max)`; the output is `value` when
- * present, else v — a "keep in range" band) OR a single CALLBACK `(value, index) => number|null` —
- * called once per valid pixel with its raw value and its flat row-major index (`row*width+col`),
- * returning the new value directly (bypassing rule-matching entirely, so it isn't limited to a
- * contiguous range — any per-pixel logic, including index-dependent logic, works). Either form:
- * `null`/`undefined` means "unmatched" → NaN (`unmatched:'nodata'`, default) or v (`'keep'`).
- * Existing NaN/noData pixels stay transparent, never passed to a rule or the callback. NOTE: a
- * callback does NOT survive Dataset.toRecord() (structured-clone can't carry functions) — that call
- * throws naming the op rather than silently dropping it; use range rules for a chain that needs to
- * persist/reload.
+ * Remaps pixel values. `rules` takes one of two forms.
+ *
+ * An array of `{ min?, max?, value? }` range rules: a pixel v matches the first rule where
+ * `(min==null||v>=min) && (max==null||v<max)`, and the output is that rule's `value`, or v itself
+ * when it has none, which keeps the band unchanged.
+ *
+ * A callback `(value, index) => number|null`: it runs once per valid pixel with the raw value and
+ * the flat row-major index `row*width+col`, and returns the new value directly. It skips rule
+ * matching, so it is not limited to a contiguous range and index-dependent logic works.
+ *
+ * Either form returning `null` or `undefined` marks the pixel unmatched, which becomes NaN under
+ * the default `unmatched:'nodata'` or keeps v under `'keep'`. A pixel already NaN or noData stays
+ * transparent and reaches neither a rule nor the callback.
+ *
+ * A callback does not survive Dataset.toRecord(), because structured clone cannot carry a function.
+ * That call throws and names the op rather than dropping it, so use range rules for a
+ * chain that has to persist and reload.
  * @param {RasterGrid} grid
  * @param {Array<{min?:number,max?:number,value?:number}>|((value:number,index:number)=>number|null|undefined)} rules
  * @param {{ unmatched?: 'nodata'|'keep' }} [opts]
- * @returns {RasterGrid} - carries `meta.unmatchedCount` (omitted when 0) when `unmatched: 'nodata'`
- *   (the default) actually turned some previously-VALID pixels into holes — i.e. the rules/callback
- *   didn't cover this raster's value range. Dataset's reclassify op reads this to warn.
+ * @returns {RasterGrid} - carries `meta.unmatchedCount` when the default `unmatched: 'nodata'`
+ *   turned previously valid pixels into holes, meaning the rules did not cover this raster's value
+ *   range. Omitted at 0. Dataset's reclassify op reads it to warn.
  */
 export function reclassifyGrid(grid, rules, { unmatched = "nodata" } = {}) {
   const { pixels, noData } = grid;
@@ -125,7 +132,7 @@ export function reclassifyGrid(grid, rules, { unmatched = "nodata" } = {}) {
   });
 }
 
-// Per-pixel reducers over the aligned input values (NaN = a noData/absent input at that pixel).
+// Per-pixel reducers over the aligned input values. NaN means that input is absent at that pixel.
 const REDUCERS = {
   difference: (v) => (v.length >= 2 && !Number.isNaN(v[0]) && !Number.isNaN(v[1])) ? v[0] - v[1] : NaN,
   ratio:      (v) => (v.length >= 2 && !Number.isNaN(v[0]) && !Number.isNaN(v[1]) && v[1] !== 0) ? v[0] / v[1] : NaN,
@@ -136,9 +143,9 @@ const REDUCERS = {
 };
 
 /**
- * Combine N aligned rasters per pixel (band math). LHS-conform: every other grid is resampled onto
- * grids[0]'s exact grid in memory, then reduced by `op`. `difference`/`ratio` are binary; `sum`/`mean`/
- * `min`/`max` are N-ary and skip noData/NaN inputs. Result carries grids[0]'s bounds/dims.
+ * Combines N aligned rasters pixel by pixel. Resamples the other grids onto grids[0]'s exact grid
+ * in memory, then reduces with `op`. `difference` and `ratio` take two grids; `sum`, `mean`, `min`
+ * and `max` take any number and skip absent inputs. The result carries grids[0]'s bounds and dims.
  * @param {RasterGrid[]} grids
  * @param {{ op?: 'difference'|'ratio'|'sum'|'mean'|'min'|'max', method?: string }} [opts]
  * @returns {RasterGrid}
@@ -165,26 +172,25 @@ export function combineGrids(grids, { op = "difference", method = "nearest" } = 
 }
 
 /**
- * Group a raster's pixels by **another raster's values** and reduce each group — the third kind of
- * reduction, alongside `reduce()` (collapse a selection axis) and `zonalStats()` (collapse space by
- * geometry). This one collapses space by *value*: "mean depth per land-use class", "rainfall binned
- * by elevation", a rating curve of one variable against another.
+ * Groups a raster's pixels by another raster's values and reduces each group. It is the third kind
+ * of reduction here: `reduce()` collapses a selection axis, `zonalStats()` collapses space by
+ * geometry, and this collapses space by value. That gives mean depth per land-use class, rainfall
+ * binned by elevation, or a rating curve of one variable against another.
  *
- * It is deliberately NOT `select`/`reduce`, and not an overload of `zonalStats`: the grouping key
- * comes from DATA rather than from the axis model or from geometry, so it earns its own verb rather
- * than making an existing one mean two things.
+ * It is neither `select`/`reduce` nor an overload of `zonalStats`, because the grouping key comes
+ * from data rather than from the axis model or from geometry.
  *
- * `by` is conformed to `grid` (resampled onto its cells) exactly as `combineGrids` conforms its
- * inputs — same LHS-conform rule, same resampler, so the two agree on what "aligned" means.
+ * `by` is resampled onto `grid`'s cells the same way `combineGrids` conforms its inputs, using the
+ * same rule and resampler, so both agree on what aligned means.
  *
- * Two grouping modes:
- * - **discrete** (default) — every distinct value of `by` is a class. For classification rasters
- *   (land use, soil type) where the values ARE the categories.
- * - **binned** — `bins: [0, 100, 500]` uses those edges; `bins: 5` cuts `by`'s finite range into five
- *   equal-width bands. For continuous `by` (elevation, discharge), where distinct values are useless.
+ * Two grouping modes. Discrete, the default, makes each distinct value of `by` a class, which suits
+ * a classification raster such as land use where the values are already the categories. Binned takes
+ * `bins: [0, 100, 500]` as explicit edges, or `bins: 5` to cut `by`'s finite range into five
+ * equal-width bands, which suits a continuous `by` such as elevation where distinct values are
+ * useless.
  *
- * A pixel is skipped when EITHER raster is absent there (NaN or the respective noData), so the result
- * only covers cells where both rasters actually have a value.
+ * A pixel is skipped when either raster is absent there, so the result covers only cells where both
+ * hold a value.
  *
  * @param {RasterGrid} grid - the values being reduced
  * @param {RasterGrid} by - the values that define the groups
@@ -208,7 +214,7 @@ export function groupByGrid(grid, by, { bins, method = "nearest", noData, byNoDa
   const { north, south, east, west } = grid.bounds;
   const pxArea = ((east - west) / grid.width) * ((north - south) / grid.height);
 
-  // Bin edges, when binning. A count cuts `by`'s own finite range; an explicit array is used as given.
+  // Bin edges. A count cuts `by`'s own finite range; an explicit array is taken as given.
   let edges = null;
   if (Array.isArray(bins)) {
     edges = [...bins].sort((a, b) => a - b);
@@ -224,7 +230,7 @@ export function groupByGrid(grid, by, { bins, method = "nearest", noData, byNoDa
     const step = (hi - lo) / bins || 1;
     edges = Array.from({ length: bins + 1 }, (_, i) => lo + i * step);
   }
-  // Last bin is closed at the top so the maximum value lands somewhere instead of falling out.
+  // The last bin is closed at the top, so the maximum value falls inside it rather than out.
   const binOf = (b) => {
     for (let i = 0; i < edges.length - 1; i++) {
       if (b >= edges[i] && (b < edges[i + 1] || i === edges.length - 2)) return i;
@@ -258,9 +264,10 @@ export function groupByGrid(grid, by, { bins, method = "nearest", noData, byNoDa
 }
 
 /**
- * Zonal statistics: per-zone min/max/mean/sum/count/area over a raster. `zones` = [{ id?, polygon | filter }]
- * (a ring/multi-ring of {lat,lng}|[lat,lng], or a SpatialFilter). noData/NaN pixels are excluded; `area`
- * is in the bounds' units² (WGS84 → deg²; scale to metres in the caller if needed).
+ * Per-zone min, max, mean, sum, count and area over a raster. Each zone is
+ * `{ id?, polygon | filter }`, where polygon is a ring or multi-ring of {lat,lng} or [lat,lng].
+ * Absent pixels are excluded. `area` is in the square of the bounds' units, so WGS84 gives degrees
+ * squared and the user scales it to meters.
  * @param {RasterGrid} grid
  * @param {Array<{id?: any, polygon?: Array, filter?: SpatialFilter}>} zones
  * @param {{ noData?: number }} [opts]
@@ -290,12 +297,12 @@ export function zonalStats(grid, zones, { noData } = {}) {
   });
 }
 
-// ---- terrain (Horn's 1981 3×3-window gradient — the algorithm gdaldem slope/aspect/hillshade use).
-// Pure JS on the decoded grid, no GDAL: `cellsizeX/Y` default to the grid's own pixel size in the
-// bounds' units (degrees for WGS84 — pass an explicit metres value for a true-scale result, the same
-// "caller scales the units" contract zonalStats' `area` already makes). Edge pixels clamp to the
-// nearest interior row/column (footprint unchanged, unlike clipGrid); a NaN/noData neighbour
-// propagates NaN (a terrain pixel needs its full 3×3 window).
+// ---- terrain: Horn's 1981 3x3-window gradient, what gdaldem slope, aspect and hillshade use ----
+// Pure JS over the decoded grid, with no GDAL. `cellsizeX` and `cellsizeY` default to the grid's own
+// pixel size in the bounds' units, so WGS84 gives degrees; pass explicit meters for a true-scale
+// result, as zonalStats' `area` also requires. An edge pixel clamps to the nearest interior row or
+// column, leaving the footprint unchanged, unlike clipGrid. An absent neighbor makes the result NaN,
+// since a terrain pixel needs its full 3x3 window.
 
 function terrainCellSize(grid, cellsizeX, cellsizeY) {
   const { width, height, bounds } = grid;
@@ -305,7 +312,7 @@ function terrainCellSize(grid, cellsizeX, cellsizeY) {
   };
 }
 
-// The 3×3 window (a..i, row-major) around (r,c), edges clamped to the grid. NaN/noData → NaN.
+// The 3x3 window a..i, row-major, around (r,c), with edges clamped to the grid. Absent gives NaN.
 function windowAt(pixels, width, height, r, c, noData) {
   const at = (rr, cc) => {
     const v = pixels[Math.min(height - 1, Math.max(0, rr)) * width + Math.min(width - 1, Math.max(0, cc))];
@@ -317,9 +324,9 @@ function windowAt(pixels, width, height, r, c, noData) {
 }
 
 /**
- * Slope — per-pixel terrain steepness via Horn's method (gdaldem's slope algorithm), computed in pure
- * JS on the decoded grid. `unit:'degrees'|'percent'`; `zFactor` scales elevation before the gradient
- * (vertical exaggeration / unit conversion, e.g. feet→metres).
+ * Per-pixel terrain steepness by Horn's method, the algorithm gdaldem slope uses, in pure JS over
+ * the decoded grid. `unit` is 'degrees' or 'percent'. `zFactor` scales elevation before the
+ * gradient, for vertical exaggeration or a unit conversion such as feet to meters.
  * @param {RasterGrid} grid
  * @param {{ zFactor?: number, cellsizeX?: number, cellsizeY?: number, unit?: 'degrees'|'percent' }} [opts]
  * @returns {RasterGrid}
@@ -343,9 +350,9 @@ export function slopeGrid(grid, { zFactor = 1, cellsizeX, cellsizeY, unit = "deg
 }
 
 /**
- * Aspect — the downslope compass bearing via Horn's method (gdaldem's aspect algorithm, cellsize-free
- * like GDAL's own — it assumes square pixels): 0=north, 90=east, clockwise. Flat pixels (no gradient)
- * → -1 (gdaldem's flat sentinel).
+ * The downslope compass bearing by Horn's method, the algorithm gdaldem aspect uses. Runs from 0 at
+ * north through 90 at east, clockwise. It needs no cellsize, assuming square pixels as GDAL's does.
+ * A flat pixel, having no gradient, returns -1, which is gdaldem's flat sentinel.
  * @param {RasterGrid} grid
  * @returns {RasterGrid}
  */
@@ -368,9 +375,10 @@ export function aspectGrid(grid) {
 }
 
 /**
- * Hillshade — a shaded-relief illumination raster via Horn's method (gdaldem's default hillshade
- * algorithm): 0 (dark) – 255 (bright). `altitude`/`azimuth` are the light source's elevation/compass
- * bearing in degrees (defaults: gdaldem's own — a 45°-high sun from the NW).
+ * A shaded-relief illumination raster by Horn's method, the algorithm gdaldem hillshade uses by
+ * default. Values run from 0, dark, to 255, bright. `altitude` and `azimuth` give the light
+ * source's elevation and compass bearing in degrees, defaulting to gdaldem's own 45-degree sun from
+ * the northwest.
  * @param {RasterGrid} grid
  * @param {{ altitude?: number, azimuth?: number, zFactor?: number, cellsizeX?: number, cellsizeY?: number }} [opts]
  * @returns {RasterGrid}
@@ -398,9 +406,9 @@ export function hillshadeGrid(grid, { altitude = 45, azimuth = 315, zFactor = 1,
   return new RasterGrid({ ...grid, pixels: out, noData: null });
 }
 
-// A GeoJSON Polygon/MultiPolygon → the exterior ring(s) SpatialFilter expects ({lat,lng} rings).
-// Holes are ignored (a quick pure-JS burn, not a full even-odd fill) — the same simplification
-// SpatialFilter's multi-ring input already makes elsewhere (rings union, not subtract).
+// Converts a GeoJSON Polygon or MultiPolygon into the exterior {lat,lng} rings SpatialFilter takes.
+// Holes are ignored, since this is a quick pure-JS burn rather than a full even-odd fill.
+// SpatialFilter's multi-ring input makes the same simplification: rings union, never subtract.
 function geometryToRings(geom) {
   if (!geom) return [];
   const toPts = (ring) => ring.map(([lng, lat]) => ({ lat, lng }));
@@ -410,10 +418,11 @@ function geometryToRings(geom) {
 }
 
 /**
- * Rasterize vector features onto a new grid (vector→raster, the kind-changing op). Each pixel
- * centre is point-tested against every feature's polygon; `field` burns the feature's property value,
- * omit for a constant `burnValue`. Later features in the collection win where they overlap (burn order
- * = draw order). Polygon/MultiPolygon geometry only — point/line features are ignored.
+ * Rasterizes vector features onto a new grid, the one op that changes a Dataset's kind. Each pixel
+ * center is point-tested against the features' polygons. `field` burns that feature property's
+ * value; omit it to burn a constant `burnValue`. Where features overlap, the later one in the
+ * collection wins, so burn order follows draw order. Reads Polygon and MultiPolygon geometry only,
+ * ignoring point and line features.
  * @param {Object} featureCollection - a GeoJSON FeatureCollection (VectorFeatures.features)
  * @param {{north:number,south:number,east:number,west:number}} bounds - the OUTPUT grid's footprint
  * @param {{ width: number, height: number, field?: string, burnValue?: number }} opts

@@ -8,11 +8,11 @@
 
 > **combineGrids**(`grids`, `opts?`): [`RasterGrid`](../../materialize/classes/RasterGrid.md)
 
-Defined in: [package/rasterOps.js:146](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/rasterOps.js#L146)
+Defined in: [package/rasterOps.js:153](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/rasterOps.js#L153)
 
-Combine N aligned rasters per pixel (band math). LHS-conform: every other grid is resampled onto
-grids[0]'s exact grid in memory, then reduced by `op`. `difference`/`ratio` are binary; `sum`/`mean`/
-`min`/`max` are N-ary and skip noData/NaN inputs. Result carries grids[0]'s bounds/dims.
+Combines N aligned rasters pixel by pixel. Resamples the other grids onto grids[0]'s exact grid
+in memory, then reduces with `op`. `difference` and `ratio` take two grids; `sum`, `mean`, `min`
+and `max` take any number and skip absent inputs. The result carries grids[0]'s bounds and dims.
 
 ## Parameters
 

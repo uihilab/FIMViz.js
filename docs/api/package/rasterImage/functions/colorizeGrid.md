@@ -8,15 +8,14 @@
 
 > **colorizeGrid**(`grid`, `opts?`): `Uint8ClampedArray`\<`ArrayBufferLike`\>
 
-Defined in: [package/rasterImage.js:41](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/rasterImage.js#L41)
+Defined in: [package/rasterImage.js:40](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/rasterImage.js#L40)
 
-Colorize a RasterGrid to an RGBA buffer (PURE — no DOM). A pixel becomes transparent when it is
-NaN, equal to the grid's `noData`, optionally zero (`skipZero`), or unmapped by the scale. With no
-`colorScale`, a continuous blues ramp (ColorScale's own default palette) over the grid's own
-min/max is used — this is the last-resort fallback; RasterLayer._draw() builds and ATTACHES a real
-ColorScale before ever reaching here (explicit → GDAL-embedded legend → this default), so a caller
-going through RasterLayer never actually exercises this branch. A caller using colorizeGrid
-directly, without a Layer, still gets a sensible default.
+Colorizes a RasterGrid into an RGBA buffer. Pure, with no DOM. A pixel goes transparent when it
+is NaN, equals the grid's `noData`, equals zero and `skipZero` is set, or maps to no color.
+
+Without a `colorScale` it falls back to a continuous blues ramp over the grid's own min and max.
+RasterLayer._draw() attaches a real scale first, preferring an explicit one, then a GDAL-embedded
+legend, then this default, so only code calling colorizeGrid outside a Layer reaches it.
 
 ## Parameters
 

@@ -1,15 +1,14 @@
 // fimMap.js — one mounted widget instance.
 //
-// A FimMap owns the map + its registries (datasets/layers) and belongs to a FimViz (the
-// ambient service container that holds config, the event bus, and — later — storage). It
-// carries a concrete reference UP the chain (`app`) so operations never resolve "the current
-// app" lazily (see docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1).
+// A FimMap owns the map and its dataset and layer registries, and belongs to a FimViz, the service
+// container holding config, the event bus and storage. It keeps a direct `app` reference up the
+// chain, so nothing resolves "the current app" lazily (docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md
+// §1.1).
 //
-// The host runtime owns map boot. This class reaches it through INJECTED accessors (`getMap`/
-// `teardown`, supplied by mount.js) rather than importing the runtime — otherwise the core instance
-// object could not be constructed without pulling in the Maps loader and every layer subsystem
-// transitively. Same rule as Dataset → GDAL: dependencies point INWARD to the model, never out to
-// infrastructure.
+// The host runtime boots the map. This class reaches it through the `getMap` and `teardown`
+// accessors mount.js injects, rather than importing the runtime. Importing it would make the core
+// instance object unconstructable without pulling in the Maps loader and every layer subsystem
+// behind it. Dataset treats GDAL the same way: dependencies point inward to the model.
 
 import { parseSource } from "../io/parse.js";
 import { proxiedUrl } from "./config.js";
@@ -17,37 +16,36 @@ import { createLayer, dispatchMapEventToLayers } from "./layer.js";
 import { getMapProvider, DEFAULT_PROVIDER } from "./mapProvider.js";
 import { ColorScale } from "./colorScale.js";
 
-// `#foo` -> `[id="foo"]` for the exact-id case only. See $() below for why.
+// Rewrites `#foo` to `[id="foo"]`, for an exact id only. $() below explains why.
 const ID_ONLY = /^#([A-Za-z_][\w-]*)$/;
 const _scopedSel = (sel) => {
   const m = ID_ONLY.exec(String(sel).trim());
   return m ? `[id="${m[1]}"]` : sel;
 };
 
-// A Dataset already has a materialize hook; anything else shaped like a comparison {pixels,meta}
-// source has neither and isn't parseable anyway, so it passes through untouched for the layer
-// factory to consume as-is.
+// A Dataset carries its own materialize hook. Anything shaped like a comparison {pixels,meta}
+// source has none and is not parseable, so it passes through untouched for the layer factory.
 const _looksLikeDataset = (v) => typeof v === "object" && v != null
   && (typeof v.load === "function" || typeof v.grid === "function");
-// The same source shapes addDataset()/parseFile() already accept (File extends Blob in a browser).
+// The source shapes addDataset() and parseFile() already accept. A browser's File extends Blob.
 const _looksLikeRawSource = (v) => (typeof Blob !== "undefined" && v instanceof Blob)
   || v instanceof ArrayBuffer || typeof v === "string";
-// A layer.toSpec() descriptor: a string `type` PLUS a sources array. No other accepted
-// first-argument shape has both (a Dataset carries `kind`, a raw file is a Blob/ArrayBuffer/string).
+// A layer.toSpec() descriptor carries both a string `type` and a sources array. No other accepted
+// first argument has both: a Dataset carries `kind`, and a raw file is a Blob, ArrayBuffer or string.
 const _looksLikeSpec = (v) => typeof v === "object" && v != null
   && typeof v.type === "string" && Array.isArray(v.sources);
 
-// provider map object -> the FimMap that owns it. Populated by _adoptMap().
+// Maps a provider map object to the FimMap that owns it. _adoptMap() fills it.
 //
-// This is how engine code that was handed a raw provider map (a google.maps.Map / L.Map — what the
-// overlay subsystems receive) finds its owning instance. The alternative, reaching for
-// `FimViz.current()?.maps?.[0]`, hardcodes the DEFAULT app's FIRST map: correct only while exactly
-// one widget exists, and silently wrong (optional-chained to a no-op) the moment a second mounts.
-// A WeakMap, so a destroyed map is collectable with no bookkeeping.
+// Engine code handed a raw google.maps.Map or L.Map, which is what the overlay subsystems receive,
+// finds its owning instance here. Reaching for `FimViz.current()?.maps?.[0]` instead would hardcode
+// the default app's first map: right while one widget exists, and wrong once a second mounts,
+// with no error, since the optional chain turns it into a no-op. A WeakMap, so a destroyed map is
+// collectable with no bookkeeping.
 const _byProviderMap = new WeakMap();
 
 /**
- * The FimMap that owns `providerMap`, or null if it is not one this library mounted.
+ * The FimMap that owns `providerMap`, or null when this library did not mount it.
  * @param {*} providerMap - a `google.maps.Map`, `L.Map`, or another provider's map object
  * @returns {FimMap|null}
  */
@@ -57,10 +55,10 @@ export function fimForMap(providerMap) {
 }
 
 /**
- * Parse `v` into a Dataset via addDataset() if it's a raw File/Blob/ArrayBuffer/URL; a Dataset (or any
- * other source shape, e.g. a comparison {pixels,meta}) passes through unchanged. Lets addLayer take
- * a raw file directly, the same as addDataset does, instead of requiring a separate `await
- * fim.addDataset(file)` step first.
+ * Parses `v` into a Dataset through addDataset() when it is a raw File, Blob, ArrayBuffer or URL.
+ * A Dataset passes through unchanged, as does any other source shape such as a comparison
+ * {pixels,meta}. This is what lets addLayer take a raw file directly, with no separate
+ * `await fim.addDataset(file)` step.
  * @param {import('./fimMap.js').FimMap} fim @param {*} v @returns {Promise<*>}
  */
 async function _resolveLayerSource(fim, v) {
@@ -114,18 +112,19 @@ export class FimMap {
   get root() { return this.#root; }
 
   /**
-   * The provider's map object. Advisory / read-mostly (see docs/usage/USAGE.md).
+   * The provider's map object. Read it rather than write it (see docs/usage/USAGE.md).
    *
-   * Each instance OWNS its own reference — mount.js calls `_adoptMap()` once boot completes. This
-   * must not resolve through a runtime-level accessor, or every FimMap on a page would answer with
-   * whichever map booted last. `#getMap` is only a fallback for a runtime that never reports one.
+   * Each instance holds its own reference, which mount.js sets through `_adoptMap()` once boot
+   * completes. Resolving through a runtime-level accessor instead would make every FimMap on a page
+   * answer with whichever map booted last. `#getMap` is only a fallback for a runtime that never
+   * reports one.
    */
   /** @returns {*} the provider's map object — a `google.maps.Map`, an `L.Map`, or another provider's type */
   get map() { return this.#map ?? this.#getMap?.() ?? null; }
 
   /**
-   * Record the google.maps.Map this instance booted. Called by mount.js after the runtime's
-   * bootstrap() resolves. Internal — hosts use `fim.map`.
+   * Records the map this instance booted. mount.js calls it after the runtime's bootstrap()
+   * resolves. Internal; a host reads `fim.map`.
    * @internal @param {*} map
    * @returns {FimMap}
    */
@@ -139,12 +138,11 @@ export class FimMap {
   get storage() { return this.#app.storage; }
 
   /**
-   * Datasets parsed on this app — SHARED with every other map on it, exactly like `storage`.
+   * Datasets parsed on this app, shared with its other maps the way `storage` is.
    *
-   * A Dataset is a free value with no back-pointer to a map, so a file parsed here (by `addDataset`,
-   * or implicitly by `addLayer(rawFile)`) is directly usable as a source for a Layer on another
-   * map, of another provider, with no re-parse and no second decode. Rendering state — `layers` —
-   * stays per-map.
+   * A Dataset holds no back-pointer to a map, so a file parsed here by `addDataset`, or implicitly
+   * by `addLayer(rawFile)`, works as a source for a Layer on another map and another provider, with
+   * no re-parse and no second decode. Rendering state stays per map, in `layers`.
    * @returns {import('./dataset.js').Dataset[]}
    */
   get datasets() { return this.#app.datasets; }
@@ -153,26 +151,26 @@ export class FimMap {
   adoptDataset(ds) { return this.#app.adoptDataset(ds); }
 
   /**
-   * Forget a Dataset — drops it from the app registry and releases its decode. Throws while any
-   * layer on this app still renders it (pass `{ force: true }` to override).
+   * Drops a Dataset from the app registry and releases its decode. Throws while a layer on this app
+   * still renders it, unless given `{ force: true }`.
    * @param {*} ds @param {{force?: boolean}} [opts] @returns {boolean}
    */
   removeDataset(ds, opts) { return this.#app.removeDataset(ds, opts); }
 
   /**
-   * This instance's runtime config — always the app that owns THIS map, so two isolated apps on one
-   * page never read each other's settings. This is THE way the engine reads config: there is no
-   * ambient config pointer (the only module-level runtime value is gdalPath, which is process-global
-   * because GDAL is a per-page singleton). See package/config.js.
+   * This instance's runtime config, always from the app owning this map, so two isolated apps on one
+   * page never read each other's settings. The engine reads config only this way; there is no
+   * ambient config pointer. The one module-level runtime value is gdalPath, which is process-global
+   * because GDAL is a per-page singleton. See package/config.js.
    * @returns {Object}
    */
   get config() { return this.#app.config; }
 
   /**
-   * This instance's Layer Panel — the per-instance UI object, lazily built against #root via the
-   * factory mount.js injects (createLayerPanel). The model never imports ui/; the composition root
-   * wires it in, same rule as getMap/teardown. Null when no factory was injected (headless boot).
-   * Replaces the module-level `window.layerPanel` singleton, so two maps drive their own panels.
+   * This instance's Layer Panel, built lazily against #root by the createLayerPanel factory mount.js
+   * injects. The model never imports ui/; mount.js supplies it, as it does getMap and teardown.
+   * Null when no factory was injected, which is the headless boot. Replaces the module-level
+   * `window.layerPanel` singleton, so two maps drive their own panels.
    * @returns {*}
    */
   get layerPanel() {
@@ -181,20 +179,19 @@ export class FimMap {
   }
 
   /**
-   * Scoped query helpers — resolve against this instance's root, not the whole document.
-   * The linchpin for multi-instance: duplicate IDs across instances stop being ambiguous
-   * Prefer these over `document.getElementById` so two widgets on one page cannot collide.
+   * Query helpers resolving against this instance's root rather than the whole document. Use these
+   * instead of `document.getElementById`, so duplicate ids across two widgets stay unambiguous.
    *
-   * A bare `#id` is rewritten to the equivalent `[id="..."]`. Per spec these are identical, but
-   * some engines optimize `#id` by routing through document.getElementById — which returns only
-   * the FIRST match in the document and then filters to the subtree, so a scoped lookup finds
-   * NOTHING when ids repeat across instances. That is precisely our case: two widgets both carry
-   * `#layer-panel`. jsdom/nwsapi does exactly this (browsers do not), so without the rewrite the
-   * property cannot even be tested. The attribute form is engine-independent.
+   * A bare `#id` is rewritten to `[id="..."]`. The spec calls them identical, but some engines
+   * optimize `#id` through document.getElementById, which returns the first match in the document
+   * and then filters to the subtree, so a scoped lookup finds nothing when ids repeat. That is this
+   * case exactly: two widgets both carry `#layer-panel`. jsdom and nwsapi do this where browsers do
+   * not, so without the rewrite the behavior cannot even be tested. The attribute form behaves the
+   * same everywhere.
    *
-   * Only an exact `#identifier` is rewritten — that is what the ~604 getElementById call sites
-   * migrate to. Compound selectors are passed through untouched (rewriting inside them risks
-   * mangling quoted attribute values), so they remain subject to the engine quirk above.
+   * Only an exact `#identifier` is rewritten, which is what the migrated getElementById call sites
+   * use. A compound selector passes through untouched, because rewriting inside one risks mangling
+   * a quoted attribute value, so it stays subject to the engine quirk above.
    * @param {string} sel
    * @returns {Element|null}
    */
@@ -202,8 +199,8 @@ export class FimMap {
   /** @param {string} sel @returns {Element[]} */
   $$(sel) { return [...(this.#root || document).querySelectorAll(_scopedSel(sel))]; }
 
-  // Events are on the app's shared bus; a FimMap delegates to it (single-instance today,
-  // shared across maps on a page).
+  // Events live on the app's shared bus, and a FimMap forwards to it. One instance today, shared
+  // across the maps on a page.
   /** @param {string} evt @param {(payload: any) => void} fn @returns {FimMap} */
   on(evt, fn) { this.#app.on(evt, fn); return this; }
   /** @param {string} evt @param {(payload: any) => void} fn @returns {FimMap} */
@@ -211,30 +208,30 @@ export class FimMap {
   /** @param {string} evt @param {*} [payload] @returns {FimMap} */
   emit(evt, payload) { this.#app.emit(evt, payload); return this; }
 
-  // NOTE: there is no getMap(). `fim.map` (the getter above) is the single accessor — a noun for
-  // state, a verb only for work. The v0 `getMap()` alias returned exactly `this.map` and was removed
-  // rather than deprecated, so there is one name for one concept.
+  // There is no getMap(). The `fim.map` getter above is the only accessor: a noun names state and a
+  // verb does work. The v0 `getMap()` returned exactly `this.map`, so it was removed rather than
+  // deprecated, leaving one name for one thing.
 
   // ---- delegated actions -------------------------------------------------------------------
   //
-  // Replaces the inline `onclick="fn('a')"` → `window.fn` bridge with ONE delegated listener per
+  // Replaces the inline `onclick="fn('a')"` to `window.fn` bridge with one delegated listener per
   // instance, scoped to this map's root. Markup declares:
   //
   //     <button data-action="damageEstimate">                       (click is the default)
   //     <input  data-action="handleOptionsToggle" data-on="change" data-args='["fd"]'>
   //
-  // The handler is invoked as `fn.call(el, ...args)` — `this` is the element, exactly as an inline
-  // handler behaves — so existing functions migrate without changing their bodies. `data-on` is
-  // REQUIRED for non-click events because a checkbox fires click AND change: dispatching on both
-  // would fire every handler twice.
+  // The handler runs as `fn.call(el, ...args)`, so `this` is the element just as an inline handler
+  // sees it, and an existing function migrates without changing its body. A non-click event needs
+  // `data-on`, because a checkbox fires both click and change and dispatching on both would run
+  // every handler twice.
   //
-  // Resolution order: this instance's registry, then `window[name]`. The window fallback is
-  // TRANSITIONAL — it is what makes the migration incremental (convert the markup once, then move
-  // subsystems off `window.*` one at a time). It is also why this is per-instance from day one:
-  // the registry is the thing that eventually makes two widgets on a page independent.
+  // Names resolve through this instance's registry first, then `window[name]`. The window fallback
+  // is temporary, and it is what makes the migration incremental: convert the markup once, then move
+  // subsystems off `window.*` one at a time. It is also why this is per-instance already, since the
+  // registry is what eventually makes two widgets on a page independent.
 
   /**
-   * Register a handler for `data-action="name"`.
+   * Registers a handler for `data-action="name"`.
    * @param {string} name
    * @param {(this: Element, ...args: any[]) => void} fn
    * @returns {FimMap}
@@ -246,7 +243,7 @@ export class FimMap {
   }
 
   /**
-   * Register many at once: registerActions({ foo, bar }).
+   * Registers several at once: registerActions({ foo, bar }).
    * @param {Object<string, (this: Element, ...args: any[]) => void>} [map]
    * @returns {FimMap}
    */
@@ -256,7 +253,7 @@ export class FimMap {
   }
 
   /**
-   * The handler for `name` — this instance's registry first, then the transitional window bridge.
+   * The handler for `name`, from this instance's registry first, then the window bridge.
    * @param {string} name
    * @returns {Function|null}
    */
@@ -280,7 +277,7 @@ export class FimMap {
   /** Internal: resolve an event to a declared action and invoke it. @internal @param {Event} e @returns {*} */
   _dispatchAction(e) {
     const el = e.target?.closest?.("[data-action]");
-    // Scope check: only elements inside THIS instance's root (a shared document may hold others).
+    // Only elements inside this instance's root, since a shared document may hold others.
     if (!el || !this.#root?.contains(el)) return;
     if ((el.dataset.on || "click") !== e.type) return;
 
@@ -301,26 +298,26 @@ export class FimMap {
         return;
       }
     }
-    // `this` = the element, mirroring inline-handler semantics.
+    // `this` is the element, matching how an inline handler behaves.
     return fn.call(el, ...args);
   }
 
   /**
-   * Parse a source (File | Blob | ArrayBuffer | URL) into a Dataset and register it on this
-   * instance. Returns the Dataset (not yet rendered — addLayer draws it).
+   * Parses a File, Blob, ArrayBuffer or URL into a Dataset and registers it on this instance. The
+   * Dataset comes back unrendered; addLayer draws it.
    *
-   * Format comes from the extension: geotiff, geojson, kml, kmz, shp, csv, xyz, and the
-   * multi-dimensional scientific formats (.nc/.nc4/.cdf, .grib/.grib2/.grb2, .zarr), which return a
-   * Dataset carrying a **time axis** to `select()` and `reduce()` over. `options` is passed through
-   * to the parser — see `parseSource` for the per-format keys.
+   * The extension decides the format. Alongside geotiff, geojson, kml, kmz, shp, csv and xyz, the
+   * multi-dimensional scientific formats (.nc, .nc4, .cdf, .grib, .grib2, .grb2, .zarr) return a
+   * Dataset carrying a time axis for `select()` and `reduce()`. `options` passes through to the
+   * parser; `parseSource` lists the per-format keys.
    * @param {File|Blob|ArrayBuffer|string} source
    * @param {Object} [options] - see `io/parse.js`'s `parseSource`
    * @returns {Promise<import('./dataset.js').Dataset>}
    */
   async addDataset(source, options = {}) {
-    // Bind this instance's URL resolver (config.resolveUrl) into the parse options, so a fetched URL
-    // goes through the host's CORS-proxy/mirror/auth rules. Instance-safe: the resolver closes over
-    // THIS app's config, never a shared pointer. A caller-supplied options.resolveUrl still wins.
+    // Bind this instance's config.resolveUrl into the parse options, so a fetched URL goes through
+    // the host's CORS proxy, mirror or auth rules. The resolver closes over this app's config, never
+    // a shared pointer. An options.resolveUrl passed by the user still wins.
     const cfg = this.#app.config;
     const opts = cfg.resolveUrl ? { resolveUrl: (u) => proxiedUrl(u, cfg), ...options } : options;
     const ds = await parseSource(source, opts);
@@ -328,36 +325,37 @@ export class FimMap {
   }
 
   /**
-   * Create a rendered Layer of `type`. Dispatches to the subsystem factory registered via
-   * registerLayerType. `type` can be a bare Dataset instead of a registry string — `fim.addLayer(ds)`
-   * — or omitted, in either case inferred from the (single) source's `Dataset.kind` (see
-   * createLayer). A raw File/Blob/ArrayBuffer/URL works too, in the `type` slot or in
-   * `opts.source`/`opts.sources` — it is parsed into a Dataset via addDataset() first (and lands in
-   * `this.datasets`, same as calling addDataset() yourself), so `fim.addLayer(file)` needs no separate
-   * addDataset() step. Throws for types with no registered factory. Some factories (e.g. 'raster', whose
-   * RasterLayer.render() is the async base implementation) return a Promise rather than a Layer, so
-   * this must await before pushing — pushing an un-awaited Promise onto `this.layers` would silently
-   * corrupt the registry for every consumer that iterates it.
+   * Creates and renders a Layer of `type`, dispatching to the factory registerLayerType recorded.
+   *
+   * `type` may be a bare Dataset, as in `fim.addLayer(ds)`, or omitted; either way
+   * createLayer infers it from the single source's `Dataset.kind`. A raw File, Blob, ArrayBuffer or
+   * URL works too, in the `type` slot or in `opts.source` or `opts.sources`: addDataset() parses it
+   * first and it joins `this.datasets`, so `fim.addLayer(file)` needs no separate addDataset() call.
+   *
+   * Throws for a type with no registered factory. Some factories return a Promise rather than a
+   * Layer, i.e. 'raster', whose RasterLayer.render() is async, so this awaits before pushing.
+   * Pushing an un-awaited Promise onto `this.layers` would corrupt the registry for anything that
+   * iterates it.
    * @param {string|Object|File|Blob|ArrayBuffer} [type] - a registry name, a bare source to infer
    *   from, or a raw file/URL to parse first
    * @param {Object} [opts]
    * @returns {Promise<import('./layer.js').Layer>}
    */
   async addLayer(type, opts = {}) {
-    // A SPEC from layer.toSpec() — rebuild an equivalent layer here, typically to put the same data
-    // on a second map or a second provider. Distinguished by carrying both a string `type` and a
-    // `sources` array, which none of the other accepted first-argument shapes do (a Dataset has
-    // `kind`, not `type`). The ColorScale is REBUILT from its description, never shared, so the two
-    // layers diverge instead of silently pointing at one mutable scale.
+    // A spec from layer.toSpec(), rebuilt here as an equivalent layer, usually to put the same data
+    // on a second map or provider. It is recognizable by carrying both a string `type` and a
+    // `sources` array, which no other accepted first argument does: a Dataset has `kind`, not
+    // `type`. The ColorScale is rebuilt from its description rather than shared, so the two layers
+    // diverge instead of pointing at one mutable scale.
     if (_looksLikeSpec(type)) {
       const spec = type;
       for (const ds of spec.sources) this.adoptDataset(ds);   // discoverable on THIS app too
       const { colorScale, settings, visible, sources, type: t } = spec;
       const layer = await this.addLayer(t, { ...opts, sources });
-      // Settings are applied through set() AFTER construction, not passed as factory options: a
-      // factory takes construction args (`style`, `noData`), which are not the same vocabulary as
-      // the settings knobs (`color`, `opacity`, `palette`). The scale goes first so that any
-      // palette/continuous knob in `settings` lands on the scale this spec brought.
+      // Settings go through set() after construction rather than as factory options, because a
+      // factory takes construction arguments such as `style` and `noData`, which are a different
+      // vocabulary from the settings knobs `color`, `opacity` and `palette`. The scale is applied
+      // first, so a palette or continuous knob in `settings` writes to the scale this spec brought.
       if (colorScale) layer.set?.({ colorScale: ColorScale.fromJSON(colorScale) });
       if (settings && Object.keys(settings).length) layer.set?.(settings);
       if (visible === false) layer.hide?.();
@@ -383,10 +381,10 @@ export class FimMap {
   getLayer(id) { return this.layers.find((l) => l.id === id) || null; }
 
   /**
-   * Register a Layer under a filename key — the user-file registry that floodExtent's
-   * toggle_uploaded_file drives (one displayed user file → one Layer). Wires the up-chain `_map`
-   * ref so layer.remove() can unregister itself, evicts any prior layer under the same name, and
-   * adds the layer to `this.layers`.
+   * Registers a Layer under a filename key, the user-file registry floodExtent's
+   * toggle_uploaded_file drives, where one displayed user file means one Layer. Sets the layer's
+   * `_map` reference so layer.remove() can unregister itself, evicts any prior layer under the same
+   * name, and adds this one to `this.layers`.
    * @param {string} name
    * @param {import('./layer.js').Layer} layer
    * @returns {import('./layer.js').Layer}
@@ -414,12 +412,11 @@ export class FimMap {
   }
 
   /**
-   * Announce that the layer SET changed — added, removed, or reordered.
+   * Announces that the layer set changed, by an add, a remove or a reorder.
    *
-   * `layers` is a plain public array with no change signal of its own, so anything rendering a view
-   * of it (ui/layerPanel.js) had no way to stay in sync short of polling. One event covers all three
-   * mutations because a panel redraws the whole list either way; `reason` is there for a consumer
-   * that wants to animate only insertions.
+   * `layers` is a plain public array with no change signal, so ui/layerPanel.js had no way to stay
+   * in sync short of polling. One event covers all three, since a panel redraws the whole list
+   * either way. `reason` is there for a view that wants to animate insertions alone.
    * @param {'added'|'removed'|'reordered'} reason
    * @param {import('./layer.js').Layer|null} [layer]
    */
@@ -437,12 +434,12 @@ export class FimMap {
     if (this.#exclusiveClaimant === layer) this.#exclusiveClaimant = null;
   }
 
-  // ---- Dataset lifecycle — owned by the APP, delegated from here ----
+  // ---- Datasets: the app owns them, this class forwards ----
   //
-  // One Dataset can back many Layers, on many maps, sharing one memoized decode. So eviction is
-  // ref-counted at the APP: Layer.setSources acquires the new source and releases the old, and the
-  // decode is dropped only when the last Layer ANYWHERE on the app lets go. Layers never call
-  // ds.release() directly — that would strand a sibling still rendering the same Dataset.
+  // One Dataset can back many Layers across many maps, sharing one memoized decode, so the app
+  // reference-counts eviction. Layer.setSources acquires the new source and releases the old, and
+  // the decode drops only once the last Layer anywhere on the app lets go. A Layer never calls
+  // ds.release() itself, which would strand a sibling still rendering the same Dataset.
 
   /** @internal @param {import('./dataset.js').Dataset} ds @returns {void} */
   _acquireDataset(ds) { this.#app._acquireDataset(ds); }
@@ -450,12 +447,11 @@ export class FimMap {
   /** @internal @param {import('./dataset.js').Dataset} ds @returns {void} */
   _releaseDataset(ds) { this.#app._releaseDataset(ds); }
 
-  // ---- exclusive display claim — formalizes ui/activeDisplayLayer.js ----
+  // ---- exclusive display claim, replacing ui/activeDisplayLayer.js ----
 
   /**
-   * Internal: `layer` (an exclusive display-claiming Layer) is taking the map. Tear down the prior
-   * claimant first, so velocity/ensemble stay mutually exclusive. Called by Layer.render() when
-   * `layer.exclusive`.
+   * Hands the map to `layer`, tearing down the previous exclusive layer first so velocity and
+   * ensemble stay mutually exclusive. Layer.render() calls it when `layer.exclusive`. Internal.
    * @internal @param {import('./layer.js').Layer} layer @returns {void}
    */
   _claimExclusive(layer) {
@@ -466,17 +462,18 @@ export class FimMap {
   /** The Layer currently holding the exclusive display slot, or null. @returns {import('./layer.js').Layer|null} */
   get exclusiveClaimant() { return this.#exclusiveClaimant; }
 
-  // ---- map event dispatch (the event-dispatch first slice — PACKAGE_ROADMAP §1) ---------------
+  // ---- map event dispatch (PACKAGE_ROADMAP §1) ------------------------------------------------
   //
-  // Subscribes to the provider's normalized map events and routes each to the layers TOP-DOWN in
-  // z-order (last = top), hit-testing each layer and stopping when one absorbs it. It also emits an
-  // UNFILTERED `map:${type}` on the app bus so a consumer (e.g. a value tooltip) can react to every
-  // event, hit or miss — that is what lets a hover tooltip hide when the cursor leaves a raster.
+  // Subscribes to the provider's normalized map events and routes each to the layers top down in
+  // z-order, where the last entry is topmost, hit-testing each and stopping once one absorbs it. It
+  // also emits `map:${type}` on the app bus unfiltered, so a view such as a value tooltip sees every
+  // event whether it hit a layer or not. That is what lets a hover tooltip hide when the cursor
+  // leaves a raster.
 
   /**
-   * Start routing provider map events (default: click + hover) to layers via hitTest + z-order
-   * dispatch, and mirror each as `map:${type}` on the bus. Idempotent; needs a mounted map and a
-   * provider that implements onMapEvent.
+   * Starts routing provider map events, click and hover by default, to layers by hit test and
+   * z-order, and mirrors each as `map:${type}` on the bus. Idempotent. Needs a mounted map and a
+   * provider implementing onMapEvent.
    * @param {string[]} [types]
    * @param {{ simultaneous?: boolean }} [opts] - simultaneous:true → every hit layer gets the event
    * @returns {FimMap}
@@ -504,8 +501,9 @@ export class FimMap {
   }
 
   /**
-   * Dispatch mode. false (default) = precedence: top hit layer first, absorption stops propagation.
-   * true = simultaneous: every hit-tested layer receives the event (no veto). PACKAGE_ROADMAP §1.
+   * Dispatch mode. false, the default, gives precedence: the top hit layer goes first and
+   * absorption stops propagation. true delivers the event to each hit layer, with no veto.
+   * PACKAGE_ROADMAP §1.
    * @param {boolean} v
    */
   set simultaneousLayerEvents(v) { this.#simultaneous = !!v; }
@@ -513,10 +511,10 @@ export class FimMap {
   get simultaneousLayerEvents() { return this.#simultaneous; }
 
   /**
-   * Register a MODAL interaction (e.g. a region-draw tool) that takes ALL map events until released.
-   * While captured, the normal layer dispatch + `map:${type}` mirror are suppressed — every event
-   * goes only to `handler({ type, lat, lng, originalEvent })`. Returns a release function; only one
-   * capture at a time (a new one replaces the prior). PACKAGE_ROADMAP §1.
+   * Registers a modal interaction, i.e. a region-draw tool, that takes all map events until it is
+   * released. While captured, layer dispatch and the `map:${type}` mirror are suppressed and each
+   * event goes only to `handler({ type, lat, lng, originalEvent })`. Returns a release function. One
+   * capture at a time; a new one replaces the previous. PACKAGE_ROADMAP §1.
    * @param {(evt: {type: string, lat: number, lng: number}) => void} handler
    * @returns {() => void}
    */
@@ -525,27 +523,27 @@ export class FimMap {
     return () => { if (this.#capture === handler) this.#capture = null; };
   }
   /**
-   * Resolve once the map's camera has settled.
+   * Resolves once the map's camera has settled.
    *
-   * The reason this exists rather than a `setTimeout`: `fitBounds`/`fit()` are ANIMATED on both
-   * providers, and anything that reads the projection while one is in flight gets the pre-animation
-   * one. A click captured mid-zoom therefore lands at the wrong coordinates — off by exactly 2× when
-   * the fit changed zoom by one level. So the rule is `layer.fit(); await fim.whenIdle();` before
-   * starting any tool that converts pointer position to coordinates.
+   * This exists rather than a `setTimeout` because `fitBounds` and `fit()` animate on both
+   * providers, and reading the projection mid-flight returns the pre-animation one. A click captured
+   * mid-zoom then resolves to the wrong coordinates, off by exactly 2x when the fit changed zoom by
+   * one level. So write `layer.fit(); await fim.whenIdle();` before starting any tool that converts
+   * a pointer position into coordinates.
    *
-   * Safe to await unconditionally: it resolves on a timeout when the map is already still, and
-   * resolves immediately when the provider declares no `whenIdle` at all.
+   * Always safe to await: it resolves on a timeout when the map is already still, and immediately
+   * when the provider declares no `whenIdle`.
    * @param {{ timeout?: number }} [opts]
    * @returns {Promise<void>}
    */
   /**
-   * Turn pan-by-drag on or off.
+   * Turns pan-by-drag on or off.
    *
-   * Exists for drag-based selection: a freehand or brush stroke is the SAME gesture as a map pan, so
-   * one of the two has to give. The tool suppresses dragging for the length of the stroke and
-   * restores it on finish/cancel — which is why restoring is in a `finally`, not on the happy path.
+   * Drag-based selection needs it: a freehand or brush stroke is the same gesture as a map pan, so
+   * one has to yield. The tool suppresses dragging for the length of the stroke and restores it on
+   * finish or cancel, which is why the restore sits in a `finally` rather than the success path.
    *
-   * A no-op when the provider declares no `setDraggable`, so a caller never has to feature-detect.
+   * Does nothing when the provider declares no `setDraggable`, so no feature detection is needed.
    * @param {boolean} on
    * @returns {FimMap}
    */
@@ -556,13 +554,13 @@ export class FimMap {
   }
 
   /**
-   * Draw a GeoJSON overlay that is NOT a Layer — a tool's in-progress shape, a rubber band, a
-   * highlight. It never enters `fim.layers`, so it is not hit-tested, not reordered, not listed in the
-   * layer panel and not saved: it is scaffolding the user is looking at, not data they loaded.
+   * Draws a GeoJSON overlay that is not a Layer: a tool's in-progress shape, a rubber band, a
+   * highlight. It never enters `fim.layers`, so nothing hit-tests it, reorders it, lists it in the
+   * layer panel or saves it. It is scaffolding the user is looking at, not data they loaded.
    *
-   * This exists because the selection tools are headless by design — they produce `{lat,lng}` and name
-   * no map SDK — which left "show me what I am drawing" with nowhere to live. Putting it here rather
-   * than in `fimviz/ui` keeps the provider registry (and Leaflet) out of the `dist/ui.js` bundle.
+   * The selection tools are headless by design, producing `{lat,lng}` and naming no map SDK, which
+   * left "show me what I am drawing" with nowhere to live. Keeping it here rather than in
+   * `fimviz/ui` keeps the provider registry, and Leaflet with it, out of the `dist/ui.js` bundle.
    *
    * @param {Object} geojson - a Feature or FeatureCollection
    * @param {{ style?: Object|Function }} [opts] - the neutral style vocabulary `VectorLayer` uses
@@ -584,8 +582,8 @@ export class FimMap {
   }
 
   /**
-   * Ground metres per screen pixel, plus the map's pixel size — what lets a tool be sized in SCREEN
-   * units (a brush that stays the same width as you zoom) without touching a map SDK.
+   * Ground meters per screen pixel, with the map's pixel size. A tool uses these to size itself in
+   * screen units, i.e. a brush that keeps its width as the user zooms, without touching a map SDK.
    * @returns {{metresPerPixel: number, width: number, height: number}|null} null when unavailable
    */
   viewMetrics() {
@@ -602,26 +600,25 @@ export class FimMap {
   }
 
   /**
-   * Push this instance's layer order down to the map, so what is DRAWN on top matches what
+   * Pushes this instance's layer order down to the map, so what is drawn on top matches what
    * `layers` says is on top.
    *
-   * Worth being explicit about why this is needed at all: `dispatchMapEventToLayers` already walks
-   * `layers` top-down and treats the last entry as the topmost for hit-testing, but visual stacking
-   * has only ever been whatever order the provider happened to insert overlays in. The two could
-   * therefore disagree — the layer that received a click was not necessarily the one drawn on top.
-   * This makes the array authoritative for both.
+   * `dispatchMapEventToLayers` already walks `layers` top down and treats the last entry as topmost
+   * for hit-testing, but visual stacking was whatever order the provider inserted overlays in. The
+   * two could disagree, so the layer receiving a click was not necessarily the one drawn on top.
+   * This makes the array decide both.
    * @returns {FimMap}
    */
   applyLayerOrder() {
     const provider = getMapProvider(this.config?.provider || DEFAULT_PROVIDER);
     const map = this.map;
     if (!map || typeof provider?.applyLayerOrder !== "function") return this;
-    // Bottom → top is the array's own order. Each layer exposes ONE provider handle; a layer with
-    // none yet (never rendered, or hidden by teardown) simply has no place in the stack.
+    // The array's own order runs bottom to top. Each layer exposes one provider handle, and a layer
+    // with none yet, never rendered or hidden by teardown, has no place in the stack.
     const owners = this.layers.filter((l) => l._providerHandle);
     const reordered = provider.applyLayerOrder(map, owners.map((l) => l._providerHandle));
-    // A provider may hand back REPLACED handles (Google recreates ground overlays), so adopt them or
-    // the next removeLayer()/opacity change would act on a handle no longer on the map.
+    // A provider may return replaced handles, since Google recreates ground overlays, so adopt them.
+    // Otherwise the next removeLayer() or opacity change would act on a handle no longer on the map.
     owners.forEach((l, i) => { if (reordered[i] !== undefined) l._adoptProviderHandle(reordered[i]); });
     return this;
   }
@@ -632,7 +629,7 @@ export class FimMap {
   get capturing() { return !!this.#capture; }
 
   /**
-   * Internal: mirror the event on the bus, then dispatch to layers top-down with absorption.
+   * Mirrors the event on the bus, then dispatches to layers top down with absorption. Internal.
    * @internal @param {string} type @param {{lat:number,lng:number,originalEvent?:any}} base @returns {Object}
    */
   _dispatchMapEvent(type, base) {
@@ -642,9 +639,9 @@ export class FimMap {
   }
 
   /**
-   * Best-effort teardown for SPA unmount. Detaches the map, removes injected markup, and
-   * releases this map from its app (which frees the ambient default's shared services when
-   * the last map goes). Module-level singletons in host subsystems are NOT reset.
+   * Best-effort teardown for an SPA unmount. Detaches the map, removes injected markup, and
+   * releases this map from its app, which frees the default app's shared services once the last map
+   * goes. Module-level singletons inside host subsystems are left alone.
    * @returns {void}
    */
   destroy() {

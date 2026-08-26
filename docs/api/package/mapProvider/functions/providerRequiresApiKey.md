@@ -8,9 +8,9 @@
 
 > **providerRequiresApiKey**(`name?`): `boolean`
 
-Defined in: [package/mapProvider.js:735](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/mapProvider.js#L735)
+Defined in: [package/mapProvider.js:796](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mapProvider.js#L796)
 
-Does the named provider need an apiKey? Used by mount() to validate config before booting.
+True when the named provider needs an apiKey. mount() checks config with it before booting.
 
 ## Parameters
 

@@ -1,11 +1,11 @@
-// stats.js — computed statistics as a PURE, TERMINAL read-model (docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1).
+// stats.js — computed statistics, pure and terminal (docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1).
 //
-// Extracted from ui/rasterTools.js `computeStats` (raster) and `_computeVectorMetrics` (vector).
-// Enriched at compute time (histogram, area, byClass) and exposes pure derived views over what it
-// holds (percentile, diff, describe, toCSV). It NEVER retains the source pixels, so it is not
-// filterable after the fact — "stats then filter" is a fresh layer.getStats(filter) pass.
+// Replaces computeStats and _computeVectorMetrics in ui/rasterTools.js. Computes the histogram,
+// area and byClass up front, then derives percentile, diff, describe and toCSV from what it holds.
+// It never keeps the source pixels, so it cannot be filtered afterwards: filtering means a fresh
+// layer.getStats(filter) pass.
 //
-// A Filter (filter.js) scopes the computation; a ColorScale (colorScale.js) buckets `byClass`.
+// A Filter (filter.js) scopes the computation, and a ColorScale (colorScale.js) buckets `byClass`.
 
 import { Filter } from "./filter.js";
 
@@ -14,18 +14,18 @@ function normalizeFilter(filter) {
   return Array.isArray(filter) ? Filter.all(filter) : Filter.from(filter);
 }
 
-// meters² of one pixel whose centre is at `lat`, given per-pixel degree spans (equirectangular).
+// Square meters of one pixel centered at `lat`, from its degree spans. Equirectangular.
 function pixelAreaM2(lat, dLatDeg, dLngDeg) {
   const mPerDegLat = 111320;
   return Math.abs(dLatDeg * mPerDegLat) * Math.abs(dLngDeg * mPerDegLat * Math.cos(lat * Math.PI / 180));
 }
 
 export class Stats {
-  /** Not usually called directly — use the `Stats.raster()`/`Stats.vector()` factories. @param {Object} [fields] */
+  /** Use `Stats.raster()` or `Stats.vector()` instead of calling this. @param {Object} [fields] */
   constructor(fields = {}) { Object.assign(this, fields); }
 
   /**
-   * Raster statistics over pixelData, optionally scoped by a Filter and classified by a ColorScale.
+   * Raster statistics over pixelData. A Filter scopes it and a ColorScale classifies it.
    * @param {ArrayLike<number>} pixelData
    * @param {{bw: number, bs: number, be: number, bn: number, width: number, height: number, noData?: number, unit?: string}} meta
    * @param {Object} [opts]
@@ -41,7 +41,7 @@ export class Stats {
     const f = normalizeFilter(filter);
     const bbox = f && typeof f.pixelBbox === "function" ? f.pixelBbox(meta) : null;
     const at = (x, y) => pixelData[Math.max(0, Math.min(height - 1, y)) * width + Math.max(0, Math.min(width - 1, x))];
-    const unit = {};   // reused mutable unit — no per-pixel allocation
+    const unit = {};   // one mutable unit, reused so the loop allocates nothing per pixel
 
     const dLat = (bn - bs) / height, dLng = (be - bw) / width;
     const isTransparent = (v) =>
@@ -80,7 +80,7 @@ export class Stats {
     let variance = 0; for (const v of vals) variance += (v - mean) ** 2;
     const stddev = Math.sqrt(variance / count);
 
-    // histogram (over sorted vals) — powers percentile()
+    // Histogram over the sorted values. percentile() reads it.
     const edges = [], counts = new Array(bins).fill(0);
     const span = vMax - vMin || 1;
     for (let i = 0; i <= bins; i++) edges.push(vMin + (span * i) / bins);
@@ -101,17 +101,17 @@ export class Stats {
   /**
    * Vector statistics over any feature source.
    *
-   * Accepts **GeoJSON** (a FeatureCollection, a single Feature, a Feature[], or the engine's
-   * `VectorFeatures`) — what a headless caller and `VectorLayer.getStats()` have — **or** a
+   * Takes GeoJSON as a FeatureCollection, a Feature, a Feature array or the engine's
+   * `VectorFeatures`, which is what `VectorLayer.getStats()` and headless code hold. Also takes a
    * `google.maps.Data`-shaped layer.
    *
    * @param {*} source - GeoJSON FeatureCollection|Feature|Feature[]|VectorFeatures, or a `google.maps.Data` layer
    * @param {Object} [opts]
    * @param {import('./filter.js').Filter|Function|Array|null} [opts.filter]
-   * @param {import('./colorScale.js').ColorScale|null} [opts.classify] - bucket features into `byClass`
-   *   by the SAME scale that colours them. Needs `classifyBy` to know which property carries the
-   *   value; `VectorLayer.getStats()` passes both from the layer, so the buckets line up with the
-   *   legend exactly as they do for a raster.
+   * @param {import('./colorScale.js').ColorScale|null} [opts.classify] - buckets features into
+   *   `byClass` by the scale that colors them, so they line up with the legend as a raster's do.
+   *   Needs `classifyBy` to know which property holds the value. `VectorLayer.getStats()` passes
+   *   both from the layer.
    * @param {string|null} [opts.classifyBy] - the feature property `classify` reads
    * @returns {Stats}
    */
@@ -119,19 +119,19 @@ export class Stats {
     const f = normalizeFilter(filter);
     const graded = classify && classifyBy ? [] : null;   // the values that will fall into buckets
     let total = 0, nPoly = 0, nLine = 0, nPoint = 0, areaM2 = 0, lengthM = 0;
-    let n = 0, s = 90, w = 180, e = -180, north = -90;   // bbox accumulate
+    let n = 0, s = 90, w = 180, e = -180, north = -90;   // bbox accumulators
 
     for (const { feature, geometry } of normalizeFeatures(source)) {
       if (!geometry) continue;
       const t = geometry.type;
       const rep = representativePoint(geometry);
-      // One unit works for both kinds: PredicateFilter reads `feature`, SpatialFilter reads lat/lng.
+      // One unit serves both: PredicateFilter reads `feature`, SpatialFilter reads lat and lng.
       if (f && !f.test({ feature, lat: rep?.lat, lng: rep?.lng })) continue;
       total++;
       if (rep) { n++; if (rep.lat < s) s = rep.lat; if (rep.lat > north) north = rep.lat; if (rep.lng < w) w = rep.lng; if (rep.lng > e) e = rep.lng; }
       if (t === "Polygon" || t === "MultiPolygon") {
         nPoly++;
-        // Outer ring only (index 0) — holes are not subtracted, same as before.
+        // Outer ring only, at index 0. Holes are not subtracted.
         const polys = t === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
         for (const poly of polys) if (poly?.[0]) areaM2 += ringArea(poly[0]);
       } else if (t === "LineString" || t === "MultiLineString") {
@@ -144,9 +144,9 @@ export class Stats {
       if (graded) {
         const raw = feature?.properties?.[classifyBy];
         const v = raw == null || raw === "" ? NaN : Number(raw);
-        // A feature with no usable value is counted in featureCount but lands in no bucket —
-        // "missing" must not be silently graded as a real number (matching the render path, which
-        // leaves such a feature at its base style rather than colouring it).
+        // A feature with no usable value counts toward featureCount but enters no bucket, so a
+        // missing value is never graded as a real number. The render path agrees: it leaves such a
+        // feature at its base style rather than coloring it.
         if (Number.isFinite(v)) graded.push(v);
       }
     }
@@ -158,8 +158,8 @@ export class Stats {
       bbox: n ? { north, south: s, east: e, west: w } : null,
       propertySummary: null,
     });
-    // Same bucketing the raster path uses, so one `byClass` shape serves both kinds. `area` is
-    // meaningless per feature-class here, so only counts are filled.
+    // The bucketing the raster path uses, so one `byClass` layout serves both kinds. Per-class area
+    // means nothing for features, so only the counts are filled.
     if (graded) stats.byClass = byClassBuckets(graded.sort((a, b) => a - b), 0, classify);
     return stats;
   }
@@ -167,7 +167,7 @@ export class Stats {
   // ---- pure derived views ----
 
   /**
-   * Approximate percentile p (0–100) from the histogram. Raster only.
+   * Approximates percentile p, from 0 to 100, from the histogram. Raster only.
    * @param {number} p
    * @returns {number|null}
    */
@@ -187,7 +187,7 @@ export class Stats {
   }
 
   /**
-   * Deltas between two Stats of the same kind (this − other) over shared numeric fields.
+   * Subtracts `other` from this, field by field, over the numeric fields both kinds share.
    * @param {Stats} other
    * @returns {Object<string, number>}
    */
@@ -250,7 +250,8 @@ export class Stats {
 
 // ---- helpers ----
 
-// area/count per ColorScale band. `perCellArea` = mean pixel area (m²) for a quick area estimate.
+// Counts values and sums area per ColorScale band. `perCellArea` is the mean pixel area in m2,
+// which gives a rough area estimate.
 function byClassBuckets(sortedVals, perCellArea, colorScale) {
   const stops = colorScale.getStops();
   const discrete = stops.length && "value" in stops[0];
@@ -269,16 +270,17 @@ function byClassBuckets(sortedVals, perCellArea, colorScale) {
   return out;
 }
 
-// Spherical helpers — identical to ui/rasterTools.js `_ringArea` / `_lineLength`.
-// ---- neutral geometry ---------------------------------------------------------------------
+// ---- provider-neutral geometry --------------------------------------------------------------
 //
-// `Stats` is part of the HEADLESS engine, so its vector path must not require a `google.maps.Data`
-// layer — that was a provider leak, and it is why `VectorLayer.getStats()` could not be implemented
-// (a VectorLayer renders from plain GeoJSON, `dataset.data`). Both shapes normalize to GeoJSON
-// geometry (`{type, coordinates}`, `[lng, lat]`) and the math below runs once, against that.
+// The spherical helpers below match _ringArea and _lineLength in ui/rasterTools.js.
+//
+// Stats belongs to the headless engine, so its vector path must not require a `google.maps.Data`
+// layer. That requirement leaked a provider into the engine and blocked VectorLayer.getStats(),
+// since a VectorLayer renders from plain GeoJSON in `dataset.data`. Both inputs normalize to GeoJSON
+// geometry, `{type, coordinates}` with `[lng, lat]`, and the math below runs once against that.
 
-// Google's geometry objects → GeoJSON geometry. Kept so `Stats.vector(dataLayer)` (the app's
-// ui/rasterTools.js call site) keeps working unchanged.
+// Converts Google's geometry objects to GeoJSON geometry, so `Stats.vector(dataLayer)` still works
+// for the ui/rasterTools.js call site.
 function googleGeomToGeoJson(geom) {
   const ll = (p) => [p.lng(), p.lat()];
   const ring = (r) => (r.getArray ? r.getArray() : []).map(ll);
@@ -297,15 +299,15 @@ function googleGeomToGeoJson(geom) {
 }
 
 /**
- * Accept anything that carries features and return `[{feature, geometry}]` with GeoJSON geometry:
- * a `google.maps.Data` layer, a GeoJSON FeatureCollection / Feature / Feature[], or the engine's own
- * `VectorFeatures` wrapper. `feature` is passed through untouched so a PredicateFilter still sees
- * whatever the caller's own feature object is.
+ * Takes anything carrying features and returns `[{feature, geometry}]` with GeoJSON geometry. That
+ * covers a `google.maps.Data` layer, a GeoJSON FeatureCollection, Feature or Feature array, and the
+ * engine's `VectorFeatures`. `feature` passes through untouched, so a PredicateFilter still sees
+ * the original feature object.
  * @internal
  */
 function normalizeFeatures(input) {
   if (!input) return [];
-  // google.maps.Data-shaped: iterate with forEach, features answer getGeometry().
+  // google.maps.Data-shaped: iterated with forEach, and its features answer getGeometry().
   if (typeof input.forEach === "function" && typeof input.getFeatureById === "function") {
     const out = [];
     input.forEach((f) => {
@@ -321,8 +323,8 @@ function normalizeFeatures(input) {
   return [];
 }
 
-// GeoJSON rings are closed by spec; Google's paths are not. Closing before measuring makes the two
-// inputs agree (and fixes a missing final segment on the Google path).
+// GeoJSON rings are closed by spec and Google's paths are not. Closing before measuring makes both
+// agree, and adds the final segment the Google path would otherwise drop.
 function closeRing(r) {
   if (r.length < 2) return r;
   const a = r[0], b = r[r.length - 1];
@@ -353,7 +355,7 @@ function lineLength(coords) {
   return total;
 }
 
-// A representative lat/lng for a feature (first vertex) — used for spatial filtering of vectors.
+// One lat/lng standing in for a feature, its first vertex. SpatialFilter tests against it.
 function representativePoint(geometry) {
   let c = geometry?.coordinates;
   while (Array.isArray(c) && Array.isArray(c[0])) c = c[0];   // descend Multi*/Polygon rings

@@ -8,7 +8,7 @@
 
 > `const` **FimViz**: `object`
 
-Defined in: [package/fimViz.js:252](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/fimViz.js#L252)
+Defined in: [package/fimViz.js:250](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/fimViz.js#L250)
 
 ## Type Declaration
 
@@ -16,7 +16,7 @@ Defined in: [package/fimViz.js:252](https://github.com/uihilab/FIMViz.js/blob/af
 
 > **current**(): [`FimVizInstance`](../classes/FimVizInstance.md)
 
-The active default instance, or null if no map is mounted.
+The active default instance, or null when no map is mounted.
 
 #### Returns
 
@@ -26,7 +26,7 @@ The active default instance, or null if no map is mounted.
 
 > **reset**(): `void`
 
-Force-release the default instance (tears down its maps). Rarely needed.
+Releases the default instance, tearing down its maps. Rarely needed.
 
 #### Returns
 

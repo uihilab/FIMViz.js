@@ -8,11 +8,11 @@
 
 > **slopeGrid**(`grid`, `opts?`): [`RasterGrid`](../../materialize/classes/RasterGrid.md)
 
-Defined in: [package/rasterOps.js:327](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/rasterOps.js#L327)
+Defined in: [package/rasterOps.js:334](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/rasterOps.js#L334)
 
-Slope — per-pixel terrain steepness via Horn's method (gdaldem's slope algorithm), computed in pure
-JS on the decoded grid. `unit:'degrees'|'percent'`; `zFactor` scales elevation before the gradient
-(vertical exaggeration / unit conversion, e.g. feet→metres).
+Per-pixel terrain steepness by Horn's method, the algorithm gdaldem slope uses, in pure JS over
+the decoded grid. `unit` is 'degrees' or 'percent'. `zFactor` scales elevation before the
+gradient, for vertical exaggeration or a unit conversion such as feet to meters.
 
 ## Parameters
 

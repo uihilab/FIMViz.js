@@ -8,13 +8,13 @@
 
 > **dispatchMapEventToLayers**(`layers`, `type`, `base`, `opts?`): `any`
 
-Defined in: [package/layer.js:1087](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L1087)
+Defined in: [package/layer.js:1091](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/layer.js#L1091)
 
-Dispatch a normalized map event to the layers TOP-DOWN in z-order (last = top), hit-testing each.
-Default (precedence): stop when a handler absorbs it (`evt.stopPropagation()`). With
-`{ simultaneous: true }`: precedence/absorption is bypassed — EVERY hit-tested layer receives it,
-`stopPropagation` is inert. Only visible layers with a listener for `type` and a passing hitTest
-receive it either way. Pure over a layers array — FimMap wraps it. (PACKAGE_ROADMAP §1)
+Dispatches a normalized map event to the layers top down in z-order, where the last entry is
+topmost, hit-testing each. By default it stops once a handler absorbs the event with
+`evt.stopPropagation()`. With `{ simultaneous: true }` each hit layer receives it and
+`stopPropagation` does nothing. Either way, only a visible layer with a listener for `type` and a
+passing hitTest receives it. Pure over a layers array, and FimMap wraps it. (PACKAGE_ROADMAP §1)
 
 ## Parameters
 

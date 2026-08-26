@@ -6,6 +6,10 @@
 
 # ui/regionDraw
 
+## Variables
+
+- [REGION\_MODES](variables/REGION_MODES.md)
+
 ## Functions
 
 - [createRegionDraw](functions/createRegionDraw.md)

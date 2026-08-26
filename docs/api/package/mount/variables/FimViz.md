@@ -8,7 +8,7 @@
 
 > `const` **FimViz**: `object` & `object`
 
-Defined in: [package/mount.js:260](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/mount.js#L260)
+Defined in: [package/mount.js:257](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mount.js#L257)
 
 ## Type Declaration
 
@@ -16,7 +16,7 @@ Defined in: [package/mount.js:260](https://github.com/uihilab/FIMViz.js/blob/af3
 
 > **current**(): [`FimVizInstance`](../../fimViz/classes/FimVizInstance.md)
 
-The active default instance, or null if no map is mounted.
+The active default instance, or null when no map is mounted.
 
 #### Returns
 
@@ -26,7 +26,7 @@ The active default instance, or null if no map is mounted.
 
 > **reset**(): `void`
 
-Force-release the default instance (tears down its maps). Rarely needed.
+Releases the default instance, tearing down its maps. Rarely needed.
 
 #### Returns
 
@@ -38,11 +38,11 @@ Force-release the default instance (tears down its maps). Rarely needed.
 
 > **create**: (`target`, `options?`) => `Promise`\<[`FimMap`](../../fimMap/classes/FimMap.md)\> & `object`
 
-create(target, options) — boot a FimMap on the ambient default app.
+Boots a FimMap on the default app.
 
-Applies host config (set-once), validates it, injects the widget markup unless the page
-already provides it, boots the map, and resolves to the FimMap once it is ready. On mount
-failure the map is released so the single-instance guard does not stay stuck.
+Applies the host config once, validates it, injects the widget markup unless the page already
+has it, boots the map, then resolves to the FimMap. A mount failure releases the map so the
+single-instance guard does not stay stuck.
 
 #### Parameters
 
@@ -66,10 +66,9 @@ see docs/usage/USAGE.md "Configuration"
 
 > **mount**: (`target`, `options?`) => `Promise`\<[`FimMap`](../../fimMap/classes/FimMap.md)\> & `object`
 
-mount(target, options) — the public entry point; an alias for `create()`. With a registered
-runtime it boots the full widget; otherwise it boots a bare map (see the note above `_runtime`).
-Single-document composition (Path B via dom.js scoping); the abandoned iframe `isolate` path
-(Path A) was removed.
+The public entry point, and an alias for `create()`. With a registered runtime it boots the full
+widget, and without one it boots a bare map (see the note above `_runtime`). Widgets share one
+document and are kept apart by dom.js scoping; the iframe isolation path was removed.
 
 #### Parameters
 
@@ -89,7 +88,7 @@ Single-document composition (Path B via dom.js scoping); the abandoned iframe `i
 
 > **parseFile**: (`source`, `options?`) => `Promise`\<[`Dataset`](../../dataset/classes/Dataset.md)\>
 
-parseFile(source, options) — pure parse (no instance, no map). Returns a Dataset.
+Parses a source into a Dataset. Needs no instance and no map.
 
 #### Parameters
 

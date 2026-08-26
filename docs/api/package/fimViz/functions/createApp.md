@@ -8,13 +8,13 @@
 
 > **createApp**(): [`FimVizInstance`](../classes/FimVizInstance.md)
 
-Defined in: [package/fimViz.js:246](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/fimViz.js#L246)
+Defined in: [package/fimViz.js:244](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/fimViz.js#L244)
 
-An ISOLATED app — its own config, event bus, storage and single-map guard, NOT the shared
-default. This is what lets two independent widgets (e.g. a Google map and a Leaflet map) coexist
-on one page: each `mount({ isolated: true })` gets a fresh app, so the per-app "already-mounted"
-guard does not collide. (The ambient DOM/config pointers are still last-writer-wins — fine for
-bare maps; the layer subsystems are not yet fully isolated.)
+An isolated app with its own config, event bus, storage and single-map guard, separate from the
+default. This is what lets two widgets coexist on one page, i.e. a Google map beside a Leaflet
+one: each `mount({ isolated: true })` gets a fresh app, so the per-app already-mounted guard does
+not collide. The ambient DOM and config pointers remain last-writer-wins, which is fine for bare
+maps, but the layer subsystems are not fully isolated yet.
 
 ## Returns
 

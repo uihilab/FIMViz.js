@@ -8,15 +8,14 @@
 
 > **createLayer**(`fim`, `type?`, `opts?`): [`Layer`](../classes/Layer.md) \| `Promise`\<[`Layer`](../classes/Layer.md)\>
 
-Defined in: [package/layer.js:1146](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/layer.js#L1146)
+Defined in: [package/layer.js:1149](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/layer.js#L1149)
 
-Construct a Layer of `type` for `fim`. `type` is normally a registry string ('vector', 'raster',
-…), but a bare source works too: pass a Dataset (or anything else) in the `type` slot and it is
-treated as `{ source: type }` — `fim.addLayer(ds)` needs no type argument at all. Either way, when
-a type ends up unresolved it is inferred from `opts.source`/`opts.sources[0]`'s `Dataset.kind`
-('raster'|'vector') — only when there is EXACTLY one source, since a multi-source type
-(comparison/ensemble) can't be guessed. Throws a clear error if a type can't be resolved, or if
-the resolved type has no registered factory.
+Constructs a Layer of `type` for `fim`. `type` is normally a registry string such as 'vector', but
+a bare source works too: a Dataset in the `type` slot is read as `{ source: type }`, so
+`fim.addLayer(ds)` needs no type at all. When the type is still unresolved it comes from
+`opts.source` or `opts.sources[0]`'s `Dataset.kind`, raster or vector, and only when there is
+exactly one source, since a multi-source type such as comparison cannot be guessed. Throws when
+the type cannot be resolved, or when the resolved type has no registered factory.
 
 ## Parameters
 

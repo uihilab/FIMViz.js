@@ -6,7 +6,7 @@
 
 # Class: SpatialFilter
 
-Defined in: [package/filter.js:118](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L118)
+Defined in: [package/filter.js:117](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L117)
 
 ## Extends
 
@@ -18,7 +18,7 @@ Defined in: [package/filter.js:118](https://github.com/uihilab/FIMViz.js/blob/af
 
 > **new SpatialFilter**(`polygon`): `SpatialFilter`
 
-Defined in: [package/filter.js:120](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L120)
+Defined in: [package/filter.js:119](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L119)
 
 #### Parameters
 
@@ -42,7 +42,7 @@ Defined in: [package/filter.js:120](https://github.com/uihilab/FIMViz.js/blob/af
 
 > **features**: `object`[][]
 
-Defined in: [package/filter.js:123](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L123)
+Defined in: [package/filter.js:122](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L122)
 
 ## Methods
 
@@ -50,9 +50,9 @@ Defined in: [package/filter.js:123](https://github.com/uihilab/FIMViz.js/blob/af
 
 > **contains**(`lat`, `lng`): `boolean`
 
-Defined in: [package/filter.js:135](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L135)
+Defined in: [package/filter.js:134](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L134)
 
-Inside ANY ring (multi-polygon union).
+True when the point falls inside any ring, i.e. the union of a multi-polygon.
 
 #### Parameters
 
@@ -74,7 +74,7 @@ Inside ANY ring (multi-polygon union).
 
 > **isEmpty**(): `boolean`
 
-Defined in: [package/filter.js:127](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L127)
+Defined in: [package/filter.js:126](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L126)
 
 #### Returns
 
@@ -90,10 +90,10 @@ Defined in: [package/filter.js:127](https://github.com/uihilab/FIMViz.js/blob/af
 
 > **pixelBbox**(`meta`): `object`
 
-Defined in: [package/filter.js:151](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L151)
+Defined in: [package/filter.js:150](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L150)
 
-Fast-reject window in pixel space (union across rings), mirroring
-ui/rasterTools.js `polygonPixelBbox`.
+A fast-reject window in pixel space, covering all rings. Mirrors polygonPixelBbox in
+ui/rasterTools.js.
 
 #### Parameters
 
@@ -149,7 +149,7 @@ ui/rasterTools.js `polygonPixelBbox`.
 
 > **test**(`unit`): `boolean`
 
-Defined in: [package/filter.js:143](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L143)
+Defined in: [package/filter.js:142](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L142)
 
 #### Parameters
 
@@ -171,9 +171,9 @@ Defined in: [package/filter.js:143](https://github.com/uihilab/FIMViz.js/blob/af
 
 > `static` **all**(`filters`): [`Filter`](Filter.md)
 
-Defined in: [package/filter.js:68](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L68)
+Defined in: [package/filter.js:67](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L67)
 
-Combine filters as a conjunction (AND) — the semantics of chaining applyFilter().
+Combines filters with AND, matching what chaining applyFilter() does.
 
 #### Parameters
 
@@ -195,21 +195,20 @@ Combine filters as a conjunction (AND) — the semantics of chaining applyFilter
 
 > `static` **from**(`input`): [`Filter`](Filter.md)
 
-Defined in: [package/filter.js:53](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L53)
+Defined in: [package/filter.js:52](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L52)
 
-Coerce any friendly input into a Filter.
-  Filter-like   → returned as-is (anything with a `test(unit)` method)
-  function      → PredicateFilter
-  Region-like   → input.toFilter()
-  polygon       → SpatialFilter   ([[lat,lng],…] | [{lat,lng},…] | [[ring],[ring]…])
+Turns any accepted input into a Filter.
+  anything with test(unit) → returned unchanged
+  function                 → PredicateFilter
+  anything with toFilter() → input.toFilter()
+  polygon                  → SpatialFilter ([[lat,lng],…] | [{lat,lng},…] | [[ring],[ring]…])
 
-DUCK-TYPED, not `instanceof Filter`, for the same reason nothing in the engine does
-`instanceof Dataset`: class identity is per-module-instance, and `fimviz` and `fimviz/ui` are
-two separate bundles that each carry their own copy of this file. A `SpatialFilter` built by
-`fimviz/ui`'s createRegionDraw is therefore NOT `instanceof` the engine bundle's `Filter`, so
-`layer.getStats({ filter })` rejected the tool's own output. Testing for the method — the only
-thing every call site actually uses — makes the seam work across bundles and lets a host pass
-its own filter object.
+Checks for the method rather than `instanceof Filter`, for the reason nothing in the engine
+uses `instanceof Dataset`: class identity is per module instance, and `fimviz` and `fimviz/ui`
+are separate bundles each carrying their own copy of this file. A SpatialFilter from
+`fimviz/ui`'s createRegionDraw is not `instanceof` the engine bundle's Filter, so
+`layer.getStats({ filter })` rejected the tool's own output. Checking for test() works across
+bundles and lets a host pass its own filter object.
 
 #### Parameters
 

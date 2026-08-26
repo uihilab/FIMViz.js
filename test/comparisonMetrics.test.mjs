@@ -47,6 +47,35 @@ describe("compareExtentMetrics", () => {
     assert.equal(m.pc, 1);
   });
 
+  // A zero denominator means the score has no value, not that it scored zero. 0 would read as
+  // "predicted nothing where there was flooding" when the truth is "nothing to score against".
+  test("all-dry: b, h, k and f are null, not 0; pc stays 1", () => {
+    const m = compareExtentMetrics([DRY, DRY], [DRY, DRY], { ...meta, height: 1 });
+    assert.equal(m.pc, 1, "every pixel agrees, so pc is defined");
+    assert.equal(m.b, null, "no observed wet pixels, so bias has no value");
+    assert.equal(m.h, null);
+    assert.equal(m.f, null, "neither raster has a wet pixel");
+    assert.equal(m.k, null, "both put every pixel in one class, so kappa is 0/0");
+    assert.equal(m.mi, null, "null in any component makes the sum null, never 0");
+  });
+
+  test("observation dry, prediction wet: b and h are null, f and k are defined", () => {
+    const m = compareExtentMetrics([1, 1], [DRY, DRY], { ...meta, height: 1 });
+    assert.equal(m.fp, 2, "wet in the prediction only");
+    assert.equal(m.b, null, "tp+fn is 0");
+    assert.equal(m.h, null);
+    assert.equal(m.f, 0, "a real 0: wet pixels were claimed and none agreed");
+    assert.equal(m.pc, 0);
+  });
+
+  test("a real 0 is still 0, and stays distinguishable from null", () => {
+    // prediction wet at pixel 0, observation wet at pixel 1 - no overlap at all
+    const m = compareExtentMetrics([1, DRY], [DRY, 1], { ...meta, height: 1 });
+    assert.equal(m.h, 0, "observed wet exists, none of it was hit");
+    assert.equal(m.b, 1, "one wet predicted, one wet observed");
+    assert.notEqual(m.h, null);
+  });
+
   test("missing inputs → null (guard)", () => {
     assert.equal(compareExtentMetrics(null, [1], meta), null);
     assert.equal(compareExtentMetrics([1], [1], null), null);
@@ -165,7 +194,7 @@ describe("palette override (2^n - 1 colours)", () => {
   });
 
   test("combineExtentRgba rejects a colours list that doesn't match the layer count", () => {
-    assert.throws(() => combineExtentRgba([[1], [1]], { colors: ["#111", "#222"] }), /needs 3 colours/);
+    assert.throws(() => combineExtentRgba([[1], [1]], { colors: ["#111", "#222"] }), /needs 3 colors/);
   });
 
   test("a 3-layer comparison is fully colourable via `colors` (7 colours)", () => {
@@ -205,13 +234,13 @@ describe("ensemble reducer (agreement count → n colours)", () => {
     const r = ensembleAgreementRgba([[1, DRY], [1, 1]]);
     assert.equal(r.nLayers, 2);
     assert.equal(r.warnings.length, 1);
-    assert.match(r.warnings[0], /No ensemble colours/);
+    assert.match(r.warnings[0], /No ensemble colors/);
     assert.equal(r.rgba.length, 2 * 4);
   });
 
   test("a wrong-length colour list is rejected (must be exactly N)", () => {
     assert.throws(() => ensembleAgreementRgba([[1], [1], [1]], { colors: ["#111", "#222"] }),
-      /3 members need 3 colours/);
+      /3 members need 3 colors/);
   });
 
   test("defaultAgreementColors returns N distinct rgba stops", () => {

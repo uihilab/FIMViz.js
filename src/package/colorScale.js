@@ -1,18 +1,13 @@
-// colorScale.js — the mutable value→(color,label) engine (docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1).
+// colorScale.js — maps a value to a color and a label (docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1).
 //
-// Unifies the TWO coloring paths that exist in the code today (see docs/CLASS_DIAGRAM.md
-// "ColorScale's two modes"):
-//   • palette-scale : { palette, min, max, continuous }  → color computed per value
-//                     (from ui/rasterTools.js PALETTES + getRgbForValue / interpolateColors)
-//   • explicit-stops: [{ value|range, color, label }]     → color looked up in stored stops
-//                     (from layers/depthMap.js parseLegendAndUnit / buildDefaultDepthLegend)
+// Two coloring paths, described in docs/CLASS_DIAGRAM.md under "ColorScale's two modes":
+//   • palette-scale : { palette, min, max, continuous } → color computed per value (ui/rasterTools.js)
+//   • explicit-stops: [{ value|range, color, label }] → color looked up in stops (layers/depthMap.js)
 //
-// `Legend` (legend.js) is the read-model derived from this; `Stats.byClass` buckets against it.
-// `onChange` is the repaint seam: `RasterLayer` subscribes to it and re-colorizes in place.
+// legend.js derives its read model from this. RasterLayer recolors on `onChange`.
 
-// Built-in palette table. Host code can add its own via registerPalette() — the same open
-// -registration pattern as registerLayerType, so a consumer is not limited to this lab's eight.
-// (ui/rasterTools.js iterates PALETTES to build the picker; it stays an object for that.)
+// Built-in palettes. registerPalette() adds more, the same way registerLayerType() extends layers.
+// Stays an object because ui/rasterTools.js iterates it to build the picker.
 export const PALETTES = {
   blues:     { name: "Blue Scale",  colors: ["#EFF7FB","#C6DBEF","#9ECAE1","#6BAED6","#3182BD","#08519C","#08306B"] },
   grayscale: { name: "Grayscale",   colors: ["#F7F7F7","#D9D9D9","#BDBDBD","#969696","#636363","#252525"] },
@@ -24,12 +19,12 @@ export const PALETTES = {
   plasma:    { name: "Plasma",      colors: ["#0D0887","#7E03A8","#CC4778","#F89540","#FDE725"] },
 };
 
-// Host-registered palettes live here, keyed by name (kept out of PALETTES so the built-in table
-// stays immutable and the picker can distinguish built-in vs custom if it wants to).
+// Registered palettes, keyed by name. Held apart from PALETTES so the built-in table stays
+// immutable and the picker can tell a custom palette from a built-in one.
 const _custom = new Map();
 
 /**
- * Register a custom palette so a name string resolves to it. colors: >=2 hex strings.
+ * Register a palette so a name string resolves to it. `colors` needs at least 2 hex strings.
  * @param {string} name
  * @param {string[]} colors
  * @returns {void}
@@ -60,17 +55,9 @@ export function paletteNames() {
 }
 
 /**
- * @param {string} hex
- * @returns {[number,number,number]}
- */
-/**
- * Is this "a value that isn't one"? — `null`, `undefined`, `''`, `NaN`, a non-numeric string, or an
- * infinity. Checked BEFORE any arithmetic, because numeric coercion is what makes this dangerous:
- * `Number(null)` and `Number('')` are both `0`, so an absent value would silently take the colour of
- * the domain minimum — "no data" rendering as "the lowest reading", the one confusion the
- * `missingColor` contract exists to prevent (docs/usage/COLOR_SCALE.md). `NaN` and `'abc'` coerce to
- * `NaN` instead, which used to escape as the malformed string `rgb(NaN, NaN, NaN)` — painting
- * nothing, and undetectable by a caller checking for null.
+ * True for a value that isn't one: `null`, `undefined`, `''`, `NaN`, a non-numeric string or an
+ * infinity. Runs before any arithmetic, because `Number(null)` and `Number('')` are both `0`, so an
+ * absent value would otherwise paint as the domain minimum (docs/usage/COLOR_SCALE.md).
  * @param {*} v
  * @returns {boolean}
  */
@@ -78,6 +65,10 @@ function isAbsentValue(v) {
   return v == null || v === "" || !Number.isFinite(typeof v === "number" ? v : Number(v));
 }
 
+/**
+ * @param {string} hex
+ * @returns {[number,number,number]}
+ */
 export function hexToRgb(hex) {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [0, 0, 0];
@@ -99,10 +90,10 @@ function interpolateColors(colors, t) {
   return lerpRgb(hexToRgb(colors[idx]), hexToRgb(colors[idx + 1]), frac);
 }
 
-// Shared by setColorStops' _colorStopValues AND continuous, value-keyed _stops (a materialized
-// continuous scale — see _scaleRgb): find the bracketing pair of arbitrarily-spaced control points
-// and either interpolate between them (continuousMode) or snap to the nearer one. Values outside the
-// outermost control points clamp to that end's color — no extrapolation.
+// Finds the pair of control points bracketing `value`, then interpolates between them when
+// `continuousMode` is set or snaps to the nearer one. Points need not be evenly spaced; a value
+// past the outermost one clamps to that end's color. Serves _colorStopValues and value-keyed
+// _stops alike (see _scaleRgb).
 function bracketRgb(vals, cols, value, continuousMode) {
   const n = vals.length - 1;
   if (value <= vals[0]) return hexToRgb(cols[0]);
@@ -118,10 +109,9 @@ function bracketRgb(vals, cols, value, continuousMode) {
   return lerpRgb(hexToRgb(cols[i]), hexToRgb(cols[i + 1]), frac);
 }
 
-// Resolve a palette (name or custom color array) to its colors. THROWS on an unknown name rather
-// than falling back to a default, which would render the wrong colors with no signal.
-// Safe on the render hot path because set({palette})/the constructor validate the name up front, so
-// this is only ever reached with a value that resolves.
+// Resolves a palette name or color array to its colors. Throws on an unknown name instead of
+// falling back to a default, which would render wrong colors with no signal. The constructor and
+// set({ palette }) validate up front, so the render path only sees names that resolve.
 function paletteColors(palette) {
   if (Array.isArray(palette)) return palette;          // custom color array
   if (PALETTES[palette]) return PALETTES[palette].colors;
@@ -131,7 +121,7 @@ function paletteColors(palette) {
     `Register a custom palette with registerPalette(name, colors).`);
 }
 
-// Validate a palette value at set time (name must be known; an array is always allowed).
+// Validates a palette at set time. A name must be known; an array is always allowed.
 function assertPalette(palette) {
   if (Array.isArray(palette)) return palette;
   if (typeof palette === "string" && hasPalette(palette)) return palette;
@@ -142,8 +132,8 @@ function assertPalette(palette) {
 
 const rgbCss = (rgb) => `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 
-// Normalize a stored stop to { value?, min?, max?, color, label }. GDAL legends use either
-// { value, color, label } (discrete) or { range:[lo,hi], color, label } (classed).
+// Normalizes a stored stop to { value?, min?, max?, color, label }. GDAL legends arrive as either
+// { value, color, label } for discrete stops or { range:[lo,hi], color, label } for classed ones.
 function normalizeStop(s) {
   const out = { color: s.color, label: s.label };
   if ("value" in s) out.value = s.value;
@@ -171,16 +161,14 @@ export class ColorScale {
    * @param {Array<{value?: number, range?: [number,number], min?: number, max?: number, color: string, label?: string}>|null} [opts.stops] - explicit stops; presence switches to explicit mode
    * @param {string} [opts.unit]
    * @param {'palette'|'custom'|'gdal'|null} [opts.source]
-   * @param {string|null} [opts.missingColor] - the colour for a value that ISN'T one: `null`/`undefined`/
-   *   `NaN`/`''`. `null` (the default) means "no colour" — the consumer decides what absent looks
-   *   like (a vector layer leaves the feature at its base style; a raster leaves the pixel
-   *   transparent). Set it to render missing data explicitly, e.g. a grey "no data" swatch.
+   * @param {string|null} [opts.missingColor] - color for an absent value (`null`, `undefined`,
+   *   `NaN` or `''`). Defaults to `null`, meaning no color: a vector feature keeps its base style
+   *   and a raster pixel stays transparent. Set it to draw missing data as an explicit swatch.
    */
   constructor({ palette = "blues", min = 0, max = 1, continuous = false,
                 stops = null, unit = "", source = null, missingColor = null } = {}) {
-    // Deliberately NOT part of the three mutually-exclusive colouring modes: it answers a question
-    // none of them can ("what colour is a value that doesn't exist?"), so switching palette/stops/
-    // colorStops leaves it alone.
+    // Not one of the three coloring modes, so switching palette, stops or colorStops leaves it
+    // alone. It answers a question none of them cover: what color is a value that doesn't exist?
     this.missingColor = missingColor;
     this.palette = assertPalette(palette);   // PALETTES key or a custom color array (validated)
     this._min = min;
@@ -189,10 +177,10 @@ export class ColorScale {
     this.unit = unit;
     this._stops = stops ? stops.map(normalizeStop) : null;   // null → palette mode
     this.source = source || (this._stops ? "custom" : "palette");
-    // Continuous gradient control points (setColorStops) — a THIRD mode, distinct from both palette
-    // (evenly-spaced ramp) and _stops (discrete, flat bands): arbitrary breakpoint values, each with
-    // its own color, interpolated between the nearest bracketing pair. Mutually exclusive with the
-    // other two — setPalette/setStops/setColorStops each clear the others.
+    // Control points for the third mode, written by setColorStops(): arbitrary breakpoint values,
+    // each with its own color, interpolated between the bracketing pair. The other two modes are a
+    // palette (an evenly-spaced ramp) and _stops (flat bands). Each of the three setters clears the
+    // other two.
     this._colorStopValues = null;
     this._colorStopColors = null;
     /** @type {((value: number) => (string|null))|null} null → fall back to the scale */
@@ -209,11 +197,11 @@ export class ColorScale {
     return new ColorScale({ stops: legend, unit, source: "gdal" });
   }
 
-  // ---- the palette registry, as statics on the type it serves -------------------------------
+  // ---- palette registry, as statics on the type it serves -----------------------------------
   //
-  // A palette is a ColorScale's ramp and has no meaning without one, so this is where a consumer
-  // meets the registry rather than as loose barrel functions. `palettes()` subsumes the old
-  // paletteNames() + hasPalette() pair: a list answers both ("is x available" is `.includes(x)`).
+  // A palette only means something as a ColorScale's ramp, so the registry lives here rather than
+  // as loose exports. palettes() replaces paletteNames() and hasPalette(), since `.includes(x)`
+  // answers both.
 
   /**
    * Add a palette by name. `colors`: >= 2 hex strings.
@@ -224,19 +212,17 @@ export class ColorScale {
   static registerPalette(name, colors) { return registerPalette(name, colors); }
 
   /**
-   * Every palette name available to `{ palette }` — the built-ins plus anything registered.
+   * Every palette name `{ palette }` accepts, built-in and registered.
    * @returns {string[]}
    */
   static palettes() { return paletteNames(); }
 
-  // ---- GDAL legend XML parser (host-registered) ----
+  // ---- GDAL legend XML parser, registered by the host ----
   //
-  // fromGdalLegend (above) takes an ALREADY-PARSED legend array; turning a raw GDAL_METADATA XML
-  // string into one needs DOMParser (browser-only) and currently lives in layers/depthMap.js
-  // (parseLegendAndUnit) — which already imports RasterLayer FROM this file, so this file importing
-  // it back would be a circular import. Same registered-seam inversion as registerReprojector/
-  // registerMaterializer: this module names the mechanism, layers/depthMap.js supplies the impl by
-  // calling registerGdalLegendParser(parseLegendAndUnit) on import.
+  // fromGdalLegend() above takes an already-parsed legend array. Parsing raw GDAL_METADATA XML
+  // needs DOMParser, so it lives in layers/depthMap.js as parseLegendAndUnit, which already imports
+  // RasterLayer from here. Importing it back would be circular, so that file calls
+  // registerGdalLegendParser(parseLegendAndUnit) on import instead, as registerReprojector does.
 
   /** @type {((xmlStr: string) => {legend: Array|null, unit: string|null})|null} */
   static #gdalLegendParser = null;
@@ -262,12 +248,10 @@ export class ColorScale {
   }
 
   /**
-   * A plain, structured-cloneable description of this scale — enough to rebuild an equivalent one
-   * with `new ColorScale(spec)`. It captures whichever of the three modes is active.
-   *
-   * This is a COPY, not a handle: rebuilding from it gives an independent scale, so two layers
-   * built from one spec can diverge. `colorFor` (a function) and `onChange` listeners are
-   * deliberately not included — neither survives serialization.
+   * A structured-cloneable description of this scale, enough to rebuild an equivalent one with
+   * `new ColorScale(spec)`, capturing whichever of the three modes is active. The result is a copy,
+   * so two layers rebuilt from one spec can diverge. It omits `colorFor` and the `onChange`
+   * listeners because functions do not survive serialization.
    * @returns {{palette: string|string[], min: number, max: number, continuous: boolean, unit: string,
    *            source: string|null, stops: Array|null, colorStops: {values: number[], colors: string[]}|null}}
    */
@@ -284,8 +268,8 @@ export class ColorScale {
   }
 
   /**
-   * Rebuild a scale from `toJSON()` output. Restores the continuous-control-point mode too, which
-   * the constructor alone cannot express.
+   * Rebuilds a scale from `toJSON()` output, including the control-point mode that the constructor
+   * alone cannot express.
    * @param {Object} spec @returns {ColorScale}
    */
   static fromJSON(spec = {}) {
@@ -300,7 +284,7 @@ export class ColorScale {
   /** @returns {boolean} */
   get discrete() { return !!(this._stops && this._stops.length && "value" in this._stops[0]); }
   /**
-   * Is interpolation on? A read-only flag — write it with `set({ continuous })`.
+   * True when interpolation is on. Read-only; write it with `set({ continuous })`.
    * @returns {boolean}
    */
   get continuous() { return this._continuous; }
@@ -308,8 +292,8 @@ export class ColorScale {
   // ---- read ----
 
   /**
-   * [{ min?, max?, value?, color, label }] — explicit→stored | palette→derived | colorStops→one
-   * `{ value, color }` per control point (setColorStops).
+   * The stops as [{ min?, max?, value?, color, label }]. Explicit mode returns the stored stops,
+   * palette mode derives them, and setColorStops() mode returns one `{ value, color }` per point.
    * @returns {ColorStop[]}
    */
   getStops() {
@@ -321,7 +305,7 @@ export class ColorScale {
     const n = colors.length;
     const min = this._min, max = this._max;
     if (this._continuous) {
-      // sample the ramp at each colour's position
+      // sample the ramp at each color's position
       return colors.map((c, i) => {
         const v = n > 1 ? min + (i / (n - 1)) * (max - min) : min;
         return { value: v, color: c, label: `${v.toFixed(2)}` };
@@ -339,9 +323,7 @@ export class ColorScale {
     if (this._colorStopValues) return [...this._colorStopValues];
     const stops = this.getStops();
     if (this.discrete) return stops.map((s) => s.value);
-    // Band stops are {min,max}; CONTINUOUS stops are {value} control points. Reading `s.min`
-    // unconditionally returned an array of `undefined` for every continuous scale — so the public way
-    // to read a scale's domain back was broken exactly where a legend/ramp needs it most.
+    // Band stops carry {min,max} and continuous stops carry {value}, so read whichever is present.
     const vals = stops.map((s) => s.min ?? s.value);
     const last = stops[stops.length - 1];
     if (last && last.max != null && isFinite(last.max)) vals.push(last.max);
@@ -358,8 +340,8 @@ export class ColorScale {
   }
 
   /**
-   * Resolve any value → css color string. `colorFor` wins; a value that isn't one resolves to
-   * `missingColor` (or null); null when nothing matches.
+   * Resolves a value to a CSS color string. `colorFor` takes precedence. An absent value returns
+   * `missingColor`, and a value matching no stop returns null.
    * @param {number} value
    * @returns {string|null}
    */
@@ -368,16 +350,16 @@ export class ColorScale {
       const c = this.colorFor(value);
       if (c != null) return c;
     }
-    // Returned VERBATIM rather than round-tripped through rgb, so any CSS colour works here —
-    // hexToRgb only parses 6-digit hex and would turn `#ccc` or `grey` into black.
+    // Returned verbatim rather than through hexToRgb, which parses only 6-digit hex and would turn
+    // `#ccc` or `gray` into black. Any CSS color works here.
     if (isAbsentValue(value)) return this.missingColor || null;
     const rgb = this._scaleRgb(value);
     return rgb ? rgbCss(rgb) : null;
   }
 
   /**
-   * Hot-path [r,g,b] for the render loop; null → pixel is transparent (no matching stop, or an
-   * absent value with no `missingColor`).
+   * Returns [r,g,b] for the render loop. Returns null when no stop matches, or when the value is
+   * absent and no `missingColor` is set, and colorizeGrid leaves that pixel transparent.
    * @param {number} value
    * @returns {[number,number,number]|null}
    */
@@ -396,11 +378,9 @@ export class ColorScale {
       return bracketRgb(this._colorStopValues, this._colorStopColors, value, this._continuous);
     }
     if (this._stops) {
-      // Value-keyed stops under continuous:true are control points, not an exact-match lookup — same
-      // shape as _colorStopValues (this is exactly what a materialized continuous scale produces, via
-      // setColor/setRange/setLabel on one band — see _materialize). Without this branch, virtually no
-      // real pixel value ever equals one of a handful of sparse breakpoints exactly, so the whole
-      // layer would render fully transparent the moment any single band got edited.
+      // Under continuous:true, value-keyed stops are control points, not an exact-match table, and
+      // _materialize() produces exactly that when one band is edited. Without this branch a pixel
+      // value almost never equals a sparse breakpoint, so one band edit would blank the layer.
       if (this.discrete && this._continuous) {
         return bracketRgb(this._stops.map((s) => s.value), this._stops.map((s) => s.color), value, true);
       }
@@ -422,20 +402,17 @@ export class ColorScale {
   // ---- write (chainable; each fires onChange) ----
 
   /**
-   * THE knob writer. One mutation idiom for every whole-object knob:
+   * Writes any whole-object setting in one call:
    *
    *   cs.set({ palette: 'viridis', min: 0, max: 46, continuous: true, unit: 'm' });
    *
-   * Sync and chainable (returns `this`) — a ColorScale is a pure value type, so nothing here awaits.
-   * Fires `onChange` ONCE for the whole batch, not once per key, so a repaint hook wired via
-   * `onChange` doesn't redraw N times for one logical edit.
+   * Synchronous and chainable. Fires `onChange` once for the whole batch, not once per key, so a
+   * repaint listener redraws once for one logical edit.
    *
    * Recognised keys: `palette`, `min`, `max`, `continuous`, `unit`, `stops`, `colorStops`
-   * (`{values, colors}`). `stops`/`colorStops` are MODE switches and remain available as the explicit
-   * `setStops()`/`setColorStops()` methods too; the INDEX-addressed ops (`setColor(i,·)`,
-   * `setRange(i,·)`, `setLabel(i,·)`) are not knobs and stay as their own verbs.
-   *
-   * An unknown key throws, naming the recognised set, rather than being silently ignored.
+   * (`{values, colors}`) and `missingColor`. `stops` and `colorStops` switch mode and are also
+   * available as `setStops()` and `setColorStops()`. Per-band edits keep their own verbs:
+   * `setColor(i, c)`, `setRange(i, r)`, `setLabel(i, s)`. An unknown key throws.
    * @param {{palette?: string|string[], min?: number, max?: number, continuous?: boolean, unit?: string,
    *          stops?: Array<Object>, colorStops?: {values: number[], colors: string[]}}} [patch]
    * @returns {ColorScale}
@@ -468,8 +445,8 @@ export class ColorScale {
   }
 
   /**
-   * @internal — use `set({ palette })`. Kept as the implementation `set()` routes to (and because it
-   * carries the palette-name validation).
+   * @internal Use `set({ palette })`. This stays as the implementation `set()` calls, and it holds
+   * the palette-name validation.
    * @param {string|string[]} nameOrColors
    * @returns {ColorScale}
    */
@@ -493,22 +470,19 @@ export class ColorScale {
   }
 
   /**
-   * Define a CONTINUOUS color gradient via explicit control points — arbitrary breakpoint VALUES
-   * (need not be evenly spaced, or even given in order — sorted internally), each paired with its own
-   * color. Distinct from setStops(): that's discrete, flat bands (one solid color per range/value, no
-   * interpolation); this interpolates smoothly between the nearest bracketing pair when
-   * set({continuous:true}) is set (the intended pairing) —
-   *   setColorStops([-1, 0, 1], ['#015498', '#ffffff', '#21bf90']).set({ continuous: true })
-   * gives a diverging blue→white→green gradient skewed however the control points are spaced, not an
-   * even 3-way split of some [min,max]. Values outside the outermost control point clamp to that end's
-   * color (no extrapolation). With continuous false, a value takes the NEAREST control point's color
-   * instead of interpolating — flat, but not "banded" in the setStops() sense, since these are point
-   * positions, not ranges.
+   * Defines a continuous gradient from explicit control points, sorted on the way in and not
+   * required to be evenly spaced. Pair it with `set({ continuous: true })` to interpolate between
+   * the bracketing pair:
    *
-   * set({min,max})'s domain keeps governing peripheral things (a legend axis label, a stats-classification
-   * range) but the actual color mapping is driven entirely by these control points, not by min/max —
-   * the two are complementary, not conflicting: set both if you want a labeled axis range that differs
-   * from where the color control points themselves sit.
+   *   setColorStops([-1, 0, 1], ['#015498', '#ffffff', '#21bf90']).set({ continuous: true })
+   *
+   * gives a diverging blue-to-white-to-green gradient skewed by the point spacing, not an even
+   * three-way split of [min, max]. A value past the outermost point clamps to that end's color.
+   * With `continuous` false it takes the nearest point's color. setStops() differs: one flat
+   * color per range, never interpolated.
+   *
+   * The control points drive the color mapping alone. `set({ min, max })` still governs the legend
+   * axis label and the stats classification range, so set both when they should differ.
    * @param {number[]} values - breakpoint values; >= 2 required
    * @param {string[]} colors - one "#rrggbb" hex color per value, same length as `values`
    * @returns {ColorScale}
@@ -540,12 +514,13 @@ export class ColorScale {
   }
 
   /**
-   * Per-band edits materialize the palette into explicit stops, then mutate → marks it 'custom'.
+   * Converts the active mode into explicit stops so a per-band edit has something to mutate, and
+   * marks the scale 'custom'.
    * @internal @returns {ColorStop[]}
    */
   _materialize() {
     if (!this._stops) {
-      this._stops = this.getStops();   // captures whichever mode was active (palette OR colorStops)
+      this._stops = this.getStops();   // captures whichever mode was active, palette or colorStops
       this._colorStopValues = null; this._colorStopColors = null;   // mutually exclusive with _stops
       this.source = "custom";
     }

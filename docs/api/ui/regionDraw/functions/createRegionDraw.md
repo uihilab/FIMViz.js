@@ -8,7 +8,9 @@
 
 > **createRegionDraw**(`fim`, `opts?`): `object`
 
-Defined in: [ui/regionDraw.js:32](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/ui/regionDraw.js#L32)
+Defined in: [ui/regionDraw.js:125](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/regionDraw.js#L125)
+
+Mount a modal selection tool over `fim`.
 
 **Do not `start()` while the camera is moving.** `fit()`/`fitBounds` are animated on both
 providers, and a click resolved mid-animation lands at the pre-animation projection — off by
@@ -20,8 +22,20 @@ await fim.whenIdle();     // resolves immediately-ish when the map is already st
 regionDraw.start();
 ```
 
-This module cannot enforce that itself: it is headless by design (it knows only
-`fim.captureInteraction`, never a map SDK), so the wait belongs to the caller that moved the camera.
+This module cannot enforce that itself: it is headless by design (it knows only `fim`'s own
+methods, never a map SDK), so the wait belongs to the caller that moved the camera.
+
+**Event types the host must enable.** `polygon` and `rectangle` need only `click`; `rectangle`
+additionally uses `hover` for its rubber band. `freehand` and `brush` prefer
+`mousedown`/`mouseup`, so enable them:
+
+```js
+fim.enableMapEvents(["click", "hover", "mousedown", "mouseup"]);
+```
+
+Without those two, the drag modes fall back to click-to-start / click-to-stop rather than
+silently doing nothing — which is also how they behave on a touch device that never reports a
+button press.
 
 ## Parameters
 
@@ -31,17 +45,49 @@ This module cannot enforce that itself: it is headless by design (it knows only
 
 ### opts?
 
+#### brushRadius?
+
+`string` \| `number` = `250`
+
+#### brushSides?
+
+`number` = `16`
+
+#### freezeCamera?
+
+`boolean` = `true`
+
+#### keys?
+
+`boolean` = `true`
+
+#### keyTarget?
+
+`any`
+
+#### minSampleMetres?
+
+`number` = `0`
+
+#### mode?
+
+`"polygon"` \| `"rectangle"` \| `"freehand"` \| `"brush"` = `"polygon"`
+
 #### onCancel?
 
 () => `void`
 
 #### onComplete?
 
-(`filter`, `points`) => `void`
+(`filter`, `points`, `rings`) => `void`
 
 #### onPoint?
 
 (`points`, `evt`) => `void`
+
+#### onPreview?
+
+(`rings`, `points`) => `void`
 
 ## Returns
 
@@ -67,13 +113,43 @@ This module cannot enforce that itself: it is headless by design (it knows only
 
 [`SpatialFilter`](../../../package/filter/classes/SpatialFilter.md)
 
+### mode
+
+> **mode**: `string`
+
 ### points
 
 > **points**: `object`[]
 
+### rings
+
+> **rings**: `object`[][]
+
+### setMode
+
+> **setMode**: (`m`) => `void`
+
+#### Parameters
+
+##### m
+
+`string`
+
+#### Returns
+
+`void`
+
 ### start
 
 > **start**: () => `void`
+
+#### Returns
+
+`void`
+
+### undo
+
+> **undo**: () => `void`
 
 #### Returns
 

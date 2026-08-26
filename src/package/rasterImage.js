@@ -1,16 +1,16 @@
-// rasterImage.js — headless raster COLORIZE + image encoding for RasterLayer rendering.
+// rasterImage.js — colorizes a raster and encodes it as an image for RasterLayer.
 //
-// The provider-neutral half of drawing a raster (the pipeline the app hand-rolled in ~6 places:
-// floodExtent, depthMap, ensemble, comparison, rasterTools): a value grid → RGBA → a canvas data URL
-// that ANY provider's addRasterImage positions over bounds. `colorizeGrid` is PURE (node-testable, no
-// DOM); the canvas encode is browser-only (ambient `document`, like Dataset.download — no import cost).
+// The provider-neutral half of drawing a raster: a value grid becomes RGBA, then a canvas data URL
+// that any provider's addRasterImage positions over bounds. Replaces the pipeline floodExtent,
+// depthMap, ensemble, comparison and rasterTools each hand-rolled. colorizeGrid is pure and
+// testable under node; the canvas encode needs a browser `document`.
 
 import { ColorScale } from "./colorScale.js";
 
 /**
- * Min/max over a grid's pixels, skipping noData/NaN — to seed a default continuous scale when the
- * caller attaches none. Exported so a caller building its own default ColorScale (e.g.
- * RasterLayer._draw's precedence chain) matches colorizeGrid's own fallback ranging exactly.
+ * Min and max over a grid's pixels, skipping noData and NaN, used to seed a default continuous
+ * scale when colorizeGrid is given none. Exported so that code building its own default ColorScale,
+ * such as RasterLayer._draw, ranges exactly the way colorizeGrid's fallback does.
  * @param {import('./materialize.js').RasterGrid} grid
  * @returns {{min: number, max: number}}
  */
@@ -27,13 +27,12 @@ export function rangeOf(grid) {
 }
 
 /**
- * Colorize a RasterGrid to an RGBA buffer (PURE — no DOM). A pixel becomes transparent when it is
- * NaN, equal to the grid's `noData`, optionally zero (`skipZero`), or unmapped by the scale. With no
- * `colorScale`, a continuous blues ramp (ColorScale's own default palette) over the grid's own
- * min/max is used — this is the last-resort fallback; RasterLayer._draw() builds and ATTACHES a real
- * ColorScale before ever reaching here (explicit → GDAL-embedded legend → this default), so a caller
- * going through RasterLayer never actually exercises this branch. A caller using colorizeGrid
- * directly, without a Layer, still gets a sensible default.
+ * Colorizes a RasterGrid into an RGBA buffer. Pure, with no DOM. A pixel goes transparent when it
+ * is NaN, equals the grid's `noData`, equals zero and `skipZero` is set, or maps to no color.
+ *
+ * Without a `colorScale` it falls back to a continuous blues ramp over the grid's own min and max.
+ * RasterLayer._draw() attaches a real scale first, preferring an explicit one, then a GDAL-embedded
+ * legend, then this default, so only code calling colorizeGrid outside a Layer reaches it.
  * @param {import('./materialize.js').RasterGrid} grid
  * @param {Object} [opts] - { colorScale?, alpha?, skipZero?, noData? } (noData overrides grid.noData)
  * @returns {Uint8ClampedArray} width*height*4 RGBA
@@ -56,7 +55,7 @@ export function colorizeGrid(grid, { colorScale = null, alpha = 255, skipZero = 
   return rgba;
 }
 
-/** RGBA buffer → PNG data URL via an offscreen canvas (browser). @returns {string} */
+/** Encodes an RGBA buffer as a PNG data URL through an offscreen canvas. @returns {string} */
 export function rgbaToDataURL(rgba, width, height) {
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -66,7 +65,7 @@ export function rgbaToDataURL(rgba, width, height) {
 }
 
 /**
- * Colorize + encode: a RasterGrid → a PNG data URL ready for `provider.addRasterImage`.
+ * Colorizes and encodes a RasterGrid into a PNG data URL ready for `provider.addRasterImage`.
  * @param {import('./materialize.js').RasterGrid} grid
  * @param {Object} [opts] - see colorizeGrid
  * @returns {string}

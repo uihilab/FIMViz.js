@@ -8,7 +8,7 @@
 
 > **registerRuntime**(`rt?`): [`Runtime`](../interfaces/Runtime.md)
 
-Defined in: [package/mount.js:48](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/mount.js#L48)
+Defined in: [package/mount.js:46](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mount.js#L46)
 
 ## Parameters
 

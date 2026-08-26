@@ -53,7 +53,7 @@ describe("EnsembleAggregationLayer.compute", () => {
     const r = layer.compute();   // no policy/method/colours
     assert.ok(r.warnings.some((w) => /grid policy/.test(w)));
     assert.ok(r.warnings.some((w) => /resampling method/.test(w)));
-    assert.ok(r.warnings.some((w) => /ensemble colours/.test(w)));
+    assert.ok(r.warnings.some((w) => /ensemble colors/.test(w)));
   });
 
   test("registered type: createLayer('ensembleAgreement', …) computes at construction", () => {
@@ -64,5 +64,27 @@ describe("EnsembleAggregationLayer.compute", () => {
     });
     assert.ok(layer instanceof EnsembleAggregationLayer);
     assert.ok(layer.result && layer.result.perPixel, "computed on construction");
+  });
+});
+
+describe("EnsembleAggregationLayer.getLegend", () => {
+  const g = { width: 1, height: 1, bw: 0, bs: 0, be: 1, bn: 1 };
+  const wet = () => ({ pixels: Float32Array.from([1]), meta: g });
+
+  test("null before compute(); one row per agreement level after, count 0 excluded", () => {
+    const layer = new EnsembleAggregationLayer({ sources: [wet(), wet(), wet()] });
+    assert.equal(layer.getLegend(), null);
+    layer.compute({ policy: "low", method: "nearest" });
+    const legend = layer.getLegend();
+    assert.equal(legend.stops.length, 3, "3 members -> levels 1..3");
+    assert.deepEqual(legend.stops.map((x) => x.value), [1, 2, 3]);
+    assert.deepEqual(legend.stops.map((x) => x.label), ["1 of 3 wet", "2 of 3 wet", "3 of 3 wet"]);
+  });
+
+  test("reports the explicit ramp that was drawn", () => {
+    const layer = new EnsembleAggregationLayer({ sources: [wet(), wet()] });
+    layer.compute({ policy: "low", method: "nearest", colors: ["#111111", "#222222"] });
+    assert.deepEqual(layer.getLegend().stops.map((x) => x.color),
+      ["rgba(17, 17, 17, 1)", "rgba(34, 34, 34, 1)"]);
   });
 });

@@ -8,11 +8,12 @@
 
 > **zonalStats**(`grid`, `zones`, `opts?`): `object`[]
 
-Defined in: [package/rasterOps.js:269](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/rasterOps.js#L269)
+Defined in: [package/rasterOps.js:276](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/rasterOps.js#L276)
 
-Zonal statistics: per-zone min/max/mean/sum/count/area over a raster. `zones` = [{ id?, polygon | filter }]
-(a ring/multi-ring of {lat,lng}|[lat,lng], or a SpatialFilter). noData/NaN pixels are excluded; `area`
-is in the bounds' units² (WGS84 → deg²; scale to metres in the caller if needed).
+Per-zone min, max, mean, sum, count and area over a raster. Each zone is
+`{ id?, polygon | filter }`, where polygon is a ring or multi-ring of {lat,lng} or [lat,lng].
+Absent pixels are excluded. `area` is in the square of the bounds' units, so WGS84 gives degrees
+squared and the user scales it to meters.
 
 ## Parameters
 

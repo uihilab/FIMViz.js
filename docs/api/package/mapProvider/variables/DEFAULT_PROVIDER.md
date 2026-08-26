@@ -8,9 +8,9 @@
 
 > `const` **DEFAULT\_PROVIDER**: `string` = `"leaflet"`
 
-Defined in: [package/mapProvider.js:93](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/mapProvider.js#L93)
+Defined in: [package/mapProvider.js:96](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mapProvider.js#L96)
 
-The provider a DETACHED layer resolves against — one built without a mounted app, so there is no
-`config.provider` to read (a unit test's stub, or a Layer constructed directly). NOT a config
-default: `mount()` requires an explicit `provider` and throws `config-invalid` without one, so
-this is never what a real mounted map uses. `leaflet` because it is the credential-free one.
+The provider a detached layer resolves against, meaning one built without a mounted app and so
+with no `config.provider` to read: a unit test's stub, or a Layer constructed directly. Not a
+config default, since `mount()` requires an explicit `provider` and throws `config-invalid`
+without one, so a real mounted map never uses this. It is leaflet because leaflet needs no key.

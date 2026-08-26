@@ -6,7 +6,7 @@
 
 # Class: PredicateFilter
 
-Defined in: [package/filter.js:82](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L82)
+Defined in: [package/filter.js:81](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L81)
 
 ## Extends
 
@@ -18,7 +18,7 @@ Defined in: [package/filter.js:82](https://github.com/uihilab/FIMViz.js/blob/af3
 
 > **new PredicateFilter**(`fn`): `PredicateFilter`
 
-Defined in: [package/filter.js:84](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L84)
+Defined in: [package/filter.js:83](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L83)
 
 #### Parameters
 
@@ -40,7 +40,7 @@ Defined in: [package/filter.js:84](https://github.com/uihilab/FIMViz.js/blob/af3
 
 > **fn**: (...`args`) => `boolean`
 
-Defined in: [package/filter.js:84](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L84)
+Defined in: [package/filter.js:83](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L83)
 
 #### Parameters
 
@@ -58,7 +58,7 @@ Defined in: [package/filter.js:84](https://github.com/uihilab/FIMViz.js/blob/af3
 
 > **isEmpty**(): `boolean`
 
-Defined in: [package/filter.js:34](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L34)
+Defined in: [package/filter.js:34](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L34)
 
 #### Returns
 
@@ -74,7 +74,7 @@ Defined in: [package/filter.js:34](https://github.com/uihilab/FIMViz.js/blob/af3
 
 > **test**(`unit`): `boolean`
 
-Defined in: [package/filter.js:86](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L86)
+Defined in: [package/filter.js:85](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L85)
 
 #### Parameters
 
@@ -96,9 +96,9 @@ Defined in: [package/filter.js:86](https://github.com/uihilab/FIMViz.js/blob/af3
 
 > `static` **all**(`filters`): [`Filter`](Filter.md)
 
-Defined in: [package/filter.js:68](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L68)
+Defined in: [package/filter.js:67](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L67)
 
-Combine filters as a conjunction (AND) — the semantics of chaining applyFilter().
+Combines filters with AND, matching what chaining applyFilter() does.
 
 #### Parameters
 
@@ -120,21 +120,20 @@ Combine filters as a conjunction (AND) — the semantics of chaining applyFilter
 
 > `static` **from**(`input`): [`Filter`](Filter.md)
 
-Defined in: [package/filter.js:53](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/filter.js#L53)
+Defined in: [package/filter.js:52](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L52)
 
-Coerce any friendly input into a Filter.
-  Filter-like   → returned as-is (anything with a `test(unit)` method)
-  function      → PredicateFilter
-  Region-like   → input.toFilter()
-  polygon       → SpatialFilter   ([[lat,lng],…] | [{lat,lng},…] | [[ring],[ring]…])
+Turns any accepted input into a Filter.
+  anything with test(unit) → returned unchanged
+  function                 → PredicateFilter
+  anything with toFilter() → input.toFilter()
+  polygon                  → SpatialFilter ([[lat,lng],…] | [{lat,lng},…] | [[ring],[ring]…])
 
-DUCK-TYPED, not `instanceof Filter`, for the same reason nothing in the engine does
-`instanceof Dataset`: class identity is per-module-instance, and `fimviz` and `fimviz/ui` are
-two separate bundles that each carry their own copy of this file. A `SpatialFilter` built by
-`fimviz/ui`'s createRegionDraw is therefore NOT `instanceof` the engine bundle's `Filter`, so
-`layer.getStats({ filter })` rejected the tool's own output. Testing for the method — the only
-thing every call site actually uses — makes the seam work across bundles and lets a host pass
-its own filter object.
+Checks for the method rather than `instanceof Filter`, for the reason nothing in the engine
+uses `instanceof Dataset`: class identity is per module instance, and `fimviz` and `fimviz/ui`
+are separate bundles each carrying their own copy of this file. A SpatialFilter from
+`fimviz/ui`'s createRegionDraw is not `instanceof` the engine bundle's Filter, so
+`layer.getStats({ filter })` rejected the tool's own output. Checking for test() works across
+bundles and lets a host pass its own filter object.
 
 #### Parameters
 

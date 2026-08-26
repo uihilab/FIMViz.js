@@ -1,28 +1,28 @@
 // dom.js — instance-scoped DOM lookups.
 //
-// THE seam the single-document multi-instance migration routes through. Two widgets mounted on
-// one page both carry `#layer-panel`, `#lp-tab-metrics`, etc. `document.getElementById(id)` returns
-// only the FIRST match document-wide, so with duplicate ids the second instance's code drives the
-// first instance's DOM. Every `document.getElementById(id)` / `document.querySelector('#id')`
-// becomes a lookup scoped to the owning FimMap root, and the ambiguity disappears.
+// Two widgets mounted on one page both carry `#layer-panel`, `#lp-tab-metrics` and the rest.
+// `document.getElementById(id)` returns only the first match in the document, so with duplicate ids
+// the second instance's code drives the first instance's DOM. Scoping every lookup to the owning
+// FimMap root removes the ambiguity.
 //
-// The ~604 call sites (see docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.2) migrate onto `scoped(root)` — a UI module holds
-// one bound scope for its instance root and never touches the global `document` again.
+// docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.2 covers the migration onto `scoped(root)`. A
+// migrated UI module holds one bound scope for its own root and never touches the global
+// `document`.
 
-// `#foo` -> `[id="foo"]`. Some engines optimize a bare `#id` selector by routing through
-// document.getElementById (first match document-wide, then subtree filter) — which finds NOTHING
-// when ids repeat across instances. The attribute form is engine-independent. Only an exact
-// `#identifier` is rewritten; compound selectors pass through untouched (rewriting inside them
-// risks mangling quoted attribute values). Mirrors the rule documented on FimMap.$().
+// Rewrites `#foo` to `[id="foo"]`. Some engines optimize a bare `#id` selector through
+// document.getElementById, taking the first match in the document and then filtering by subtree,
+// which finds nothing when ids repeat across instances. The attribute form behaves the same
+// everywhere. Only an exact `#identifier` is rewritten, because rewriting inside a compound
+// selector risks mangling a quoted attribute value. FimMap.$() documents the same rule.
 const ID_ONLY = /^#([A-Za-z_][\w-]*)$/;
 export function scopedSel(sel) {
   const m = ID_ONLY.exec(String(sel).trim());
   return m ? `[id="${m[1]}"]` : sel;
 }
 
-// A bound scope for one root: `{ byId, $, $$ }`. `root == null` falls back to `document` — the
-// transitional single-instance default while call sites are still being threaded a root; the
-// end state passes a real FimMap root everywhere and the fallback becomes dead.
+// A bound scope for one root: `{ byId, $, $$ }`. A null root falls back to `document`, which is the
+// single-instance default while call sites are still being given a root. Once every call site
+// passes a real FimMap root, the fallback goes dead.
 export function scoped(root) {
   const base = root || (typeof document !== "undefined" ? document : null);
   return {
@@ -33,27 +33,29 @@ export function scoped(root) {
   };
 }
 
-// ---- Ambient active scope ------------------------------------------------------------------
+// ---- Ambient active scope, for host code only ------------------------------------------------
 //
-// The big stateful subsystems (layers/*, io/*, package/script.js) are not yet per-instance objects,
-// so they can't hold their own root the way the ui/ factories do. Until they are, they resolve DOM
-// through this ambient active scope — the same pattern as the event sink (reportError()): the app whose
-// map is booting sets it (mount.js → setActiveDom(container)), and the ~452 migrated call sites read
-// it via el()/qs()/qsa() instead of document.getElementById. Single-instance: scoped to the one
-// container (correct). Multi-instance: set per boot, with the known across-await caveat those
-// subsystems inherit, for code that is not a per-instance object.
+// No module under src/ calls setActiveDom or reads domId, domQs or domQsa. mount.js leaves the
+// ambient scope alone and says so, the engine emits instead of writing host markup, and
+// test/hostEvents.test.mjs enforces the rule: it fails if any engine module outside this file
+// mentions one of the five. These stay for host code that has not moved onto scoped(root) yet.
+//
+// `_active` is one module-level variable, so a host using it inherits one hazard. Two widgets
+// booting means the second setActiveDom call replaces the first. Host code that awaits and then
+// calls domId gets whichever root booted last, and it gets a wrong element rather than an error.
+// Pass an explicit root to scoped(root) to avoid that; that is what the ui/ factories do.
 let _active = scoped(null);
 
-// Set the ambient scope to a mount root. Called at boot with the widget container.
+// Points the ambient scope at a mount root. Host code calls this; nothing in src/ does.
 export function setActiveDom(root) { _active = scoped(root); }
 
 // Reset to document (teardown / tests).
 export function resetActiveDom() { _active = scoped(null); }
 
-// Migration aliases for `document.getElementById` / `querySelector` / `querySelectorAll`, resolved
-// against the active scope. Named with a `dom` prefix (not `el`/`qs`) because `el` collides with
-// the pervasive `const el = ...` locals in the subsystems being migrated. A bare `#id` passed to
-// domQs/domQsa is rewritten to `[id="..."]` (see scopedSel).
+// Replacements for document.getElementById, querySelector and querySelectorAll, resolved against
+// the active scope. They carry a `dom` prefix rather than `el`/`qs` because `el` collides with the
+// `const el = ...` locals throughout the subsystems that were migrating. A bare `#id` given to
+// domQs or domQsa is rewritten to `[id="..."]` (see scopedSel). Host code only, per the note above.
 export function domId(id) { return _active.byId(id); }
 export function domQs(sel) { return _active.$(sel); }
 export function domQsa(sel) { return _active.$$(sel); }

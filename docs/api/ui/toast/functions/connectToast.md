@@ -6,18 +6,20 @@
 
 # Function: connectToast()
 
-> **connectToast**(`fim`, `toast?`): `object`
+> **connectToast**(`fim`, `toast?`, `opts?`): `object` & `object`
 
-Defined in: [ui/toast.js:70](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/ui/toast.js#L70)
+Defined in: [ui/toast.js:86](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/toast.js#L86)
 
-Subscribe a toast to the engine's `notify` host event (the host wires this — the engine never
-reaches for the UI). Maps notify levels (info/warn/error) onto toast levels.
+Subscribe a toast to the engine's user-facing host events (the host wires this — the engine never
+reaches for the UI). `notify` maps its levels (info/warn/error/success) onto toast levels;
+`layer:raster-oversized` and `layer:crs-unrenderable` become warnings, since both describe
+something visibly wrong with what was just drawn.
 
 ## Parameters
 
 ### fim
 
-[`FimMap`](../../../package/fimMap/classes/FimMap.md) \| \{ `on`: `Function`; \}
+[`FimMap`](../../../package/fimMap/classes/FimMap.md) \| \{ `off?`: `Function`; `on`: `Function`; \}
 
 ### toast?
 
@@ -37,50 +39,16 @@ reaches for the UI). Maps notify levels (info/warn/error) onto toast levels.
 
 (`msg`, `o?`) => `Element`
 
+### opts?
+
+`warnings:false` keeps this to `notify` only
+
+#### warnings?
+
+`boolean` = `true`
+
 ## Returns
 
-`object`
+`object` & `object`
 
-### clear
-
-> **clear**: () => `void`
-
-#### Returns
-
-`void`
-
-### destroy
-
-> **destroy**: () => `void`
-
-#### Returns
-
-`void`
-
-### el
-
-> **el**: `Element`
-
-### show
-
-> **show**: (`msg`, `o?`) => `Element`
-
-#### Parameters
-
-##### msg
-
-`string`
-
-##### o?
-
-###### level?
-
-`string`
-
-###### timeout?
-
-`number`
-
-#### Returns
-
-`Element`
+the toast, plus an unsubscribe

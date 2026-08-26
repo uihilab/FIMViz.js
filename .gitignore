@@ -10,3 +10,6 @@ dist
 /api/
 /guides/
 .site
+
+# Working notes for the comment rewrite pass. Not part of the package.
+reformatting/

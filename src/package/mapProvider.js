@@ -1,38 +1,37 @@
 // mapProvider.js — creating the underlying map. The one place the engine constructs one.
 //
-// WHY THIS EXISTS: booting a map ("load the SDK, make a Map centred here at this zoom") is generic
-// engine work — the genuinely app-specific part is the WIDGET (panels, layer controllers, custom
-// styling), not the map. Delegating boot wholesale to the host would force every consumer, even one
-// that only wants a plain map, to import the Maps Loader and hand the result back.
+// Booting a map, meaning loading the SDK and making a Map centered somewhere at some zoom, is
+// generic engine work. What is app-specific is the widget around it: panels, layer controllers,
+// custom styling. Handing boot to the host would force anyone who only wants a plain map to import
+// the Maps Loader and pass the result back.
 //
-// So: `mount()` boots a map by itself, and `registerRuntime()` is an override for a host that needs
-// to control boot (because it wires a whole widget around the map).
+// So `mount()` boots a map itself, and `registerRuntime()` overrides that for a host that needs to
+// control boot because it builds a whole widget around the map.
 //
-// PROVIDER SEAM: `provider` is a registry, not a hardcoded branch, so a second backend can be added
-// without changing the mount contract or any caller's option shape. `requiresApiKey` is a property
-// of the PROVIDER — Google needs one, Leaflet does not — so mount() demands an apiKey only when the
-// selected provider declares it.
+// `provider` is a registry rather than a hardcoded branch, so a second backend needs no change to
+// mount() or to anyone's options. `requiresApiKey` belongs to the provider, since Google needs one
+// and Leaflet does not, so mount() demands an apiKey only when the chosen provider declares it.
 //
-// ⚠️ SCOPE: a provider covers the MAP, the VECTOR tier (addVector/removeVector/fitBounds — both
-// google and leaflet implement them, so `fim.addLayer('vector', …)` works on either), the STATIC
-// RASTER-IMAGE tier (addRasterImage/removeRasterImage/setRasterImageOpacity/setRasterImageUrl — one
-// pre-rendered image positioned over geographic bounds, swappable for live repaint), and map
-// mouse-move (onMapMouseMove, normalized to `{lat,lng}` — hover-value readouts). What a non-Google
-// provider still does NOT get: velocity's continuously-animated canvas (its own viewport-driven
-// repaint loop, not a static image), a host's raster Layer-Settings draw/measurement tool
-// (polyline/polygon drawing + area/distance math, built directly on
-// `google.maps.event`/`getProjection()` — a bespoke tool, same class of work as the next item), the
-// comparison draw-mask tool, `AdvancedMarkerElement` HAZUS damage markers, and `FloodDepthLayer`'s
-// ArcGIS MapServer tile integration (a whole vendored Google-only library). Each of those needs its
-// own per-provider work — see docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §2.1.
+// A provider covers four things. The map itself. Vectors, through addVector, removeVector and
+// fitBounds, which both providers implement, so `fim.addLayer('vector', ...)` works on either.
+// Static raster images, through addRasterImage, removeRasterImage, setRasterImageOpacity and
+// setRasterImageUrl: one pre-rendered image over geographic bounds, swappable for a live repaint.
+// And map mouse-move, through onMapMouseMove normalized to `{lat,lng}`, which drives hover readouts.
+//
+// Five things stay Google-only. Velocity's continuously animated canvas, which runs its own
+// viewport-driven repaint loop rather than showing a static image. The raster draw and measurement
+// tool, built directly on `google.maps.event` and `getProjection()`. The comparison draw-mask tool.
+// HAZUS damage markers, which use `AdvancedMarkerElement`. And `FloodDepthLayer`'s ArcGIS MapServer
+// tiles, a vendored Google-only library. Each needs its own per-provider work; see
+// docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §2.1.
 
 import { fimError, reportError } from "./events.js";
 
 // @googlemaps/js-api-loader is a dual-package hazard — webpack resolves it as ESM (named `Loader`),
-// node resolves the CJS build (no named export). A STATIC import forces one shape and breaks the
-// other. Loading it lazily inside the google provider's create() sidesteps that entirely: the
-// dynamic-import namespace works in both resolvers, and node tests that import this module never
-// try to resolve the loader at all (they register a fake provider instead).
+// node resolves the CJS build, which has no named export. A static import commits to one shape and
+// breaks the other. Loading it lazily inside the google provider's create() avoids that: the
+// dynamic-import namespace works under both resolvers, and node tests importing this module never
+// resolve the loader at all, since they register a fake provider instead.
 async function loadGoogleLoader() {
   const ns = await import("@googlemaps/js-api-loader");
   return ns.Loader ?? ns.default?.Loader ?? ns.default;
@@ -41,73 +40,71 @@ async function loadGoogleLoader() {
 const _providers = new Map();
 
 /**
- * The contract a map backend must implement to register via `registerMapProvider(name, impl)`. Every
- * method except `create` has the IDENTICAL parameter shape on every built-in provider — that
- * uniformity is the whole point of the seam: `VectorLayer`/`RasterLayer`/the engine's event dispatch
- * call these without knowing which provider is underneath. `create()`'s `options` is the one
- * PROVIDER-SPECIFIC piece — see `GoogleCreateOptions`/`LeafletCreateOptions`.
+ * What a map backend must implement to register through `registerMapProvider(name, impl)`. Every
+ * method but `create` takes identical parameters on both built-in providers, which is what lets
+ * VectorLayer, RasterLayer and the engine's event dispatch call them without knowing which provider
+ * is underneath. `create()`'s `options` is the one provider-specific piece; see
+ * `GoogleCreateOptions` and `LeafletCreateOptions`.
  * @typedef {Object} MapProviderImpl
  * @property {boolean} [requiresApiKey] - does `create()` need `options.apiKey`? (google: true, leaflet: false)
  * @property {(crs: string|null) => boolean} [acceptsCRS] - can this provider render content in `crs`?
- *   Asked by `Layer`'s render precondition before drawing. Omitted = permissive (accepts anything).
+ *   Layer's render precondition asks this before drawing. Omitting it accepts anything.
  * @property {(el: Element, options: (GoogleCreateOptions|LeafletCreateOptions)) => Promise<any>} create -
- *   build the map in `el`; returns the provider's native map object (exposed as `fim.map`).
+ *   builds the map in `el` and returns the provider's native map object, exposed as `fim.map`.
  * @property {(map: any, geojson: Object, opts?: { style?: (NeutralStyle|string|((ctx: {feature: Object, index: number}) => (NeutralStyle|string|null))) }) => any} addVector -
- *   render a GeoJSON FeatureCollection/Feature onto `map`; returns an opaque vector handle.
+ *   renders a GeoJSON FeatureCollection or Feature onto `map` and returns an opaque handle.
  * @property {(map: any, handle: any) => void} removeVector - tear a vector handle down.
  * @property {(map: any, bounds: {north: number, south: number, east: number, west: number}) => void} fitBounds -
- *   fit the map's viewport to `bounds`.
+ *   fits the map's viewport to `bounds`.
  * @property {(map: any, opts?: { timeout?: number }) => Promise<void>} [whenIdle] - resolve once the
- *   camera has settled. Safe to await unconditionally: it resolves on a timeout when the map is
- *   already still, so it can never hang. Anything that reads the projection right after a `fitBounds`
- *   must await this first — a click resolved mid-animation lands at the wrong coordinates.
+ *   camera has settled. Always safe to await: it resolves on a timeout when the map is already
+ *   still, so it cannot hang. Anything reading the projection right after a `fitBounds` must await
+ *   it first, since a click resolved mid-animation gives the wrong coordinates.
  * @property {(map: any, on: boolean) => void} [setDraggable] - turn pan-by-drag on or off. Drag-based
- *   selection tools suppress it while drawing, because tracing a stroke and panning the map are the
- *   same gesture.
+ *   the selection tools suppress it while drawing, since tracing a stroke and panning the map are
+ *   the same gesture.
  * @property {(map: any) => ({metresPerPixel: number, width: number, height: number}|null)} [viewMetrics] -
- *   ground metres per screen pixel, plus the map's pixel size. What lets a tool be sized in SCREEN
- *   units (a brush that stays the same width as you zoom) without ever touching a map SDK.
+ *   ground meters per screen pixel, with the map's pixel size. A tool sizes itself in screen units
+ *   from these, i.e. a brush that keeps its width as the user zooms, without touching a map SDK.
  * @property {(map: any, handles: any[]) => any[]} [applyLayerOrder] - restack overlays to match
- *   `handles`, ordered bottom → top, and RETURN the handles: a provider may have replaced some (the
- *   Google raster path recreates them), so callers must adopt the returned array.
+ *   `handles`, ordered bottom to top, and returns them. A provider may have replaced some, since
+ *   the Google raster path recreates them, so use the returned array from then on.
  * @property {(map: any, dataUrl: string, bounds: {north: number, south: number, east: number, west: number}, opts?: { opacity?: number, interactive?: boolean }) => any} addRasterImage -
- *   position a pre-rendered image (data URL or any image URL) over `bounds`; returns an opaque
- *   raster-image handle. Non-interactive (`clickable:false`) by default so map events pass through to
- *   the engine's own hit-testing; pass `{ interactive: true }` to opt this overlay into direct SDK
- *   interaction.
+ *   positions a pre-rendered image, a data URL or any image URL, over `bounds` and returns an
+ *   opaque handle. Non-interactive by default, so map events reach the engine's own hit-testing.
+ *   Pass `{ interactive: true }` to give this overlay direct SDK interaction.
  * @property {(map: any, handle: any) => void} removeRasterImage - tear a raster-image handle down.
  * @property {(handle: any, opacity: number) => void} setRasterImageOpacity -
- *   change a raster-image handle's opacity (0..1).
+ *   changes a raster-image handle's opacity, from 0 to 1.
  * @property {(map: any, handle: any, dataUrl: string, bounds: {north: number, south: number, east: number, west: number}, opts?: { opacity?: number, interactive?: boolean }) => any} setRasterImageUrl -
- *   swap a raster-image handle's image (e.g. a palette repaint). The caller MUST use the RETURNED
- *   handle going forward — some providers (google) cannot swap the image in place and recreate the
- *   overlay instead.
+ *   swaps a raster-image handle's image, i.e. for a palette repaint. Use the returned handle from
+ *   then on: google cannot swap the image in place and recreates the overlay instead.
  * @property {(map: any, cb: (pt: {lat: number, lng: number}) => void) => (() => void)} onMapMouseMove -
- *   subscribe to mouse-move on the map, normalized to `{lat, lng}`; returns an unsubscribe function.
+ *   subscribes to mouse-move on the map, normalized to `{lat, lng}`, and returns an unsubscribe.
  * @property {(map: any, type: ('click'|'hover'|'dblclick'|'mousedown'|'mouseup'|'rightclick'), cb: (evt: {type: string, lat: number, lng: number, originalEvent: (MouseEvent|null)}) => void) => (() => void)} onMapEvent -
- *   subscribe to a normalized map event; returns an unsubscribe function. `hover` maps to the
- *   provider's mousemove equivalent.
+ *   subscribes to a normalized map event and returns an unsubscribe. `hover` becomes the
+ *   provider's own mousemove.
  */
 
 /**
- * The provider a DETACHED layer resolves against — one built without a mounted app, so there is no
- * `config.provider` to read (a unit test's stub, or a Layer constructed directly). NOT a config
- * default: `mount()` requires an explicit `provider` and throws `config-invalid` without one, so
- * this is never what a real mounted map uses. `leaflet` because it is the credential-free one.
+ * The provider a detached layer resolves against, meaning one built without a mounted app and so
+ * with no `config.provider` to read: a unit test's stub, or a Layer constructed directly. Not a
+ * config default, since `mount()` requires an explicit `provider` and throws `config-invalid`
+ * without one, so a real mounted map never uses this. It is leaflet because leaflet needs no key.
  * @type {string}
  */
 export const DEFAULT_PROVIDER = "leaflet";
 
-// Ground metres per screen pixel in Web Mercator: the equator is one 256 px tile at zoom 0, and a
-// degree of longitude shortens by cos(lat). Both providers tile the same way, so both compute it the
-// same way — the only difference is how each spells "give me the zoom and the centre".
+// Ground meters per screen pixel in Web Mercator. The equator is one 256 px tile at zoom 0, and a
+// degree of longitude shortens by cos(lat). Both providers tile the same way, so the math is the
+// same; they differ only in how each spells "give me the zoom and the center".
 const EQUATOR_M = 40075016.686;
 function metresPerPixelAt(lat, zoom) {
   return (EQUATOR_M * Math.cos((lat * Math.PI) / 180)) / (256 * Math.pow(2, zoom));
 }
 
 /**
- * Register a map backend.
+ * Registers a map backend.
  * @param {string} name
  * @param {MapProviderImpl} provider
  */
@@ -133,30 +130,31 @@ export function mapProviderNames() {
 
 // ---- neutral vector style vocabulary ------------------------------------------------------------
 //
-// THIS is what makes VectorLayer provider-agnostic. A consumer describes a vector's look ONCE, in a
-// neutral vocabulary, and each provider translates it to its own SDK — Google wants `strokeWeight`,
-// Leaflet wants `weight`; Google `strokeColor`, Leaflet `color`. Without this, a page targeting both
-// backends would have to pass two different style objects and know which map is which.
+// This is what makes VectorLayer provider-agnostic. The user describes a vector's look once in a
+// neutral vocabulary and each provider translates it into its own SDK: Google wants `strokeWeight`
+// and `strokeColor` where Leaflet wants `weight` and `color`. Without it, a page targeting both
+// backends would pass two style objects and track which map is which.
 //
-// Neutral keys (all optional):
+// The neutral keys, all optional:
 //   fillColor, fillOpacity, strokeColor, strokeWidth, strokeOpacity
 //
-// Any OTHER key is passed through untouched, so a single-provider power user can still hand a
-// provider-native option (e.g. Google's `icon`, Leaflet's `dashArray`) straight through — it simply
-// won't be portable. Portability is opt-in via the neutral names, not enforced.
+// Any other key passes through untouched, so someone on one provider can hand through a native
+// option, i.e. Leaflet's `dashArray`. It simply will not be portable. The neutral names buy
+// portability; nothing enforces it.
 //
-// PER-FEATURE STYLING: `style` may also be a FUNCTION `({ feature, index }) => result`, evaluated
-// once per GeoJSON feature so colouring can branch on `feature.properties`, coordinates, or the
-// feature's `index`. Its `result` is either a neutral style OBJECT (same vocabulary as above) or a
-// bare colour STRING — the "graded colour" shorthand, expanded to `{ fillColor, strokeColor }`. The
-// callback sees the ORIGINAL GeoJSON feature and the same 0-based index on EVERY provider; each
-// adapter maps its own SDK feature back to that (see addVector below). See resolveFeatureStyle.
-// POINT GEOMETRY is the one case the path vocabulary above cannot express on either provider: a
-// google.maps.Data point draws an `icon`, not a filled path, and Leaflet's default point is an
-// L.marker whose Icon.Default ignores path options too. So `fillColor`/`strokeColor` silently did
-// nothing for points on BOTH providers. Each adapter now translates the SAME neutral style into its
-// own circle primitive — a google symbol icon, an L.circleMarker — so a styled point looks the same
-// on either. `pointRadius` (px) sizes it.
+// `style` may also be a function `({ feature, index }) => result`, run once per GeoJSON feature, so
+// coloring can branch on `feature.properties`, on coordinates or on the index. The result is either
+// a neutral style object, using the vocabulary above, or a bare color string, which is shorthand
+// expanded to `{ fillColor, strokeColor }`. The callback sees the original GeoJSON feature and the
+// same 0-based index on both providers, because each adapter maps its own SDK feature back to that
+// (see addVector below and resolveFeatureStyle).
+//
+// Point geometry is what the path vocabulary above cannot express on either provider: a
+// google.maps.Data point draws an `icon` rather than a filled path, and Leaflet's default point is
+// an L.marker whose Icon.Default ignores path options too, so `fillColor` and `strokeColor` did
+// nothing for points on both. Each adapter now translates the neutral style into its own circle,
+// a google symbol icon or an L.circleMarker, so a styled point looks the same on either.
+// `pointRadius` sizes it, in px.
 /**
  * @typedef {Object} NeutralStyle
  * @property {string} [fillColor]
@@ -167,16 +165,17 @@ export function mapProviderNames() {
  * @property {number} [pointRadius] - radius in px for Point/MultiPoint features (default 6)
  */
 
-/** Default point radius in px — shared, so a point is the same size on every provider. */
+/** Default point radius in px, shared so a point is the same size on both providers. */
 export const DEFAULT_POINT_RADIUS = 6;
 
-// A unit-radius circle as an SVG path, scaled by `pointRadius`. Spelled out rather than using
-// google.maps.SymbolPath.CIRCLE so the translation stays a PURE function: it is unit-tested under
-// Node, where the google namespace does not exist.
+// A unit-radius circle as an SVG path, scaled by `pointRadius`. Written out rather than using
+// google.maps.SymbolPath.CIRCLE so the translation stays pure and testable under Node, where the
+// google namespace does not exist.
 const UNIT_CIRCLE_PATH = "M 0,-1 A 1,1 0 1,0 0,1 A 1,1 0 1,0 0,-1 Z";
 
 /**
- * The neutral style of a POINT feature → a `google.maps.Symbol` for `Data.StyleOptions.icon`.
+ * Converts a point feature's neutral style into a `google.maps.Symbol` for
+ * `Data.StyleOptions.icon`.
  * @param {NeutralStyle} [s]
  * @returns {Object} a google.maps.Symbol
  */
@@ -185,8 +184,8 @@ export function styleToGooglePoint(s = {}) {
   return {
     path: UNIT_CIRCLE_PATH,
     scale: pointRadius ?? DEFAULT_POINT_RADIUS,
-    // A symbol defaults to fillOpacity 0 (invisible), unlike a path — so a supplied fillColor
-    // implies a fully opaque fill unless the caller said otherwise.
+    // A symbol defaults to fillOpacity 0, invisible, where a path does not. So a fillColor implies
+    // a fully opaque fill unless an explicit opacity says otherwise.
     ...(fillColor != null ? { fillColor, fillOpacity: fillOpacity ?? 1 } : {}),
     ...(strokeColor != null ? { strokeColor } : {}),
     ...(strokeWidth != null ? { strokeWeight: strokeWidth } : {}),
@@ -227,9 +226,9 @@ export function styleToLeaflet(s = {}) {
   };
 }
 
-// The features of any accepted GeoJSON, in document order — a FeatureCollection's array, a lone
-// Feature wrapped as a one-element list, or [] for a bare geometry. The addVector adapters use this
-// to give a per-feature `style` callback the ORIGINAL feature + its index.
+// The features of any accepted GeoJSON, in document order: a FeatureCollection's array, a lone
+// Feature as a one-element list, or [] for a bare geometry. The addVector adapters use it to give a
+// per-feature `style` callback the original feature and its index.
 /**
  * @param {Object} geojson
  * @returns {Object[]}
@@ -241,11 +240,11 @@ export function featuresOf(geojson) {
   return [];
 }
 
-// Resolve `style` for ONE feature into a neutral style object, ready for styleToGoogle/styleToLeaflet.
-//   • object   → used as-is for every feature (the non-callback path).
-//   • function → called `({ feature, index })`; may return a neutral style OBJECT, or a colour
-//                STRING (the graded-colour shorthand → { fillColor, strokeColor }).
-//   • nullish result → {} (provider default styling for that feature).
+// Resolves `style` for one feature into a neutral style object for styleToGoogle or styleToLeaflet.
+//   object          used as-is for each feature, the non-callback path
+//   function        called as `({ feature, index })`, returning a neutral style object or a color
+//                   string, which is shorthand for { fillColor, strokeColor }
+//   nullish result  {}, so the provider styles that feature itself
 /**
  * @param {NeutralStyle|((ctx: {feature: Object, index: number}) => (NeutralStyle|string|null))|null} style
  * @param {Object} feature
@@ -261,8 +260,8 @@ export function resolveFeatureStyle(style, feature, index) {
 
 // ---- built-in: google ---------------------------------------------------------------------------
 
-// Defaults chosen so a bare `mount(el, { apiKey })` yields a usable map. Each is overridable via
-// `mapOptions`, which is merged last and wins.
+// Defaults chosen so a bare `mount(el, { apiKey })` gives a usable map. `mapOptions` merges last
+// and overrides any of them.
 const GOOGLE_DEFAULTS = {
   center: { lat: 39.8097343, lng: -98.5556199 },   // continental US
   zoom: 5,
@@ -271,19 +270,19 @@ const GOOGLE_DEFAULTS = {
   clickableIcons: false,
 };
 
-// Google invokes this global when the key is invalid/unauthorized. Owned by THIS provider (it is a
-// Google concept), routed to the active app's error bus as a typed 'invalid-api-key'. Installed
-// lazily on first create() so registering the provider has no global side effect.
+// Google calls this global when the key is invalid or unauthorized. It is a Google concept, so it
+// lives in this provider, and it reaches the active app's error bus as 'invalid-api-key'. Installed
+// on first create(), so registering the provider touches no global.
 function installGmAuthFailure() {
   if (typeof window === "undefined" || window.gm_authFailure) return;
   window.gm_authFailure = () =>
     reportError("invalid-api-key", "Google Maps rejected the API key (gm_authFailure).");
 }
 
-// CRS the Google JS API can place an overlay in: it works in WGS84 lat/lng. NAD83 (EPSG:4269) differs
-// from WGS84 by ~1-2 m — below render resolution — so it is accepted as-is (matches geo/reproject.js's
-// NAD83→WGS84 no-op). Anything else must be reprojected before a Layer can render it (the render
-// precondition asks acceptsCRS; see Layer.#checkProviderCRS).
+// The CRS the Google JS API can place an overlay in, which is WGS84 lat/lng. NAD83, EPSG:4269,
+// differs from WGS84 by 1 to 2 m, below render resolution, so it is accepted as-is, matching
+// geo/reproject.js where NAD83 to WGS84 does nothing. Anything else must be reprojected before a
+// Layer renders it; the render precondition asks acceptsCRS (see Layer.#checkProviderCRS).
 const WGS84_FAMILY = new Set(["EPSG:4326", "EPSG:4269"]);
 
 /**
@@ -301,8 +300,8 @@ const WGS84_FAMILY = new Set(["EPSG:4326", "EPSG:4269"]);
 registerMapProvider("google", {
   requiresApiKey: true,
 
-  // A null/unknown CRS is treated as acceptable (best-effort) — the engine can't prove it wrong, and
-  // many sources arrive already in 4326 without declaring geokeys. Only a KNOWN non-WGS84 CRS blocks.
+  // A null or unknown CRS is accepted, since the engine cannot prove it wrong and many sources
+  // arrive in 4326 without declaring geokeys. Only a known non-WGS84 CRS blocks the render.
   acceptsCRS: (crs) => crs == null || WGS84_FAMILY.has(String(crs).toUpperCase()),
 
   /**
@@ -327,28 +326,29 @@ registerMapProvider("google", {
     });
   },
 
-  // ---- vector rendering (the first slice of the overlay contract) ----
-  // The engine's VectorLayer calls these; provider-specific SDK code (google.maps.Data) lives
-  // HERE, in the google adapter, so the Layer model itself stays provider-neutral.
+  // ---- vector rendering ----
+  // VectorLayer calls these. The google.maps.Data code lives here in the adapter, so the Layer model
+  // stays provider-neutral.
 
-  /** Render a GeoJSON FeatureCollection → an opaque handle the engine holds. */
+  /** Renders a GeoJSON FeatureCollection and returns an opaque handle the engine holds. */
   addVector(map, geojson, { style } = {}) {
     // eslint-disable-next-line no-undef
     const data = new google.maps.Data();
     const added = data.addGeoJson(geojson);   // Data.Feature[] in document order
     if (style) {
-      // google.maps.Data.setStyle accepts a per-feature function, but hands it a Data.Feature — not
-      // the GeoJSON feature. Map it back by add order so the callback sees feature.properties/geometry.
-      // Always a FUNCTION, even for a static style object: the geometry TYPE decides whether the
-      // style becomes path options or a point symbol, and only the callback sees it.
+      // google.maps.Data.setStyle takes a per-feature function but passes it a Data.Feature rather
+      // than the GeoJSON feature, so map it back by add order and the callback sees the original
+      // properties and geometry. Always a function, even for a static style object, because the
+      // geometry type decides whether the style becomes path options or a point symbol and only the
+      // callback sees the type.
       const feats = featuresOf(geojson);
       const indexOf = new Map(added.map((df, i) => [df, i]));
       data.setStyle((df) => {
         const i = indexOf.get(df) ?? 0;
         const neutral = typeof style === "function" ? resolveFeatureStyle(style, feats[i], i) : style;
         const out = styleToGoogle(neutral);
-        // Points draw an icon, not a path — translate the same neutral style into a circle symbol,
-        // unless the caller passed a provider-native `icon` of their own (which `rest` preserved).
+        // A point draws an icon rather than a path, so translate the neutral style into a circle
+        // symbol, unless a native `icon` was passed, which `rest` preserved.
         if (out.icon == null && /Point$/.test(df.getGeometry?.()?.getType?.() || "")) {
           out.icon = styleToGooglePoint(neutral);
         }
@@ -359,30 +359,29 @@ registerMapProvider("google", {
     return data;
   },
 
-  /** Tear a vector handle down. */
+  /** Removes a vector handle from the map. */
   removeVector(_map, handle) {
     handle?.setMap(null);
   },
 
-  /** Fit the map to { north, south, east, west }. */
+  /** Fits the map to { north, south, east, west }. */
   fitBounds(map, bounds) {
     if (bounds) map.fitBounds(bounds);   // LatLngBoundsLiteral
   },
 
   // ---- static raster-image rendering ----
-  // The engine's raster overlays (flood extent, depth, ensemble, …) already do 100% of the
-  // provider-neutral work themselves — decode the GeoTIFF, colour it, build a canvas, get a data
-  // URL — so all a provider needs is "put this image over these geographic bounds." GroundOverlay
-  // does that as a first-class Maps object (no custom OverlayView subclass, no manual draw()
-  // repositioning on pan/zoom — it handles that internally), which is what makes this a genuine
-  // simplification of the google path too, not just a Leaflet compatibility shim.
+  // The engine's raster overlays already do the provider-neutral work themselves: decode the
+  // GeoTIFF, color it, build a canvas and take a data URL. A provider only has to put that image
+  // over the given geographic bounds. GroundOverlay does exactly that as a built-in Maps object,
+  // with no OverlayView subclass and no manual draw() repositioning on pan or zoom, so this
+  // simplifies the google path rather than merely accommodating Leaflet.
 
   /**
-   * Position a pre-rendered image (data URL or any image URL) over bounds → an opaque handle.
-   * Raster overlays default NON-INTERACTIVE (`clickable:false`) so the overlay does not swallow map
-   * mouse events over its rectangle — the engine's event dispatch attaches to the MAP and hit-tests
-   * layers itself (PACKAGE_ROADMAP §1), so it must still fire over the raster. Pass `{ interactive:
-   * true }` to opt a specific overlay INTO direct SDK interaction.
+   * Positions a pre-rendered image, a data URL or any image URL, over bounds and returns an opaque
+   * handle. Raster overlays are non-interactive by default, so the overlay does not swallow map
+   * mouse events over its rectangle: the engine's dispatch attaches to the map and hit-tests layers
+   * itself (PACKAGE_ROADMAP §1), so events must still fire over the raster. Pass
+   * `{ interactive: true }` to give one overlay direct SDK interaction.
    */
   addRasterImage(map, dataUrl, bounds, { opacity, interactive } = {}) {
     // eslint-disable-next-line no-undef
@@ -391,24 +390,24 @@ registerMapProvider("google", {
     return overlay;
   },
 
-  /** Tear a raster-image handle down. */
+  /** Removes a raster-image handle from the map. */
   removeRasterImage(_map, handle) {
     handle?.setMap(null);
   },
 
-  /** Change a raster-image handle's opacity (0..1). */
+  /** Changes a raster-image handle's opacity, from 0 to 1. */
   setRasterImageOpacity(handle, opacity) {
     handle?.setOpacity?.(opacity);
   },
 
-  // GroundOverlay has no documented way to swap its image after construction (unlike Leaflet's
-  // ImageOverlay#setUrl) — so a live repaint (e.g. switching palettes in the Layer Settings panel)
-  // means remove-and-recreate here. Callers must use the RETURNED handle going forward, not the one
-  // they passed in — this is exactly why the contract returns a handle instead of mutating in place.
-  /** Swap a raster-image handle's image (e.g. a palette repaint). Returns the handle to use next. */
+  // GroundOverlay documents no way to swap its image after construction, where Leaflet has
+  // ImageOverlay#setUrl. So a live repaint, i.e. switching palettes in the Layer Settings panel,
+  // means removing and recreating it here. Use the returned handle from then on, not the one passed
+  // in, which is why this returns a handle rather than mutating in place.
+  /** Swaps a raster-image handle's image. Returns the handle to use next. */
   setRasterImageUrl(map, handle, dataUrl, bounds, { opacity, interactive } = {}) {
     handle?.setMap(null);
-    // Keep the same interactivity across the repaint — see addRasterImage (default non-interactive).
+    // Keep the same interactivity across the repaint; addRasterImage defaults to non-interactive.
     // eslint-disable-next-line no-undef
     const next = new google.maps.GroundOverlay(dataUrl, bounds, { opacity: opacity ?? 1, clickable: !!interactive });
     next.setMap(map);
@@ -418,7 +417,7 @@ registerMapProvider("google", {
   // ---- map mouse-move (hover-value readouts) ----
 
   /**
-   * Subscribe to mouse-move on the map, normalized to `{lat, lng}`.
+   * Subscribes to mouse-move on the map, normalized to `{lat, lng}`.
    * @returns {() => void} an unsubscribe function
    */
   onMapMouseMove(map, cb) {
@@ -430,25 +429,25 @@ registerMapProvider("google", {
   },
 
   /**
-   * Turn pan-by-drag on or off. Drag-based selection (freehand, brush) is otherwise unusable: the
-   * same gesture that traces the stroke also pans the map, so the stroke is drawn against a moving
-   * projection and lands nowhere near where it was drawn.
+   * Turns pan-by-drag on or off. Without it, freehand and brush selection are unusable: the gesture
+   * that traces the stroke also pans the map, so the stroke is drawn against a moving projection and
+   * ends up far from where the user drew it.
    * @param {any} map @param {boolean} on
    */
   setDraggable(map, on) { map?.setOptions?.({ draggable: !!on }); },
 
   /**
-   * What one screen pixel is worth on the ground right now, plus the map's pixel size — enough to
-   * express a tool's size in SCREEN units (a brush that stays the same width as you zoom) without the
-   * tool ever touching a map SDK.
+   * What one screen pixel covers on the ground right now, with the map's pixel size. A tool sizes
+   * itself in screen units from these, i.e. a brush that keeps its width as the user zooms, without
+   * touching a map SDK.
    * @param {any} map @returns {{metresPerPixel: number, width: number, height: number}|null}
    */
   viewMetrics(map) {
-    const zoom = map?.getZoom?.(), centre = map?.getCenter?.();
-    if (zoom == null || !centre) return null;
+    const zoom = map?.getZoom?.(), center = map?.getCenter?.();
+    if (zoom == null || !center) return null;
     const div = map.getDiv?.();
     return {
-      metresPerPixel: metresPerPixelAt(centre.lat(), zoom),
+      metresPerPixel: metresPerPixelAt(center.lat(), zoom),
       width: div?.offsetWidth ?? 0,
       height: div?.offsetHeight ?? 0,
     };
@@ -468,28 +467,27 @@ registerMapProvider("google", {
       };
       // eslint-disable-next-line no-undef
       const listener = google.maps.event.addListenerOnce(map, "idle", finish);
-      // 'idle' does not fire for a map that is ALREADY idle, so the timer is what makes this safe to
-      // await unconditionally — without it, `await whenIdle()` on a still map would hang forever.
+      // 'idle' does not fire for a map that is already idle, so the timer is what makes this always
+      // safe to await. Without it, `await whenIdle()` on a still map would hang.
       const timer = setTimeout(finish, timeout);
     });
   },
 
   /**
-   * Restack overlays to match `handles`, ordered bottom → top. Returns the handles, since some may
-   * have been REPLACED (see below) — callers must adopt the returned array.
+   * Restacks overlays to match `handles`, ordered bottom to top, and returns them. Some may have
+   * been replaced, as described below, so use the returned array from then on.
    *
-   * Google's `GroundOverlay` exposes no z-index of any kind: its constructor takes only
-   * `{ opacity, clickable, map }` and there is no public reorder. So a raster is restacked by
-   * removing it and re-adding it in the right order, which is why the handle changes. That costs a
-   * flicker and an image re-fetch per reorder — deliberate, because the alternative (replacing
-   * GroundOverlay with a custom OverlayView whose DOM node we own) rewrites the working raster path
-   * on the provider half with the least test coverage. Both live behind this one method, so that
-   * upgrade is available later without touching a single caller.
+   * Google's `GroundOverlay` exposes no z-index at all: its constructor takes only
+   * `{ opacity, clickable, map }` and offers no public reorder. So restacking a raster means
+   * removing and re-adding it in order, which is why the handle changes. That costs a flicker and an
+   * image re-fetch per reorder. The alternative, replacing GroundOverlay with an OverlayView whose
+   * DOM node this file owns, would rewrite the working raster path on the least-tested provider.
+   * Both sit behind this one method, so that upgrade stays available without changing any call site.
    *
-   * KNOWN LIMIT: `google.maps.Data` vectors always draw ABOVE ground overlays in Google's own
-   * stacking, and putting a raster over a vector would mean styling every feature's `zIndex` and
-   * clobbering the host's own style function. So on Google, raster-over-vector is not honoured —
-   * rasters restack among themselves, vectors stay on top.
+   * Known limit: `google.maps.Data` vectors always draw above ground overlays in Google's stacking,
+   * and putting a raster over a vector would mean setting every feature's `zIndex` and overwriting
+   * the host's own style function. So on Google a raster never goes over a vector: rasters restack
+   * among themselves and vectors stay on top.
    */
   applyLayerOrder(map, handles = []) {
     const rasters = handles.filter((h) => h && typeof h.getUrl === "function");
@@ -506,11 +504,12 @@ registerMapProvider("google", {
     });
   },
 
-  // ---- generalized map events (the event-dispatch first slice — PACKAGE_ROADMAP §1) ----
+  // ---- normalized map events (PACKAGE_ROADMAP §1) ----
   /**
-   * Subscribe to a normalized map event. `type` ∈ click/hover/dblclick/mousedown/mouseup/rightclick;
-   * the callback gets `{ type, lat, lng, originalEvent }` (originalEvent = the DOM MouseEvent, for a
-   * UI that positions at the pointer). `hover` maps to Google's `mousemove`.
+   * Subscribes to a normalized map event. `type` is one of click, hover, dblclick, mousedown,
+   * mouseup or rightclick. The callback receives `{ type, lat, lng, originalEvent }`, where
+   * originalEvent is the DOM MouseEvent, for a UI that positions itself at the pointer. `hover`
+   * becomes Google's `mousemove`.
    * @returns {() => void} an unsubscribe function
    */
   onMapEvent(map, type, cb) {
@@ -527,19 +526,18 @@ registerMapProvider("google", {
 
 // ---- built-in: leaflet --------------------------------------------------------------------------
 
-// Leaflet is a real dependency but lazy-loaded (dynamic import inside create()), so a google-only
-// consumer never downloads it — webpack code-splits it into its own async chunk. Node tests that
-// import this module do not trigger it either.
+// Leaflet is a real dependency, imported dynamically inside create(), so a google-only app never
+// downloads it: webpack splits it into its own async chunk. Node tests importing this module do not
+// trigger it either.
 //
-// requiresApiKey is false — this is the whole reason apiKey is a per-provider property.
+// requiresApiKey is false, which is why apiKey belongs to the provider rather than to config.
 //
-// Implements the same MAP + VECTOR + static RASTER-IMAGE contract as the google provider (see the
-// scope note at the top of this file for what's still Google-only: animated velocity, the
-// comparison draw tool, damage markers, ArcGIS depth tiles).
+// Implements the same map, vector and static raster-image methods the google provider does. The
+// note at the top of this file lists what stays Google-only.
 //
-// CSS: Leaflet needs leaflet.css for correct tile/marker layout. In a bundler, add
-// `import "leaflet/dist/leaflet.css"`; in a raw-browser page, add a <link> to it. The provider does
-// not inject a stylesheet, to avoid baking a CDN URL into the library.
+// Leaflet needs leaflet.css for correct tile and marker layout. In a bundler, add
+// `import "leaflet/dist/leaflet.css"`; in a raw-browser page, add a <link>. This provider injects no
+// stylesheet, so no CDN URL is baked into the library.
 const LEAFLET_DEFAULTS = {
   center: { lat: 39.8097343, lng: -98.5556199 },
   zoom: 5,
@@ -547,9 +545,9 @@ const LEAFLET_DEFAULTS = {
   tileOptions: { attribution: "© OpenStreetMap contributors" },
 };
 
-// Leaflet is a singleton library — `import("leaflet")` returns the same module every time. create()
-// stashes it here so the (synchronous) vector-contract methods below don't each have to await the
-// import. A map must be created before any addVector, so this is always set by the time they run.
+// `import("leaflet")` returns the same module every time, so create() stores it here and the
+// synchronous vector methods below need not await the import. A map is always created before any
+// addVector, so this is set by the time they run.
 let _leaflet = null;
 
 /**
@@ -558,7 +556,7 @@ let _leaflet = null;
  * @property {{lat: number, lng: number}} [center] - initial map center; defaults to the continental US.
  * @property {number} [zoom] - initial zoom level; defaults to `5`.
  * @property {string|null} [tileUrl] - basemap tile URL template; pass `null` to opt out of the default
- *   OpenStreetMap tile layer (e.g. to add your own via `L.tileLayer`).
+ *   OpenStreetMap tile layer, i.e. to add your own with `L.tileLayer`.
  * @property {Object} [tileOptions] - options passed to `L.tileLayer` (e.g. `attribution`).
  * @property {Object} [mapOptions] - raw Leaflet `L.Map` options, passed straight to `L.map(el, mapOptions)`.
  */
@@ -566,8 +564,8 @@ let _leaflet = null;
 registerMapProvider("leaflet", {
   requiresApiKey: false,
 
-  // L.imageOverlay/L.geoJSON position content by lat/lng, so Leaflet renders the same WGS84 family as
-  // google (a documented small subset — reprojected basemaps in other CRS are a separate concern).
+  // L.imageOverlay and L.geoJSON position content by lat/lng, so Leaflet renders the same WGS84
+  // family google does. Reprojected basemaps in another CRS are a separate matter.
   acceptsCRS: (crs) => crs == null || WGS84_FAMILY.has(String(crs).toUpperCase()),
 
   /**
@@ -576,12 +574,12 @@ registerMapProvider("leaflet", {
    * @returns {Promise<any>} an `L.Map` instance
    */
   async create(el, options = {}) {
-    // Leaflet needs its own CSS (unlike google.maps, which the script Loader pulls in for you) — a
-    // host would otherwise have to remember a manual <link> tag. Dynamic-imported alongside the JS, same
-    // laziness rationale (a google-only consumer downloads neither); webpack's style-loader
-    // (configured in this package's build) injects it as a real bundled <style>
-    // tag on first evaluation — no CDN request, no separate asset, and ES module caching means a
-    // second create() call is a no-op re-import, not a duplicate injection.
+    // Leaflet needs its own CSS, where google.maps' script Loader pulls its own in, so a host would
+    // otherwise have to remember a <link> tag. Imported dynamically alongside the JS for the same
+    // reason: a google-only app downloads neither. webpack's style-loader, configured in this
+    // package's build, injects it as a bundled <style> tag on first evaluation, so there is no CDN
+    // request and no separate asset. ES module caching makes a second create() a no-op re-import
+    // rather than a duplicate injection.
     await import("leaflet/dist/leaflet.css");
     const ns = await import("leaflet");
     const L = (_leaflet = ns.default ?? ns);
@@ -591,7 +589,7 @@ registerMapProvider("leaflet", {
 
     const map = L.map(el, options.mapOptions || {}).setView([center.lat, center.lng], zoom);
 
-    // A basemap tile layer, unless the host opts out with `tileUrl: null` (e.g. to add its own).
+    // A basemap tile layer, unless the host passes `tileUrl: null` to add its own.
     const tileUrl = options.tileUrl !== undefined ? options.tileUrl : LEAFLET_DEFAULTS.tileUrl;
     if (tileUrl) {
       L.tileLayer(tileUrl, options.tileOptions || LEAFLET_DEFAULTS.tileOptions).addTo(map);
@@ -599,17 +597,17 @@ registerMapProvider("leaflet", {
     return map;
   },
 
-  // ---- vector rendering: the SAME contract the google provider implements ----
-  // VectorLayer calls these without knowing which provider it is on; the neutral style is
-  // translated to Leaflet path options here. This is the whole point of the seam — one Layer, one
-  // style vocabulary, any provider that implements addVector/removeVector/fitBounds.
+  // ---- vector rendering: the same methods the google provider implements ----
+  // VectorLayer calls these without knowing which provider it is on, and the neutral style becomes
+  // Leaflet path options here. One Layer and one style vocabulary work on any provider implementing
+  // addVector, removeVector and fitBounds.
 
-  /** Render a GeoJSON FeatureCollection via L.geoJSON → the layer handle the engine holds. */
+  /** Renders a GeoJSON FeatureCollection through L.geoJSON and returns the handle. */
   addVector(map, geojson, { style } = {}) {
     const L = _leaflet;
     if (!L) throw new Error("leaflet provider: addVector called before a leaflet map was created");
-    // L.geoJSON's style callback gets the GeoJSON feature but no index; recover it from a
-    // reference map (L.geoJSON keeps the original feature object as layer.feature).
+    // L.geoJSON's style callback receives the GeoJSON feature but no index, so recover it from a
+    // lookup map. L.geoJSON keeps the original feature object as layer.feature.
     const indexOf = typeof style === "function"
       ? new Map(featuresOf(geojson).map((f, i) => [f, i]))
       : null;
@@ -619,10 +617,10 @@ registerMapProvider("leaflet", {
 
     const opts = {
       // Leaflet's default for a Point is L.marker with Icon.Default, which resolves its PNGs from
-      // the URL of a `<script src=".../leaflet.js">` tag. This package BUNDLES Leaflet, so that tag
-      // never exists, Icon.Default falls back to a page-relative `images/marker-icon.png`, and every
-      // point renders as a broken image. A circleMarker needs no asset at all AND honours the
-      // neutral style vocabulary that an icon marker ignores — the same circle google draws above.
+      // the URL of a `<script src=".../leaflet.js">` tag. This package bundles Leaflet, so that tag
+      // never exists, Icon.Default falls back to a page-relative `images/marker-icon.png`, and each
+      // point renders as a broken image. A circleMarker needs no asset and reads the neutral style
+      // vocabulary an icon marker ignores, giving the same circle google draws above.
       pointToLayer: (feature, latlng) => {
         const s = neutralFor(feature);
         return L.circleMarker(latlng, { radius: DEFAULT_POINT_RADIUS, ...styleToLeaflet(s) });
@@ -640,16 +638,17 @@ registerMapProvider("leaflet", {
     else if (handle) map.removeLayer(handle);
   },
 
-  /** Fit the map to { north, south, east, west }. Leaflet wants [[south,west],[north,east]]. */
+  /** Fits the map to { north, south, east, west }. Leaflet takes [[south,west],[north,east]]. */
   fitBounds(map, bounds) {
     if (!bounds) return;
     map.fitBounds([[bounds.south, bounds.west], [bounds.north, bounds.east]]);
   },
 
-  // ---- static raster-image rendering: the SAME contract the google provider implements ----
+  // ---- static raster-image rendering: the same methods the google provider implements ----
 
-  /** Position a pre-rendered image over bounds via L.imageOverlay → the handle the engine holds.
-   * Non-interactive by default (the engine dispatch hit-tests on map events); opt in with { interactive }. */
+  /** Positions a pre-rendered image over bounds through L.imageOverlay and returns the handle.
+   * Non-interactive by default, since the engine dispatch hit-tests map events; opt in with
+   * { interactive }. */
   addRasterImage(map, dataUrl, bounds, { opacity, interactive } = {}) {
     const L = _leaflet;
     if (!L) throw new Error("leaflet provider: addRasterImage called before a leaflet map was created");
@@ -670,9 +669,9 @@ registerMapProvider("leaflet", {
     handle?.setOpacity?.(opacity);
   },
 
-  // L.ImageOverlay#setUrl swaps the image in place — cheap, no remove/recreate needed. Still
-  // returns the handle (same one), matching the google provider's contract shape so callers never
-  // need to know which provider they're on.
+  // L.ImageOverlay#setUrl swaps the image in place, with no remove and recreate. It still returns
+  // the handle, the same one, matching the google provider's signature so a call site never has to
+  // know which provider it is on.
   /** Swap a raster-image handle's image (e.g. a palette repaint). Returns the handle to use next. */
   setRasterImageUrl(_map, handle, dataUrl, _bounds, { opacity } = {}) {
     handle?.setUrl?.(dataUrl);
@@ -680,7 +679,7 @@ registerMapProvider("leaflet", {
     return handle;
   },
 
-  // ---- map mouse-move (hover-value readouts): the SAME contract the google provider implements ----
+  // ---- map mouse-move for hover readouts: the same method the google provider implements ----
 
   /**
    * @returns {() => void} an unsubscribe function
@@ -692,23 +691,23 @@ registerMapProvider("leaflet", {
   },
 
   /**
-   * Turn pan-by-drag on or off — the same contract the google provider implements, for the same
-   * reason: a freehand stroke and a map pan are the same gesture, so one must be suppressed.
+   * Turns pan-by-drag on or off, as the google provider does and for the same reason: a freehand
+   * stroke and a map pan are the same gesture, so one has to be suppressed.
    * @param {any} map @param {boolean} on
    */
   setDraggable(map, on) { if (on) map?.dragging?.enable?.(); else map?.dragging?.disable?.(); },
 
   /**
-   * Ground metres per screen pixel + the map's pixel size — the same contract the google provider
-   * implements, from Leaflet's own accessors.
+   * Ground meters per screen pixel with the map's pixel size, as the google provider returns, read
+   * from Leaflet's own accessors.
    * @param {any} map @returns {{metresPerPixel: number, width: number, height: number}|null}
    */
   viewMetrics(map) {
-    const zoom = map?.getZoom?.(), centre = map?.getCenter?.();
-    if (zoom == null || !centre) return null;
+    const zoom = map?.getZoom?.(), center = map?.getCenter?.();
+    if (zoom == null || !center) return null;
     const size = map.getSize?.();
     return {
-      metresPerPixel: metresPerPixelAt(centre.lat, zoom),
+      metresPerPixel: metresPerPixelAt(center.lat, zoom),
       width: size?.x ?? 0,
       height: size?.y ?? 0,
     };
@@ -728,27 +727,27 @@ registerMapProvider("leaflet", {
       };
       map.on("moveend", finish);
       map.on("zoomend", finish);
-      // Neither event fires for a map that is ALREADY still, so the timer is what makes this safe to
-      // await unconditionally. It also caps the wait if an animation is interrupted mid-flight.
+      // Neither event fires for a map that is already still, so the timer is what makes this always
+      // safe to await. It also caps the wait when an animation is interrupted.
       const timer = setTimeout(finish, timeout);
     });
   },
 
   /**
-   * Restack overlays to match `handles`, ordered bottom → top. Returns the same handles — unlike
-   * Google, nothing has to be recreated here.
+   * Restacks overlays to match `handles`, ordered bottom to top, and returns the same handles.
+   * Nothing is recreated here, unlike on Google.
    *
-   * `bringToFront()` exists on both handle types (`L.ImageOverlay` and `L.GeoJSON`, via
-   * `L.FeatureGroup`), and calling it over the list in order leaves the last one on top. That is
-   * simpler and more reliable than assigning z-indices: Leaflet has no z-index for vector paths at
-   * all, only pane-relative DOM order, so a `setZIndex`-shaped API would be a half-truth.
+   * `bringToFront()` exists on both handle types, `L.ImageOverlay` and `L.GeoJSON` through
+   * `L.FeatureGroup`, and calling it over the list in order leaves the last one on top. That beats
+   * assigning z-indices, because Leaflet has no z-index for vector paths at all, only pane-relative
+   * DOM order, so a `setZIndex`-shaped method would be misleading.
    */
   applyLayerOrder(map, handles = []) {
     for (const h of handles) h?.bringToFront?.();
     return handles;
   },
 
-  // ---- generalized map events: the SAME contract the google provider implements ----
+  // ---- normalized map events: the same method the google provider implements ----
   /**
    * @returns {() => void} an unsubscribe function
    */
@@ -764,7 +763,7 @@ registerMapProvider("leaflet", {
 // ---- the entry point ----------------------------------------------------------------------------
 
 /**
- * Create a map in `el` using the configured provider.
+ * Creates a map in `el` using the configured provider.
  *
  * @param {Element} el
  * @param {object}  options  { provider?, apiKey?, center?, zoom?, mapId?, mapOptions?, version?, libraries? }
@@ -793,15 +792,15 @@ export async function createMap(el, options = {}) {
   return provider.create(el, options);
 }
 
-/** Does the named provider need an apiKey? Used by mount() to validate config before booting. */
+/** True when the named provider needs an apiKey. mount() checks config with it before booting. */
 export function providerRequiresApiKey(name = DEFAULT_PROVIDER) {
   return !!getMapProvider(name)?.requiresApiKey;
 }
 
 /**
- * Can the named provider render content in `crs`? The Layer render precondition asks this before
- * drawing so a non-WGS84 raster surfaces a clear "reproject first" error instead of a blank overlay.
- * A provider that declares no `acceptsCRS` is treated as accepting anything (permissive default).
+ * True when the named provider can render content in `crs`. The Layer render precondition asks
+ * before drawing, so a non-WGS84 raster raises a clear "reproject first" error rather than showing
+ * a blank overlay. A provider declaring no `acceptsCRS` accepts anything.
  * @param {string} name @param {string|null} crs @returns {boolean}
  */
 export function providerAcceptsCRS(name = DEFAULT_PROVIDER, crs = null) {

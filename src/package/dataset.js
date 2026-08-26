@@ -1,27 +1,25 @@
-// dataset.js — a LAZY, IMMUTABLE parsed source (raster or vector) in its NATIVE CRS + metadata.
+// dataset.js — a lazy, immutable parsed source, raster or vector, in its native CRS with metadata.
 //
-// See docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1 — it records why Dataset became a lazy op-chain
-// (reversing the older "Dataset is a pure eager value; reproject lives in geo/" stance) and why each
-// decision was made.
+// docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1 records why Dataset became a lazy op chain and
+// what each decision traded away.
 //
-// A Dataset is one node in an op-chain:
-//   • a ROOT wraps a source — inlined bytes/GeoJSON (the classic `data` payload), or a URI (fromURL);
-//   • a DERIVED node is a parent + one op (reproject/select/…).
-// Nothing is fetched, decoded or warped until a TERMINAL forces it: `load()`/`grid()`/`features()`, or
-// a Layer rendering it. Ops return NEW lazy Datasets and never mutate — so one Dataset backs many
-// Layers without any of them corrupting the others. `kind ∈ {raster, vector}`; the two decoded
-// representations are RasterGrid / VectorFeatures (package/materialize.js).
+// A Dataset is one node in an op chain. A root wraps a source, either inlined bytes or GeoJSON in
+// `data`, or a URI through fromURL. A derived node is a parent plus one op such as reproject or
+// select. Nothing is fetched, decoded or warped until a terminal forces it: `load()`, `grid()`,
+// `features()`, or a Layer rendering it. An op returns a new lazy Dataset and mutates nothing, so
+// one Dataset backs many Layers without any of them corrupting the others. `kind` is raster or
+// vector, decoding to a RasterGrid or VectorFeatures (package/materialize.js).
 //
-// HEADLESS, STILL. `reproject` is now a method, but this file imports NO GDAL and no geotiff: building
-// a reproject node is pure, and forcing it dispatches through the registered reprojector
-// (package/materialize.js). Decoding dispatches through registered materializers. So `new Dataset()`
-// is still constructible and node-testable without the toolchain — the property protected by keeping
-// the heavy decoders in io/materializers.js, outside this import graph. (Dependencies flow
-// geo/ + io/ → package/, never back.)
+// This file stays headless. `reproject` is a method, but nothing here imports GDAL or geotiff:
+// building a reproject node is pure, and forcing it dispatches through the registered reprojector
+// (package/materialize.js), just as decoding dispatches through the registered materializers. So
+// `new Dataset()` is constructible and testable under node without the toolchain, which is why the
+// heavy decoders live in io/materializers.js, outside this import graph. Dependencies flow from geo/
+// and io/ into package/, never back.
 //
-// SELECTION AXES (`axes`, optional) — unchanged: a Dataset whose payloads are ADDRESSED rather than
-// inlined carries generic, format-neutral selection axes (e.g. a URL-backed stage series). `select()`
-// resolves one entry into a child URL-rooted Dataset. See the axes docs below.
+// A Dataset whose payloads are addressed rather than inlined carries format-neutral selection axes
+// in `axes`, i.e. a URL-backed stage series. `select()` resolves one entry into a child Dataset. The
+// axes docs below cover the details.
 
 import {
   RasterGrid, VectorFeatures,
@@ -33,16 +31,16 @@ import {
   maskGrid, clipGrid, reclassifyGrid, combineGrids, zonalStats,
   slopeGrid, aspectGrid, hillshadeGrid, rasterizeFeatures, groupByGrid,
 } from "./rasterOps.js";
-// resampleGrid is pure JS / headless (geo/resample.js has zero imports of its own) — same status as
-// rasterOps.js, which already imports it for combine()'s LHS-conform resampling. registerResampler
-// (the escape hatch for GDAL-only methods) and resampleGrid itself are also barrel-exported directly
-// (lib.js), so a caller can use either the Dataset op below or the raw function on pixel arrays.
+// resampleGrid is pure JS and headless, since geo/resample.js imports nothing, the same as
+// rasterOps.js which already imports it for combine()'s resampling. lib.js exports resampleGrid and
+// registerResampler directly too, so the user can take either the Dataset op below or the raw
+// function over pixel arrays.
 import { resampleGrid, registerResampler } from "../geo/resample.js";
 import { notifyBusy } from "./events.js";
 
-// A resample target is either resample.js's native meta shape already, or anything grid-shaped
-// (a RasterGrid, or another Dataset's already-forced .grid() result) — normalized the same way
-// rasterOps.js's internal gridMeta() does, so resampleTo() accepts what a caller actually has on hand.
+// A resample target is either resample.js's own meta layout or anything grid-shaped, i.e. a
+// RasterGrid or another Dataset's forced .grid() result. Normalized the way rasterOps.js's gridMeta()
+// does, so resampleTo() takes whatever the user already holds.
 function toResampleMeta(t) {
   if (!t) return null;
   if (typeof t.bw === "number" && typeof t.width === "number") return t;
@@ -58,7 +56,7 @@ function nextId() {
   return `ds_${Date.now().toString(36)}_${(++_seq).toString(36)}`;
 }
 
-// Infer a parse/decode format from a URL or filename extension (for fromURL / select).
+// Infers a decode format from a URL or filename extension, for fromURL and select.
 function formatFromName(name) {
   const ext = (String(name).split("?")[0].split(".").pop() || "").toLowerCase();
   switch (ext) {
@@ -72,28 +70,28 @@ function formatFromName(name) {
 }
 const kindOfFormat = (fmt) => (fmt === "geotiff" ? "raster" : fmt ? "vector" : null);
 
-// Is this axis-entry `ref` an in-file selector rather than a URL / named URL variants? Discriminated
-// on an OBJECT-valued `select` key: named variants are string-valued throughout, so a variant literally
-// named "select" (holding a URL string) is still read as a variant, not mistaken for a selector.
+// True when this axis entry's `ref` is an in-file selector rather than a URL or named URL variants.
+// An object-valued `select` key tells them apart: named variants hold strings throughout, so a
+// variant actually named "select", holding a URL string, still reads as a variant.
 const isSelectorRef = (ref) =>
   !!ref && typeof ref === "object" && !!ref.select && typeof ref.select === "object";
 
 /**
- * One entry on a selection axis. `ref` says how to GET this entry's payload, and has three forms —
- * the axis model is agnostic about which, so `select()`/`reduce()` work the same over all of them:
+ * One entry on a selection axis. `ref` says how to get this entry's payload and takes three forms.
+ * The axis model does not care which, so `select()` and `reduce()` work the same over all three.
  *
- * - `'stage_12.tif'` — a **URL** (relative to `select`'s `base`). One file per entry: the FIM Scenario
- *   shape, where each timestep/stage is its own downloadable raster.
- * - `{ raster: 'a.tif', vector: 'a.geojson' }` — **named URL variants**; `select({ variant })` picks one.
- * - `{ select: { variable: 'TMP', date: '…' } }` — an **in-file selector**. The entry is not a separate
- *   file: it is a slice of the SAME source this Dataset already points at (a NetCDF/GRIB2/Zarr file
- *   holding every timestep). The child shares the parent's bytes/URL and carries the selector through
- *   to the materializer as `root.select`. Optional siblings `name`/`crs`/`bounds` override what the
- *   child would otherwise inherit from its parent.
+ * - `'stage_12.tif'`, a URL relative to `select`'s `base`. One file per entry, which is the FIM
+ *   Scenario layout where each stage is its own downloadable raster.
+ * - `{ raster: 'a.tif', vector: 'a.geojson' }`, named URL variants, picked by `select({ variant })`.
+ * - `{ select: { variable: 'TMP', date: '…' } }`, an in-file selector. The entry is not a separate
+ *   file but a slice of the source this Dataset already points at, i.e. a NetCDF file holding every
+ *   timestep. The child shares the parent's bytes or URL and passes the selector to the materializer
+ *   as `root.select`. Optional `name`, `crs` and `bounds` siblings override what the child would
+ *   otherwise inherit.
  *
  * The third form is what lets one multi-dimensional file back a whole temporal axis. Without it an
- * axis entry must be separately fetchable, which is true of FIM Scenario and false of every
- * scientific multi-dim format.
+ * axis entry has to be separately fetchable, which holds for FIM Scenario and for no scientific
+ * multi-dimensional format.
  *
  * @typedef {Object} DatasetAxisEntry
  * @property {number|string} coord
@@ -101,13 +99,13 @@ const isSelectorRef = (ref) =>
  * @property {Object} [meta]
  */
 /**
- * A selection axis, and **its algebra**. Which verbs are legal is a property of the axis, not of the
- * verb — so a band, variable or ensemble axis is safe by construction instead of by special case.
+ * A selection axis and the operations it permits. Which verbs are legal belongs to the axis rather
+ * than to the verb, so a band, variable or ensemble axis is safe by construction.
  *
- * The two flags are **independent**, which is the whole reason there are two. Ensemble member is the
- * proof: unordered (member 3 is not "between" 2 and 4) yet perfectly reducible (the members are the
- * same quantity, differently realised). Band is the mirror image: ordered by index, but a mean of red
- * and near-infrared is not a thing.
+ * The two flags are independent, which is why there are two. An ensemble member axis is unordered,
+ * since member 3 is not between 2 and 4, yet fully reducible, since the members are one quantity
+ * realized differently. A band axis is the reverse: ordered by index, but a mean of red and
+ * near-infrared means nothing.
  *
  * | axis | `ordered` | `commensurable` |
  * |---|---|---|
@@ -116,17 +114,17 @@ const isSelectorRef = (ref) =>
  * | band (R/G/B) | ✅ | ✗ |
  * | variable (Rainf/Tair) | ✗ | ✗ |
  *
- * Both default to `true`, which is what every axis built before them was: FIM Scenario's stage and
- * the NetCDF/GRIB2/Zarr time axis are ordered and commensurable.
+ * Both default to `true`, matching the axes that existed before the flags did: FIM Scenario's stage
+ * and the NetCDF, GRIB2 and Zarr time axes are all ordered and commensurable.
  *
  * @typedef {Object} DatasetAxis
  * @property {string} name
  * @property {string|null} [unit]
  * @property {boolean} [ordered=true] - do the coords have a magnitude, so that "between" and
- *   "nearest" mean something? Gates `selectRange` and `selectAxisEntry`'s nearest-match. Without it,
- *   nearest-match would happily snap `select(1.5)` to band 2.
+ *   whether "nearest" means anything here. Gates `selectRange` and selectAxisEntry's nearest match,
+ *   which would otherwise snap `select(1.5)` to band 2.
  * @property {boolean} [commensurable=true] - do the entries measure the same quantity in the same
- *   units, so that averaging across them is meaningful? Gates `reduce`.
+ *   whether the entries share units, so averaging across them means something. Gates `reduce`.
  * @property {DatasetAxisEntry[]} entries
  */
 /**
@@ -135,15 +133,15 @@ const isSelectorRef = (ref) =>
  */
 
 export class Dataset {
-  // ---- lazy-graph state (private; never enumerated, excluded from toRecord unless storeMaterialized) ----
+  // ---- lazy-graph state: private, never enumerated, and out of toRecord unless storeMaterialized ----
   #url = null;          // root only: a URI source (fromURL). Mutually exclusive with inline `data`.
   #resolveUrl = null;   // url root only: an optional (url)=>string resolver (host CORS-proxy/mirror),
-                        //   applied at force time. Instance-supplied, never serialized (a function).
+                        //   applied at force time. Supplied per instance, and never serialized.
   #selector = null;     // root only: an IN-FILE selection (e.g. { variable, date }), handed to the
-                        //   materializer as `root.select`. What lets one multi-dimensional source back
-                        //   a whole axis without one file per entry — see select()'s selector refs.
+                        //   materializer as `root.select`. This is what lets one multi-dimensional
+                        //   source back a whole axis; see select()'s selector refs.
   #inputs = null;       // derived only: the INPUT Datasets (array — unary ops are length-1, N-ary ops
-                        //   like combine/difference hold several). null on a root.
+                        //   such as combine hold several. null on a root.
   #op = null;           // derived only: a declarative op descriptor, e.g. { op:'reproject', crs }
   #materialized = null; // memoized force result (RasterGrid|VectorFeatures)
   #warnings = [];       // collected at FORCE time (a lazy op can't warn at construction)
@@ -165,7 +163,7 @@ export class Dataset {
    * @param {DatasetAxis|null} [init.axis] - 1-D sugar for a single selection axis
    * @param {DatasetAxis[]|null} [init.axes]
    * @param {Object|null} [init.selector] - an in-file selection passed to the materializer as `root.select`
-   *   (normally produced by `select()` off a selector ref, not passed by hand)
+   *   normally produced by `select()` from a selector ref rather than passed by hand
    */
   constructor({ id, name, kind = null, format = null, crs = null,
                 bounds = null, meta = {}, data = null, url = null, resolveUrl = null,
@@ -185,9 +183,8 @@ export class Dataset {
   }
 
   /**
-   * A URI-rooted Dataset. It fetches + decodes into a RasterGrid/VectorFeatures on FORCE — nothing
-   * happens now. Format/kind are inferred from the URL when not given. This is what folds the decoded
-   * Grid/Features back into Dataset: a URL Dataset IS the materialized value, lazily.
+   * A URI-rooted Dataset. It fetches and decodes into a RasterGrid or VectorFeatures on force, and
+   * does nothing before then. Format and kind come from the URL when not given.
    * @param {string} url
    * @param {Object} [opts]
    * @param {'geotiff'|'geojson'|'kml'|'kmz'|'shp'|'hazus'} [opts.format] - inferred from the URL's extension when omitted
@@ -214,27 +211,26 @@ export class Dataset {
   }
 
   /**
-   * A Dataset around an ALREADY-DECODED grid (or VectorFeatures) — the way back into the op chain
-   * for something you decoded yourself, computed with the standalone grid functions, or built by
-   * hand. The result is pre-materialized: no decode, no fetch, no materializer needed, and
-   * `load()`/`grid()` return the value handed in.
+   * Wraps an already-decoded grid or VectorFeatures, which is the way back into the op chain for
+   * something decoded elsewhere, computed with the standalone grid functions, or built by hand. The
+   * result is already materialized: no decode, no fetch, no materializer, and `load()` and `grid()`
+   * return the value passed in.
    *
-   * This is what makes "ops live on Dataset" a complete story rather than a one-way door: `ds.grid()`
-   * hands you a grid, and this hands it back so `clip`/`mask`/`slope`/… stay reachable.
+   * This is what keeps the op chain two-way. `ds.grid()` hands out a grid and this takes one back, so
+   * `clip`, `mask` and `slope` stay reachable.
    *
    * @param {import('./materialize.js').RasterGrid|import('./materialize.js').VectorFeatures} value
    * @param {Object} [opts] - { name?, format?, meta? }; `kind`/`crs`/`bounds` come from the value
    * @returns {Dataset}
    */
-  // ---- the decode/warp seams, as statics on the type they serve ----------------------------
+  // ---- the decode and warp registries, as statics on the type they serve -------------------
   //
-  // These are Dataset's registries: what `load()`/`grid()` dispatch through. They live here rather
-  // than as loose barrel functions because the owner was never ambiguous — a materializer decodes
-  // FOR a Dataset, a reprojector warps ONE. Same functions as `package/materialize.js` exports;
-  // this is where a consumer meets them.
+  // `load()` and `grid()` dispatch through these. They live here rather than as loose exports
+  // because the owner was never in doubt: a materializer decodes for a Dataset and a reprojector
+  // warps one. They are the same functions `package/materialize.js` exports.
 
   /**
-   * Register the decoder for a `format` (e.g. 'geotiff', 'nc').
+   * Registers the decoder for a `format`, i.e. 'geotiff'.
    * @param {string} format
    * @param {(root: Object, ds: Dataset) => Promise<RasterGrid|VectorFeatures>} fn
    * @returns {void}
@@ -242,31 +238,31 @@ export class Dataset {
   static registerMaterializer(format, fn) { return registerMaterializer(format, fn); }
 
   /**
-   * Every format that can be decoded right now — built-ins plus anything registered. Build a file
-   * picker's `accept` list from it, or check an upload before parsing.
+   * The formats that can be decoded right now, built-in and registered. Build a file picker's
+   * `accept` list from it, or check an upload before parsing.
    * @returns {string[]}
    */
   static formats() { return materializerFormats(); }
 
   /**
-   * Supply the ONE warp implementation `reproject()` forces through.
+   * Supplies the single warp implementation `reproject()` forces through.
    * @param {(grid: RasterGrid, toCrs: string) => Promise<RasterGrid>} fn
    * @returns {void}
    */
   static registerReprojector(fn) { return registerReprojector(fn); }
 
   /**
-   * A JIT fallback invoked at most once, on the first force that finds no reprojector registered —
-   * how the GDAL warp auto-loads with no setup call.
+   * A fallback run at most once, on the first force that finds no reprojector registered. This is
+   * how the GDAL warp loads itself with no setup call.
    * @param {() => Promise<void>} fn
    * @returns {void}
    */
   static registerDefaultReprojectorLoader(fn) { return registerDefaultReprojectorLoader(fn); }
 
   /**
-   * Supply a resampler for the methods the pure-JS path doesn't implement (cubic/lanczos/…), which
-   * `resampleTo({ method })` otherwise throws on. Synchronous and pixel-level — GDAL's own richer
-   * methods go through the warp seam instead (see geo/resample.js).
+   * Supplies a resampler for the methods the pure-JS path does not implement, i.e. cubic, which
+   * `resampleTo({ method })` otherwise throws on. Synchronous and pixel-level. GDAL's own richer
+   * methods go through the reprojector instead (see geo/resample.js).
    * @param {Function} fn
    * @returns {void}
    */
@@ -279,32 +275,31 @@ export class Dataset {
     const ds = new Dataset({
       name: opts.name || "grid",
       kind: value.kind,
-      // No source FORMAT: there are no encoded bytes here to decode, which is the whole point. A
-      // format would be a claim about bytes that do not exist.
+      // No format, because there are no encoded bytes here to decode. A format would claim
+      // something about bytes that do not exist.
       format: opts.format ?? null,
       crs: value.crs ?? null,
       bounds: value.bounds ?? null,
       meta: opts.meta ?? value.meta ?? {},
     });
-    ds.#materialized = value;   // already forced: terminals return this without touching a seam
+    ds.#materialized = value;   // already forced, so a terminal returns this without decoding
     return ds;
   }
 
   /**
-   * The footprint, in `crs`. Constructor-known for a root (or an op whose result is knowable upfront,
-   * e.g. `clip`), `null` when it genuinely isn't (e.g. a fresh `reproject()` node — the real bounds
-   * depend on what the warp actually produces). Once this node is FORCED, reads the real value off the
-   * memoized result instead — so `ds.reproject(crs).grid().then(() => ds2.bounds)` (`ds2` being the
-   * reprojected node) reflects the true post-warp footprint rather than staying stuck at the
-   * construction-time placeholder.
+   * The footprint, in `crs`. Known at construction for a root, and for an op whose result is
+   * predictable such as `clip`. Null when it genuinely is not, i.e. a fresh `reproject()` node, whose
+   * real bounds depend on what the warp produces. Once this node is forced it reads the value off
+   * the memoized result instead, so the reprojected node's `bounds` reports the true post-warp
+   * footprint rather than the construction-time placeholder.
    * @returns {DatasetBounds|null}
    */
   get bounds() { return this.#materialized?.bounds ?? this.#bounds; }
 
   /**
-   * Free-form metadata (GDAL legend/unit/noData, …). Same self-updating rule as `bounds`: once forced,
-   * reads off the memoized result — which matters for raster ops like `reproject` whose reprojector
-   * refreshes dimension fields (`width`/`height`) that the pre-force value can't know.
+   * Free-form metadata, i.e. a GDAL legend. Updates itself the way `bounds` does: once forced it
+   * reads off the memoized result, which matters for an op like `reproject` whose reprojector
+   * refreshes `width` and `height` that the pre-force value cannot know.
    * @returns {Object}
    */
   get meta() { return this.#materialized?.meta ?? this.#meta; }
@@ -318,20 +313,20 @@ export class Dataset {
   /** Has this node been forced (decoded/warped) yet? @returns {boolean} */
   get isMaterialized() { return this.#materialized != null; }
 
-  // ---- OPS: sync to build, return a NEW lazy Dataset, never mutate ----
+  // ---- ops: synchronous to build, returning a new lazy Dataset, never mutating ----
 
   /**
-   * Reproject to `toCrs` as a LAZY op. Returns a new Dataset; the warp runs only on force, dispatched
-   * through the registered reprojector (this file imports no GDAL). An exact same-CRS request is a
-   * no-op that returns `this`. Rasters only (vectors are EPSG:4326 by spec).
+   * Builds a lazy reproject to `toCrs` and returns a new Dataset. The warp runs on force, through
+   * the registered reprojector, since this file imports no GDAL. Requesting the CRS it already has
+   * returns `this` unchanged. Rasters only, as vectors are EPSG:4326 by spec.
    * @param {string} toCrs
    * @returns {Dataset}
    */
   reproject(toCrs) {
     if (!toCrs) throw new Error("reproject: a target CRS is required (e.g. 'EPSG:4326')");
-    // Validate the shape AND normalize case here, at the point of the mistake — rather than storing
-    // whatever string was passed and letting a case/format slip surface many frames later as a
-    // confusing "cannot render CRS" from a provider check that never learns this is the SAME CRS.
+    // Validate and normalize case here, where the mistake is made. Storing the string as passed
+    // would let a case or format slip appear many frames later as a confusing "cannot render CRS"
+    // from a provider check that never learns it is the same CRS.
     const m = /^epsg:(\d+)$/i.exec(String(toCrs).trim());
     if (!m) {
       throw new Error(`reproject: "${toCrs}" is not a recognized CRS — expected the form "EPSG:<code>" ` +
@@ -346,14 +341,16 @@ export class Dataset {
     return this.#derive({ op: "reproject", crs }, { crs, bounds: null });
   }
 
-  // The first non-"reproject" op name found walking this node's ancestry back to its root, or null if
-  // the whole lineage (if any) is nothing but reproject nodes. Forcing a reproject warps the CHAIN'S
-  // ROOT bytes when it can (#rootData) — correct for a plain source, or a reproject-only lineage
-  // (re-warping straight to the final CRS beats double-warping through an intermediate one). Anything
-  // ELSE in the ancestry — combine/clip/mask/reclassify/resample/rasterize/… — means the root's bytes
-  // no longer represent what this node currently IS, so #applyOp's reproject case uses this to decide:
-  // reuse the root bytes (cheap), or encode+warp the actually-computed grid instead (geo/gdal.js
-  // warpGrid, via the reprojector's ctx.grid) — never silently discard the computation.
+  // The first op name other than "reproject" found walking this node's ancestry to its root, or null
+  // when the lineage holds nothing but reproject nodes.
+  //
+  // Forcing a reproject warps the chain's root bytes when it can, through #rootData. That is right
+  // for a plain source and for a reproject-only lineage, where warping straight to the final CRS
+  // beats warping twice through an intermediate one. Any other op in the ancestry, i.e. clip, means
+  // the root's bytes no longer represent what this node is. #applyOp's reproject case reads this to
+  // choose between reusing the root bytes, which is cheap, and encoding and warping the computed
+  // grid through geo/gdal.js warpGrid via the reprojector's ctx.grid. It never discards the
+  // computation.
   #nonReprojectAncestorOp() {
     let n = this;
     while (n.#inputs) {
@@ -363,11 +360,11 @@ export class Dataset {
     return null;
   }
 
-  // ---- transformation ops (raster analysis) — lazy, pure-JS on the decoded grid (PACKAGE_ROADMAP §2) ----
+  // ---- raster analysis ops: lazy, pure JS over the decoded grid (PACKAGE_ROADMAP §2) ----
 
   /**
-   * Mask by a polygon: pixels outside the polygon become transparent (NaN) on force — or inside, with
-   * `{ invert }`. Footprint unchanged. Lazy: builds a node; the transform runs at terminal.
+   * Masks by a polygon. On force, pixels outside it become transparent, or inside it with
+   * `{ invert }`. The footprint does not change. Lazy: this builds a node and the terminal runs it.
    * @param {import('./filter.js').SpatialFilter|Array} polygon - a SpatialFilter, or a ring/multi-ring of {lat,lng}|[lat,lng]
    * @param {{ invert?: boolean }} [opts]
    * @returns {Dataset}
@@ -379,7 +376,7 @@ export class Dataset {
   }
 
   /**
-   * Clip (crop) to a bbox — the footprint shrinks to the overlap, snapped to pixel edges. Lazy.
+   * Crops to a bbox, shrinking the footprint to the overlap and snapping to pixel edges. Lazy.
    * @param {{north:number,south:number,east:number,west:number}} bbox
    * @returns {Dataset}
    */
@@ -390,19 +387,23 @@ export class Dataset {
   }
 
   /**
-   * Reclassify pixel values by `rules` (see rasterOps.reclassifyGrid) — EITHER a range-rules array
-   * (`[{min?,max?,value?}]`, first-match-wins; a rule with no `value` is a "keep matched pixel's
-   * value" band) OR a single callback `(value, index) => number|null|undefined` called once per
-   * valid pixel with its raw value and flat row-major index (`row*width+col`), returning the new
-   * value directly — not limited to a contiguous range, and skips rule-matching entirely (one call
-   * per pixel instead of a per-rule scan), so it's both the more general and the cheaper form once
-   * you need more than a couple of simple ranges. Either form: returning `null`/`undefined` (or no
-   * rule matching) → unmatched → transparent (default) or kept. Lazy.
+   * Remaps pixel values by `rules` (see rasterOps.reclassifyGrid), in one of two forms.
    *
-   * ⚠️ A callback does NOT survive `toRecord()` (structured-clone can't carry functions) — forcing it
-   * (`.grid()`) works fine in-session, but `toRecord()` on this node (or a descendant of it) throws
-   * naming the op, rather than silently dropping it. Use range rules for a chain you need to
-   * persist/reload from Storage.
+   * A range-rules array `[{min?,max?,value?}]`, first match wins, where a rule with no `value` keeps
+   * the matched pixel's own value.
+   *
+   * A callback `(value, index) => number|null|undefined`, run once per valid pixel with its raw
+   * value and flat row-major index `row*width+col`, returning the new value directly. It is not
+   * limited to a contiguous range and skips rule matching, one call per pixel instead of a
+   * scan per rule, so past a couple of simple ranges it is both more general and cheaper.
+   *
+   * Either form: returning `null` or `undefined`, or matching no rule, leaves the pixel unmatched,
+   * which becomes transparent by default or is kept. Lazy.
+   *
+   * A callback does not survive `toRecord()`, since structured clone cannot carry a function.
+   * Forcing it with `.grid()` works in-session, but `toRecord()` on this node or a descendant throws
+   * and names the op rather than dropping it. Use range rules for a chain that has to persist to
+   * Storage and reload.
    * @param {Array<{min?:number,max?:number,value?:number}>|((value:number,index:number)=>number|null|undefined)} rules
    * @param {{ unmatched?: 'nodata'|'keep' }} [opts]
    * @returns {Dataset}
@@ -417,8 +418,8 @@ export class Dataset {
   }
 
   /**
-   * Band math: combine this raster with `others` per pixel (LHS-conform — the others are resampled onto
-   * THIS grid). `op`: difference/ratio (binary) or sum/mean/min/max (N-ary). Lazy N-ary op node.
+   * Combines this raster with `others` pixel by pixel, resampling them onto this grid first. `op` is
+   * difference or ratio for two rasters, or sum, mean, min or max for any number. Lazy.
    * @param {Dataset|Dataset[]} others
    * @param {{ op?: string, method?: string }} [opts]
    * @returns {Dataset}
@@ -434,15 +435,16 @@ export class Dataset {
   difference(other) { return this.combine([other], { op: "difference" }); }
 
   /**
-   * Resample onto a specific target grid — lazy: the resample runs on force, via geo/resample.js's
-   * resampleGrid (also directly barrel-exported as `resampleGrid`/`alignRasters`, so a caller can use
-   * either this Dataset-shaped convenience or the raw function on pixel arrays). `target` is either a
-   * resample-native meta object `{ width, height, bw, bs, be, bn }`, or anything grid-shaped —
-   * `{ width, height, bounds: {north,south,east,west} }` — e.g. another (already-forced) Dataset's
-   * `.grid()` result. `method` defaults to `'nearest'` (pure-JS, always available); the GDAL-only
-   * methods (cubic/lanczos/mode/min/max/med/q1/q3) need a resampler registered via
-   * `registerResampler` (the escape hatch) or forcing throws a clear error. The result adopts the
-   * target's footprint/resolution; `crs` is unchanged (this resamples, it does not reproject).
+   * Resamples onto a target grid on force, through geo/resample.js's resampleGrid. lib.js also
+   * exports resampleGrid and alignRasters directly, so either this Dataset op or the raw function
+   * over pixel arrays works.
+   *
+   * `target` is either resample's own meta object `{ width, height, bw, bs, be, bn }` or anything
+   * grid-shaped, `{ width, height, bounds: {north,south,east,west} }`, i.e. another forced Dataset's
+   * `.grid()` result. `method` defaults to `'nearest'`, which is pure JS and always available. The
+   * GDAL-only methods (cubic, lanczos, mode, min, max, med, q1, q3) need a resampler from
+   * `Dataset.registerResampler`, or forcing throws. The result takes the target's footprint and
+   * resolution, and `crs` does not change: this resamples, it does not reproject.
    * @param {{width:number,height:number,bw:number,bs:number,be:number,bn:number}|{width:number,height:number,bounds:{north:number,south:number,east:number,west:number}}} target
    * @param {{ method?: string, noData?: number }} [opts]
    * @returns {Dataset}
@@ -459,13 +461,13 @@ export class Dataset {
   }
 
   /**
-   * Zonal statistics — per-zone min/max/mean/sum/count/area over this raster. A TERMINAL (forces the
+   * Per-zone min, max, mean, sum, count and area over this raster. A terminal, so it forces the
    * grid); returns data, not a Dataset. @param {Array<{id?, polygon?, filter?}>} zones
    * @param {{ noData?: number }} [opts] @returns {Promise<Array>}
    */
   /**
-   * Reduce this raster's pixels **grouped by another raster's values** — a TERMINAL returning a table,
-   * not a Dataset. The third kind of reduction in the model:
+   * Reduces this raster's pixels grouped by another raster's values. A terminal returning a table
+   * rather than a Dataset, and the third kind of reduction here:
    *
    * | verb | collapses | grouped by | returns |
    * |---|---|---|---|
@@ -473,12 +475,12 @@ export class Dataset {
    * | `zonalStats(zones)` | space | geometry | a table |
    * | `groupBy(by)` | space | **another raster's values** | a table |
    *
-   * This is what "one variable as a series against another" means concretely — mean depth per
-   * land-use class, rainfall binned by elevation, a rating curve. It is a distinct verb rather than an
-   * overload because the grouping key comes from data, not from the axis model or from geometry.
+   * This is one variable as a series against another: mean depth per land-use class, rainfall
+   * binned by elevation, a rating curve. It is its own verb rather than an overload because the
+   * grouping key comes from data, not from the axis model or from geometry.
    *
-   * `by` is conformed onto THIS Dataset's grid (the same LHS-conform rule `combine` uses), and a pixel
-   * counts only where both rasters have a value.
+   * `by` is resampled onto this Dataset's grid, the way `combine` conforms its inputs, and a pixel
+   * counts only where both rasters hold a value.
    *
    * ```js
    * await depth.groupBy(landuse);                  // one row per distinct land-use code
@@ -504,8 +506,8 @@ export class Dataset {
   }
 
   /**
-   * Slope — per-pixel terrain steepness via Horn's method, computed in pure JS on the decoded grid (no
-   * GDAL — see rasterOps.slopeGrid; PACKAGE_ROADMAP §2 "terrain"). Lazy.
+   * Per-pixel terrain steepness by Horn's method, in pure JS over the decoded grid with no GDAL.
+   * See rasterOps.slopeGrid and PACKAGE_ROADMAP §2 "terrain". Lazy.
    * @param {{ zFactor?: number, cellsizeX?: number, cellsizeY?: number, unit?: 'degrees'|'percent' }} [opts]
    * @returns {Dataset}
    */
@@ -515,7 +517,7 @@ export class Dataset {
   }
 
   /**
-   * Aspect — the downslope compass bearing via Horn's method (rasterOps.aspectGrid). Lazy.
+   * The downslope compass bearing by Horn's method (rasterOps.aspectGrid). Lazy.
    * @returns {Dataset}
    */
   aspect() {
@@ -524,7 +526,7 @@ export class Dataset {
   }
 
   /**
-   * Hillshade — a shaded-relief illumination raster via Horn's method (rasterOps.hillshadeGrid). Lazy.
+   * A shaded-relief illumination raster by Horn's method (rasterOps.hillshadeGrid). Lazy.
    * @param {{ altitude?: number, azimuth?: number, zFactor?: number, cellsizeX?: number, cellsizeY?: number }} [opts]
    * @returns {Dataset}
    */
@@ -534,10 +536,10 @@ export class Dataset {
   }
 
   /**
-   * Rasterize this vector Dataset onto a new grid (vector→raster, the kind-changing op —
-   * PACKAGE_ROADMAP §2 "vectorize/rasterize"). `field` burns each feature's property value; omit for a
-   * constant `burnValue`. Bounds default to this Dataset's own footprint; `width`/`height` are required
-   * (a vector carries no inherent pixel resolution). Lazy.
+   * Rasterizes this vector Dataset onto a new grid, the one op that changes a Dataset's kind
+   * (PACKAGE_ROADMAP §2). `field` burns each feature's property value; omit it for a constant
+   * `burnValue`. Bounds default to this Dataset's footprint. `width` and `height` are required,
+   * because a vector carries no pixel resolution. Lazy.
    * @param {{ width: number, height: number, bounds?: DatasetBounds, field?: string, burnValue?: number }} opts
    * @returns {Dataset}
    */
@@ -553,10 +555,9 @@ export class Dataset {
   }
 
   /**
-   * Reduce this Dataset's selection axis to ONE grid — collapse a temporal/vertical stack (e.g. a
-   * stage/time series) via a per-pixel reducer. Sugar over select()+combine(): resolves every axis
-   * entry to a child Dataset, then LHS-conforms/reduces them exactly like combine() (PACKAGE_ROADMAP §2
-   * "3-D / aggregation", the payoff of the axes model). Lazy.
+   * Collapses this Dataset's selection axis into one grid with a per-pixel reducer, i.e. a stage or
+   * time series. Shorthand for select() then combine(): it resolves each axis entry to a child
+   * Dataset, then conforms and reduces them as combine() does (PACKAGE_ROADMAP §2). Lazy.
    * @param {'sum'|'mean'|'min'|'max'} [op]
    * @param {{ axis?: number|string, method?: string, variant?: string }} [opts]
    * @returns {Dataset}
@@ -590,19 +591,18 @@ export class Dataset {
   }
 
   /**
-   * Resolve one selection-axis entry into a child Dataset (lazy). Sugar over selectAxisEntry: it picks
-   * the entry, resolves its `ref`, and carries the entry's opaque `meta`. Returns null when no entry
-   * matches. Kind-neutral: which variant (raster vs vector) is the caller's call.
+   * Resolves one selection-axis entry into a lazy child Dataset. Shorthand for selectAxisEntry: it
+   * picks the entry, resolves its `ref` and carries the entry's opaque `meta`. Returns null when no
+   * entry matches. The user chooses the variant, raster or vector.
    *
-   * The `ref` decides what kind of child comes back (see {@link DatasetAxisEntry}):
-   * - a **URL** (bare, or a named variant picked via `opts.variant`) → a URL-rooted child, format
-   *   inferred from the URL. One file per entry.
-   * - an **in-file selector** (`{ select: {…} }`) → a child rooted on the SAME source as this Dataset
-   *   (its bytes or URL, plus resolver), carrying the selector for the materializer. One file, many
-   *   entries — a NetCDF/GRIB2/Zarr time axis.
+   * The `ref` decides what kind of child comes back (see {@link DatasetAxisEntry}). A URL, bare or a
+   * named variant chosen with `opts.variant`, gives a URL-rooted child whose format comes from the
+   * URL, one file per entry. An in-file selector, `{ select: {…} }`, gives a child rooted on this
+   * Dataset's own source, its bytes or URL plus the resolver, carrying the selector for the
+   * materializer: one file with many entries, i.e. a NetCDF time axis.
    *
-   * Either way the child has no `axes` of its own: it is one payload, not a series, so it forces
-   * through `load()`/`grid()` like any other Dataset and every op chains off it normally.
+   * Either way the child has no `axes` of its own. It is one payload rather than a series, so it
+   * forces through `load()` and `grid()` like any Dataset and every op chains off it.
    *
    * @param {number|string} coord
    * @param {Object} [opts]
@@ -618,19 +618,19 @@ export class Dataset {
     if (!entry) return null;
     let ref = entry.ref;
 
-    // In-file selector: this entry is a SLICE of the source we already hold, not a separate download.
-    // Checked before the variant branch because both are objects — a selector is discriminated by an
-    // object-valued `select` key, while named variants are string-valued throughout.
+    // An in-file selector means this entry is a slice of the source already held, not a download.
+    // Checked before the variant branch because both are objects: a selector carries an
+    // object-valued `select` key, where named variants hold strings throughout.
     if (isSelectorRef(ref)) {
       if (!this.#url && this.data == null) {
         throw new Error(`select: "${this.name}"'s axis entry ${JSON.stringify(entry.coord)} is an ` +
           "in-file selector, but this Dataset has no source to select from (no data, no url).");
       }
-      // Selecting PEELS one axis: the chosen coordinate is folded into the selector and that axis is
-      // dropped, while every other axis stays. So on a (time × member) series, select(t) leaves a
-      // member series rather than a payload, and a second select() finishes the job — which is what
-      // makes axes the model for extra dimensions rather than a special case for exactly one. The
-      // selector MERGES for the same reason: {t} then {m} must arrive at the decoder as {t, m}.
+      // Selecting peels one axis: the chosen coordinate folds into the selector, that axis drops,
+      // and the others stay. So on a time-by-member series, select(t) leaves a member series rather
+      // than a payload and a second select() finishes the job. That is what makes axes a model for
+      // any number of extra dimensions rather than a special case for one. The selector merges for
+      // the same reason: {t} then {m} must reach the decoder as {t, m}.
       const remaining = (this.axes || []).filter((_, i) => i !== idx);
       return new Dataset({
         name: ref.name || `${this.name}[${entry.coord}]`,
@@ -650,8 +650,8 @@ export class Dataset {
     }
     if (!ref) return null;
     const url = (opts.base || "") + ref;
-    // A child axis entry inherits this Dataset's URL resolver, so a resolved (proxied) series stays
-    // resolved across select() — instance-safe, since the resolver is carried, not read ambiently.
+    // A child inherits this Dataset's URL resolver, so a proxied series stays resolved across
+    // select(). The resolver is carried rather than read ambiently, so it stays per instance.
     return Dataset.fromURL(url, { name: String(ref).split("/").pop(), meta: entry.meta || {},
       resolveUrl: this.#resolveUrl });
   }
@@ -659,13 +659,14 @@ export class Dataset {
   /**
    * The named variants available at one axis coordinate, or `null` when that entry has none.
    *
-   * Variants are **not** an axis and deliberately never became one, so they need their own way to be
-   * discovered — previously the only way to learn an entry had them was to call `select()` without one
-   * and read the thrown error, which is no way to build a picker.
+   * Variants are not an axis, so they need their own way to be discovered. Otherwise the only way to
+   * learn an entry has them is to call `select()` without one and read the thrown error, which is no
+   * way to build a picker.
    *
-   * Why not an axis (see DECISIONS §1.1): a variant switches the Dataset's **kind** — `.tif` gives a
-   * raster in an unknown CRS, `.kmz` a vector in EPSG:4326 — while every genuine axis preserves kind,
-   * CRS and bounds. It is a choice of *encoding of the same datum*, not a coordinate in the data.
+   * They are not an axis because a variant switches the Dataset's kind: `.tif` gives a raster in an
+   * unknown CRS and `.kmz` a vector in EPSG:4326, where a real axis preserves kind, CRS and bounds.
+   * A variant chooses an encoding of the same datum rather than a coordinate in the data. See
+   * DECISIONS §1.1.
    *
    * ```js
    * ds.variantsAt(19.5);                       // → ['raster', 'vector']  (or null)
@@ -686,15 +687,14 @@ export class Dataset {
   get selector() { return this.#selector; }
 
   /**
-   * Resolve an axis by index or name for the OPERATIONS (`select`/`selectRange`/`reduce`), throwing
-   * when it does not exist.
+   * Resolves an axis by index or name for `select`, `selectRange` and `reduce`, throwing when it
+   * does not exist.
    *
-   * The split this settles: asking for an axis that isn't there is a **programming error** — the
-   * caller believed this Dataset was a series and it isn't — while asking for a coordinate no entry
-   * carries is a **data condition**, which stays `null`. Previously the same "no axis" case returned
-   * `null` from `select` and threw from `reduce`, so identical mistakes surfaced two different ways.
-   * The lookup (`selectAxisEntry`) keeps returning `null` throughout: a lookup that finds nothing is
-   * not a mistake.
+   * Asking for an axis that is not there is a programming error, since the code believed this
+   * Dataset was a series and it is not. Asking for a coordinate no entry carries is a data
+   * condition, and stays `null`. Before this split, the same missing-axis case returned `null` from
+   * `select` and threw from `reduce`, so one mistake appeared two ways. The lookup,
+   * `selectAxisEntry`, still returns `null` throughout: finding nothing is not a mistake.
    * @param {number|string} axis
    * @returns {{ ax: DatasetAxis, idx: number }}
    */
@@ -711,23 +711,24 @@ export class Dataset {
   }
 
   /**
-   * Narrow one axis to the window `[from, to]` — a **series in, series out** operation, which is what
-   * separates it from `select()`. `select(coord)` resolves to ONE payload and hands back something
-   * forceable; `selectRange` hands back another selection-axis Dataset, still lazy, still unforceable
-   * on its own. That is the point: everything that works on the full series works on the window,
-   * `reduce()` most of all — "the mean of these six hours" is `selectRange(a, b).reduce('mean')`,
-   * with no new machinery on either side.
+   * Narrows one axis to the window `[from, to]`, taking a series and returning a series. That is
+   * what separates it from `select()`, which resolves to one payload and returns something
+   * forceable. `selectRange` returns another selection-axis Dataset, still lazy and still not
+   * forceable on its own, so everything that works on the full series works on the window.
+   * `reduce()` most of all: the mean of six hours is `selectRange(a, b).reduce('mean')`, with no new
+   * machinery.
    *
-   * Both bounds are **inclusive**, and the comparison is a plain `>=`/`<=` on the entry coords, so it
-   * is type-agnostic: numeric coords (epoch milliseconds, a stage in feet) compare numerically, and
-   * ISO-8601 strings compare lexicographically, which for ISO-8601 is the same as chronologically.
-   * Reversed bounds are swapped rather than rejected. Unlike `select()` there is no nearest-match: a
-   * window is already tolerant of falling between samples, so a range narrower than the sampling
-   * interval matches nothing and returns `null` — which is honest, where snapping would silently hand
-   * back a wider span than asked for.
+   * Both bounds are inclusive and compared with plain `>=` and `<=` against the entry coords, so the
+   * type does not matter. Numeric coords such as epoch milliseconds or a stage in feet compare
+   * numerically, and ISO-8601 strings compare lexicographically, which for ISO-8601 matches
+   * chronological order. Reversed bounds are swapped rather than rejected.
    *
-   * Coords are compared as given — `Date.parse(iso)` for the epoch-millisecond axes `parseSciwrid`
-   * builds. The engine stays domain-neutral about what a coordinate means.
+   * There is no nearest match, unlike `select()`. A window already tolerates falling between
+   * samples, so a range narrower than the sampling interval matches nothing and returns `null`.
+   * Snapping instead would hand back a wider span than was asked for.
+   *
+   * Coords compare as given, so use `Date.parse(iso)` for the epoch-millisecond axes `parseSciwrid`
+   * builds. The engine stays neutral about what a coordinate means.
    *
    * ```js
    * const storm = ds.selectRange(Date.parse('2023-08-29T00:00Z'), Date.parse('2023-08-30T00:00Z'));
@@ -752,8 +753,8 @@ export class Dataset {
     const [lo, hi] = from <= to ? [from, to] : [to, from];
     const entries = ax.entries.filter((e) => e.coord >= lo && e.coord <= hi);
     if (!entries.length) return null;
-    // Every OTHER axis is carried through untouched — narrowing time must not disturb a variable or
-    // ensemble axis sitting beside it.
+    // The other axes carry through untouched: narrowing time must not disturb a variable or
+    // ensemble axis beside it.
     return new Dataset({
       name: this.name, kind: this.kind, format: this.format, crs: this.crs,
       bounds: this.#bounds, meta: this.#meta,
@@ -763,8 +764,8 @@ export class Dataset {
   }
 
   /**
-   * Look up an entry on one axis by coordinate. Exact match first; with { nearest: true } (default) and
-   * a NUMERIC axis, falls back to the closest coord. `axis` selects which axis (index or name).
+   * Looks up an entry on one axis by coordinate. Tries an exact match first, then the closest coord
+   * when `{ nearest: true }`, the default, and the axis is numeric. `axis` takes an index or a name.
    * @param {number|string} coord
    * @param {Object} [opts]
    * @param {number|string} [opts.axis=0] - which axis (index or name) to look up on
@@ -777,8 +778,8 @@ export class Dataset {
     if (!entries?.length) return null;
     const exact = entries.find((e) => e.coord === coord);
     if (exact) return exact;
-    // Nearest is a magnitude operation: on an unordered axis "closest" is meaningless, and snapping
-    // e.g. select(1.5) to band 2 would be a confident wrong answer rather than a miss.
+    // Nearest compares magnitudes, so on an unordered axis closest means nothing. Snapping
+    // select(1.5) to band 2 would be a confident wrong answer rather than a miss.
     if (!nearest || ax.ordered === false || typeof coord !== "number") return null;
     let best = null, bestD = Infinity;
     for (const e of entries) {
@@ -789,11 +790,11 @@ export class Dataset {
     return best;
   }
 
-  // ---- TERMINALS: async, force the chain, memoize ----
+  // ---- terminals: async, force the chain, memoize ----
 
   /**
-   * Force this node: decode/fetch the root (or force the parent and apply this op), memoize, return the
-   * decoded RasterGrid | VectorFeatures. Repeated calls reuse the memoized result.
+   * Forces this node. Fetches and decodes the root, or forces the parent and applies this op, then
+   * memoizes and returns the RasterGrid or VectorFeatures. A repeat call reuses the memoized result.
    * @returns {Promise<RasterGrid|VectorFeatures>}
    */
   async load() {
@@ -822,14 +823,15 @@ export class Dataset {
   // ---- private force helpers ----
 
   async #materializeRoot() {
-    // A selection-axis series is not forceable, whether or not it holds bytes. That distinction used
-    // to be free — a series was URL-backed and had no `data`, so the no-source branch below caught it.
-    // In-file selectors changed that: a NetCDF/GRIB2/Zarr series carries the whole file, so the
-    // series check has to come first and stand on `axes` alone. A node with its own `selector` is the
-    // exception — it is one resolved slice, and forcing it is exactly right.
-    // ANY remaining axis means unresolved: `select()` peels one axis at a time, so a partially
-    // selected node carries both a selector and the axes still outstanding. Keying this off the
-    // selector's absence would let that node through and decode an incomplete selection.
+    // A selection-axis series is not forceable, with or without bytes. That used to follow for free,
+    // because a series was URL-backed and had no `data`, so the no-source branch below caught it.
+    // In-file selectors changed that: a NetCDF series carries the whole file, so this check comes
+    // first and stands on `axes` alone. A node with its own `selector` is the exception, being one
+    // resolved slice, and forcing it is right.
+    //
+    // Any axis still present means unresolved. `select()` peels one axis at a time, so a partially
+    // selected node carries both a selector and the axes still outstanding. Keying this off a
+    // missing selector would let that node through and decode an incomplete selection.
     if (this.axes?.length) {
       throw new Error(`load(): "${this.name}" is a selection-axis series — ` +
         `${this.axes.map((a) => `${a.name || "?"}(${a.entries?.length ?? 0})`).join(", ")} ` +
@@ -843,20 +845,20 @@ export class Dataset {
       throw new Error(`load(): no materializer registered for format "${this.format}" — ` +
         `import "fimviz/src/io/materializers.js" (or register one) before forcing a Dataset.`);
     }
-    // For a url root, apply the carried resolver (host CORS-proxy/mirror) so the materializer fetches
-    // the resolved URL — keeps the resolution here (instance-supplied) and materializers dumb.
+    // For a url root, apply the carried resolver, the host's CORS proxy or mirror, so the
+    // materializer fetches the resolved URL. Resolution stays here and materializers stay simple.
     const url = this.#url && this.#resolveUrl ? this.#resolveUrl(this.#url) : this.#url;
     const root = this.#url ? { kind: "url", url } : { kind: "inline", data: this.data };
-    // An in-file selector rides on the root, so a materializer reads the source and which slice of it
-    // to decode from ONE argument. Absent (the common case) the key is simply not there, so every
-    // existing materializer is unaffected.
+    // An in-file selector rides on the root, so a materializer reads the source and which slice to
+    // decode from one argument. In the common case the key is absent, so existing materializers are
+    // unaffected.
     if (this.#selector) root.select = this.#selector;
     return mat(root, this);
   }
 
   async #applyOp() {
-    // Force every input (unary ops read bases[0]; N-ary ops read them all). Memoized ancestors make a
-    // "hot-modify" that only swaps the tail op cheap — the shared parents don't re-decode.
+    // Force each input. A one-input op reads bases[0] and an N-ary op reads them all. Memoized
+    // ancestors make swapping only the tail op cheap, since the shared parents do not re-decode.
     const bases = await Promise.all(this.#inputs.map((d) => d.load()));
     const base = bases[0];
     switch (this.#op.op) {
@@ -868,19 +870,20 @@ export class Dataset {
           throw new Error(`reproject: no reprojector registered — the app registers the GDAL warp at ` +
             `boot (registerReprojector / registerGdalReprojector). ${base.crs || "unknown"} → ${this.#op.crs}.`);
         }
-        // GDAL warps an ENCODED file, not a decoded grid. The chain's root bytes (#rootData) are only
-        // OFFERED when they're representative of `base` — this reproject's immediate parent is itself
-        // a plain source or a reproject-only chain (#nonReprojectAncestorOp, checked on the PARENT —
-        // this node's own op is "reproject", so checking `this` would always report itself). `base`
-        // (just forced, above) is ALWAYS passed too, as the fallback the reprojector uses when source
-        // bytes aren't offered (a real computation sits in the ancestry — combine/clip/…) or aren't
-        // available at all (a lazy fromURL root with no local bytes) — encoding+warping the actually-
-        // decoded grid directly rather than either reprojecting a stale file or failing outright.
+        // GDAL warps an encoded file rather than a decoded grid. The chain's root bytes, #rootData,
+        // are offered only when they represent `base`, meaning this reproject's parent is a plain
+        // source or a reproject-only chain. #nonReprojectAncestorOp is checked on the parent, since
+        // this node's own op is "reproject" and checking `this` would always report itself.
+        //
+        // `base`, forced just above, is always passed too. The reprojector falls back to it when the
+        // source bytes are not offered, because a real computation such as clip sits in the
+        // ancestry, or are not available at all, because a lazy fromURL root holds no local bytes. It
+        // then encodes and warps the decoded grid rather than reprojecting a stale file or failing.
         const parent = this.#inputs[0];
         const rootRepresentsBase = !parent.#nonReprojectAncestorOp();
-        // By far the longest operation in the library: the first warp lazily pulls ~38 MB of GDAL
-        // wasm and data from a CDN before it computes anything. A host showing no indicator through
-        // that looks hung, so this is the one op that announces itself.
+        // The longest operation in the library: the first warp pulls ~38 MB of GDAL wasm and data
+        // from a CDN before computing anything. A host showing no indicator through that looks hung,
+        // so this is the one op that announces itself.
         notifyBusy(true, "reproject");
         let out;
         try {
@@ -904,9 +907,9 @@ export class Dataset {
       case "reclassify": {
         if (base.kind !== "raster") throw new Error("reclassify: not a raster");
         const out = reclassifyGrid(base, this.#op.rules, { unmatched: this.#op.unmatched });
-        // A hole this call actually created (a previously-VALID pixel matched no rule and became
-        // no-data) — not pre-existing noData, which reclassifyGrid never even evaluates against the
-        // rules. Usually means the rules' ranges don't fully cover this raster's real value range.
+        // Counts holes this call created, meaning a previously valid pixel matched no rule and
+        // became no-data. Pre-existing noData does not count, since reclassifyGrid never evaluates
+        // it against the rules. It usually means the rules do not cover this raster's value range.
         if (out.meta?.unmatchedCount > 0) {
           this.#warnings.push(`Reclassify: ${out.meta.unmatchedCount} pixel(s) on "${this.name}" matched ` +
             "no rule and became no-data — the rules don't fully cover this raster's value range. Pass " +
@@ -954,16 +957,16 @@ export class Dataset {
     }
   }
 
-  // Walk to the chain's root and return its inline encoded bytes (an ArrayBuffer), or null. The GDAL
-  // reprojector warps these; parseFile roots carry them, lazy fromURL roots do not (yet).
+  // Walks to the chain's root and returns its inline encoded bytes as an ArrayBuffer, or null. The
+  // GDAL reprojector warps these. A parseFile root carries them; a lazy fromURL root does not yet.
   #rootData() {
     let n = this;
     while (n.#inputs) n = n.#inputs[0];
     return n.data instanceof ArrayBuffer ? n.data : null;
   }
 
-  // Build a derived child sharing identity metadata, overriding what the op changes. `inputs` defaults
-  // to [this] (a unary op); an N-ary op passes the full input list.
+  // Builds a derived child sharing identity metadata, overriding what the op changes. `inputs`
+  // defaults to [this] for a one-input op; an N-ary op passes the full list.
   #derive(op, overrides = {}, inputs = [this]) {
     const child = new Dataset({
       name: this.name,
@@ -982,11 +985,11 @@ export class Dataset {
   // ---- persistence / export ----
 
   /**
-   * A structured-cloneable record for Storage.put(). Default: the SOURCE + op recipe (small) — a root
-   * inline Dataset still serializes with `data` and round-trips exactly as before (back-compat); a URL
-   * root carries `url`; a derived node nests its INPUT records under `inputs` with its `op`. Pass
-   * { storeMaterialized: true } to also embed the decoded RasterGrid/VectorFeatures (the node must be
-   * materialized already — call `await ds.load()` first).
+   * A structured-cloneable record for Storage.put(). By default it stores the source and the op
+   * recipe, which is small: an inline root still serializes with `data` and round-trips as before, a
+   * URL root carries `url`, and a derived node nests its input records under `inputs` beside its
+   * `op`. Pass `{ storeMaterialized: true }` to embed the decoded RasterGrid or VectorFeatures too,
+   * which requires the node to be materialized already, so call `await ds.load()` first.
    * @param {Object} [opts]
    * @param {boolean} [opts.storeMaterialized=false] - also embed the decoded RasterGrid/VectorFeatures snapshot
    * @returns {Object}
@@ -1010,7 +1013,7 @@ export class Dataset {
     } else {                                   // inline root — classic shape (with data)
       base.data = this.data;
     }
-    // A selector root round-trips as a root + its in-file selection. Only present when set, so an
+    // A selector root round-trips as a root plus its in-file selection. Written only when set, so an
     // ordinary record is byte-identical to what it was before selectors existed.
     if (!this.#inputs && this.#selector) base.selector = this.#selector;
     if (opts.storeMaterialized) {
@@ -1021,7 +1024,8 @@ export class Dataset {
   }
 
   /**
-   * Rehydrate a record (recipe or materialized). Structured clone drops prototypes, so this is required.
+   * Rebuilds a Dataset from a record, recipe or materialized. Structured clone drops prototypes, so
+   * a stored record cannot be used directly.
    * @param {Object} record
    * @returns {Dataset|null}
    */
@@ -1030,8 +1034,8 @@ export class Dataset {
     let ds;
     if (record.op && record.inputs) {          // derived: rebuild inputs, replay the op
       const inputs = record.inputs.map((r) => Dataset.fromRecord(r));
-      // Unary ops (reproject/select/mask/clip/reclassify) replay off inputs[0]; the N-ary `combine`
-      // reads all inputs. #applyOpDescriptor takes the full input list for that case.
+      // A one-input op such as clip replays off inputs[0], where the N-ary `combine` reads them all.
+      // #applyOpDescriptor takes the full input list to cover both.
       ds = inputs[0].#applyOpDescriptor(record.op, inputs);
       ds.id = record.id || ds.id;
       ds.name = record.name ?? ds.name;
@@ -1043,7 +1047,7 @@ export class Dataset {
     return ds;
   }
 
-  // Replay a stored op descriptor onto this node (fromRecord).
+  // Replays a stored op descriptor onto this node, for fromRecord.
   #applyOpDescriptor(op, inputs = [this]) {
     switch (op.op) {
       case "reproject": return this.reproject(op.crs);
@@ -1066,8 +1070,8 @@ export class Dataset {
   }
 
   /**
-   * Save the original bytes/content to disk. Inline roots only (a URL root has no local bytes yet).
-   * `document` is ambient, so this costs nothing in the import graph.
+   * Saves the original bytes to disk. Inline roots only, since a URL root holds no local bytes yet.
+   * `document` is ambient, so this adds nothing to the import graph.
    * @returns {void}
    */
   download() {
@@ -1085,7 +1089,7 @@ export class Dataset {
   }
 
   /**
-   * Metadata view (without the heavy `data` payload). Axes are lightweight (URLs), so they stay.
+   * The metadata without the heavy `data` payload. Axes are small, holding URLs, so they stay.
    * @returns {Object}
    */
   toJSON() {

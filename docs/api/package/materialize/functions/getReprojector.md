@@ -8,9 +8,9 @@
 
 > **getReprojector**(): [`Reprojector`](../type-aliases/Reprojector.md)
 
-Defined in: [package/materialize.js:140](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L140)
+Defined in: [package/materialize.js:138](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L138)
 
-The registered reprojector, or null (forcing a reproject node then throws a clear error).
+The registered reprojector, or null, in which case forcing a reproject node throws.
 
 ## Returns
 

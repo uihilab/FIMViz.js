@@ -6,9 +6,9 @@
 
 # Class: VectorFeatures
 
-Defined in: [package/materialize.js:50](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L50)
+Defined in: [package/materialize.js:48](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L48)
 
-A decoded vector: a GeoJSON FeatureCollection plus its frame. What a VectorLayer draws.
+A decoded vector: a GeoJSON FeatureCollection plus its bounds and CRS. VectorLayer draws one.
 
 ## Constructors
 
@@ -16,7 +16,7 @@ A decoded vector: a GeoJSON FeatureCollection plus its frame. What a VectorLayer
 
 > **new VectorFeatures**(`init?`): `VectorFeatures`
 
-Defined in: [package/materialize.js:58](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L58)
+Defined in: [package/materialize.js:56](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L56)
 
 #### Parameters
 
@@ -50,7 +50,7 @@ Defined in: [package/materialize.js:58](https://github.com/uihilab/FIMViz.js/blo
 
 `any`
 
-a GeoJSON FeatureCollection (or Feature)
+a GeoJSON FeatureCollection or Feature
 
 ###### meta?
 
@@ -66,7 +66,7 @@ a GeoJSON FeatureCollection (or Feature)
 
 > **bounds**: `object`
 
-Defined in: [package/materialize.js:61](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L61)
+Defined in: [package/materialize.js:59](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L59)
 
 #### east
 
@@ -90,7 +90,7 @@ Defined in: [package/materialize.js:61](https://github.com/uihilab/FIMViz.js/blo
 
 > **crs**: `string`
 
-Defined in: [package/materialize.js:62](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L62)
+Defined in: [package/materialize.js:60](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L60)
 
 ***
 
@@ -98,7 +98,7 @@ Defined in: [package/materialize.js:62](https://github.com/uihilab/FIMViz.js/blo
 
 > **features**: `any`
 
-Defined in: [package/materialize.js:60](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L60)
+Defined in: [package/materialize.js:58](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L58)
 
 ***
 
@@ -106,7 +106,7 @@ Defined in: [package/materialize.js:60](https://github.com/uihilab/FIMViz.js/blo
 
 > **kind**: `string`
 
-Defined in: [package/materialize.js:59](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L59)
+Defined in: [package/materialize.js:57](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L57)
 
 ***
 
@@ -114,7 +114,7 @@ Defined in: [package/materialize.js:59](https://github.com/uihilab/FIMViz.js/blo
 
 > **meta**: `any`
 
-Defined in: [package/materialize.js:63](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L63)
+Defined in: [package/materialize.js:61](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L61)
 
 ## Accessors
 
@@ -124,7 +124,7 @@ Defined in: [package/materialize.js:63](https://github.com/uihilab/FIMViz.js/blo
 
 > **get** **count**(): `number`
 
-Defined in: [package/materialize.js:82](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L82)
+Defined in: [package/materialize.js:80](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L80)
 
 How many features this holds.
 
@@ -138,7 +138,7 @@ How many features this holds.
 
 > **\[iterator\]**(): `Iterator`\<`any`, `any`, `any`\>
 
-Defined in: [package/materialize.js:85](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L85)
+Defined in: [package/materialize.js:83](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L83)
 
 `for (const feature of await ds.features())`.
 
@@ -152,11 +152,11 @@ Defined in: [package/materialize.js:85](https://github.com/uihilab/FIMViz.js/blo
 
 > **toArray**(): `any`[]
 
-Defined in: [package/materialize.js:72](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L72)
+Defined in: [package/materialize.js:70](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L70)
 
-The features as a plain array, whatever shape the payload arrived in — a FeatureCollection, a
-lone Feature, or an array. Without this, reading them means knowing which of those you got and
-writing `(await ds.features()).features.features` for the common case.
+The features as a plain array, whether the payload arrived as a FeatureCollection, a lone
+Feature or an array. Without it, the user must know which of the three it got, and write
+`(await ds.features()).features.features` in the common case.
 
 #### Returns
 

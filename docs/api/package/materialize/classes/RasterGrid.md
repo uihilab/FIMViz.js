@@ -6,11 +6,10 @@
 
 # Class: RasterGrid
 
-Defined in: [package/materialize.js:22](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L22)
+Defined in: [package/materialize.js:20](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L20)
 
-A decoded raster: the pixel grid plus the geometry needed to place and read it. This is what a
-RasterLayer draws and what alignRasters/comparison consume — the anonymous `{ pixels, meta }` shape
-that was already passed around everywhere, now a named value type.
+A decoded raster: the pixel grid plus the geometry needed to place and read it. RasterLayer draws
+one, and alignRasters and the comparison path consume one.
 
 ## Constructors
 
@@ -18,7 +17,7 @@ that was already passed around everywhere, now a named value type.
 
 > **new RasterGrid**(`init?`): `RasterGrid`
 
-Defined in: [package/materialize.js:34](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L34)
+Defined in: [package/materialize.js:32](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L32)
 
 #### Parameters
 
@@ -62,7 +61,7 @@ in `crs`
 
 `any` = `{}`
 
-carried through from the Dataset (GDAL legend/unit, …)
+carried through from the Dataset, i.e. a GDAL legend
 
 ###### noData?
 
@@ -72,7 +71,7 @@ carried through from the Dataset (GDAL legend/unit, …)
 
 `ArrayBufferView`\<`ArrayBufferLike`\>
 
-the decoded band-0 pixel array (typed array)
+decoded band-0 pixels
 
 ###### width
 
@@ -88,7 +87,7 @@ the decoded band-0 pixel array (typed array)
 
 > **bands**: `number`
 
-Defined in: [package/materialize.js:42](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L42)
+Defined in: [package/materialize.js:40](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L40)
 
 ***
 
@@ -96,7 +95,7 @@ Defined in: [package/materialize.js:42](https://github.com/uihilab/FIMViz.js/blo
 
 > **bounds**: `object`
 
-Defined in: [package/materialize.js:39](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L39)
+Defined in: [package/materialize.js:37](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L37)
 
 #### east
 
@@ -120,7 +119,7 @@ Defined in: [package/materialize.js:39](https://github.com/uihilab/FIMViz.js/blo
 
 > **crs**: `string`
 
-Defined in: [package/materialize.js:40](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L40)
+Defined in: [package/materialize.js:38](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L38)
 
 ***
 
@@ -128,7 +127,7 @@ Defined in: [package/materialize.js:40](https://github.com/uihilab/FIMViz.js/blo
 
 > **height**: `number`
 
-Defined in: [package/materialize.js:38](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L38)
+Defined in: [package/materialize.js:36](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L36)
 
 ***
 
@@ -136,7 +135,7 @@ Defined in: [package/materialize.js:38](https://github.com/uihilab/FIMViz.js/blo
 
 > **kind**: `string`
 
-Defined in: [package/materialize.js:35](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L35)
+Defined in: [package/materialize.js:33](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L33)
 
 ***
 
@@ -144,7 +143,7 @@ Defined in: [package/materialize.js:35](https://github.com/uihilab/FIMViz.js/blo
 
 > **meta**: `any`
 
-Defined in: [package/materialize.js:43](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L43)
+Defined in: [package/materialize.js:41](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L41)
 
 ***
 
@@ -152,7 +151,7 @@ Defined in: [package/materialize.js:43](https://github.com/uihilab/FIMViz.js/blo
 
 > **noData**: `string` \| `number`
 
-Defined in: [package/materialize.js:41](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L41)
+Defined in: [package/materialize.js:39](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L39)
 
 ***
 
@@ -160,7 +159,7 @@ Defined in: [package/materialize.js:41](https://github.com/uihilab/FIMViz.js/blo
 
 > **pixels**: `ArrayBufferView`\<`ArrayBufferLike`\>
 
-Defined in: [package/materialize.js:36](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L36)
+Defined in: [package/materialize.js:34](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L34)
 
 ***
 
@@ -168,4 +167,4 @@ Defined in: [package/materialize.js:36](https://github.com/uihilab/FIMViz.js/blo
 
 > **width**: `number`
 
-Defined in: [package/materialize.js:37](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/materialize.js#L37)
+Defined in: [package/materialize.js:35](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/materialize.js#L35)

@@ -194,8 +194,9 @@
   <li><b>River hazard against a compound event.</b> EMSR864 is classified as a coastal flood
       activation while its polygons are tagged riverine, and the JRC product models river flooding
       only. Any part of the observed extent driven by storm surge is outside what the hazard map
-      represents, so a low containment is not by itself evidence the map is wrong. State this in the
-      caption; it is the main threat to the result's interpretation.</li>
+      represents, so a low containment — equivalently, a low POD — is not by itself evidence the map
+      is wrong. State this in the caption; it is the main threat to the result's
+      interpretation.</li>
 </ul>
 
 <h2><span class="n">§</span>Data</h2>
@@ -336,15 +337,23 @@ async function rasterizeOnto(vectorDs, target, label) {
  * `compareExtentMetrics` already yields CSI (`f`), POD (`h`), bias (`b`), kappa (`k`), proportion
  * correct (`pc`) and the contingency counts. Recomputing those from tp/fp/fn/tn — which an earlier
  * draft of this page did — would make a study whose whole claim is "evaluation is a reusable engine
- * capability" quietly reimplement the capability it is arguing for. FAR and containment are the two
- * the engine genuinely does not expose, so they are the only two derived here.
+ * capability" reimplement the thing it is arguing for. FAR is the one the engine does not expose,
+ * so it is the only one derived here.
+ *
+ * Containment is TP/(TP+FN), which is POD under another name, so it reads `m.h` rather than
+ * recomputing it. The two columns carry the same number by definition.
  */
+// The engine returns null, not 0, for a score whose denominator is 0 - a region mask landing on
+// dry ground has no observed wet pixels, so bias and POD have no value there. Carry the null
+// through to the CSV rather than printing a 0 that reads as a real score.
+const r6 = (v) => (v == null ? null : +v.toFixed(6));
+
 const fromEngine = (m) => ({
   tp: m.tp, fp: m.fp, fn: m.fn, tn: m.tn, n: m.n,
-  csi: +m.f.toFixed(6), pod: +m.h.toFixed(6), bias: +m.b.toFixed(6),
-  kappa: +m.k.toFixed(6), pc: +m.pc.toFixed(6),
-  far: +(m.tp + m.fp > 0 ? m.fp / (m.tp + m.fp) : 0).toFixed(6),          // not returned
-  containment: +(m.tp + m.fn > 0 ? m.tp / (m.tp + m.fn) : 0).toFixed(6),  // not returned
+  csi: r6(m.f), pod: r6(m.h), bias: r6(m.b),
+  kappa: r6(m.k), pc: r6(m.pc),
+  far: r6(m.tp + m.fp > 0 ? m.fp / (m.tp + m.fp) : null),   // not returned by the engine
+  containment: r6(m.h),                                     // same quantity as POD
 });
 
 function scorePair(predGrid, obsGrid, { policy = "low", mask = null } = {}) {
@@ -427,9 +436,13 @@ function renderResults() {
     ["scope", "threshold m", "align", "TP", "FP", "FN", "containment", "CSI", "POD", "FAR", "bias"],
     (r) => r.scope === "basin" && r.wet_threshold_m === sel.threshold && r.alignment === sel.policy);
   const note = document.getElementById("results-note");
-  note.innerHTML = "<b>containment</b> = TP / (TP + FN): the share of the observed delineation "
-    + "falling inside the hazard map. Source order is [hazard map, observed], so FP is hazard extent "
-    + "with no observed water and FN is observed water the map does not cover. The "
+  note.innerHTML = "<b>containment</b> is TP / (TP + FN), the share of the observed delineation "
+    + "falling inside the hazard map. That is the same quantity as <b>POD</b>, so the two columns "
+    + "carry the same number; both read the engine's <code>metrics.h</code>. They are kept apart "
+    + "because the question differs: POD asks how much of the flood the map detected, containment "
+    + "asks how much of the observation the map accounts for. Source order is [hazard map, "
+    + "observed], so FP is hazard extent with no observed water and FN is observed water the map "
+    + "does not cover. The "
     + "<b>observability</b> row is the EMS observed extent scored against its own modelled extent — "
     + "FN there should be 0, since the modelled extent contains the observed one by construction.";
   note.hidden = false;

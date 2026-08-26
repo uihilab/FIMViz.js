@@ -6,16 +6,16 @@
 
 # Function: hexToRgb()
 
-> **hexToRgb**(`hex`): `number`[]
+> **hexToRgb**(`hex`): \[`number`, `number`, `number`\]
 
-Defined in: [package/colorScale.js:81](https://github.com/uihilab/FIMViz.js/blob/af343381b1a457e40ac721c50ed4e6e47add4561/src/package/colorScale.js#L81)
+Defined in: [package/colorScale.js:72](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L72)
 
 ## Parameters
 
 ### hex
 
-`any`
+`string`
 
 ## Returns
 
-`number`[]
+\[`number`, `number`, `number`\]
