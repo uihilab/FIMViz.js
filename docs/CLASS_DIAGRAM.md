@@ -104,14 +104,6 @@ classDiagram
         +download() void
     }
 
-    class warp {
-        <<✅ free fn — geo/warp.js, EAGER>>
-        warp(ds, toCrs) Promise~Dataset~
-        warps immediately, returns a NEW already-warped Dataset
-        rasters only; never called by parse
-        NAMED warp, not reproject: Dataset.reproject is the LAZY op
-        and one name must never mean both
-    }
 
     class Storage {
         <<✅ generic KV store, host names db/tables/keys>>

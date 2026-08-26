@@ -57,7 +57,7 @@ const GROUPS = {
                 mods: ["io/parse.js", "io/parsePrimitives.js", "io/read.js", "io/netcdf3.js",
                        "io/materializers.js", "io/sciwrid.js"] },
   warp:       { label: "GDAL warp provider", sub: "warp · gdal · reprojector",
-                mods: ["geo/warp.js", "geo/gdal.js", "io/reprojector.js"] },
+                mods: ["geo/gdal.js", "io/reprojector.js"] },
   layermodel: { label: "Layer model",        sub: "Layer · Comparison · Ensemble",
                 mods: ["package/layer.js", "package/layerSettings.js", "package/rasterImage.js",
                        "package/comparisonLayer.js", "package/ensembleAggregationLayer.js"] },

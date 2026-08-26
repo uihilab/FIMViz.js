@@ -8,7 +8,7 @@
 
 > **dispatchMapEventToLayers**(`layers`, `type`, `base`, `opts?`): `any`
 
-Defined in: [package/layer.js:1091](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/layer.js#L1091)
+Defined in: [package/layer.js:1095](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/layer.js#L1095)
 
 Dispatches a normalized map event to the layers top down in z-order, where the last entry is
 topmost, hit-testing each. By default it stops once a handler absorbs the event with

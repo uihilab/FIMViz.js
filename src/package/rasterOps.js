@@ -13,8 +13,18 @@ import { SpatialFilter } from "./filter.js";
 import { resampleGrid } from "../geo/resample.js";
 
 const asFilter = (p) => (p instanceof SpatialFilter ? p : new SpatialFilter(p));
-// Converts RasterGrid.bounds to the {bw,bs,be,bn,width,height} meta resample and pixelBbox read.
-const gridMeta = (g) => ({ bw: g.bounds.west, bs: g.bounds.south, be: g.bounds.east, bn: g.bounds.north, width: g.width, height: g.height });
+/**
+ * Converts a RasterGrid to the `{bw,bs,be,bn,width,height}` meta that resample, pixelBbox and
+ * Stats.raster read. Exported because every headless user needs it: a RasterGrid carries
+ * `bounds.west`, those readers want `bw`, and rewriting the conversion by hand is the only
+ * alternative.
+ * @param {import('./materialize.js').RasterGrid} g
+ * @returns {{bw: number, bs: number, be: number, bn: number, width: number, height: number, noData: number|string|null, unit: string|null}}
+ */
+export const gridMeta = (g) => ({
+  bw: g.bounds.west, bs: g.bounds.south, be: g.bounds.east, bn: g.bounds.north,
+  width: g.width, height: g.height, noData: g.noData ?? null, unit: g.meta?.unit ?? null,
+});
 
 /**
  * Masks a grid by a polygon. Pixels outside it become NaN, or inside it with `invert`. The bounds

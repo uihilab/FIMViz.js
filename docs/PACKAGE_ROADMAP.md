@@ -376,7 +376,7 @@ Datasets without the parse layer.
 
 - `readCrs`/`crsEquivalent`/`epsgNumber` moved out of `geo/gdal.js` into a pure `geo/crs.js`. They touch no
   GDAL, but living in the module whose first line is `import initGdalJs from "gdal3.js"` put ~190 KB of glue
-  in every consumer's initial bundle. `geo/warp.js` now dynamic-`import()`s the warp for the same reason.
+  in every consumer's initial bundle.
 - `shpjs` (→ `proj4` + `wkt-parser` + `mgrs`, ~300 KB) and `jszip` (~95 KB) load **on demand**, inside the
   shapefile and `.kmz` branches of `parseSource`. The barrel's vendored `shp` became a thin async wrapper
   rather than a static re-export, since one re-export would have undone the whole thing.

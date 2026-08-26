@@ -6,7 +6,7 @@
 
 # Interface: Control
 
-Defined in: [ui/toolsPanel.js:13](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/toolsPanel.js#L13)
+Defined in: [ui/toolsPanel.js:13](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/ui/toolsPanel.js#L13)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [ui/toolsPanel.js:13](https://github.com/uihilab/FIMViz.js/blob/bb0a
 
 > **key**: `string`
 
-Defined in: [ui/toolsPanel.js:15](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/toolsPanel.js#L15)
+Defined in: [ui/toolsPanel.js:15](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/ui/toolsPanel.js#L15)
 
 the settings knob this control writes
 
@@ -24,7 +24,7 @@ the settings knob this control writes
 
 > `optional` **label?**: `string`
 
-Defined in: [ui/toolsPanel.js:16](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/toolsPanel.js#L16)
+Defined in: [ui/toolsPanel.js:16](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/ui/toolsPanel.js#L16)
 
 ***
 
@@ -32,7 +32,7 @@ Defined in: [ui/toolsPanel.js:16](https://github.com/uihilab/FIMViz.js/blob/bb0a
 
 > `optional` **max?**: `number`
 
-Defined in: [ui/toolsPanel.js:19](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/toolsPanel.js#L19)
+Defined in: [ui/toolsPanel.js:19](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/ui/toolsPanel.js#L19)
 
 ***
 
@@ -40,7 +40,7 @@ Defined in: [ui/toolsPanel.js:19](https://github.com/uihilab/FIMViz.js/blob/bb0a
 
 > `optional` **min?**: `number`
 
-Defined in: [ui/toolsPanel.js:19](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/toolsPanel.js#L19)
+Defined in: [ui/toolsPanel.js:19](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/ui/toolsPanel.js#L19)
 
 ***
 
@@ -48,7 +48,7 @@ Defined in: [ui/toolsPanel.js:19](https://github.com/uihilab/FIMViz.js/blob/bb0a
 
 > `optional` **note?**: `string`
 
-Defined in: [ui/toolsPanel.js:20](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/toolsPanel.js#L20)
+Defined in: [ui/toolsPanel.js:20](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/ui/toolsPanel.js#L20)
 
 a line of explanation rendered under the control
 
@@ -58,7 +58,7 @@ a line of explanation rendered under the control
 
 > `optional` **options?**: `object`[]
 
-Defined in: [ui/toolsPanel.js:18](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/toolsPanel.js#L18)
+Defined in: [ui/toolsPanel.js:18](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/ui/toolsPanel.js#L18)
 
 for 'select'
 
@@ -76,7 +76,7 @@ for 'select'
 
 > `optional` **step?**: `number`
 
-Defined in: [ui/toolsPanel.js:19](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/toolsPanel.js#L19)
+Defined in: [ui/toolsPanel.js:19](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/ui/toolsPanel.js#L19)
 
 for 'range'/'number'
 
@@ -86,7 +86,7 @@ for 'range'/'number'
 
 > **type**: `"number"` \| `"bands"` \| `"text"` \| `"range"` \| `"color"` \| `"select"` \| `"checkbox"` \| `"gradient"`
 
-Defined in: [ui/toolsPanel.js:14](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/toolsPanel.js#L14)
+Defined in: [ui/toolsPanel.js:14](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/ui/toolsPanel.js#L14)
 
 ***
 
@@ -94,6 +94,6 @@ Defined in: [ui/toolsPanel.js:14](https://github.com/uihilab/FIMViz.js/blob/bb0a
 
 > `optional` **value?**: `any`
 
-Defined in: [ui/toolsPanel.js:17](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/toolsPanel.js#L17)
+Defined in: [ui/toolsPanel.js:17](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/ui/toolsPanel.js#L17)
 
 current value (for initial render)

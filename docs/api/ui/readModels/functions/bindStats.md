@@ -8,7 +8,7 @@
 
 > **bindStats**(`layer`, `opts?`): `object`
 
-Defined in: [ui/readModels.js:159](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/readModels.js#L159)
+Defined in: [ui/readModels.js:159](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/ui/readModels.js#L159)
 
 Mount a statistics table that keeps itself current.
 

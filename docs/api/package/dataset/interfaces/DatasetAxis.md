@@ -6,7 +6,7 @@
 
 # Interface: DatasetAxis
 
-Defined in: [package/dataset.js:120](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/dataset.js#L120)
+Defined in: [package/dataset.js:121](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/dataset.js#L121)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [package/dataset.js:120](https://github.com/uihilab/FIMViz.js/blob/b
 
 > `optional` **commensurable?**: `boolean`
 
-Defined in: [package/dataset.js:126](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/dataset.js#L126)
+Defined in: [package/dataset.js:127](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/dataset.js#L127)
 
 do the entries measure the same quantity in the same
   whether the entries share units, so averaging across them means something. Gates `reduce`.
@@ -25,7 +25,7 @@ do the entries measure the same quantity in the same
 
 > **entries**: [`DatasetAxisEntry`](DatasetAxisEntry.md)[]
 
-Defined in: [package/dataset.js:128](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/dataset.js#L128)
+Defined in: [package/dataset.js:129](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/dataset.js#L129)
 
 ***
 
@@ -33,7 +33,7 @@ Defined in: [package/dataset.js:128](https://github.com/uihilab/FIMViz.js/blob/b
 
 > **name**: `string`
 
-Defined in: [package/dataset.js:121](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/dataset.js#L121)
+Defined in: [package/dataset.js:122](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/dataset.js#L122)
 
 ***
 
@@ -41,7 +41,7 @@ Defined in: [package/dataset.js:121](https://github.com/uihilab/FIMViz.js/blob/b
 
 > `optional` **ordered?**: `boolean`
 
-Defined in: [package/dataset.js:123](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/dataset.js#L123)
+Defined in: [package/dataset.js:124](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/dataset.js#L124)
 
 do the coords have a magnitude, so that "between" and
   whether "nearest" means anything here. Gates `selectRange` and selectAxisEntry's nearest match,
@@ -53,4 +53,4 @@ do the coords have a magnitude, so that "between" and
 
 > `optional` **unit?**: `string`
 
-Defined in: [package/dataset.js:122](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/dataset.js#L122)
+Defined in: [package/dataset.js:123](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/dataset.js#L123)

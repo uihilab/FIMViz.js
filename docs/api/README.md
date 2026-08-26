@@ -6,7 +6,6 @@
 
 ## Modules
 
-- [geo/warp](geo/warp/README.md)
 - [io/materializers](io/materializers/README.md)
 - [io/parse](io/parse/README.md)
 - [io/reprojector](io/reprojector/README.md)

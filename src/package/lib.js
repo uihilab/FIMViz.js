@@ -22,7 +22,6 @@ export { createMap } from "./mapProvider.js";
 // reprojects: a Dataset comes back in its native `crs` and the user warps it deliberately with
 // reproject() (docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1).
 export { Dataset } from "./dataset.js";
-export { warp } from "../geo/warp.js";
 export { Storage } from "../io/storage.js";
 // csvHeaders reads a CSV's column names before parseFile runs, so a host can build a picker for
 // { latField, lngField } or { geometryField } and let the user map columns. wktToGeometry is the
@@ -106,7 +105,7 @@ export { colorizeGrid, gridToDataURL } from "./rasterImage.js";
 // the user can transform a decoded grid directly. See docs/PACKAGE_ROADMAP.md §2.
 export {
   maskGrid, clipGrid, reclassifyGrid, combineGrids, zonalStats, groupByGrid,
-  slopeGrid, aspectGrid, hillshadeGrid, rasterizeFeatures,
+  slopeGrid, aspectGrid, hillshadeGrid, rasterizeFeatures, gridMeta,
 } from "./rasterOps.js";
 // Grid alignment behind ComparisonLayer and EnsembleAggregationLayer, and available to any N-raster
 // comparison a host builds itself: resample onto a common grid.

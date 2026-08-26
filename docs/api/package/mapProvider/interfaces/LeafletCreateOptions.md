@@ -6,7 +6,7 @@
 
 # Interface: LeafletCreateOptions
 
-Defined in: [package/mapProvider.js:555](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mapProvider.js#L555)
+Defined in: [package/mapProvider.js:555](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/mapProvider.js#L555)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [package/mapProvider.js:555](https://github.com/uihilab/FIMViz.js/bl
 
 > `optional` **center?**: `object`
 
-Defined in: [package/mapProvider.js:556](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mapProvider.js#L556)
+Defined in: [package/mapProvider.js:556](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/mapProvider.js#L556)
 
 initial map center; defaults to the continental US.
 
@@ -32,7 +32,7 @@ initial map center; defaults to the continental US.
 
 > `optional` **mapOptions?**: `any`
 
-Defined in: [package/mapProvider.js:561](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mapProvider.js#L561)
+Defined in: [package/mapProvider.js:561](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/mapProvider.js#L561)
 
 raw Leaflet `L.Map` options, passed straight to `L.map(el, mapOptions)`.
 
@@ -42,7 +42,7 @@ raw Leaflet `L.Map` options, passed straight to `L.map(el, mapOptions)`.
 
 > `optional` **tileOptions?**: `any`
 
-Defined in: [package/mapProvider.js:560](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mapProvider.js#L560)
+Defined in: [package/mapProvider.js:560](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/mapProvider.js#L560)
 
 options passed to `L.tileLayer` (e.g. `attribution`).
 
@@ -52,7 +52,7 @@ options passed to `L.tileLayer` (e.g. `attribution`).
 
 > `optional` **tileUrl?**: `string`
 
-Defined in: [package/mapProvider.js:558](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mapProvider.js#L558)
+Defined in: [package/mapProvider.js:558](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/mapProvider.js#L558)
 
 basemap tile URL template; pass `null` to opt out of the default
   OpenStreetMap tile layer, i.e. to add your own with `L.tileLayer`.
@@ -63,6 +63,6 @@ basemap tile URL template; pass `null` to opt out of the default
 
 > `optional` **zoom?**: `number`
 
-Defined in: [package/mapProvider.js:557](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/mapProvider.js#L557)
+Defined in: [package/mapProvider.js:557](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/mapProvider.js#L557)
 
 initial zoom level; defaults to `5`.

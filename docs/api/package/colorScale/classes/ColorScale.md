@@ -6,7 +6,7 @@
 
 # Class: ColorScale
 
-Defined in: [package/colorScale.js:154](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L154)
+Defined in: [package/colorScale.js:154](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L154)
 
 ## Constructors
 
@@ -14,7 +14,7 @@ Defined in: [package/colorScale.js:154](https://github.com/uihilab/FIMViz.js/blo
 
 > **new ColorScale**(`opts?`): `ColorScale`
 
-Defined in: [package/colorScale.js:168](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L168)
+Defined in: [package/colorScale.js:168](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L168)
 
 #### Parameters
 
@@ -70,7 +70,7 @@ explicit stops; presence switches to explicit mode
 
 > **\_colorStopColors**: `string`[]
 
-Defined in: [package/colorScale.js:185](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L185)
+Defined in: [package/colorScale.js:185](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L185)
 
 ***
 
@@ -78,7 +78,7 @@ Defined in: [package/colorScale.js:185](https://github.com/uihilab/FIMViz.js/blo
 
 > **\_colorStopValues**: `number`[]
 
-Defined in: [package/colorScale.js:184](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L184)
+Defined in: [package/colorScale.js:184](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L184)
 
 ***
 
@@ -86,7 +86,7 @@ Defined in: [package/colorScale.js:184](https://github.com/uihilab/FIMViz.js/blo
 
 > **\_continuous**: `boolean`
 
-Defined in: [package/colorScale.js:176](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L176)
+Defined in: [package/colorScale.js:176](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L176)
 
 ***
 
@@ -94,7 +94,7 @@ Defined in: [package/colorScale.js:176](https://github.com/uihilab/FIMViz.js/blo
 
 > **\_listeners**: `any`[]
 
-Defined in: [package/colorScale.js:188](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L188)
+Defined in: [package/colorScale.js:188](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L188)
 
 ***
 
@@ -102,7 +102,7 @@ Defined in: [package/colorScale.js:188](https://github.com/uihilab/FIMViz.js/blo
 
 > **\_max**: `number`
 
-Defined in: [package/colorScale.js:175](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L175)
+Defined in: [package/colorScale.js:175](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L175)
 
 ***
 
@@ -110,7 +110,7 @@ Defined in: [package/colorScale.js:175](https://github.com/uihilab/FIMViz.js/blo
 
 > **\_min**: `number`
 
-Defined in: [package/colorScale.js:174](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L174)
+Defined in: [package/colorScale.js:174](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L174)
 
 ***
 
@@ -118,7 +118,7 @@ Defined in: [package/colorScale.js:174](https://github.com/uihilab/FIMViz.js/blo
 
 > **\_stops**: `object`[]
 
-Defined in: [package/colorScale.js:178](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L178)
+Defined in: [package/colorScale.js:178](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L178)
 
 #### color
 
@@ -134,7 +134,7 @@ Defined in: [package/colorScale.js:178](https://github.com/uihilab/FIMViz.js/blo
 
 > **colorFor**: (`value`) => `string`
 
-Defined in: [package/colorScale.js:187](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L187)
+Defined in: [package/colorScale.js:187](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L187)
 
 #### Parameters
 
@@ -152,7 +152,7 @@ Defined in: [package/colorScale.js:187](https://github.com/uihilab/FIMViz.js/blo
 
 > **missingColor**: `string`
 
-Defined in: [package/colorScale.js:172](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L172)
+Defined in: [package/colorScale.js:172](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L172)
 
 ***
 
@@ -160,7 +160,7 @@ Defined in: [package/colorScale.js:172](https://github.com/uihilab/FIMViz.js/blo
 
 > **palette**: `string` \| `any`[]
 
-Defined in: [package/colorScale.js:173](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L173)
+Defined in: [package/colorScale.js:173](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L173)
 
 ***
 
@@ -168,7 +168,7 @@ Defined in: [package/colorScale.js:173](https://github.com/uihilab/FIMViz.js/blo
 
 > **source**: `"palette"` \| `"custom"` \| `"gdal"`
 
-Defined in: [package/colorScale.js:179](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L179)
+Defined in: [package/colorScale.js:179](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L179)
 
 ***
 
@@ -176,7 +176,7 @@ Defined in: [package/colorScale.js:179](https://github.com/uihilab/FIMViz.js/blo
 
 > **unit**: `string`
 
-Defined in: [package/colorScale.js:177](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L177)
+Defined in: [package/colorScale.js:177](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L177)
 
 ## Accessors
 
@@ -186,7 +186,7 @@ Defined in: [package/colorScale.js:177](https://github.com/uihilab/FIMViz.js/blo
 
 > **get** **continuous**(): `boolean`
 
-Defined in: [package/colorScale.js:290](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L290)
+Defined in: [package/colorScale.js:290](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L290)
 
 True when interpolation is on. Read-only; write it with `set({ continuous })`.
 
@@ -202,7 +202,7 @@ True when interpolation is on. Read-only; write it with `set({ continuous })`.
 
 > **get** **discrete**(): `boolean`
 
-Defined in: [package/colorScale.js:285](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L285)
+Defined in: [package/colorScale.js:285](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L285)
 
 ##### Returns
 
@@ -216,7 +216,7 @@ Defined in: [package/colorScale.js:285](https://github.com/uihilab/FIMViz.js/blo
 
 > **get** **isExplicit**(): `boolean`
 
-Defined in: [package/colorScale.js:283](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L283)
+Defined in: [package/colorScale.js:283](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L283)
 
 ##### Returns
 
@@ -230,7 +230,7 @@ Defined in: [package/colorScale.js:283](https://github.com/uihilab/FIMViz.js/blo
 
 > **get** **kind**(): `"continuous"` \| `"classed"`
 
-Defined in: [package/colorScale.js:245](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L245)
+Defined in: [package/colorScale.js:245](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L245)
 
 ##### Returns
 
@@ -242,7 +242,7 @@ Defined in: [package/colorScale.js:245](https://github.com/uihilab/FIMViz.js/blo
 
 > **getColor**(`value`): `string`
 
-Defined in: [package/colorScale.js:348](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L348)
+Defined in: [package/colorScale.js:348](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L348)
 
 Resolves a value to a CSS color string. `colorFor` takes precedence. An absent value returns
 `missingColor`, and a value matching no stop returns null.
@@ -263,7 +263,7 @@ Resolves a value to a CSS color string. `colorFor` takes precedence. An absent v
 
 > **getRange**(`i`): `object`
 
-Defined in: [package/colorScale.js:337](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L337)
+Defined in: [package/colorScale.js:337](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L337)
 
 #### Parameters
 
@@ -291,7 +291,7 @@ band index (as returned by `getStops()`)
 
 > **getRgb**(`value`): \[`number`, `number`, `number`\]
 
-Defined in: [package/colorScale.js:366](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L366)
+Defined in: [package/colorScale.js:366](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L366)
 
 Returns [r,g,b] for the render loop. Returns null when no stop matches, or when the value is
 absent and no `missingColor` is set, and colorizeGrid leaves that pixel transparent.
@@ -312,7 +312,7 @@ absent and no `missingColor` is set, and colorizeGrid leaves that pixel transpar
 
 > **getStops**(): [`ColorStop`](../interfaces/ColorStop.md)[]
 
-Defined in: [package/colorScale.js:299](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L299)
+Defined in: [package/colorScale.js:299](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L299)
 
 The stops as [{ min?, max?, value?, color, label }]. Explicit mode returns the stored stops,
 palette mode derives them, and setColorStops() mode returns one `{ value, color }` per point.
@@ -327,7 +327,7 @@ palette mode derives them, and setColorStops() mode returns one `{ value, color 
 
 > **getValues**(): `number`[]
 
-Defined in: [package/colorScale.js:322](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L322)
+Defined in: [package/colorScale.js:322](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L322)
 
 #### Returns
 
@@ -339,7 +339,7 @@ Defined in: [package/colorScale.js:322](https://github.com/uihilab/FIMViz.js/blo
 
 > **offChange**(`fn`): `ColorScale`
 
-Defined in: [package/colorScale.js:577](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L577)
+Defined in: [package/colorScale.js:577](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L577)
 
 #### Parameters
 
@@ -357,7 +357,7 @@ Defined in: [package/colorScale.js:577](https://github.com/uihilab/FIMViz.js/blo
 
 > **onChange**(`fn`): `ColorScale`
 
-Defined in: [package/colorScale.js:572](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L572)
+Defined in: [package/colorScale.js:572](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L572)
 
 #### Parameters
 
@@ -375,7 +375,7 @@ Defined in: [package/colorScale.js:572](https://github.com/uihilab/FIMViz.js/blo
 
 > **set**(`patch?`): `ColorScale`
 
-Defined in: [package/colorScale.js:420](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L420)
+Defined in: [package/colorScale.js:420](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L420)
 
 Writes any whole-object setting in one call:
 
@@ -439,7 +439,7 @@ available as `setStops()` and `setColorStops()`. Per-band edits keep their own v
 
 > **setColor**(`i`, `color`): `ColorScale`
 
-Defined in: [package/colorScale.js:547](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L547)
+Defined in: [package/colorScale.js:547](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L547)
 
 #### Parameters
 
@@ -463,7 +463,7 @@ band index
 
 > **setColorStops**(`values`, `colors`): `ColorScale`
 
-Defined in: [package/colorScale.js:490](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L490)
+Defined in: [package/colorScale.js:490](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L490)
 
 Defines a continuous gradient from explicit control points, sorted on the way in and not
 required to be evenly spaced. Pair it with `set({ continuous: true })` to interpolate between
@@ -503,7 +503,7 @@ one "#rrggbb" hex color per value, same length as `values`
 
 > **setLabel**(`i`, `label`): `ColorScale`
 
-Defined in: [package/colorScale.js:559](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L559)
+Defined in: [package/colorScale.js:559](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L559)
 
 #### Parameters
 
@@ -527,7 +527,7 @@ band index
 
 > **setRange**(`i`, `range`): `ColorScale`
 
-Defined in: [package/colorScale.js:535](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L535)
+Defined in: [package/colorScale.js:535](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L535)
 
 #### Parameters
 
@@ -557,7 +557,7 @@ band index
 
 > **setStops**(`stops`): `ColorScale`
 
-Defined in: [package/colorScale.js:465](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L465)
+Defined in: [package/colorScale.js:465](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L465)
 
 #### Parameters
 
@@ -575,7 +575,7 @@ Defined in: [package/colorScale.js:465](https://github.com/uihilab/FIMViz.js/blo
 
 > **toJSON**(): `object`
 
-Defined in: [package/colorScale.js:258](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L258)
+Defined in: [package/colorScale.js:258](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L258)
 
 A structured-cloneable description of this scale, enough to rebuild an equivalent one with
 `new ColorScale(spec)`, capturing whichever of the three modes is active. The result is a copy,
@@ -632,7 +632,7 @@ listeners because functions do not survive serialization.
 
 > `static` **fromGdalLegend**(`legend`, `unit?`): `ColorScale`
 
-Defined in: [package/colorScale.js:196](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L196)
+Defined in: [package/colorScale.js:196](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L196)
 
 #### Parameters
 
@@ -654,7 +654,7 @@ Defined in: [package/colorScale.js:196](https://github.com/uihilab/FIMViz.js/blo
 
 > `static` **fromJSON**(`spec?`): `ColorScale`
 
-Defined in: [package/colorScale.js:275](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L275)
+Defined in: [package/colorScale.js:275](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L275)
 
 Rebuilds a scale from `toJSON()` output, including the control-point mode that the constructor
 alone cannot express.
@@ -675,7 +675,7 @@ alone cannot express.
 
 > `static` **getGdalLegendParser**(): `Function`
 
-Defined in: [package/colorScale.js:242](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L242)
+Defined in: [package/colorScale.js:242](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L242)
 
 The registered GDAL legend parser, or null if nothing has registered one yet.
 
@@ -689,7 +689,7 @@ The registered GDAL legend parser, or null if nothing has registered one yet.
 
 > `static` **palettes**(): `string`[]
 
-Defined in: [package/colorScale.js:218](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L218)
+Defined in: [package/colorScale.js:218](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L218)
 
 Every palette name `{ palette }` accepts, built-in and registered.
 
@@ -703,7 +703,7 @@ Every palette name `{ palette }` accepts, built-in and registered.
 
 > `static` **registerGdalLegendParser**(`fn`): `void`
 
-Defined in: [package/colorScale.js:236](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L236)
+Defined in: [package/colorScale.js:236](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L236)
 
 Register the GDAL_METADATA XML parser used to auto-detect an embedded legend. Called by
 layers/depthMap.js on import.
@@ -724,7 +724,7 @@ layers/depthMap.js on import.
 
 > `static` **registerPalette**(`name`, `colors`): `void`
 
-Defined in: [package/colorScale.js:212](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/colorScale.js#L212)
+Defined in: [package/colorScale.js:212](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/colorScale.js#L212)
 
 Add a palette by name. `colors`: >= 2 hex strings.
 

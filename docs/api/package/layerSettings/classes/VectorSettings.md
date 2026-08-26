@@ -6,7 +6,7 @@
 
 # Class: VectorSettings
 
-Defined in: [package/layerSettings.js:200](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/layerSettings.js#L200)
+Defined in: [package/layerSettings.js:200](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/layerSettings.js#L200)
 
 Vector knobs. `color` and `opacity` restyle the overlay: no provider implements setVectorStyle,
 so VectorLayer.setStyle re-adds it with a merged neutral style. `hover` affects interaction only.
@@ -21,7 +21,7 @@ so VectorLayer.setStyle re-adds it with a merged neutral style. `hover` affects 
 
 > **new VectorSettings**(`layer`): `VectorSettings`
 
-Defined in: [package/layerSettings.js:201](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/layerSettings.js#L201)
+Defined in: [package/layerSettings.js:201](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/layerSettings.js#L201)
 
 #### Parameters
 
@@ -43,7 +43,7 @@ Defined in: [package/layerSettings.js:201](https://github.com/uihilab/FIMViz.js/
 
 > **\_defaults**: `object`
 
-Defined in: [package/layerSettings.js:25](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/layerSettings.js#L25)
+Defined in: [package/layerSettings.js:25](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/layerSettings.js#L25)
 
 #### hover
 
@@ -63,7 +63,7 @@ Defined in: [package/layerSettings.js:25](https://github.com/uihilab/FIMViz.js/b
 
 > **\_layer**: [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layerSettings.js:23](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/layerSettings.js#L23)
+Defined in: [package/layerSettings.js:23](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/layerSettings.js#L23)
 
 #### Inherited from
 
@@ -75,7 +75,7 @@ Defined in: [package/layerSettings.js:23](https://github.com/uihilab/FIMViz.js/b
 
 > **\_pending**: `any`
 
-Defined in: [package/layerSettings.js:91](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/layerSettings.js#L91)
+Defined in: [package/layerSettings.js:91](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/layerSettings.js#L91)
 
 #### Inherited from
 
@@ -87,7 +87,7 @@ Defined in: [package/layerSettings.js:91](https://github.com/uihilab/FIMViz.js/b
 
 > **\_state**: `any`
 
-Defined in: [package/layerSettings.js:24](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/layerSettings.js#L24)
+Defined in: [package/layerSettings.js:24](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/layerSettings.js#L24)
 
 #### Inherited from
 
@@ -99,7 +99,7 @@ Defined in: [package/layerSettings.js:24](https://github.com/uihilab/FIMViz.js/b
 
 > **\_apply**(`key`, `v`): `object`
 
-Defined in: [package/layerSettings.js:210](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/layerSettings.js#L210)
+Defined in: [package/layerSettings.js:210](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/layerSettings.js#L210)
 
 Applies one knob and reports its effect. Returns `null` for an unknown knob, which set()
 ignores. Otherwise `redraw:true` asks for an in-place re-render, and `emit` names the effect
@@ -137,7 +137,7 @@ event, or is null when something else already emits it, i.e. ColorScale.onChange
 
 > **get**(`key`): `any`
 
-Defined in: [package/layerSettings.js:29](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/layerSettings.js#L29)
+Defined in: [package/layerSettings.js:29](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/layerSettings.js#L29)
 
 Reads one knob, or a copy of the whole state object when given no key.
 
@@ -161,7 +161,7 @@ Reads one knob, or a copy of the whole state object when given no key.
 
 > **reset**(): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layerSettings.js:118](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/layerSettings.js#L118)
+Defined in: [package/layerSettings.js:118](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/layerSettings.js#L118)
 
 Restores the reset defaults.
 
@@ -179,7 +179,7 @@ Restores the reset defaults.
 
 > **set**(`partial?`): [`Layer`](../../layer/classes/Layer.md)
 
-Defined in: [package/layerSettings.js:50](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/layerSettings.js#L50)
+Defined in: [package/layerSettings.js:50](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/layerSettings.js#L50)
 
 Writes a batch of knobs. Applies each known one, re-renders if any needs a redraw, then emits
 each distinct effect event once plus a 'settings' summary. Synchronous and chainable: it returns
@@ -219,7 +219,7 @@ the layer, for chaining
 
 > **settled**(): `Promise`\<[`Layer`](../../layer/classes/Layer.md)\>
 
-Defined in: [package/layerSettings.js:115](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/layerSettings.js#L115)
+Defined in: [package/layerSettings.js:115](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/layerSettings.js#L115)
 
 Resolves once any redraw `set()` started has finished and its effect events have fired.
 Resolves immediately when nothing is pending, so `await layer.settled()` is always safe.

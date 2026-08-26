@@ -29,8 +29,9 @@ import {
 } from "./materialize.js";
 import {
   maskGrid, clipGrid, reclassifyGrid, combineGrids, zonalStats,
-  slopeGrid, aspectGrid, hillshadeGrid, rasterizeFeatures, groupByGrid,
+  slopeGrid, aspectGrid, hillshadeGrid, rasterizeFeatures, groupByGrid, gridMeta,
 } from "./rasterOps.js";
+import { Stats } from "./stats.js";
 // resampleGrid is pure JS and headless, since geo/resample.js imports nothing, the same as
 // rasterOps.js which already imports it for combine()'s resampling. lib.js exports resampleGrid and
 // registerResampler directly too, so the user can take either the Dataset op below or the raw
@@ -314,6 +315,10 @@ export class Dataset {
   get isMaterialized() { return this.#materialized != null; }
 
   // ---- ops: synchronous to build, returning a new lazy Dataset, never mutating ----
+  //
+  // The rule dividing this class: a SYNCHRONOUS method builds a lazy node and returns a Dataset, an
+  // ASYNC method is a terminal that forces the chain and returns data. Nothing in this section
+  // awaits, so nothing in it computes. test/datasetOps.test.mjs enforces both halves.
 
   /**
    * Builds a lazy reproject to `toCrs` and returns a new Dataset. The warp runs on force, through
@@ -335,8 +340,10 @@ export class Dataset {
     const crs = `EPSG:${m[1]}`;
     if (this.crs === crs) return this;
     if (this.kind && this.kind !== "raster") {
-      throw new Error(`reproject: vector reprojection is not implemented ("${this.name}"); ` +
-        "geojson/kml/kmz/shp are EPSG:4326 by spec.");
+      throw new Error(`reproject: vector reprojection is not implemented ("${this.name}", ` +
+        `${this.crs || "unknown CRS"}). geojson is EPSG:4326 by spec (RFC 7946), and kml/kmz are ` +
+        "WGS84 by spec. A shapefile with a .prj can be in any CRS, and that case is not handled " +
+        "yet — reproject it before parsing, or rasterize() and reproject the raster.");
     }
     return this.#derive({ op: "reproject", crs }, { crs, bounds: null });
   }
@@ -432,7 +439,16 @@ export class Dataset {
   }
 
   /** Sugar: this − other, per pixel (LHS-conform). @param {Dataset} other @returns {Dataset} */
+  /** `combine([other], { op: "difference" })`. @param {Dataset} other @returns {Dataset} */
   difference(other) { return this.combine([other], { op: "difference" }); }
+
+  /** `combine([other], { op: "ratio" })`. @param {Dataset} other @returns {Dataset} */
+  ratio(other) { return this.combine([other], { op: "ratio" }); }
+
+  // The two binary reducers get a shorthand; the N-ary four (sum/mean/min/max) deliberately do not.
+  // `ds.min(others)` and `ds.mean(others)` would read as "this raster's minimum" and "this raster's
+  // mean", which are `(await ds.stats()).min` and `.mean` — a different number entirely. Call
+  // combine({ op }) for those, where the word sits next to its operand list.
 
   /**
    * Resamples onto a target grid on force, through geo/resample.js's resampleGrid. lib.js also
@@ -458,51 +474,6 @@ export class Dataset {
     }
     const bounds = { north: targetMeta.bn, south: targetMeta.bs, east: targetMeta.be, west: targetMeta.bw };
     return this.#derive({ op: "resample", targetMeta, method, noData }, { bounds });
-  }
-
-  /**
-   * Per-zone min, max, mean, sum, count and area over this raster. A terminal, so it forces the
-   * grid); returns data, not a Dataset. @param {Array<{id?, polygon?, filter?}>} zones
-   * @param {{ noData?: number }} [opts] @returns {Promise<Array>}
-   */
-  /**
-   * Reduces this raster's pixels grouped by another raster's values. A terminal returning a table
-   * rather than a Dataset, and the third kind of reduction here:
-   *
-   * | verb | collapses | grouped by | returns |
-   * |---|---|---|---|
-   * | `reduce(op)` | a selection axis | — | a Dataset (one grid) |
-   * | `zonalStats(zones)` | space | geometry | a table |
-   * | `groupBy(by)` | space | **another raster's values** | a table |
-   *
-   * This is one variable as a series against another: mean depth per land-use class, rainfall
-   * binned by elevation, a rating curve. It is its own verb rather than an overload because the
-   * grouping key comes from data, not from the axis model or from geometry.
-   *
-   * `by` is resampled onto this Dataset's grid, the way `combine` conforms its inputs, and a pixel
-   * counts only where both rasters hold a value.
-   *
-   * ```js
-   * await depth.groupBy(landuse);                  // one row per distinct land-use code
-   * await rain.groupBy(dem, { bins: 10 });          // ten equal-width elevation bands
-   * await rain.groupBy(dem, { bins: [0, 100, 500, 2000] });
-   * ```
-   * @param {Dataset} by - a raster Dataset whose values define the groups
-   * @param {{ bins?: number|number[], method?: string, noData?: number, byNoData?: number }} [opts]
-   * @returns {Promise<Array<Object>>}
-   */
-  async groupBy(by, opts = {}) {
-    this.#assertRasterOp("groupBy");
-    if (!by || typeof by.grid !== "function") {
-      throw new Error("groupBy: `by` must be a raster Dataset whose values define the groups");
-    }
-    const [mine, theirs] = await Promise.all([this.grid(), by.grid()]);
-    return groupByGrid(mine, theirs, opts);
-  }
-
-  async zonalStats(zones, opts = {}) {
-    this.#assertRasterOp("zonalStats");
-    return zonalStats(await this.grid(), zones, opts);
   }
 
   /**
@@ -790,7 +761,11 @@ export class Dataset {
     return best;
   }
 
-  // ---- terminals: async, force the chain, memoize ----
+  // ---- terminals: async, force the chain, return data rather than a Dataset ----
+  //
+  // load/grid/features return the decoded value and memoize it. stats/zonalStats/groupBy force the
+  // chain and return a Stats or a table, so nothing chains off them. They used to sit among the
+  // lazy raster ops, where being async was the only thing marking them apart.
 
   /**
    * Forces this node. Fetches and decodes the root, or forces the parent and applies this op, then
@@ -815,6 +790,75 @@ export class Dataset {
     const m = await this.load();
     if (m.kind !== "vector") throw new Error(`features(): "${this.name}" is a ${m.kind} dataset, not a vector`);
     return m;
+  }
+
+  /**
+   * Statistics over this Dataset's own values: min, max, mean, median, stddev, sum, count, area and
+   * a histogram. A terminal, so it forces the chain and returns a `Stats`, not a Dataset.
+   *
+   * Rasters read the decoded pixels; vectors read the features, giving counts by geometry type plus
+   * total area, length and bbox. `RasterLayer.getStats()` and `VectorLayer.getStats()` return the
+   * same thing for a rendered layer, so this is the headless route to it.
+   *
+   * @param {Object} [opts]
+   * @param {import('./filter.js').Filter|Function|Array|null} [opts.filter] - scopes the computation
+   * @param {import('./colorScale.js').ColorScale|null} [opts.classify] - buckets values into `byClass`
+   * @param {string|null} [opts.classifyBy] - vector only: the property `classify` reads
+   * @param {boolean} [opts.skipZero] - raster only: treat 0 as absent
+   * @param {number} [opts.bins] - raster only: histogram bin count
+   * @returns {Promise<import('./stats.js').Stats>}
+   */
+  async stats(opts = {}) {
+    const value = await this.load();
+    if (value.kind === "vector") return Stats.vector(value, opts);
+    return Stats.raster(value.pixels, gridMeta(value), opts);
+  }
+
+  /**
+   * Per-zone min, max, mean, sum, count and area over this raster. Forces the chain and returns
+   * one row per zone, so nothing chains off it.
+   * @param {Array<{id?: any, polygon?: Array, filter?: import('./filter.js').SpatialFilter}>} zones
+   * @param {{ noData?: number }} [opts]
+   * @returns {Promise<Array>}
+   */
+  async zonalStats(zones, opts = {}) {
+    this.#assertRasterOp("zonalStats");
+    return zonalStats(await this.grid(), zones, opts);
+  }
+
+  /**
+   * Reduces this raster's pixels grouped by another raster's values. A terminal returning a table
+   * rather than a Dataset, and the third kind of reduction here:
+   *
+   * | verb | collapses | grouped by | returns |
+   * |---|---|---|---|
+   * | `reduce(op)` | a selection axis | — | a Dataset (one grid) |
+   * | `zonalStats(zones)` | space | geometry | a table |
+   * | `groupBy(by)` | space | **another raster's values** | a table |
+   *
+   * This is one variable as a series against another: mean depth per land-use class, rainfall
+   * binned by elevation, a rating curve. It is its own verb rather than an overload because the
+   * grouping key comes from data, not from the axis model or from geometry.
+   *
+   * `by` is resampled onto this Dataset's grid, the way `combine` conforms its inputs, and a pixel
+   * counts only where both rasters hold a value.
+   *
+   * ```js
+   * await depth.groupBy(landuse);                  // one row per distinct land-use code
+   * await rain.groupBy(dem, { bins: 10 });          // ten equal-width elevation bands
+   * await rain.groupBy(dem, { bins: [0, 100, 500, 2000] });
+   * ```
+   * @param {Dataset} by - a raster Dataset whose values define the groups
+   * @param {{ bins?: number|number[], method?: string, noData?: number, byNoData?: number }} [opts]
+   * @returns {Promise<Array<Object>>}
+   */
+  async groupBy(by, opts = {}) {
+    this.#assertRasterOp("groupBy");
+    if (!by || typeof by.grid !== "function") {
+      throw new Error("groupBy: `by` must be a raster Dataset whose values define the groups");
+    }
+    const [mine, theirs] = await Promise.all([this.grid(), by.grid()]);
+    return groupByGrid(mine, theirs, opts);
   }
 
   /** Drop the memoized decode (evictable cache — the slider's stale-load guard calls this). @returns {void} */

@@ -8,7 +8,7 @@
 
 > **maskGrid**(`grid`, `polygon`, `opts?`): [`RasterGrid`](../../materialize/classes/RasterGrid.md)
 
-Defined in: [package/rasterOps.js:27](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/rasterOps.js#L27)
+Defined in: [package/rasterOps.js:37](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/rasterOps.js#L37)
 
 Masks a grid by a polygon. Pixels outside it become NaN, or inside it with `invert`. The bounds
 do not change. Scans only the polygon's pixel bbox rather than the whole grid.

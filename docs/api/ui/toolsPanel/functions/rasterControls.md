@@ -8,7 +8,7 @@
 
 > **rasterControls**(`layer`): [`Control`](../interfaces/Control.md)[]
 
-Defined in: [ui/toolsPanel.js:37](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/toolsPanel.js#L37)
+Defined in: [ui/toolsPanel.js:37](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/ui/toolsPanel.js#L37)
 
 PURE: the control spec for a raster layer.
 

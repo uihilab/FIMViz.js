@@ -437,20 +437,19 @@ gridToDataURL(grid, opts?)    // colorizeGrid + canvas encode → a PNG data URL
 
 
 
-## Standalone `warp()` (the EAGER twin of `Dataset.reproject()`)
+## Reprojecting eagerly
+
+`ds.reproject(toCrs)` is lazy — it builds an op node and warps nothing. Force it when you want the
+result now:
 
 ```js
-import { warp } from 'fimviz';   // geo/warp.js — NOT the same as ds.reproject(toCrs)
-
-const warped = await warp(ds, toCrs);   // async — warps immediately, returns a NEW Dataset
+const warped = ds.reproject(toCrs);
+await warped.load();          // warps here; `warped` is now materialized
 ```
 
-`Dataset.reproject(toCrs)` (documented above) is **lazy** — it builds an op node, and the warp only
-runs when something forces the chain. This standalone `warp(ds, toCrs)` is the **eager**
-equivalent — it warps immediately and returns a new, already-reprojected `Dataset` (still rasters
-only; same-CRS request returns `ds` unchanged, no copy). Both dispatch to the same GDAL warp
-underneath; pick the lazy method for a chain you're building up before rendering, or this function
-when you want the result right away.
+There is no separate eager function. A standalone `warp(ds, crs)` used to exist and was removed: it
+imported `geo/gdal.js` directly instead of going through the registered reprojector, so a host that
+registered its own warp got it on `ds.reproject()` and not on `warp()`. One path now.
 
 ## Vendored primitives
 

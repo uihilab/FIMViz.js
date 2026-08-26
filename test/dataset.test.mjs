@@ -1,13 +1,14 @@
-// Dataset (package/dataset.js) + warp (geo/warp.js). See docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1.
+// Dataset (package/dataset.js). See docs/DECISIONS_TRADEOFFS_INCOMPLETE_ITEMS.md §1.1.
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { Dataset } from "../src/package/dataset.js";
-import { warp } from "../src/geo/warp.js";
+import { Stats } from "../src/package/stats.js";
+import { gridMeta } from "../src/package/rasterOps.js";
 import { parseSource } from "../src/io/parse.js";
-import { RasterGrid, registerMaterializer } from "../src/package/materialize.js";
+import { RasterGrid, VectorFeatures, registerMaterializer } from "../src/package/materialize.js";
 
 const SAMPLES = fileURLToPath(new URL("../assets/SampleFiles/", import.meta.url));
 const ab = (f) => {
@@ -43,11 +44,7 @@ describe("Dataset: purity", () => {
     assert.equal(rp.crs, "EPSG:4326");
     assert.equal(ds.crs, "EPSG:26915", "the original is untouched");
     await assert.rejects(() => rp.load(), /no reprojector registered/);
-    // The standalone geo/ helper is `warp` — deliberately NOT named `reproject`, because
-    // ds.reproject() above is LAZY (returns an unforced node) while warp() is EAGER. One name
-    // must never mean both.
-    assert.equal(typeof warp, "function", "the standalone geo/ helper still exists, as warp()");
-    assert.equal(typeof Dataset.prototype.reproject, "function", "the lazy op keeps the name reproject");
+    assert.equal(typeof Dataset.prototype.reproject, "function", "reproject is the one name for it");
   });
 
   test("reproject to the SAME crs is a no-op that returns the same instance", () => {
@@ -192,33 +189,59 @@ describe("Dataset: selection axis", () => {
   });
 });
 
-describe("warp (eager free function)", () => {
-  test("an equivalent CRS is a no-op that returns the SAME instance (no copy, no GDAL)", async () => {
-    const ds = await parseSource(ab("4326.tif"), { name: "4326.tif" });
-    assert.equal(await warp(ds, "EPSG:4326"), ds);
+describe("ds.stats() — the headless route to Stats", () => {
+  const BOUNDS = { north: 2, south: 0, east: 2, west: 0 };
+  const rasterDs = () => {
+    registerMaterializer("stats-ras", async () => new RasterGrid({
+      pixels: Float32Array.from([1, 2, 3, 4]), width: 2, height: 2, bounds: BOUNDS,
+      crs: "EPSG:4326", noData: -9999, meta: { unit: "m" },
+    }));
+    return new Dataset({ name: "r.tif", kind: "raster", format: "stats-ras", crs: "EPSG:4326",
+      bounds: BOUNDS, data: { stub: true } });
+  };
+
+  test("a raster forces the chain and returns raster statistics", async () => {
+    const st = await rasterDs().stats();
+    assert.equal(st.kind, "raster");
+    assert.equal(st.min, 1);
+    assert.equal(st.max, 4);
+    assert.equal(st.count, 4);
+    assert.equal(st.mean, 2.5);
+    assert.ok(st.histogram.counts.length, "a histogram comes back");
   });
 
-  test("NAD83 → WGS84 is a no-op (≈1-2 m, below render resolution)", async () => {
-    const ds = new Dataset({ name: "n.tif", kind: "raster", crs: "EPSG:4269" });
-    assert.equal(await warp(ds, "EPSG:4326"), ds);
+  test("it matches Stats.raster called by hand through gridMeta", async () => {
+    const ds = rasterDs();
+    const g = await ds.grid();
+    const byHand = Stats.raster(g.pixels, gridMeta(g));
+    const viaDs = await rasterDs().stats();
+    assert.equal(viaDs.min, byHand.min);
+    assert.equal(viaDs.max, byHand.max);
+    assert.equal(viaDs.count, byHand.count);
   });
 
-  test("guards throw with actionable messages", async () => {
-    const raster = await parseSource(ab("4326.tif"), { name: "4326.tif" });
-    const vector = await parseSource(ab("iowa_lakes_meta.geojson"), { name: "iowa_lakes_meta.geojson" });
-    await assert.rejects(() => warp(null, "EPSG:4326"), /a Dataset is required/);
-    await assert.rejects(() => warp(raster), /a target CRS is required/);
-    await assert.rejects(() => warp(vector, "EPSG:26914"), /vector reprojection is not implemented/);
+  test("gridMeta carries noData and unit, so they are not lost on the way to Stats", async () => {
+    const g = await rasterDs().grid();
+    const m = gridMeta(g);
+    assert.equal(m.noData, -9999);
+    assert.equal(m.unit, "m");
+    assert.deepEqual([m.bw, m.bs, m.be, m.bn], [0, 0, 2, 2]);
   });
 
-  test("a vector no-ops rather than throwing when already in the target CRS", async () => {
-    const vector = await parseSource(ab("iowa_lakes_meta.geojson"), { name: "iowa_lakes_meta.geojson" });
-    assert.equal(await warp(vector, "EPSG:4326"), vector);
+  test("a vector returns feature statistics", async () => {
+    registerMaterializer("stats-vec", async () => new VectorFeatures({
+      features: { type: "FeatureCollection", features: [
+        { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [1, 1] } },
+      ] },
+      bounds: BOUNDS, crs: "EPSG:4326",
+    }));
+    const ds = new Dataset({ name: "v.geojson", kind: "vector", format: "stats-vec",
+      crs: "EPSG:4326", data: { stub: true } });
+    const st = await ds.stats();
+    assert.equal(st.kind, "vector");
+    assert.equal(st.featureCount, 1);
+    assert.equal(st.byType.point, 1);
   });
-
-  // NOT COVERED: an actual GDAL warp (a projected raster → EPSG:4326). gdal3.js is browser-only —
-  // its Emscripten loader fails in Node ("sn.readFileSync is not a function") — so the warp path
-  // needs browser verification. Everything up to the getGdal() call is covered above.
 });
 
 // An axis entry's `ref` can be an IN-FILE selector instead of a URL, so one multi-dimensional source

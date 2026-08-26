@@ -181,7 +181,7 @@ dialog; skipped here since it can't be observed from a returned value.
 ```js
 // reproject() returns the SAME Dataset (no copy) when the request is a same-CRS no-op, and a NEW
 // one only when a warp actually ran:
-const warped = await warp(ds, 'EPSG:4326');
+const warped = await ds.reproject('EPSG:4326').load();
 console.log(warped.crs, warped === ds);
 ```
 
@@ -1128,7 +1128,7 @@ dataUrl.startsWith('data:image/png;base64,');   // true
 ### Standalone `reproject()`
 
 ```js
-const eagerlyWarped = await warp(ds, 'EPSG:4326');   // eager — warps NOW, distinct from ds.reproject()
+const eagerlyWarped = await ds.reproject('EPSG:4326').load();   // load() forces the lazy node NOW
 eagerlyWarped === ds;   // true if ds was already WGS84/equivalent; a new Dataset otherwise
 ```
 

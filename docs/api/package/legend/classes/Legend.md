@@ -6,7 +6,7 @@
 
 # Class: Legend
 
-Defined in: [package/legend.js:16](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/legend.js#L16)
+Defined in: [package/legend.js:16](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/legend.js#L16)
 
 ## Constructors
 
@@ -14,7 +14,7 @@ Defined in: [package/legend.js:16](https://github.com/uihilab/FIMViz.js/blob/bb0
 
 > **new Legend**(`opts?`): `Legend`
 
-Defined in: [package/legend.js:24](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/legend.js#L24)
+Defined in: [package/legend.js:24](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/legend.js#L24)
 
 #### Parameters
 
@@ -46,7 +46,7 @@ Defined in: [package/legend.js:24](https://github.com/uihilab/FIMViz.js/blob/bb0
 
 > **formatLabel**: (`stop`) => `string`
 
-Defined in: [package/legend.js:30](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/legend.js#L30)
+Defined in: [package/legend.js:30](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/legend.js#L30)
 
 #### Parameters
 
@@ -64,7 +64,7 @@ Defined in: [package/legend.js:30](https://github.com/uihilab/FIMViz.js/blob/bb0
 
 > **formatValue**: (`value`) => `string`
 
-Defined in: [package/legend.js:32](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/legend.js#L32)
+Defined in: [package/legend.js:32](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/legend.js#L32)
 
 #### Parameters
 
@@ -82,7 +82,7 @@ Defined in: [package/legend.js:32](https://github.com/uihilab/FIMViz.js/blob/bb0
 
 > **kind**: `"continuous"` \| `"classed"`
 
-Defined in: [package/legend.js:26](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/legend.js#L26)
+Defined in: [package/legend.js:26](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/legend.js#L26)
 
 ***
 
@@ -90,7 +90,7 @@ Defined in: [package/legend.js:26](https://github.com/uihilab/FIMViz.js/blob/bb0
 
 > **source**: `"default"` \| `"palette"` \| `"custom"` \| `"gdal"`
 
-Defined in: [package/legend.js:27](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/legend.js#L27)
+Defined in: [package/legend.js:27](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/legend.js#L27)
 
 ***
 
@@ -98,7 +98,7 @@ Defined in: [package/legend.js:27](https://github.com/uihilab/FIMViz.js/blob/bb0
 
 > **stops**: [`LegendStop`](../interfaces/LegendStop.md)[]
 
-Defined in: [package/legend.js:28](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/legend.js#L28)
+Defined in: [package/legend.js:28](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/legend.js#L28)
 
 ***
 
@@ -106,7 +106,7 @@ Defined in: [package/legend.js:28](https://github.com/uihilab/FIMViz.js/blob/bb0
 
 > **unit**: `string`
 
-Defined in: [package/legend.js:25](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/legend.js#L25)
+Defined in: [package/legend.js:25](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/legend.js#L25)
 
 ## Methods
 
@@ -114,7 +114,7 @@ Defined in: [package/legend.js:25](https://github.com/uihilab/FIMViz.js/blob/bb0
 
 > **toHtml**(): `string`
 
-Defined in: [package/legend.js:70](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/legend.js#L70)
+Defined in: [package/legend.js:70](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/legend.js#L70)
 
 Renders the legend as HTML: a gradient bar with min and max when continuous, colored rows
 when classed.
@@ -129,7 +129,7 @@ when classed.
 
 > **toJSON**(): `object`
 
-Defined in: [package/legend.js:94](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/legend.js#L94)
+Defined in: [package/legend.js:94](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/legend.js#L94)
 
 #### Returns
 
@@ -157,7 +157,7 @@ Defined in: [package/legend.js:94](https://github.com/uihilab/FIMViz.js/blob/bb0
 
 > `static` **fromColorScale**(`cs`, `opts?`): `Legend`
 
-Defined in: [package/legend.js:41](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/legend.js#L41)
+Defined in: [package/legend.js:41](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/legend.js#L41)
 
 #### Parameters
 

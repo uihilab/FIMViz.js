@@ -380,7 +380,7 @@ counties.<span class="f">rasterize</span>({ width: <span class="s">600</span>, h
       fails on purpose.
     </p>
     <p>
-      <code>ds.reproject(crs)</code> is the lazy op; <code>warp(ds, crs)</code> is the eager free
+      <code>ds.reproject(crs)</code> builds a lazy node; force it with <code>load()</code> for the eager
       function. Both dispatch to the same GDAL warp, which is <b>browser-only</b> and lazily pulls about
       38 MB of wasm from a CDN on first use — so the button below is opt-in, and the first press is slow.
     </p>

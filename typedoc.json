@@ -18,7 +18,6 @@
     "src/package/rasterOps.js",
     "src/package/comparisonLayer.js",
     "src/package/ensembleAggregationLayer.js",
-    "src/geo/warp.js",
     "src/io/storage.js",
     "src/io/parse.js",
     "src/io/materializers.js",

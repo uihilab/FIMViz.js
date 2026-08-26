@@ -11,6 +11,7 @@
 - [aspectGrid](functions/aspectGrid.md)
 - [clipGrid](functions/clipGrid.md)
 - [combineGrids](functions/combineGrids.md)
+- [gridMeta](functions/gridMeta.md)
 - [groupByGrid](functions/groupByGrid.md)
 - [hillshadeGrid](functions/hillshadeGrid.md)
 - [maskGrid](functions/maskGrid.md)

@@ -8,7 +8,7 @@
 
 > **reclassifyGrid**(`grid`, `rules`, `opts?`): [`RasterGrid`](../../materialize/classes/RasterGrid.md)
 
-Defined in: [package/rasterOps.js:101](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/rasterOps.js#L101)
+Defined in: [package/rasterOps.js:111](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/rasterOps.js#L111)
 
 Remaps pixel values. `rules` takes one of two forms.
 
@@ -25,7 +25,7 @@ the default `unmatched:'nodata'` or keeps v under `'keep'`. A pixel already NaN 
 transparent and reaches neither a rule nor the callback.
 
 A callback does not survive Dataset.toRecord(), because structured clone cannot carry a function.
-That call throws and names the op rather than dropping it silently, so use range rules for a
+That call throws and names the op rather than dropping it, so use range rules for a
 chain that has to persist and reload.
 
 ## Parameters

@@ -12,7 +12,7 @@
 // that would otherwise land in every consumer's initial bundle and undo the §6 payload work. Two
 // deferrals stack: parse.js keeps this adapter out of the initial bundle, and the `sciwrid()` import
 // below keeps the READER out until a Dataset is actually forced — the same deferral GDAL uses in
-// geo/warp.js. The webpack build additionally marks `sciwrid-toolkit` external, so the wasm never
+// io/reprojector.js. The webpack build additionally marks `sciwrid-toolkit` external, so the wasm never
 // enters dist at all.
 //
 // The division of labour: SciWrid decodes and resamples; FIMViz owns the model. We take its readers

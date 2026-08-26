@@ -751,8 +751,12 @@ export class RasterLayer extends Layer {
       if (this.overlay) provider.removeRasterImage(fim.map, this.overlay);
       this.overlay = provider.addRasterImage(fim.map, dataURL, bounds, { opacity: this.opacity });
     }
-    // Hover fields from the source grid. Still assignable, since the transitional app path sets them
-    // directly. They become getters off sources[0] once nothing assigns them.
+    // Hover fields, written from the source grid. They stay plain writable properties rather than
+    // getters off sources[0], because two callers set them on a layer that has no sources:
+    // layers/depthMap.js:39 builds `new RasterLayer({ type: "depth" })` with none, decodes and draws
+    // the GeoTIFF itself, then assigns both at :177 so valueAt() and getStats() work; the hit-test
+    // and valueAt tests do the same to avoid constructing a Dataset. Converting to getters means
+    // routing depthMap through a Dataset first.
     this.rasterData = grid.pixels;
     this.meta = { bw: bounds.west, bs: bounds.south, be: bounds.east, bn: bounds.north,
       width: grid.width, height: grid.height, noData, unit: grid.meta?.unit ?? null };

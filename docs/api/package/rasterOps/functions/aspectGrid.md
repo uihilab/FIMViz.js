@@ -8,7 +8,7 @@
 
 > **aspectGrid**(`grid`): [`RasterGrid`](../../materialize/classes/RasterGrid.md)
 
-Defined in: [package/rasterOps.js:359](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/rasterOps.js#L359)
+Defined in: [package/rasterOps.js:369](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/rasterOps.js#L369)
 
 The downslope compass bearing by Horn's method, the algorithm gdaldem aspect uses. Runs from 0 at
 north through 90 at east, clockwise. It needs no cellsize, assuming square pixels as GDAL's does.

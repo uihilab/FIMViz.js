@@ -8,7 +8,7 @@
 
 > **createOperationsPanel**(`root`, `opts?`): `object`
 
-Defined in: [ui/operationsPanel.js:245](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/operationsPanel.js#L245)
+Defined in: [ui/operationsPanel.js:245](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/ui/operationsPanel.js#L245)
 
 Mount an operations panel for `layer` into `root`.
 

@@ -181,6 +181,20 @@ describe("Dataset lazy ops (build → force → transform)", () => {
     const g = await rootA().difference(root()).grid();
     assert.deepEqual([...g.pixels], [9, 18, 27, 36]);
   });
+
+  test("ratio is combine({op:'ratio'}), the other binary shorthand", async () => {
+    const g = await rootA().ratio(root()).grid();
+    assert.equal(g.width, 2);
+    const direct = await rootA().combine([root()], { op: "ratio" }).grid();
+    assert.deepEqual([...g.pixels], [...direct.pixels]);
+  });
+
+  test("the N-ary reducers stay on combine(), with no method shorthand", () => {
+    // ds.min(others) would read as this raster's minimum, which is (await ds.stats()).min.
+    for (const name of ["sum", "mean", "min", "max"]) {
+      assert.equal(typeof Dataset.prototype[name], "undefined", `${name}() must not exist`);
+    }
+  });
   test("combine round-trips through toRecord/fromRecord (N-ary)", async () => {
     const rec = rootA().combine([root()], { op: "sum" }).toRecord();
     assert.equal(rec.op.op, "combine");
@@ -473,5 +487,45 @@ describe("groupByGrid / ds.groupBy", () => {
     assert.equal(rows.length, 3);
     assert.equal(rows[2].mean, 24 / 7);
     await assert.rejects(() => a.groupBy(null), /must be a raster Dataset/);
+  });
+});
+
+// dataset.js divides on one rule: a synchronous method builds a lazy node and returns a Dataset, an
+// async one is a terminal that forces the chain and returns data. groupBy and zonalStats broke the
+// reading of it by sitting among the lazy raster ops — async was the only thing marking them apart.
+// These two tests are what keeps the rule true rather than merely tidy.
+describe("lazy ops vs terminals: the sync/async rule", () => {
+  const LAZY = ["reproject", "mask", "clip", "reclassify", "combine", "difference", "ratio",
+                "resampleTo", "slope", "aspect", "hillshade", "rasterize", "reduce",
+                "select", "selectRange"];
+  const TERMINALS = ["load", "grid", "features", "stats", "zonalStats", "groupBy"];
+
+  test("every lazy op is synchronous", () => {
+    for (const name of LAZY) {
+      const fn = Dataset.prototype[name];
+      assert.equal(typeof fn, "function", `${name} exists`);
+      assert.notEqual(fn.constructor.name, "AsyncFunction",
+        `${name}() must stay synchronous — an async op would compute at build time`);
+    }
+  });
+
+  test("every terminal is async", () => {
+    for (const name of TERMINALS) {
+      const fn = Dataset.prototype[name];
+      assert.equal(typeof fn, "function", `${name} exists`);
+      assert.equal(fn.constructor.name, "AsyncFunction",
+        `${name}() must stay async — it forces the chain`);
+    }
+  });
+
+  test("a lazy op returns a new Dataset and decodes nothing", () => {
+    const ds = new Dataset({ name: "t.tif", kind: "raster", format: "never-registered",
+                             crs: "EPSG:4326", data: { stub: true } });
+    const out = ds.clip({ north: 1, south: 0, east: 1, west: 0 }).mask([[0, 0], [1, 0], [1, 1]]);
+    assert.ok(out instanceof Dataset);
+    assert.notEqual(out, ds, "a new node, not a mutation");
+    assert.equal(ds.isMaterialized, false, "the source was never forced");
+    assert.equal(out.isMaterialized, false, "and neither was the result");
+    // the format is registered nowhere, so forcing would throw — proof nothing forced
   });
 });

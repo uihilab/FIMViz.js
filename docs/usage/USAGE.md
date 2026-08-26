@@ -49,7 +49,7 @@ the code that does it. See [examples/README.md](../../examples/README.md).
 ```js
 import {
   mount, FimViz,                                // boot
-  Dataset, warp, Storage,                       // composable core
+  Dataset, Storage,                             // composable core
   csvHeaders, wktToGeometry,                    // the CSV column-mapping seam
   RasterGrid, VectorFeatures,                   // the two decoded value types
   ColorScale, Legend, Stats,                    // read-models
@@ -387,12 +387,13 @@ that knows the format.
 ## `warp`
 
 ```js
-const wgs84 = await warp(ds, 'EPSG:4326');   // → a NEW Dataset; the input is untouched
+const wgs84 = ds.reproject('EPSG:4326');   // → a NEW lazy Dataset; the input is untouched
+await wgs84.grid();                        // the warp runs here
 ```
 
-**Two names, because there are two behaviours.** `warp(ds, crs)` is the **eager** free function — it
-warps immediately. `ds.reproject(crs)` is the **lazy** `Dataset` op — it returns an unforced node and
-nothing warps until a terminal (`grid()`/`load()`) forces it. Both dispatch to the same GDAL warp.
+`ds.reproject(crs)` is lazy: it returns an unforced node, and nothing warps until a terminal
+(`grid()`/`load()`) forces it. It dispatches through the registered reprojector, so a host that
+registers its own warp (a Node build, a server endpoint) gets it here.
 
 Explicit by design: an implicit warp makes parse cost non-deterministic (the first lazily pulls ~38 MB of
 GDAL wasm from a CDN) and destroys GDAL metadata tags. **Browser-only** — gdal3.js can't run under Node.
@@ -598,7 +599,7 @@ The built-in map providers only render the WGS84 family (`EPSG:4326`/`4269`); `g
 
 ```js
 if (ds.kind === 'raster' && ds.crs && !FimViz.providerAcceptsCRS(fim.config.provider, ds.crs)) {
-  ds = await warp(ds, 'EPSG:4326');   // → a NEW Dataset (GDAL WASM; browser-only, first call is slow)
+  ds = await ds.reproject('EPSG:4326').load();   // GDAL WASM by default; first call pulls the wasm
 }
 ```
 

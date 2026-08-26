@@ -124,8 +124,8 @@ classification, and region-scoped metrics are, and they are the parts every grou
 
 1. Ingest both products through `fim.addDataset(...)`. Record `t_fetch` and `t_decode` per product,
    plus `ds.crs`, `ds.bounds`, and `ds.warnings`.
-2. Reproject to a common CRS. Run this **both** ways — `ds.reproject(crs)` (lazy) and `warp(ds, crs)`
-   (eager) — and record the difference, because Section 4.3 needs the cost of a warp and the frequency
+2. Reproject to a common CRS with `ds.reproject(crs)`, then force it. Record the cost, because
+   Section 4.3 needs the cost of a warp and the frequency
    with which it is avoidable.
 3. Rasterize the observed vector delineation onto the modelled grid: `observed.rasterize({ width,
    height, bounds, burnValue: 1 })`. State the alignment policy explicitly (`GRID_POLICY` setting) and

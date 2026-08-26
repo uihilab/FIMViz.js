@@ -6,7 +6,7 @@
 
 # Class: Filter
 
-Defined in: [package/filter.js:26](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L26)
+Defined in: [package/filter.js:26](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/filter.js#L26)
 
 ## Extended by
 
@@ -29,7 +29,7 @@ Defined in: [package/filter.js:26](https://github.com/uihilab/FIMViz.js/blob/bb0
 
 > **isEmpty**(): `boolean`
 
-Defined in: [package/filter.js:34](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L34)
+Defined in: [package/filter.js:34](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/filter.js#L34)
 
 #### Returns
 
@@ -41,7 +41,7 @@ Defined in: [package/filter.js:34](https://github.com/uihilab/FIMViz.js/blob/bb0
 
 > **test**(`unit`): `boolean`
 
-Defined in: [package/filter.js:32](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L32)
+Defined in: [package/filter.js:32](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/filter.js#L32)
 
 #### Parameters
 
@@ -59,7 +59,7 @@ Defined in: [package/filter.js:32](https://github.com/uihilab/FIMViz.js/blob/bb0
 
 > `static` **all**(`filters`): `Filter`
 
-Defined in: [package/filter.js:67](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L67)
+Defined in: [package/filter.js:67](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/filter.js#L67)
 
 Combines filters with AND, matching what chaining applyFilter() does.
 
@@ -79,7 +79,7 @@ Combines filters with AND, matching what chaining applyFilter() does.
 
 > `static` **from**(`input`): `Filter`
 
-Defined in: [package/filter.js:52](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/package/filter.js#L52)
+Defined in: [package/filter.js:52](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/package/filter.js#L52)
 
 Turns any accepted input into a Filter.
   anything with test(unit) → returned unchanged

@@ -54,8 +54,8 @@ async function gdalReproject(grid, targetCrs, ctx = {}) {
     bands: image.getSamplesPerPixel(),
     // The source grid's opaque meta (GDAL legend/unit/nodata) describes the data's MEANING, not its
     // grid — the warp does not preserve those tags, so carry them forward, noting the reprojection.
-    // width/height DO describe the grid, and the warp changes them (mirrors geo/warp.js's eager path),
-    // so refresh them here rather than leaving the pre-warp dimensions in a "meta" a caller might read.
+    // width/height DO describe the grid and the warp changes them, so refresh them here rather than
+    // leaving the pre-warp dimensions in a meta that Stats or a hover lookup might read.
     meta: { ...grid.meta, width: image.getWidth(), height: image.getHeight(), reprojectedFrom: grid.crs },
   });
 }

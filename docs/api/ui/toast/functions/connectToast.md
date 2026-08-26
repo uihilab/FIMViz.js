@@ -8,7 +8,7 @@
 
 > **connectToast**(`fim`, `toast?`, `opts?`): `object` & `object`
 
-Defined in: [ui/toast.js:86](https://github.com/uihilab/FIMViz.js/blob/bb0a538d32e039b08b0262c3169d06460273c60b/src/ui/toast.js#L86)
+Defined in: [ui/toast.js:86](https://github.com/uihilab/FIMViz.js/blob/20575188daabf89b00e9e31ae0314273480ab3d3/src/ui/toast.js#L86)
 
 Subscribe a toast to the engine's user-facing host events (the host wires this — the engine never
 reaches for the UI). `notify` maps its levels (info/warn/error/success) onto toast levels;
