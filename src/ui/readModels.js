@@ -72,6 +72,12 @@ const MODEL_EVENTS = ["restyle", "recomputed", "rendered"];
  */
 function bindReadModel(layer, { root, name, read, empty }) {
   if (!layer) throw new Error(`${name}: a layer is required`);
+  // A selector string resolves here, matching the panel factories. See ui/hostBindings.js.
+  if (typeof root === "string") {
+    const found = typeof document === "undefined" ? null : document.querySelector(root);
+    if (!found) throw new Error(`${name}: no element matches "${root}"`);
+    root = found;
+  }
   const doc = root?.ownerDocument || (typeof document === "undefined" ? null : document);
   if (!doc) throw new Error(`${name}: no document — this is the live half of the module, mount it in a browser`);
 
@@ -134,7 +140,7 @@ function bindReadModel(layer, { root, name, read, empty }) {
  * layer.set({ palette: 'viridis' });     // the panel repaints itself
  * ```
  * @param {import('../package/layer.js').Layer} layer
- * @param {{ root?: Element, html?: boolean, render?: Function, empty?: string }} [opts]
+ * @param {{ root?: Element|string, html?: boolean, render?: Function, empty?: string }} [opts]
  *   `render` overrides `renderLegend` — take the Legend, return an HTML string.
  * @returns {{ el: Element, update: () => void, off: () => void, destroy: () => void }}
  */
@@ -153,7 +159,7 @@ export function bindLegend(layer, { root, html = true, render = renderLegend, em
  * `update()` after that; everything the LAYER can know about is already automatic.
  *
  * @param {import('../package/layer.js').Layer} layer
- * @param {{ root?: Element, html?: boolean, filter?: *|(() => *), render?: Function, empty?: string }} [opts]
+ * @param {{ root?: Element|string, html?: boolean, filter?: *|(() => *), render?: Function, empty?: string }} [opts]
  * @returns {{ el: Element, update: () => void, off: () => void, destroy: () => void }}
  */
 export function bindStats(layer, { root, html = true, filter, render = renderStats, empty = "" } = {}) {

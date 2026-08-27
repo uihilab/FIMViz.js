@@ -8,13 +8,14 @@
 //
 // Headless rule: DOM only inside functions; no `window.foo()`.
 
+import { resolveTheme, injectTokens, applyTheme } from "./theme.js";
 const PRETTY_CSS = `
-.fim-drop{display:flex;align-items:center;justify-content:center;gap:8px;min-height:74px;padding:12px;
-  border:1.5px dashed #2b3440;border-radius:8px;color:#8b949e;background:transparent;cursor:pointer;
+.fim-drop[data-fim-theme]{display:flex;align-items:center;justify-content:center;gap:8px;min-height:74px;padding:12px;
+  border:1.5px dashed var(--fim-line);border-radius:8px;color:var(--fim-muted);background:transparent;cursor:pointer;
   font:13px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;text-align:center;transition:border-color .12s,background .12s}
-.fim-drop:hover{border-color:#3d4756}
-.fim-drop[data-over]{border-color:#58a6ff;background:rgba(88,166,255,.08);color:#e6edf3}
-.fim-drop[data-busy]{opacity:.6;cursor:progress}
+.fim-drop[data-fim-theme]:hover{border-color:var(--fim-line-hover)}
+.fim-drop[data-fim-theme][data-over]{border-color:var(--fim-accent);background:var(--fim-accent-soft);color:var(--fim-fg)}
+.fim-drop[data-fim-theme][data-busy]{opacity:.6;cursor:progress}
 `;
 
 function injectStyles(doc) {
@@ -60,7 +61,7 @@ const extOf = (name) => {
  */
 export function createDropzone(root, {
   fim, add = "layer", accept = DROP_EXTENSIONS, multiple = true, browse = true,
-  label = "Drop a file here, or click to browse", pretty = true,
+  label = "Drop a file here, or click to browse", theme, pretty = true,
   onDrop, onLoad, onError, onDone,
 } = {}) {
   const host = typeof root === "string" ? document.querySelector(root) : root;
@@ -71,12 +72,13 @@ export function createDropzone(root, {
   const doc = host.ownerDocument || document;
 
   const el = doc.createElement("div");
-  el.className = "fim-drop" + (pretty ? " fim-pretty" : "");
+  const _theme = resolveTheme({ theme, pretty });
+  if (_theme !== "none") { injectTokens(doc, _theme); injectStyles(doc); }
+  applyTheme(el, "fim-drop", _theme);
   el.setAttribute("data-fim-ui", "dropzone");
   el.setAttribute("tabindex", "0");
   el.setAttribute("role", "button");
   el.textContent = label;
-  if (pretty) injectStyles(doc);
   host.appendChild(el);
 
   let picker = null;

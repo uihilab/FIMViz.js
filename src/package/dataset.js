@@ -861,8 +861,21 @@ export class Dataset {
     return groupByGrid(mine, theirs, opts);
   }
 
-  /** Drop the memoized decode (evictable cache — the slider's stale-load guard calls this). @returns {void} */
-  release() { this.#materialized = null; }
+  /**
+   * Drop the memoized decode (evictable cache — the slider's stale-load guard calls this).
+   *
+   * A VALUE ROOT is exempt. `Dataset.fromGrid` builds a root that holds no bytes and no URL: its
+   * memoized value is the data, not a cache of it, so `#materializeRoot` has nothing to read a
+   * second time. Freeing it would leave a Dataset that can never be forced again, and the failure
+   * surfaces far from here — a layer op releases the old sources after a successful swap, and the
+   * next `reset()` or re-force of a derived node throws "has no source (no data, no url)".
+   * Everything else is safe to drop, because the root can be fetched or decoded again.
+   * @returns {void}
+   */
+  release() {
+    if (!this.#inputs && !this.#url && this.data == null) return;   // value root — the cache IS the data
+    this.#materialized = null;
+  }
 
   // ---- private force helpers ----
 

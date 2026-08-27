@@ -374,6 +374,11 @@ export class FimMap {
     const layer = await createLayer(this, type, opts);
     this.layers.push(layer);
     this.#layersChanged("added", layer);
+    // Restack immediately, so "the array's order is the z-order" holds from the first add rather
+    // than from the first panel move. Without this the provider draws in insertion order while
+    // hit-testing follows the array, and the two disagree the moment they differ — a layer whose
+    // handle attaches late, or any add after a remove.
+    this.applyLayerOrder();
     return layer;
   }
 
@@ -395,7 +400,11 @@ export class FimMap {
     layer._map = this;
     layer._name = name;
     this.#layersByName.set(name, layer);
-    if (!this.layers.includes(layer)) { this.layers.push(layer); this.#layersChanged("added", layer); }
+    if (!this.layers.includes(layer)) {
+      this.layers.push(layer);
+      this.#layersChanged("added", layer);
+      this.applyLayerOrder();
+    }
     return layer;
   }
 
@@ -607,6 +616,9 @@ export class FimMap {
    * for hit-testing, but visual stacking was whatever order the provider inserted overlays in. The
    * two could disagree, so the layer receiving a click was not necessarily the one drawn on top.
    * This makes the array decide both.
+   *
+   * Called automatically after every add (addLayer, registerNamedLayer) and by the layer panel after
+   * a move, so a host only calls it directly when it reorders `layers` itself.
    * @returns {FimMap}
    */
   applyLayerOrder() {

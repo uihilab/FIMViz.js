@@ -15,19 +15,20 @@
 // Headless rule, as everywhere in this folder: DOM only inside functions, and the engine is never
 // called back into except through its public API.
 
+import { resolveTheme, injectTokens, applyTheme } from "./theme.js";
 const PRETTY_CSS = `
-.fim-layer-panel.fim-pretty{background:#161b22;color:#e6edf3;border:1px solid #2b3440;border-radius:8px;padding:6px;font:13px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-width:230px}
-.fim-layer-panel.fim-pretty .lyr{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:6px}
-.fim-layer-panel.fim-pretty .lyr+.lyr{margin-top:2px}
-.fim-layer-panel.fim-pretty .lyr:hover{background:#0f1216}
-.fim-layer-panel.fim-pretty .lyr.sel{background:#132135;outline:1px solid #58a6ff}
-.fim-layer-panel.fim-pretty .lyr.off .nm{opacity:.45;text-decoration:line-through}
-.fim-layer-panel.fim-pretty .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
-.fim-layer-panel.fim-pretty .ty{font:10px ui-monospace,Menlo,monospace;color:#8b949e}
-.fim-layer-panel.fim-pretty button{background:transparent;border:1px solid #2b3440;color:#8b949e;border-radius:5px;padding:1px 5px;font-size:11px;cursor:pointer;line-height:1.4}
-.fim-layer-panel.fim-pretty button:hover:not(:disabled){color:#e6edf3;border-color:#58a6ff}
-.fim-layer-panel.fim-pretty button:disabled{opacity:.3;cursor:not-allowed}
-.fim-layer-panel.fim-pretty .empty{color:#8b949e;padding:6px;font-size:12px}
+.fim-layer-panel[data-fim-theme]{background:var(--fim-bg);color:var(--fim-fg);border:1px solid var(--fim-line);border-radius:8px;padding:6px;font:13px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-width:230px}
+.fim-layer-panel[data-fim-theme] .lyr{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:6px}
+.fim-layer-panel[data-fim-theme] .lyr+.lyr{margin-top:2px}
+.fim-layer-panel[data-fim-theme] .lyr:hover{background:var(--fim-hover)}
+.fim-layer-panel[data-fim-theme] .lyr.sel{background:var(--fim-sel);outline:1px solid var(--fim-accent)}
+.fim-layer-panel[data-fim-theme] .lyr.off .nm{opacity:.45;text-decoration:line-through}
+.fim-layer-panel[data-fim-theme] .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.fim-layer-panel[data-fim-theme] .ty{font:10px ui-monospace,Menlo,monospace;color:var(--fim-muted)}
+.fim-layer-panel[data-fim-theme] button{background:transparent;border:1px solid var(--fim-line);color:var(--fim-muted);border-radius:5px;padding:1px 5px;font-size:11px;cursor:pointer;line-height:1.4}
+.fim-layer-panel[data-fim-theme] button:hover:not(:disabled){color:var(--fim-fg);border-color:var(--fim-accent)}
+.fim-layer-panel[data-fim-theme] button:disabled{opacity:.3;cursor:not-allowed}
+.fim-layer-panel[data-fim-theme] .empty{color:var(--fim-muted);padding:6px;font-size:12px}
 `;
 
 function injectStyles(doc) {
@@ -59,17 +60,18 @@ export function layerLabel(layer) {
  * @returns {{ el: Element, update: () => void, select: (layer: any) => void,
  *             get selected(): any, destroy: () => void }}
  */
-export function createLayerPanel(root, { fim, pretty = false, selected = null, onSelect, onRemove } = {}) {
+export function createLayerPanel(root, { fim, theme, pretty = false, selected = null, onSelect, onRemove } = {}) {
   if (!fim) throw new Error("createLayerPanel: { fim } is required");
   const host = typeof root === "string" ? document.querySelector(root) : root;
   if (!host) throw new Error("createLayerPanel: target element not found");
   const doc = host.ownerDocument || document;
-  if (pretty) injectStyles(doc);
+  const _theme = resolveTheme({ theme, pretty });
+  if (_theme !== "none") { injectTokens(doc, _theme); injectStyles(doc); }
 
   let current = selected;
 
   const panel = doc.createElement("div");
-  panel.className = "fim-layer-panel" + (pretty ? " fim-pretty" : "");
+  applyTheme(panel, "fim-layer-panel", _theme);
   panel.setAttribute("data-fim-ui", "layer-panel");
   host.appendChild(panel);
 

@@ -10,21 +10,22 @@
 // a table entry apiece, and why an op can never disagree with its own controls. Every op is filtered
 // by `kind`, so a vector layer is offered rasterize and nothing that would throw on it.
 
+import { resolveTheme, injectTokens, applyTheme } from "./theme.js";
 const PRETTY_CSS = `
-.fim-ops-panel.fim-pretty{background:#161b22;color:#e6edf3;border:1px solid #2b3440;border-radius:8px;padding:4px 12px 10px;font:13px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-width:210px}
-.fim-ops-panel.fim-pretty .op-group{border-bottom:1px solid #2b3440}
-.fim-ops-panel.fim-pretty .op-group:last-of-type{border-bottom:0}
-.fim-ops-panel.fim-pretty .op-group>summary{cursor:pointer;padding:7px 0;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#8b949e}
-.fim-ops-panel.fim-pretty .op{display:flex;flex-direction:column;gap:5px;padding:0 0 9px}
-.fim-ops-panel.fim-pretty .op-title{font-size:12px;color:#8b949e}
-.fim-ops-panel.fim-pretty .op-row{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
-.fim-ops-panel.fim-pretty label{display:flex;gap:4px;align-items:center;font-size:11px;color:#8b949e}
-.fim-ops-panel.fim-pretty input[type=number],.fim-ops-panel.fim-pretty input[type=text]{width:66px;background:#0f1216;color:#e6edf3;border:1px solid #2b3440;border-radius:5px;padding:4px 6px;font-size:12px}
-.fim-ops-panel.fim-pretty select{background:#0f1216;color:#e6edf3;border:1px solid #2b3440;border-radius:5px;padding:4px 6px;font-size:12px;max-width:150px}
-.fim-ops-panel.fim-pretty button{background:#58a6ff;color:#08111f;border:0;border-radius:6px;padding:5px 10px;font-weight:600;cursor:pointer;font-size:12px}
-.fim-ops-panel.fim-pretty button.sec{background:transparent;color:#58a6ff;border:1px solid #2b3440}
-.fim-ops-panel.fim-pretty button:disabled{opacity:.45;cursor:not-allowed}
-.fim-ops-panel.fim-pretty .op-note{font-size:11px;color:#8b949e;font-style:italic}
+.fim-ops-panel[data-fim-theme]{background:var(--fim-bg);color:var(--fim-fg);border:1px solid var(--fim-line);border-radius:8px;padding:4px 12px 10px;font:13px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-width:210px}
+.fim-ops-panel[data-fim-theme] .op-group{border-bottom:1px solid var(--fim-line)}
+.fim-ops-panel[data-fim-theme] .op-group:last-of-type{border-bottom:0}
+.fim-ops-panel[data-fim-theme] .op-group>summary{cursor:pointer;padding:7px 0;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--fim-muted)}
+.fim-ops-panel[data-fim-theme] .op{display:flex;flex-direction:column;gap:5px;padding:0 0 9px}
+.fim-ops-panel[data-fim-theme] .op-title{font-size:12px;color:var(--fim-muted)}
+.fim-ops-panel[data-fim-theme] .op-row{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.fim-ops-panel[data-fim-theme] label{display:flex;gap:4px;align-items:center;font-size:11px;color:var(--fim-muted)}
+.fim-ops-panel[data-fim-theme] input[type=number],.fim-ops-panel[data-fim-theme] input[type=text]{width:66px;background:var(--fim-field);color:var(--fim-fg);border:1px solid var(--fim-line);border-radius:5px;padding:4px 6px;font-size:12px}
+.fim-ops-panel[data-fim-theme] select{background:var(--fim-field);color:var(--fim-fg);border:1px solid var(--fim-line);border-radius:5px;padding:4px 6px;font-size:12px;max-width:150px}
+.fim-ops-panel[data-fim-theme] button{background:var(--fim-accent);color:var(--fim-accent-fg);border:0;border-radius:6px;padding:5px 10px;font-weight:600;cursor:pointer;font-size:12px}
+.fim-ops-panel[data-fim-theme] button.sec{background:transparent;color:var(--fim-accent);border:1px solid var(--fim-line)}
+.fim-ops-panel[data-fim-theme] button:disabled{opacity:.45;cursor:not-allowed}
+.fim-ops-panel[data-fim-theme] .op-note{font-size:11px;color:var(--fim-muted);font-style:italic}
 `;
 
 function injectStyles(doc) {
@@ -243,7 +244,7 @@ const GROUP_ORDER = ["Extent", "Values", "Terrain", "Grid", "Multi-layer", "Axis
  * @returns {{ el: Element, ops: string[], destroy: () => void }}
  */
 export function createOperationsPanel(root, {
-  layer, region, layers, fim, open = ["Extent", "Values"], pretty = false, onApply, onResult,
+  layer, region, layers, fim, open = ["Extent", "Values"], theme, pretty = false, onApply, onResult,
 } = {}) {
   if (!layer) throw new Error("createOperationsPanel: { layer } is required");
   const host = typeof root === "string" ? document.querySelector(root) : root;
@@ -261,9 +262,10 @@ export function createOperationsPanel(root, {
   const ctx = { layer, region, operands, fim };
 
   const panel = doc.createElement("div");
-  panel.className = "fim-ops-panel" + (pretty ? " fim-pretty" : "");
+  const _theme = resolveTheme({ theme, pretty });
+  if (_theme !== "none") { injectTokens(doc, _theme); injectStyles(doc); }
+  applyTheme(panel, "fim-ops-panel", _theme);
   panel.setAttribute("data-fim-ui", "operations-panel");
-  if (pretty) injectStyles(doc);
 
   const mk = (tag, props = {}, kids = []) => {
     const e = doc.createElement(tag);

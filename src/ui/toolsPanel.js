@@ -8,6 +8,7 @@
 // Headless rule: DOM only inside functions; no `window.foo()`.
 
 import { paletteNames } from "../package/colorScale.js";
+import { resolveTheme, injectTokens, applyTheme } from "./theme.js";
 
 /**
  * @typedef {Object} Control
@@ -98,20 +99,20 @@ function defaultControls(layer) {
 }
 
 const PRETTY_CSS = `
-.fim-tools-panel.fim-pretty{background:#161b22;color:#e6edf3;border:1px solid #2b3440;border-radius:8px;padding:10px 12px;font:13px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-width:210px}
-.fim-tools-panel.fim-pretty label{display:flex;gap:8px;align-items:center;margin:6px 0}
-.fim-tools-panel.fim-pretty label>span{min-width:84px;color:#8b949e;font-size:12px}
-.fim-tools-panel.fim-pretty select,.fim-tools-panel.fim-pretty input[type=range]{flex:1}
-.fim-tools-panel.fim-pretty input[type=number],.fim-tools-panel.fim-pretty input[type=text]{flex:1;min-width:0;background:#0f1216;color:#e6edf3;border:1px solid #2b3440;border-radius:5px;padding:3px 6px;font-size:12px}
-.fim-tools-panel.fim-pretty .fim-note{display:block;margin:-3px 0 7px 92px;color:#6e7681;font-size:11px;font-style:italic}
-.fim-tools-panel.fim-pretty .fim-stops{margin:6px 0 8px}
-.fim-tools-panel.fim-pretty .fim-stops>span.hd{display:block;color:#8b949e;font-size:12px;margin-bottom:4px}
-.fim-tools-panel.fim-pretty .fim-stop{display:flex;gap:4px;align-items:center;margin:3px 0}
-.fim-tools-panel.fim-pretty .fim-stop input[type=number]{width:52px;flex:0 0 auto}
-.fim-tools-panel.fim-pretty .fim-stop input[type=text]{flex:1;min-width:36px}
-.fim-tools-panel.fim-pretty .fim-stop input[type=color]{width:26px;height:22px;padding:0;border:1px solid #2b3440;border-radius:4px;background:none}
-.fim-tools-panel.fim-pretty .fim-stops button{background:transparent;color:#58a6ff;border:1px solid #2b3440;border-radius:5px;padding:2px 7px;font-size:11px;cursor:pointer}
-.fim-tools-panel.fim-pretty .fim-stop button{color:#8b949e;padding:2px 6px}
+.fim-tools-panel[data-fim-theme]{background:var(--fim-bg);color:var(--fim-fg);border:1px solid var(--fim-line);border-radius:8px;padding:10px 12px;font:13px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-width:210px}
+.fim-tools-panel[data-fim-theme] label{display:flex;gap:8px;align-items:center;margin:6px 0}
+.fim-tools-panel[data-fim-theme] label>span{min-width:84px;color:var(--fim-muted);font-size:12px}
+.fim-tools-panel[data-fim-theme] select,.fim-tools-panel[data-fim-theme] input[type=range]{flex:1}
+.fim-tools-panel[data-fim-theme] input[type=number],.fim-tools-panel[data-fim-theme] input[type=text]{flex:1;min-width:0;background:var(--fim-field);color:var(--fim-fg);border:1px solid var(--fim-line);border-radius:5px;padding:3px 6px;font-size:12px}
+.fim-tools-panel[data-fim-theme] .fim-note{display:block;margin:-3px 0 7px 92px;color:var(--fim-muted);font-size:11px;font-style:italic}
+.fim-tools-panel[data-fim-theme] .fim-stops{margin:6px 0 8px}
+.fim-tools-panel[data-fim-theme] .fim-stops>span.hd{display:block;color:var(--fim-muted);font-size:12px;margin-bottom:4px}
+.fim-tools-panel[data-fim-theme] .fim-stop{display:flex;gap:4px;align-items:center;margin:3px 0}
+.fim-tools-panel[data-fim-theme] .fim-stop input[type=number]{width:52px;flex:0 0 auto}
+.fim-tools-panel[data-fim-theme] .fim-stop input[type=text]{flex:1;min-width:36px}
+.fim-tools-panel[data-fim-theme] .fim-stop input[type=color]{width:26px;height:22px;padding:0;border:1px solid var(--fim-line);border-radius:4px;background:none}
+.fim-tools-panel[data-fim-theme] .fim-stops button{background:transparent;color:var(--fim-accent);border:1px solid var(--fim-line);border-radius:5px;padding:2px 7px;font-size:11px;cursor:pointer}
+.fim-tools-panel[data-fim-theme] .fim-stop button{color:var(--fim-muted);padding:2px 6px}
 `;
 
 function injectPrettyStyles(doc) {
@@ -285,7 +286,7 @@ function controlEl(doc, c, layer) {
  *           reactive?: boolean }} opts
  * @returns {{ el: Element, update: () => void, destroy: () => void }}
  */
-export function createToolsPanel(root, { layer, controls, pretty = false, reactive = false } = {}) {
+export function createToolsPanel(root, { layer, controls, theme, pretty = false, reactive = false } = {}) {
   if (!layer) throw new Error("createToolsPanel: { layer } is required");
   const host = typeof root === "string" ? document.querySelector(root) : root;
   if (!host) throw new Error(`createToolsPanel: target ${typeof root === "string" ? root : "element"} not found`);
@@ -297,9 +298,10 @@ export function createToolsPanel(root, { layer, controls, pretty = false, reacti
   };
 
   const panel = doc.createElement("div");
-  panel.className = "fim-tools-panel" + (pretty ? " fim-pretty" : "");
+  const _theme = resolveTheme({ theme, pretty });
+  if (_theme !== "none") { injectTokens(doc, _theme); injectPrettyStyles(doc); }
+  applyTheme(panel, "fim-tools-panel", _theme);
   panel.setAttribute("data-fim-ui", "tools-panel");
-  if (pretty) injectPrettyStyles(doc);
   host.appendChild(panel);
 
   function render() {

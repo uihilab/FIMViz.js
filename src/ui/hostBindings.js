@@ -17,23 +17,25 @@
 //
 // Headless rule: DOM only inside functions; no `window.foo()`.
 
+import { resolveTheme, injectTokens, applyTheme } from "./theme.js";
+
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 const BUSY_CSS = `
-.fim-busy{display:none;align-items:center;gap:8px;font:12px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#8b949e}
-.fim-busy[data-active]{display:flex}
-.fim-busy .fim-busy-dot{width:11px;height:11px;border:2px solid #58a6ff;border-right-color:transparent;border-radius:50%;animation:fim-busy-spin .7s linear infinite}
+.fim-busy[data-fim-theme]{display:none;align-items:center;gap:8px;font:12px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--fim-muted)}
+.fim-busy[data-fim-theme][data-active]{display:flex}
+.fim-busy[data-fim-theme] .fim-busy-dot{width:11px;height:11px;border:2px solid var(--fim-accent);border-right-color:transparent;border-radius:50%;animation:fim-busy-spin .7s linear infinite}
 @keyframes fim-busy-spin{to{transform:rotate(360deg)}}
 `;
 
 const META_CSS = `
-.fim-meta{display:none;font:12px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e6edf3}
-.fim-meta[data-shown]{display:block}
-.fim-meta h4{margin:0 0 5px;font-size:12px;color:#e6edf3}
-.fim-meta table{border-collapse:collapse;width:100%}
-.fim-meta td{padding:1px 0;vertical-align:top}
-.fim-meta td.k{color:#8b949e;padding-right:10px;white-space:nowrap}
-.fim-meta td.num{font-family:ui-monospace,Menlo,monospace}
+.fim-meta[data-fim-theme]{display:none;font:12px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--fim-fg)}
+.fim-meta[data-fim-theme][data-shown]{display:block}
+.fim-meta[data-fim-theme] h4{margin:0 0 5px;font-size:12px;color:var(--fim-fg)}
+.fim-meta[data-fim-theme] table{border-collapse:collapse;width:100%}
+.fim-meta[data-fim-theme] td{padding:1px 0;vertical-align:top}
+.fim-meta[data-fim-theme] td.k{color:var(--fim-muted);padding-right:10px;white-space:nowrap}
+.fim-meta[data-fim-theme] td.num{font-family:ui-monospace,Menlo,monospace}
 `;
 
 function injectStyles(doc, id, css) {
@@ -43,11 +45,19 @@ function injectStyles(doc, id, css) {
   (doc.head || doc.body || doc.documentElement).appendChild(s);
 }
 
-function mount(root, className, dataName) {
+function mount(root, base, dataName, theme) {
+  // A selector string resolves here, so `root` accepts what the panel factories accept
+  // (createLayerPanel, createToolsPanel, …). Without this the two halves of the kit disagree about
+  // the same option name, which is a defect a host hits on its first call.
+  if (typeof root === "string") {
+    const found = typeof document === "undefined" ? null : document.querySelector(root);
+    if (!found) throw new Error(`${dataName}: no element matches "${root}"`);
+    root = found;
+  }
   const doc = root?.ownerDocument || (typeof document === "undefined" ? null : document);
   if (!doc) throw new Error(`${dataName}: no document — mount this in a browser`);
   const el = doc.createElement("div");
-  el.className = className;
+  applyTheme(el, base, theme);
   el.setAttribute("data-fim-ui", dataName);
   (root || doc.body).appendChild(el);
   return { doc, el };
@@ -66,10 +76,11 @@ function mount(root, className, dataName) {
  * @param {{ root?: Element, label?: string|((sources: string[]) => string), pretty?: boolean }} [opts]
  * @returns {{ el: Element, active: boolean, sources: string[], off: () => void, destroy: () => void }}
  */
-export function createBusyIndicator(fim, { root, label = "Working…", pretty = true } = {}) {
+export function createBusyIndicator(fim, { root, label = "Working…", theme, pretty = true } = {}) {
   if (!fim?.on) throw new Error("createBusyIndicator: a FimMap (or anything with .on) is required");
-  const { doc, el } = mount(root, "fim-busy" + (pretty ? " fim-pretty" : ""), "busy");
-  if (pretty) injectStyles(doc, "fim-busy-css", BUSY_CSS);
+  const _theme = resolveTheme({ theme, pretty });
+  const { doc, el } = mount(root, "fim-busy", "busy", _theme);
+  if (_theme !== "none") { injectTokens(doc, _theme); injectStyles(doc, "fim-busy-css", BUSY_CSS); }
 
   const dot = doc.createElement("span");
   dot.className = "fim-busy-dot";
@@ -122,10 +133,11 @@ export function createBusyIndicator(fim, { root, label = "Working…", pretty = 
  * @param {{ root?: Element, render?: (payload: Object) => string, pretty?: boolean }} [opts]
  * @returns {{ el: Element, shown: boolean, payload: Object|null, off: () => void, destroy: () => void }}
  */
-export function bindRasterMetadata(fim, { root, render, pretty = true } = {}) {
+export function bindRasterMetadata(fim, { root, render, theme, pretty = true } = {}) {
   if (!fim?.on) throw new Error("bindRasterMetadata: a FimMap (or anything with .on) is required");
-  const { doc, el } = mount(root, "fim-meta" + (pretty ? " fim-pretty" : ""), "raster-metadata");
-  if (pretty) injectStyles(doc, "fim-meta-css", META_CSS);
+  const _theme = resolveTheme({ theme, pretty });
+  const { doc, el } = mount(root, "fim-meta", "raster-metadata", _theme);
+  if (_theme !== "none") { injectTokens(doc, _theme); injectStyles(doc, "fim-meta-css", META_CSS); }
 
   let payload = null;
 

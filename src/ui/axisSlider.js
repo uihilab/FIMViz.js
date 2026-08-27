@@ -9,15 +9,16 @@
 // examples/04-temporal.html: a stale frame must never win, and a play loop must wait for the
 // frame it asked for. Headless rule: DOM only inside functions; no `window.foo()`.
 
+import { resolveTheme, injectTokens, applyTheme } from "./theme.js";
 const PRETTY_CSS = `
-.fim-axis{font:12px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e6edf3}
-.fim-axis .fim-axis-row{display:flex;gap:7px;align-items:center}
-.fim-axis input[type=range]{flex:1;min-width:0;accent-color:#58a6ff}
-.fim-axis button{background:transparent;color:#58a6ff;border:1px solid #2b3440;border-radius:6px;padding:3px 9px;font-size:12px;cursor:pointer;font-family:inherit}
-.fim-axis button:disabled{opacity:.45;cursor:not-allowed}
-.fim-axis .fim-axis-out{display:flex;justify-content:space-between;gap:8px;margin-top:4px;color:#8b949e}
-.fim-axis .fim-axis-label{color:#e6edf3;font-family:ui-monospace,Menlo,monospace}
-.fim-axis .fim-axis-none{color:#8b949e;font-style:italic}
+.fim-axis[data-fim-theme]{font:12px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--fim-fg)}
+.fim-axis[data-fim-theme] .fim-axis-row{display:flex;gap:7px;align-items:center}
+.fim-axis[data-fim-theme] input[type=range]{flex:1;min-width:0;accent-color:var(--fim-accent)}
+.fim-axis[data-fim-theme] button{background:transparent;color:var(--fim-accent);border:1px solid var(--fim-line);border-radius:6px;padding:3px 9px;font-size:12px;cursor:pointer;font-family:inherit}
+.fim-axis[data-fim-theme] button:disabled{opacity:.45;cursor:not-allowed}
+.fim-axis[data-fim-theme] .fim-axis-out{display:flex;justify-content:space-between;gap:8px;margin-top:4px;color:var(--fim-muted)}
+.fim-axis[data-fim-theme] .fim-axis-label{color:var(--fim-fg);font-family:ui-monospace,Menlo,monospace}
+.fim-axis[data-fim-theme] .fim-axis-none{color:var(--fim-muted);font-style:italic}
 `;
 
 function injectStyles(doc) {
@@ -76,7 +77,7 @@ export function axisEntryLabel(entry) {
  */
 export function createAxisSlider(root, {
   layer, dataset, axis = 0, index = 0, label = axisEntryLabel,
-  play: showPlay = true, interval = 600, loop = true, pretty = true,
+  play: showPlay = true, interval = 600, loop = true, theme, pretty = true,
   onChange, onError,
 } = {}) {
   if (!layer) throw new Error("createAxisSlider: { layer } is required");
@@ -89,9 +90,10 @@ export function createAxisSlider(root, {
   const entries = ax?.entries ?? [];
 
   const el = doc.createElement("div");
-  el.className = "fim-axis" + (pretty ? " fim-pretty" : "");
+  const _theme = resolveTheme({ theme, pretty });
+  if (_theme !== "none") { injectTokens(doc, _theme); injectStyles(doc); }
+  applyTheme(el, "fim-axis", _theme);
   el.setAttribute("data-fim-ui", "axis-slider");
-  if (pretty) injectStyles(doc);
   host.appendChild(el);
 
   const mk = (tag, props = {}, kids = []) => {

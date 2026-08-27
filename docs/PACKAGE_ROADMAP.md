@@ -187,6 +187,35 @@ common case directly. Malformed per-site/per-reading rows are skipped, not fatal
 or feeding a stage into the flood-extent slider) — that consumer wiring is open UI/app work, deliberately
 out of scope for the adapter itself.
 
+**Still open: GeoJSON shapes the vector path reads as empty.** RFC 7946 §3 allows a bare geometry
+(`{ type: "Polygon", coordinates: [...] }`) and a `GeometryCollection` as the top-level object. Six call
+sites decide independently what a vector payload contains, and all six return `[]` for those two:
+`VectorFeatures.toArray` (`package/materialize.js:70`), `buildVectorDataset` (`io/parse.js:195`),
+`VectorLayer.featureAt` (`package/layer.js:1046`), `featuresOf` (`package/mapProvider.js:236`),
+`Stats`'s `normalizeFeatures` (`package/stats.js:318`) and `rasterizeFeatures` (`package/rasterOps.js:443`).
+They already disagree on a bare array of Features: `stats.js` accepts one, `layer.js` and `mapProvider.js`
+do not. `boundsOf` does read both shapes, so such a file produces a Dataset with correct `bounds`,
+`meta.featureCount: 0` and nothing drawn. The two providers also diverge: `addVector` passes the payload
+straight to the SDK, and `L.geoJSON` (`mapProvider.js:630`) renders a bare geometry while
+`google.maps.Data.addGeoJson` (`mapProvider.js:337`) takes a Feature or FeatureCollection only.
+
+Two routes, not yet chosen. **(a)** Normalize on ingest — one `toFeatureCollection(json)` called from the
+`VectorFeatures` constructor and from `buildVectorDataset`, so `ds.data` and `vf.features` are always a
+FeatureCollection and all six readers are fixed at once. Cost: `Dataset.toBlob` (`package/dataset.js:1122`)
+serializes `ds.data`, so a bare-geometry file no longer round-trips byte-identically, and `vf.features`
+stops being the object passed in. **(b)** Opt-in — add `VectorFeatures.coerceToFeatures()` (wraps a bare
+geometry as one Feature, a GeometryCollection as one Feature per member) plus `toGeoJSON()` returning a
+compliant FeatureCollection. Nothing stored changes and the payload stays recoverable from
+`vf.features`, but `featureAt` and `featuresOf` read `ds.data` and need the same fix separately. Either
+way the wrapper invents `properties: {}` and gives no `id`, and a GeometryCollection's own `bbox` and
+foreign members are dropped.
+
+Out of scope for both: **Esri JSON** (`{ features: [{ attributes, geometry: { rings } }] }`) passes the
+`Array.isArray(f.features)` check and yields objects with no `geometry.type` and no `properties`, so
+`geomContains` and `Stats.vector` read `undefined` with no error. **TopoJSON** yields nothing. Making
+either compliant means a per-encoding converter, which belongs with the format candidates above rather
+than with shape normalization.
+
 ---
 
 ## 4. Data import / export mechanisms
@@ -829,6 +858,71 @@ path was never affected because `colorizeGrid` pre-filters `NaN` itself.
     resolved slice), and names `select()`/`reduce()` as the way forward.
 - **Parquet/Kerchunk** — SciWrid reads both, and they are vector/reference-shaped rather than gridded.
   Out of scope until the raster path lands.
+
+---
+
+## 9. Known defects
+
+Recorded here rather than fixed silently, because each one is a claim the paper makes or a claim a
+host would reasonably infer from the API.
+
+### 9.1 `raster:metadata` never fired for a core raster layer — fixed
+
+**Observed.** `bindRasterMetadata` mounts, subscribes, and stays empty for the lifetime of a page
+that renders only `raster` and `vector` layers.
+
+**Cause.** The event has exactly one producer, `showTifMetadata()` in `geo/tifMeta.js`, and exactly
+three call sites: `layers/depthMap.js`, `layers/ensemble.js`, and `layers/velocity.js`. All three are
+in the opt-in overlay barrel, so a host importing only the package barrel never loads a producer.
+The producer also takes a decoded `geotiff` image object, so a layer built from `Dataset.fromGrid` or
+from any non-GeoTIFF source could not feed it even with the barrel loaded.
+
+**Why it matters.** `ui/hostBindings.js` presents `bindRasterMetadata` as a view over the engine's
+outbound bus alongside `busy` and `notify`, both of which the core does emit. A host reads that list
+and concludes the core emits all three. It does not, and nothing says so.
+
+**Fix, when taken.** Emit `raster:metadata` from the core raster render path with a payload built
+from `RasterGrid` (`width`, `height`, `bounds`, `crs`, `noData`, `bands`) plus whatever `Dataset.meta`
+carries, so the payload is format-independent. The GeoTIFF-specific rows the overlay tier adds stay
+where they are, as extra rows. Until then, `docs/usage/UI.md` should state which events the core
+emits and which come from the overlay barrel.
+
+**Status.** Fixed. `RasterLayer._draw` now emits `raster:metadata` with a payload built by
+`rasterMetadataPayload()` from the RasterGrid (size, CRS, bands, bounds, nodata, unit), and `hide()`
+emits `raster:metadata-hidden` — which covers removal, since `remove()` calls `hide()` first. The
+overlay tier still emits its own richer GeoTIFF payload. Found while building `test.html` for the
+interface-kit figure.
+
+### 9.2 Provider stack was only synced on a panel move — fixed
+
+`FimMap.applyLayerOrder()` had one caller, `ui/layerPanel.js`, invoked after a bring-forward or
+send-backward. On add, the layer was pushed to `this.layers` and the provider drew it in insertion
+order, so the array order (which `dispatchMapEventToLayers` uses for hit-testing, and which the layer
+panel renders) and the drawn stack could disagree until the user moved something. `addLayer` and
+`registerNamedLayer` now call `applyLayerOrder()` after the push, so the invariant holds from the
+first add.
+
+### 9.3 `release()` destroyed a `fromGrid` root — fixed
+
+**Observed.** Apply two or three operations to a layer whose source came from `Dataset.fromGrid`,
+then press "Reset to original": `load(): "<name>" has no source (no data, no url)`.
+
+**Cause.** `Layer.setSources` releases the previous sources once a swap succeeds, and
+`FimVizInstance._releaseDataset` calls `ds.release()` when the reference count reaches zero.
+`release()` cleared `#materialized`. For a URL- or bytes-rooted Dataset that is a cache eviction and
+`#materializeRoot` reads the source again. For a `fromGrid` root there is nothing to read: the
+memoized value is the data. The node became permanently unforceable, and the error surfaced later, on
+the reset or on the next re-force of a derived node whose input it was.
+
+**Fix.** `release()` now returns early for a value root — a node with no inputs, no URL, and no
+`data`. Every other node still evicts.
+
+**Related, not fixed.** A derived node does not acquire its inputs, so a root reachable only through
+a chain has a reference count of zero and is released as soon as the layer swaps sources. That is
+harmless now that value roots are exempt, but it does mean a URL root gets re-fetched on the next
+re-force rather than re-read from memory.
+
+**Status.** Fixed. Found while exercising the operations panel in `test.html`.
 
 ---
 

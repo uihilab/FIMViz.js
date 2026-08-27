@@ -525,6 +525,39 @@ export class Layer {
 // `type` and in which of the common palette-canvas fields they use. The subsystem does the actual
 // render, and these fields hold the handles it manages, so the state lives on the Layer rather than
 // in module scope. Nothing here names google, so the model stays provider-neutral.
+
+/**
+ * The `raster:metadata` payload for a core raster layer, built from its decoded grid.
+ *
+ * Format-independent by construction: everything here comes off the RasterGrid and the layer, so a
+ * GeoTIFF, a NetCDF timestep and a synthesised grid all describe themselves in the same rows. Extra
+ * rows a specific format knows about — GeoTIFF tags, a GDAL legend — are the overlay tier's to add.
+ *
+ * `num: true` marks a value the default renderer right-aligns in a monospace column.
+ * @param {RasterLayer} layer
+ * @param {{width: number, height: number, crs?: string|null, bands?: number, meta?: Object}} grid
+ * @param {{north: number, south: number, east: number, west: number}} bounds
+ * @param {number|null} noData
+ * @returns {{title: string, name: string, specRows: Array<{k: string, v: *, num?: boolean}>}}
+ */
+function rasterMetadataPayload(layer, grid, bounds, noData) {
+  const name = layer.dataset?.name || layer._name || layer.type || layer.id;
+  const dp = (n) => (typeof n === "number" ? +n.toFixed(4) : n);
+  const specRows = [
+    { k: "Size", v: `${grid.width} \u00d7 ${grid.height}` },
+    { k: "CRS", v: grid.crs || layer.dataset?.crs || "unknown" },
+    { k: "Bands", v: grid.bands ?? 1, num: true },
+    { k: "North", v: dp(bounds.north), num: true },
+    { k: "South", v: dp(bounds.south), num: true },
+    { k: "East", v: dp(bounds.east), num: true },
+    { k: "West", v: dp(bounds.west), num: true },
+    { k: "No-data", v: noData == null ? "none declared" : noData, num: noData != null },
+  ];
+  const unit = grid.meta?.unit ?? layer.colorScale?.unit ?? null;
+  if (unit) specRows.push({ k: "Unit", v: unit });
+  return { title: "Raster", name, specRows };
+}
+
 export class RasterLayer extends Layer {
   constructor(opts = {}) {
     super(opts);
@@ -571,6 +604,9 @@ export class RasterLayer extends Layer {
       provider?.setRasterImageOpacity?.(this.overlay, 0);
     }
     this.visible = false;
+    // The panel describes what is on the map, so a hidden raster's metadata is no longer current.
+    // remove() calls hide() first, which covers removal too.
+    emitHost("raster:metadata-hidden", { id: this.id });
     return this;
   }
 
@@ -760,6 +796,14 @@ export class RasterLayer extends Layer {
     this.rasterData = grid.pixels;
     this.meta = { bw: bounds.west, bs: bounds.south, be: bounds.east, bn: bounds.north,
       width: grid.width, height: grid.height, noData, unit: grid.meta?.unit ?? null };
+    // 'raster:metadata' from the CORE raster path (PACKAGE_ROADMAP.md §9.1). Before this, the event
+    // had one producer, showTifMetadata() in geo/tifMeta.js, reachable only from the opt-in overlay
+    // barrel and only for a decoded GeoTIFF — so a host that mounted bindRasterMetadata against a
+    // plain `raster` layer subscribed to an event nothing emitted. The payload here is built from
+    // the RasterGrid, so it carries no format assumption: a GeoTIFF, a NetCDF slice and a
+    // Dataset.fromGrid surface all describe themselves the same way. The overlay tier still emits
+    // its own richer payload, with the GeoTIFF tag rows this one cannot know about.
+    emitHost("raster:metadata", rasterMetadataPayload(this, grid, bounds, noData));
     this._teardown = () => {
       if (this.overlay) provider.removeRasterImage(fim.map, this.overlay);
       this.overlay = null;

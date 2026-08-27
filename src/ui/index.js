@@ -7,6 +7,11 @@
 // available as the `fimviz/ui` subpath (its own bundle, dist/ui.js) so a headless consumer can
 // import just the UI without pulling in the engine.
 
+// The three themes and the option resolver. A host that writes its own panel against the kit's
+// class names can read the same tokens, and `resolveTheme` is exported so a wrapper can forward
+// whichever of `theme` / `pretty` its own caller passed.
+export { THEMES, resolveTheme } from "./theme.js";
+
 export { createToast, connectToast } from "./toast.js";
 export { createBusyIndicator, bindRasterMetadata, renderRasterMetadata } from "./hostBindings.js";
 export { createTooltip, bindHoverValue } from "./tooltip.js";

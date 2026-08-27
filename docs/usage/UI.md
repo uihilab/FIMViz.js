@@ -12,6 +12,42 @@ having exactly one entry means an app can never load two copies with two sets of
 import { createToast, connectToast, createToolsPanel } from 'fimviz/ui';
 ```
 
+## Themes
+
+Every factory in this module takes `theme`:
+
+| `theme` | what you get |
+|---|---|
+| `'normal'` | the default — light, for a page with a white background |
+| `'dark'` | the palette the kit shipped with before themes existed |
+| `'none'` | no CSS at all; the kit emits its markup and the host styles it by class name |
+
+```js
+createLayerPanel('#layers', { fim, theme: 'dark' });
+createToolsPanel('#tools', { layer });                  // 'none' — this factory's own default
+createAxisSlider('#axis', { layer });                   // 'normal' — this one defaults to themed
+```
+
+Colour lives in custom properties on one shared stylesheet (`#fim-theme-css`), and each module's own
+stylesheet reads them, so a host can override a single token instead of restyling a panel:
+
+```css
+[data-fim-theme="normal"] { --fim-accent: #7a1f2b; }
+```
+
+The tokens are `--fim-bg`, `--fim-fg`, `--fim-muted`, `--fim-line`, `--fim-line-hover`, `--fim-field`,
+`--fim-hover`, `--fim-sel`, `--fim-accent`, `--fim-accent-fg`, and `--fim-accent-soft`.
+
+`pretty` is the older spelling and still works: `pretty: false` means `'none'` and `pretty: true`
+means `'normal'`. An explicit `theme` wins over it. Note that `pretty: true` used to mean dark, so a
+page that passed it renders light after this change; pass `theme: 'dark'` to keep the old look.
+
+Which factories default to themed and which to `'none'` is unchanged: the three panels
+(`createLayerPanel`, `createToolsPanel`, `createOperationsPanel`) default to `'none'`, and
+`createAxisSlider`, `createDropzone`, `createBusyIndicator` and `bindRasterMetadata` default to
+`'normal'`.
+
+
 ## Contents
 
 [Toast](#toast) · [Host bus (busy, metadata)](#the-rest-of-the-enginehost-bus) ·
@@ -51,11 +87,15 @@ subscription it made.
 ## The rest of the engine→host bus
 
 ```js
-createBusyIndicator(fim, { root?, label?, pretty? })
+createBusyIndicator(fim, { root?, label?, pretty? })   // root: Element | selector string
+
+Mount the bus views (`createBusyIndicator`, `bindRasterMetadata`, `connectToast`) **before** the
+first `addDataset`/`addLayer`. The engine emits these as work happens and replays nothing, so a
+binding created after the data is loaded subscribes to events that have already fired.
 // label: a string, or (sources: string[]) => string
 // → { el, active, sources, off(), destroy() }
 
-bindRasterMetadata(fim, { root?, render?, pretty? })
+bindRasterMetadata(fim, { root?, render?, pretty? })  // root: Element | selector string
 // → { el, shown, payload, off(), destroy() }
 
 renderRasterMetadata(payload)   // PURE — the default rendering, for a host's own chrome
@@ -215,6 +255,9 @@ bindStats (layer, { root?, html?, filter?, render?, empty? })
 // → { el, update(), off(), destroy() }
 ```
 
+`root` takes an Element or a selector string, the same as every panel factory in this module. Omit
+it and the binding creates its element without attaching it; mount `.el` yourself.
+
 They subscribe to three of the layer's own events, and only these three:
 
 | | |
@@ -226,8 +269,8 @@ They subscribe to three of the layer's own events, and only these three:
 `settings` is deliberately excluded: it fires for knobs that change neither, such as the hover toggle.
 
 ```js
-const legend = bindLegend(layer, { root: $('#legend'), empty: 'no colour scale' });
-const stats  = bindStats(layer,  { root: $('#stats'), filter: () => currentRegion });
+const legend = bindLegend(layer, { root: '#legend', empty: 'no colour scale' });
+const stats  = bindStats(layer,  { root: '#stats', filter: () => currentRegion });
 layer.set({ palette: 'viridis' });    // both repaint themselves
 ```
 
