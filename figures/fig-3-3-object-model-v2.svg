@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="1090" viewBox="0 0 1180 1090"
+     font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
+  <title>FIMViz.js object model — classes, members, and operations</title>
+  <desc>A UML class diagram of the engine's public object model. FimViz creates a FimVizInstance,
+        which owns FimMaps and a Dataset registry. A Dataset is an immutable description of a source
+        and the operations asked of it; its derivation operations return new Datasets and its
+        resolution operations return a RasterGrid, VectorFeatures or Stats. A Layer is one rendering
+        of one or more Datasets, specialized as raster, vector, comparison and ensemble layers, and
+        reads its presentation from ColorScale, Legend, Stats and Filter.</desc>
+
+  <defs>
+    <marker id="open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10" fill="none" stroke="#475569" stroke-width="1.4"/>
+    </marker>
+  </defs>
+
+  <rect width="1180" height="1090" fill="#ffffff"/>
+
+  <rect x="20" y="70" width="244" height="99.59999999999997" rx="6" fill="#eef2f6" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="32" y="90" font-size="12.5" font-weight="700" fill="#0f172a">FimViz</text>
+  <text x="252" y="90" font-size="9" fill="#64748b" text-anchor="end">«namespace»</text>
+  <line x1="20" y1="98" x2="264" y2="98" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="32" y="114" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">create(options) : FimVizInstance</text>
+  <text x="32" y="128.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">mount(target, options) : FimMap</text>
+  <text x="32" y="142.39999999999998" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">parseFile(source) : Dataset</text>
+  <text x="32" y="156.59999999999997" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">current() : FimVizInstance</text>
+  <rect x="20" y="200" width="244" height="180.39999999999992" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="32" y="220" font-size="12.5" font-weight="700" fill="#0f172a">FimVizInstance</text>
+  <line x1="20" y1="228" x2="264" y2="228" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="32" y="244" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">config : Config</text>
+  <text x="32" y="258.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">storage : Storage</text>
+  <text x="32" y="272.4" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">datasets : Dataset [0..*]</text>
+  <text x="32" y="286.59999999999997" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">maps : FimMap [0..*]</text>
+  <line x1="20" y1="293.59999999999997" x2="264" y2="293.59999999999997" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="32" y="310.59999999999997" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">configure(options)</text>
+  <text x="32" y="324.79999999999995" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">adoptDataset(ds) : Dataset</text>
+  <text x="32" y="338.99999999999994" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">removeDataset(ds)</text>
+  <text x="32" y="353.19999999999993" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">on / off / emit(event)</text>
+  <text x="32" y="367.3999999999999" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">destroy()</text>
+  <rect x="20" y="410" width="244" height="166.20000000000016" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="32" y="430" font-size="12.5" font-weight="700" fill="#0f172a">FimMap</text>
+  <line x1="20" y1="438" x2="264" y2="438" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="32" y="454" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">map : ProviderMap</text>
+  <text x="32" y="468.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">root : Element</text>
+  <text x="32" y="482.4" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">layers : Layer [0..*]</text>
+  <line x1="20" y1="489.4" x2="264" y2="489.4" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="32" y="506.4" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">addDataset(src, opts) : Dataset</text>
+  <text x="32" y="520.6" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">addLayer(type, opts) : Layer</text>
+  <text x="32" y="534.8000000000001" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">getLayer(id) : Layer</text>
+  <text x="32" y="549.0000000000001" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">removeLayer(id)</text>
+  <text x="32" y="563.2000000000002" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">on / off / emit(event)</text>
+  <rect x="20" y="610" width="244" height="152.00000000000023" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="32" y="630" font-size="12.5" font-weight="700" fill="#0f172a">Storage</text>
+  <line x1="20" y1="638" x2="264" y2="638" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="32" y="654" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">name : string</text>
+  <text x="32" y="668.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">tables : string [1..*]</text>
+  <line x1="20" y1="675.2" x2="264" y2="675.2" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="32" y="692.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">put(table, key, value)</text>
+  <text x="32" y="706.4000000000001" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">get(table, key)</text>
+  <text x="32" y="720.6000000000001" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">list(table, opts)</text>
+  <text x="32" y="734.8000000000002" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">delete(table, key)</text>
+  <text x="32" y="750.0000000000002" font-size="9.5" fill="#64748b" font-style="italic">the host names the database</text>
+  <rect x="288" y="70" width="296" height="393.39999999999975" rx="6" fill="#dbeafe" stroke="#60a5fa" stroke-width="1.7"/>
+  <text x="300" y="90" font-size="12.5" font-weight="700" fill="#0f172a">Dataset</text>
+  <text x="572" y="90" font-size="9" fill="#64748b" text-anchor="end">«immutable»</text>
+  <line x1="288" y1="98" x2="584" y2="98" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="300" y="114" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">id : string</text>
+  <text x="300" y="128.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">name : string</text>
+  <text x="300" y="142.39999999999998" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">kind : raster | vector</text>
+  <text x="300" y="156.59999999999997" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">format : geotiff | netcdf | grib2 |</text>
+  <text x="300" y="170.79999999999995" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">         zarr | geojson | shp | …</text>
+  <text x="300" y="184.99999999999994" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">crs : string   // native, never assumed</text>
+  <text x="300" y="199.19999999999993" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">bounds : Bounds</text>
+  <text x="300" y="213.39999999999992" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">axes : Axis [0..*]</text>
+  <text x="300" y="227.5999999999999" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">warnings : string [0..*]</text>
+  <line x1="288" y1="234.5999999999999" x2="584" y2="234.5999999999999" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="300" y="251.5999999999999" font-size="9.5" font-weight="700" fill="#1e40af">derivation — returns a new Dataset</text>
+  <text x="300" y="265.7999999999999" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">reproject(crs)   clip(bbox)</text>
+  <text x="300" y="279.9999999999999" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">mask(polygon)    reclassify(rules)</text>
+  <text x="300" y="294.1999999999999" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">combine(others, op)   resampleTo(target)</text>
+  <text x="300" y="308.39999999999986" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">slope()  aspect()  hillshade()</text>
+  <text x="300" y="322.59999999999985" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">rasterize(opts)</text>
+  <text x="300" y="336.79999999999984" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">select(coord)   selectRange(from, to)</text>
+  <text x="300" y="350.99999999999983" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">reduce(op, { axis })</text>
+  <text x="300" y="365.1999999999998" font-size="9.5" font-weight="700" fill="#1e40af">resolution — returns a value</text>
+  <text x="300" y="379.3999999999998" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">grid() : RasterGrid</text>
+  <text x="300" y="393.5999999999998" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">features() : VectorFeatures</text>
+  <text x="300" y="407.7999999999998" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">stats(opts) : Stats</text>
+  <text x="300" y="421.9999999999998" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">zonalStats(zones)   groupBy(by)</text>
+  <text x="300" y="436.19999999999976" font-size="9.5" font-weight="700" fill="#1e40af">provenance</text>
+  <text x="300" y="450.39999999999975" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">toRecord() : Record   download()</text>
+  <rect x="288" y="500" width="140" height="99.60000000000014" rx="6" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="300" y="520" font-size="12.5" font-weight="700" fill="#0f172a">RasterGrid</text>
+  <line x1="288" y1="528" x2="428" y2="528" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="300" y="544" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">pixels : TypedArray</text>
+  <text x="300" y="558.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">width, height</text>
+  <text x="300" y="572.4000000000001" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">bounds, crs</text>
+  <text x="300" y="586.6000000000001" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">noData, bands</text>
+  <rect x="444" y="500" width="140" height="71.20000000000005" rx="6" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="456" y="520" font-size="12.5" font-weight="700" fill="#0f172a">VectorFeatures</text>
+  <line x1="444" y1="528" x2="584" y2="528" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="456" y="544" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">features : Feature[]</text>
+  <text x="456" y="558.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">bounds, crs</text>
+  <rect x="288" y="630" width="296" height="128.00000000000023" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="300" y="650" font-size="12.5" font-weight="700" fill="#0f172a">Axis</text>
+  <line x1="288" y1="658" x2="584" y2="658" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="300" y="674" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">name : string          // time, stage, band</text>
+  <text x="300" y="688.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">unit : string          // &#x27;index&#x27; if unlabeled</text>
+  <text x="300" y="702.4000000000001" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">ordered : boolean      // gates selectRange</text>
+  <text x="300" y="716.6000000000001" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">commensurable : boolean   // gates reduce</text>
+  <text x="300" y="730.8000000000002" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">entries : AxisEntry [1..*]</text>
+  <text x="300" y="746.0000000000002" font-size="9.5" fill="#64748b" font-style="italic">select() · selectRange() · reduce() act here</text>
+  <rect x="288" y="800" width="296" height="99.60000000000014" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="300" y="820" font-size="12.5" font-weight="700" fill="#0f172a">AxisEntry</text>
+  <line x1="288" y1="828" x2="584" y2="828" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="300" y="844" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">coord : number | string</text>
+  <text x="300" y="858.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">ref : URL | { select } | { name: URL }</text>
+  <text x="300" y="872.4000000000001" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">meta : object</text>
+  <text x="300" y="887.6000000000001" font-size="9.5" fill="#64748b" font-style="italic">a separate file, an in-file slice, or named variants</text>
+  <rect x="624" y="70" width="296" height="293.99999999999983" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="636" y="90" font-size="12.5" font-weight="700" fill="#0f172a" font-style="italic">Layer</text>
+  <text x="908" y="90" font-size="9" fill="#64748b" text-anchor="end">«abstract»</text>
+  <line x1="624" y1="98" x2="920" y2="98" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="636" y="114" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">id : string</text>
+  <text x="636" y="128.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">type : string</text>
+  <text x="636" y="142.39999999999998" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">sources : Dataset [1..*]</text>
+  <text x="636" y="156.59999999999997" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">result : any        // set by compute()</text>
+  <text x="636" y="170.79999999999995" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">colorScale : ColorScale</text>
+  <text x="636" y="184.99999999999994" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">settings : LayerSettings</text>
+  <text x="636" y="199.19999999999993" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">visible : boolean   dirty : boolean</text>
+  <line x1="624" y1="206.19999999999993" x2="920" y2="206.19999999999993" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="636" y="223.19999999999993" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">compute(opts) : any</text>
+  <text x="636" y="237.39999999999992" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">render(opts) : Layer</text>
+  <text x="636" y="251.5999999999999" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">show()  hide()  fit()  remove()</text>
+  <text x="636" y="265.7999999999999" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">setSources(sources)   deriveSources(fn)</text>
+  <text x="636" y="279.9999999999999" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">reset()          // back to pre-op sources</text>
+  <text x="636" y="294.1999999999999" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">hitTest(lat, lng) : boolean</text>
+  <text x="636" y="308.39999999999986" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">getLegend() : Legend</text>
+  <text x="636" y="322.59999999999985" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">getStats() : Stats</text>
+  <text x="636" y="336.79999999999984" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">clip · mask · reclassify · reproject ·</text>
+  <text x="636" y="350.99999999999983" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">slope · select · reduce   // to the sources</text>
+  <rect x="664" y="430" width="256" height="85.40000000000009" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="676" y="450" font-size="12.5" font-weight="700" fill="#0f172a">RasterLayer</text>
+  <line x1="664" y1="458" x2="920" y2="458" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="676" y="474" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">valueAt(lat, lng) : number</text>
+  <text x="676" y="488.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">enableHover(opts)</text>
+  <text x="676" y="502.4" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">setNoData(v)   setOpacity(v)</text>
+  <rect x="664" y="540" width="256" height="95.20000000000005" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="676" y="560" font-size="12.5" font-weight="700" fill="#0f172a">VectorLayer</text>
+  <line x1="664" y1="568" x2="920" y2="568" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="676" y="584" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">colorBy : string   // feature property</text>
+  <line x1="664" y1="591.0" x2="920" y2="591.0" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="676" y="608.0" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">featureAt(lat, lng) : Feature</text>
+  <text x="676" y="622.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">setStyle(patch)</text>
+  <rect x="664" y="665" width="256" height="123.60000000000014" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="676" y="685" font-size="12.5" font-weight="700" fill="#0f172a">ComparisonLayer</text>
+  <line x1="664" y1="693" x2="920" y2="693" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="676" y="709" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">sources : Dataset [2..8]</text>
+  <line x1="664" y1="716.0" x2="920" y2="716.0" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="676" y="733.0" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">compute({ policy, method, mask })</text>
+  <text x="676" y="747.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">getAligned()</text>
+  <text x="676" y="761.4000000000001" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">metricsForMask(mask) : Metrics</text>
+  <text x="676" y="776.6000000000001" font-size="9.5" fill="#64748b" font-style="italic">contingency table + agreement metrics</text>
+  <rect x="664" y="820" width="256" height="109.40000000000009" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="676" y="840" font-size="12.5" font-weight="700" fill="#0f172a">EnsembleAggregationLayer</text>
+  <line x1="664" y1="848" x2="920" y2="848" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="676" y="864" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">sources : Dataset [2..*]</text>
+  <line x1="664" y1="871.0" x2="920" y2="871.0" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="676" y="888.0" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">compute({ policy, method, colors })</text>
+  <text x="676" y="902.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">getAligned()</text>
+  <text x="676" y="917.4000000000001" font-size="9.5" fill="#64748b" font-style="italic">agreement count, 0..N</text>
+  <rect x="944" y="70" width="216" height="166.19999999999993" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="956" y="90" font-size="12.5" font-weight="700" fill="#0f172a">ColorScale</text>
+  <line x1="944" y1="98" x2="1160" y2="98" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="956" y="114" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">kind : classed | continuous</text>
+  <text x="956" y="128.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">palette : string | string[]</text>
+  <text x="956" y="142.39999999999998" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">unit : string</text>
+  <text x="956" y="156.59999999999997" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">missingColor : string</text>
+  <line x1="944" y1="163.59999999999997" x2="1160" y2="163.59999999999997" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="956" y="180.59999999999997" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">getColor(value) : string</text>
+  <text x="956" y="194.79999999999995" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">getStops() : Stop[]</text>
+  <text x="956" y="208.99999999999994" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">set(patch)   setStops(stops)</text>
+  <text x="956" y="223.19999999999993" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">onChange(fn)</text>
+  <rect x="944" y="276" width="216" height="123.59999999999997" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="956" y="296" font-size="12.5" font-weight="700" fill="#0f172a">Legend</text>
+  <text x="1148" y="296" font-size="9" fill="#64748b" text-anchor="end">«derived»</text>
+  <line x1="944" y1="304" x2="1160" y2="304" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="956" y="320" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">kind : classed | continuous</text>
+  <text x="956" y="334.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">unit : string</text>
+  <text x="956" y="348.4" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">stops : Stop [1..*]</text>
+  <line x1="944" y1="355.4" x2="1160" y2="355.4" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="956" y="372.4" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">fromColorScale(cs) : Legend</text>
+  <text x="956" y="386.59999999999997" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">toJSON()   toHtml()</text>
+  <rect x="944" y="456" width="216" height="166.20000000000027" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="956" y="476" font-size="12.5" font-weight="700" fill="#0f172a">Stats</text>
+  <line x1="944" y1="484" x2="1160" y2="484" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="956" y="500" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">min, max, mean, median</text>
+  <text x="956" y="514.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">stddev, sum, count</text>
+  <text x="956" y="528.4000000000001" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">histogram : object</text>
+  <text x="956" y="542.6000000000001" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">area : number</text>
+  <line x1="944" y1="549.6000000000001" x2="1160" y2="549.6000000000001" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="956" y="566.6000000000001" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">raster(grid, opts) : Stats</text>
+  <text x="956" y="580.8000000000002" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">vector(src, opts) : Stats</text>
+  <text x="956" y="595.0000000000002" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">percentile(p)   diff(other)</text>
+  <text x="956" y="609.2000000000003" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">toCSV()</text>
+  <rect x="944" y="691" width="216" height="123.60000000000014" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="956" y="711" font-size="12.5" font-weight="700" fill="#0f172a" font-style="italic">Filter</text>
+  <text x="1148" y="711" font-size="9" fill="#64748b" text-anchor="end">«abstract»</text>
+  <line x1="944" y1="719" x2="1160" y2="719" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="956" y="735" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">SpatialFilter(polygon)</text>
+  <text x="956" y="749.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">PredicateFilter(fn)</text>
+  <line x1="944" y1="756.2" x2="1160" y2="756.2" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="956" y="773.2" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">contains(lat, lng) : boolean</text>
+  <text x="956" y="787.4000000000001" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569">pixelBbox(meta) : Bbox</text>
+  <text x="956" y="802.6000000000001" font-size="9.5" fill="#64748b" font-style="italic">scopes a statistic or a metric</text>
+
+    <path d="M142,180 L142,196" fill="none" stroke="#475569" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#open)"/>
+  <text x="150" y="194" font-size="8.5" fill="#64748b" text-anchor="start" font-weight="400">«creates»</text>
+  <path d="M142,390 L147.5,398 L142,406 L136.5,398 Z" fill="#475569" stroke="#475569" stroke-width="1.3" transform="rotate(0 142 398)"/>
+  <path d="M142,406 L142,410" fill="none" stroke="#475569" stroke-width="1.3"/>
+  <path d="M268,287 L273.5,295 L268,303 L262.5,295 Z" fill="#ffffff" stroke="#475569" stroke-width="1.3" transform="rotate(90 268 295)"/>
+  <path d="M274,295 L284,295" fill="none" stroke="#475569" stroke-width="1.3" marker-end="url(#open)"/>
+  <path d="M272,342 L277.5,350 L272,358 L266.5,350 Z" fill="#475569" stroke="#475569" stroke-width="1.3" transform="rotate(90 272 350)"/>
+  <path d="M280,350 L276,350 L276,690 L260,690" fill="none" stroke="#475569" stroke-width="1.3" marker-end="url(#open)"/>
+  <path d="M272,462 L277.5,470 L272,478 L266.5,470 Z" fill="#475569" stroke="#475569" stroke-width="1.3" transform="rotate(90 272 470)"/>
+  <path d="M280,470 L604,470 L604,220 L620,220" fill="none" stroke="#475569" stroke-width="1.3" marker-end="url(#open)"/>
+  <path d="M624,116 L588,116" fill="none" stroke="#475569" stroke-width="1.3" marker-end="url(#open)"/>
+  <text x="604" y="106" font-size="8.5" fill="#475569" text-anchor="middle" font-weight="400">0..*   sources   1..*</text>
+  <path d="M358,459 L358,496" fill="none" stroke="#475569" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#open)"/>
+  <text x="364" y="484" font-size="8.5" fill="#64748b" text-anchor="start" font-weight="400">«grid()»</text>
+  <path d="M514,459 L514,496" fill="none" stroke="#475569" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#open)"/>
+  <text x="520" y="484" font-size="8.5" fill="#64748b" text-anchor="start" font-weight="400">«features()»</text>
+  <path d="M436,449 L441.5,457 L436,465 L430.5,457 Z" fill="#475569" stroke="#475569" stroke-width="1.3" transform="rotate(0 436 457)"/>
+  <path d="M436,465 L436,626" fill="none" stroke="#475569" stroke-width="1.3" marker-end="url(#open)"/>
+  <path d="M436,757 L441.5,765 L436,773 L430.5,765 Z" fill="#475569" stroke="#475569" stroke-width="1.3" transform="rotate(0 436 765)"/>
+  <path d="M436,773 L436,796" fill="none" stroke="#475569" stroke-width="1.3" marker-end="url(#open)"/>
+  <text x="444" y="616" font-size="8.5" fill="#64748b" text-anchor="start" font-weight="400">0..*</text>
+  <text x="444" y="790" font-size="8.5" fill="#64748b" text-anchor="start" font-weight="400">1..*</text>
+  <path d="M350,70 L350,44 L432,44 L432,66" fill="none" stroke="#475569" stroke-width="1.3" marker-end="url(#open)"/>
+  <text x="440" y="48" font-size="9" fill="#475569" text-anchor="start" font-weight="400">every derivation returns a new Dataset</text>
+  <path d="M644,373 L637,384 L651,384 Z" fill="#ffffff" stroke="#475569" stroke-width="1.3"/>
+  <path d="M644,384 L644,874.5" fill="none" stroke="#475569" stroke-width="1.3"/>
+  <path d="M644,472.5 L660,472.5" fill="none" stroke="#475569" stroke-width="1.3"/>
+  <path d="M644,587.5 L660,587.5" fill="none" stroke="#475569" stroke-width="1.3"/>
+  <path d="M644,727 L660,727" fill="none" stroke="#475569" stroke-width="1.3"/>
+  <path d="M644,874.5 L660,874.5" fill="none" stroke="#475569" stroke-width="1.3"/>
+  <path d="M920,160 L940,160" fill="none" stroke="#475569" stroke-width="1.3" marker-end="url(#open)"/>
+  <path d="M1052,246 L1052,272" fill="none" stroke="#475569" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#open)"/>
+  <text x="1058" y="265" font-size="8.5" fill="#64748b" text-anchor="start" font-weight="400">fromColorScale()</text>
+  <path d="M920,352 L932,352 L932,544 L940,544" fill="none" stroke="#475569" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#open)"/>
+  <path d="M1052,632 L1052,687" fill="none" stroke="#475569" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#open)"/>
+  <text x="1058" y="664" font-size="8.5" fill="#64748b" text-anchor="start" font-weight="400">scoped by</text>
+  <line x1="20" y1="950" x2="1160" y2="950" stroke="#e2e8f0" stroke-width="1.2"/>
+  <path d="M30,960 L35.5,968 L30,976 L24.5,968 Z" fill="#475569" stroke="#475569" stroke-width="1.3" transform="rotate(90 30 968)"/>
+  <path d="M38,968 L64,968" stroke="#475569" stroke-width="1.3" fill="none"/>
+  <text x="72" y="971" font-size="9.5" fill="#475569" text-anchor="start" font-weight="400">composition — the owner's lifetime governs the part</text>
+  <path d="M360,960 L365.5,968 L360,976 L354.5,968 Z" fill="#ffffff" stroke="#475569" stroke-width="1.3" transform="rotate(90 360 968)"/>
+  <path d="M368,968 L394,968" stroke="#475569" stroke-width="1.3" fill="none"/>
+  <text x="402" y="971" font-size="9.5" fill="#475569" text-anchor="start" font-weight="400">aggregation — a registry, not ownership</text>
+  <path d="M660,968 L692,968" stroke="#475569" stroke-width="1.3" fill="none" marker-end="url(#open)"/>
+  <text x="700" y="971" font-size="9.5" fill="#475569" text-anchor="start" font-weight="400">association</text>
+  <path d="M800,962 L793,973 L807,973 Z" fill="#ffffff" stroke="#475569" stroke-width="1.3"/>
+  <path d="M800,973 L826,973" stroke="#475569" stroke-width="1.3" fill="none"/>
+  <text x="834" y="971" font-size="9.5" fill="#475569" text-anchor="start" font-weight="400">generalization</text>
+  <path d="M950,968 L982,968" stroke="#475569" stroke-width="1.3" fill="none" stroke-dasharray="4 3" marker-end="url(#open)"/>
+  <text x="990" y="971" font-size="9.5" fill="#475569" text-anchor="start" font-weight="400">dependency</text>
+  <text x="20" y="992" font-size="9.5" fill="#64748b" text-anchor="start" font-weight="400">Class names in italic are abstract. Multiplicity is carried on the attribute where an attribute already declares it, and on the line where it does not.</text>
+  <text x="20" y="1022" font-size="11.5" fill="#0f172a" text-anchor="start" font-weight="700">A source is not a rendering.</text>
+  <text x="20" y="1038" font-size="11" fill="#475569" text-anchor="start" font-weight="400">A Dataset describes where data comes from and what has been asked of it; a Layer is one way of drawing one or more Datasets. The cardinality runs both ways: one Dataset</text>
+  <text x="20" y="1054" font-size="11" fill="#475569" text-anchor="start" font-weight="400">backs many Layers, and the comparison and ensemble layers take several Datasets onto a common grid. A multi-dimensional source needs no class of its own: an Axis entry</text>
+  <text x="20" y="1070" font-size="11" fill="#475569" text-anchor="start" font-weight="400">addresses either a separate file or a slice of the one already held, and a selected step is an ordinary Dataset that any RasterLayer can draw.</text>
+</svg>

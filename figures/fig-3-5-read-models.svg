@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="650" viewBox="0 0 1180 650"
+     font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
+  <title>FIMViz.js read-models — one contract, any interface or none</title>
+  <desc>ColorScale, Legend, Stats and Filter are plain serializable objects with no DOM dependency.
+        A React or Vue host, the engine's optional DOM kit, a headless Node script, and a page with
+        no interface at all bind to the same four objects and obtain the same values.</desc>
+
+  <defs>
+    <marker id="flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#475569"/>
+    </marker>
+    <marker id="blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#2563eb"/>
+    </marker>
+  </defs>
+
+  <rect width="1180" height="650" fill="#ffffff"/>
+
+  <!-- ═══════════════ SOURCE ════════════════════════════════════════════════════════════ -->
+  <rect x="420" y="26" width="340" height="58" rx="8" fill="#dbeafe" stroke="#60a5fa" stroke-width="1.6"/>
+  <text x="590" y="49" font-size="12.5" font-weight="700" fill="#0f172a" text-anchor="middle">one Layer over one forced Dataset</text>
+  <text x="590" y="68" font-size="10.5" fill="#1e40af" text-anchor="middle">the values exist before any interface does</text>
+
+  <path d="M590,84 L590,100 L156,100 L156,116" fill="none" stroke="#2563eb" stroke-width="1.4" marker-end="url(#blue)"/>
+  <path d="M590,84 L590,100 L445,100 L445,116" fill="none" stroke="#2563eb" stroke-width="1.4" marker-end="url(#blue)"/>
+  <path d="M590,84 L590,100 L734,100 L734,116" fill="none" stroke="#2563eb" stroke-width="1.4" marker-end="url(#blue)"/>
+  <path d="M590,84 L590,100 L1023,100 L1023,116" fill="none" stroke="#2563eb" stroke-width="1.4" marker-end="url(#blue)"/>
+
+  <!-- ═══════════════ THE FOUR READ-MODELS ═════════════════════════════════════════════ -->
+  <rect x="24" y="118" width="265" height="180" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="40" y="140" font-size="12.5" font-weight="700" fill="#0f172a">ColorScale</text>
+  <text x="40" y="155" font-size="10" fill="#64748b">value → color</text>
+  <line x1="40" y1="163" x2="273" y2="163" stroke="#e2e8f0" stroke-width="1.1"/>
+  <text x="40" y="180" font-size="9.5" fill="#475569">Three mutually exclusive modes:</text>
+  <text x="40" y="194" font-size="9.5" fill="#475569">palette · classed stops · control points</text>
+  <text x="40" y="211" font-size="9.5" fill="#475569">missingColor sits outside the modes,</text>
+  <text x="40" y="225" font-size="9.5" fill="#475569">so an absent value is never the ramp</text>
+  <text x="40" y="239" font-size="9.5" fill="#475569">minimum.</text>
+  <text x="40" y="258" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">getColor(v) · getStops() · set(patch)</text>
+  <text x="40" y="273" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">onChange(fn) · registerPalette()</text>
+  <text x="40" y="290" font-size="9" fill="#64748b" font-style="italic">one writer, so every reader stays in step</text>
+
+  <rect x="313" y="118" width="265" height="180" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="329" y="140" font-size="12.5" font-weight="700" fill="#0f172a">Legend</text>
+  <text x="329" y="155" font-size="10" fill="#64748b">derived, never authored</text>
+  <line x1="329" y1="163" x2="562" y2="163" stroke="#e2e8f0" stroke-width="1.1"/>
+  <text x="329" y="180" font-size="9.5" fill="#475569">Built from the scale that colored the</text>
+  <text x="329" y="194" font-size="9.5" fill="#475569">data, so a legend cannot drift from</text>
+  <text x="329" y="208" font-size="9.5" fill="#475569">what is on screen.</text>
+  <text x="329" y="227" font-size="9.5" fill="#475569">Carries stops, unit, kind, and the</text>
+  <text x="329" y="241" font-size="9.5" fill="#475569">source it came from.</text>
+  <text x="329" y="260" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">Legend.fromColorScale(cs)</text>
+  <text x="329" y="275" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">stops[] · toJSON() · toHtml()</text>
+  <text x="329" y="291" font-size="9" fill="#64748b" font-style="italic">toJSON() is the contract; toHtml() is a convenience</text>
+
+  <rect x="602" y="118" width="265" height="180" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="618" y="140" font-size="12.5" font-weight="700" fill="#0f172a">Stats</text>
+  <text x="618" y="155" font-size="10" fill="#64748b">computed, not displayed</text>
+  <line x1="618" y1="163" x2="851" y2="163" stroke="#e2e8f0" stroke-width="1.1"/>
+  <text x="618" y="180" font-size="9.5" fill="#475569">Raster: min, max, mean, median,</text>
+  <text x="618" y="194" font-size="9.5" fill="#475569">standard deviation, histogram, area,</text>
+  <text x="618" y="208" font-size="9.5" fill="#475569">valid and total cell counts.</text>
+  <text x="618" y="227" font-size="9.5" fill="#475569">Vector: the same set over a chosen</text>
+  <text x="618" y="241" font-size="9.5" fill="#475569">feature property.</text>
+  <text x="618" y="260" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">Stats.raster() · Stats.vector()</text>
+  <text x="618" y="275" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">percentile(p) · diff(other) · toCSV()</text>
+  <text x="618" y="291" font-size="9" fill="#64748b" font-style="italic">the same object a panel shows and a script writes</text>
+
+  <rect x="891" y="118" width="265" height="180" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="907" y="140" font-size="12.5" font-weight="700" fill="#0f172a">Filter</text>
+  <text x="907" y="155" font-size="10" fill="#64748b">scopes the other three</text>
+  <line x1="907" y1="163" x2="1140" y2="163" stroke="#e2e8f0" stroke-width="1.1"/>
+  <text x="907" y="180" font-size="9.5" fill="#475569">SpatialFilter confines a computation</text>
+  <text x="907" y="194" font-size="9.5" fill="#475569">to a polygon; PredicateFilter to a</text>
+  <text x="907" y="208" font-size="9.5" fill="#475569">test on the value or the feature.</text>
+  <text x="907" y="227" font-size="9.5" fill="#475569">The same filter scopes a statistic, an</text>
+  <text x="907" y="241" font-size="9.5" fill="#475569">agreement metric, and a readout.</text>
+  <text x="907" y="260" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">contains(lat, lng) · pixelBbox(meta)</text>
+  <text x="907" y="275" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">metricsForMask(mask)</text>
+  <text x="907" y="291" font-size="9" fill="#64748b" font-style="italic">region-scoped results, not a basin-wide number</text>
+
+  <line x1="156" y1="298" x2="156" y2="318" stroke="#475569" stroke-width="1.4"/>
+  <line x1="445" y1="298" x2="445" y2="318" stroke="#475569" stroke-width="1.4"/>
+  <line x1="734" y1="298" x2="734" y2="318" stroke="#475569" stroke-width="1.4"/>
+  <line x1="1023" y1="298" x2="1023" y2="318" stroke="#475569" stroke-width="1.4"/>
+
+  <!-- ═══════════════ THE CONTRACT ═════════════════════════════════════════════════════ -->
+  <rect x="24" y="318" width="1132" height="32" rx="8" fill="#eef2f6" stroke="#475569" stroke-width="1.6"/>
+  <text x="590" y="339" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="middle">READ-MODEL CONTRACT — plain objects · no DOM · no framework · serializable · identical in every consumer below</text>
+
+  <line x1="156" y1="350" x2="156" y2="374" stroke="#475569" stroke-width="1.4" marker-end="url(#flow)"/>
+  <line x1="445" y1="350" x2="445" y2="374" stroke="#475569" stroke-width="1.4" marker-end="url(#flow)"/>
+  <line x1="734" y1="350" x2="734" y2="374" stroke="#475569" stroke-width="1.4" marker-end="url(#flow)"/>
+  <line x1="1023" y1="350" x2="1023" y2="374" stroke="#475569" stroke-width="1.4" marker-end="url(#flow)"/>
+
+  <!-- ═══════════════ FOUR CONSUMERS ═══════════════════════════════════════════════════ -->
+  <rect x="24" y="378" width="265" height="126" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="5 4"/>
+  <text x="40" y="400" font-size="11.5" font-weight="700" fill="#0f172a">React or Vue host</text>
+  <text x="40" y="419" font-size="9.5" fill="#475569">Host components read the objects and</text>
+  <text x="40" y="433" font-size="9.5" fill="#475569">render the host's own markup in the</text>
+  <text x="40" y="447" font-size="9.5" fill="#475569">host's own styling.</text>
+  <text x="40" y="468" font-size="9.5" font-weight="700" fill="#1e40af">The engine's DOM kit is not loaded.</text>
+  <text x="40" y="488" font-size="9" fill="#64748b" font-style="italic">Section 5.4, host 2</text>
+
+  <rect x="313" y="378" width="265" height="126" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="5 4"/>
+  <text x="329" y="400" font-size="11.5" font-weight="700" fill="#0f172a">Plain DOM — fimviz/ui</text>
+  <text x="329" y="419" font-size="9.5" fill="#475569">An optional kit that binds the same</text>
+  <text x="329" y="433" font-size="9.5" fill="#475569">objects to elements it creates.</text>
+  <text x="329" y="452" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">bindLegend() · bindStats()</text>
+  <text x="329" y="472" font-size="9.5" font-weight="700" fill="#1e40af">A separate bundle the core never imports.</text>
+  <text x="329" y="490" font-size="9" fill="#64748b" font-style="italic">dist/ui.js · the engine emits, the kit subscribes</text>
+
+  <rect x="602" y="378" width="265" height="126" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="5 4"/>
+  <text x="618" y="400" font-size="11.5" font-weight="700" fill="#0f172a">Headless Node</text>
+  <text x="618" y="419" font-size="9.5" fill="#475569">No DOM, no map. The chain forces, the</text>
+  <text x="618" y="433" font-size="9.5" fill="#475569">metrics compute, and the numbers are</text>
+  <text x="618" y="447" font-size="9.5" fill="#475569">written to a file.</text>
+  <text x="618" y="468" font-size="9.5" font-weight="700" fill="#1e40af">Same values as the panel above it.</text>
+  <text x="618" y="488" font-size="9" fill="#64748b" font-style="italic">Section 5.1 reports the browser-to-Node difference</text>
+
+  <rect x="891" y="378" width="265" height="126" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="5 4"/>
+  <text x="907" y="400" font-size="11.5" font-weight="700" fill="#0f172a">No consumer at all</text>
+  <text x="907" y="419" font-size="9.5" fill="#475569">Nothing assumes a listener exists. An</text>
+  <text x="907" y="433" font-size="9.5" fill="#475569">emitted event with no subscriber does</text>
+  <text x="907" y="447" font-size="9.5" fill="#475569">nothing and reports nothing.</text>
+  <text x="907" y="468" font-size="9.5" font-weight="700" fill="#1e40af">This is what lets the engine run headless.</text>
+  <text x="907" y="488" font-size="9" fill="#64748b" font-style="italic">events.js · emitHost() returns false</text>
+
+  <!-- ═══════════════ THE HONEST NOTE ══════════════════════════════════════════════════ -->
+  <rect x="24" y="520" width="700" height="70" rx="8" fill="#fffbeb" stroke="#d97706" stroke-width="1.4"/>
+  <text x="40" y="541" font-size="11" font-weight="700" fill="#9a3412">Where the contract stops today</text>
+  <text x="40" y="559" font-size="10" fill="#475569">A ColorScale stop keys on a numeric value or a [min, max] range, so numeric classing is covered.</text>
+  <text x="40" y="575" font-size="10" fill="#475569">A scale keyed on a string attribute — a regulatory zone code, say — is host code. Section 5.3 records how much.</text>
+
+  <rect x="740" y="520" width="416" height="70" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="756" y="541" font-size="11" font-weight="700" fill="#0f172a">The testable form of the claim</text>
+  <text x="756" y="559" font-size="10" fill="#475569">A headless script and a rendered panel call the same method on</text>
+  <text x="756" y="575" font-size="10" fill="#475569">the same object, so the two agree by construction, not by convention.</text>
+
+  <!-- ═══════════════ TAKEAWAY ═════════════════════════════════════════════════════════ -->
+  <line x1="24" y1="606" x2="1156" y2="606" stroke="#e2e8f0" stroke-width="1.2"/>
+  <text x="24" y="626" font-size="11.5" font-weight="700" fill="#0f172a">The engine exposes values, not widgets.</text>
+  <text x="24" y="642" font-size="11" fill="#475569">Four objects carry everything an interface needs to draw, and each consumer decides what drawing means — including deciding not to.</text>
+</svg>
