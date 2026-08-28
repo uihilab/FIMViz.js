@@ -2,19 +2,26 @@
 <!--
   test.html — every module of the optional interface kit, mounted at once.
 
-  Purpose: the source figure for Section 3.8. No sample files, no network: the two layers are
-  synthesised in the page, so the only thing on screen is the kit.
+  The source figure for Section 3.8. The body is a fixed 1080 px wide and about 790 px tall, so one
+  screenshot captures it whole at a size where the labels stay readable in print. Panels fill the
+  left half, the map the right.
 
-  To run:
+  To run — serve the REPOSITORY ROOT, since the sample files load from ./assets:
       npm run build          # writes dist/fimviz.js and dist/ui.js
-      npx serve .            # any static server; file:// will not load ES modules
+      npx serve .
       open http://localhost:3000/test.html
 
-  To populate the axis slider, drop a NetCDF/GRIB2/Zarr file on the drop zone. Without one the
-  slider renders its real empty state, which is what a Dataset with no selection axis produces.
+  Three real layers, no synthetic data:
+    · idalia-nldas2.nc          NLDAS-2 precipitation, a 3-D series — this is what fills the slider
+    · Brazos_RP100_depth.tif    a 100-year return-period depth grid, UTM 14N — warped on the way in
+    · Ensemble.tif              an ensemble agreement surface
 
-  Every panel is mounted with theme 'normal', the kit's light default. Pass theme: 'dark' for the
-  palette the kit used to ship, or theme: 'none' to take the markup and style it here.
+  The two Brazos products are EPSG:26914 and the Leaflet provider draws WGS84 only, so the page
+  calls ds.reproject('EPSG:4326'). That first forced warp downloads gdal3.js (~38 MB) from the CDN,
+  so the first load needs a network and takes a few seconds; the busy indicator shows it.
+
+  Panels use theme 'normal', the kit's light default. Pass theme: 'dark' for the palette the kit
+  used to ship, or theme: 'none' to take the markup and style it here.
 -->
 <html lang="en">
 <head>
@@ -25,125 +32,103 @@
   :root { --line: #d8dde3; --ink: #1a1d21; --muted: #5b6570; }
 
   body {
-    margin: 0;
-    padding: 20px;
-    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-    color: var(--ink);
-    background: #fff;
+    width: 1080px;                 /* fixed, so the screenshot is the same every time */
+    margin: 0; padding: 12px 14px;
+    font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    color: var(--ink); background: #fff;
   }
 
-  h1 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
-  p.sub { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+  header { display: flex; align-items: baseline; gap: 10px; margin: 0 0 10px; }
+  h1 { font-size: 14px; font-weight: 600; margin: 0; }
+  header p { margin: 0; color: var(--muted); font-size: 12px; }
+  header #busy { margin-left: auto; }
 
-  .grid {
-    display: grid;
-    grid-template-columns: 260px minmax(420px, 1fr) 260px;
-    gap: 16px;
-    align-items: start;
-  }
+  /* left half: the panels, in two sub-columns. right half: the map and what sits under it. */
+  .page { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+  .half { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+  .col  { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 
-  .col { display: flex; flex-direction: column; gap: 16px; }
-
-  section { border: 1px solid var(--line); }
-
+  section { border: 1px solid var(--line); min-width: 0; }
   section > h2 {
-    margin: 0;
-    padding: 6px 10px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--muted);
-    border-bottom: 1px solid var(--line);
-    background: #f7f8f9;
+    margin: 0; padding: 4px 8px;
+    font-size: 10.5px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase;
+    color: var(--muted); border-bottom: 1px solid var(--line); background: #f7f8f9;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-
   section > h2 code { font-weight: 400; text-transform: none; letter-spacing: 0; }
-  section > .body { padding: 10px; }
+  section > .body { padding: 7px 8px; min-width: 0; overflow-x: auto; }
 
-  #map { height: 460px; border: 1px solid var(--line); }
-  #drop { min-height: 66px; }
-  #busy { min-height: 20px; font-size: 13px; color: var(--muted); }
-
-
-  .row { display: flex; gap: 8px; flex-wrap: wrap; }
-  button { font: inherit; padding: 3px 9px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+  #map { height: 428px; border: 1px solid var(--line); }
+  .row { display: flex; gap: 5px; flex-wrap: wrap; }
+  button { font: inherit; font-size: 12px; padding: 2px 7px;
+           border: 1px solid var(--line); background: #fff; cursor: pointer; }
   button:hover { background: #f2f4f6; }
 </style>
 </head>
 <body>
 
-<h1>FIMViz.js interface kit</h1>
-<p class="sub">
-  Every module of <code>fimviz/ui</code>, mounted around one Leaflet map. The engine supplies the
-  markup; this page supplies the page.
-</p>
+<header>
+  <h1>FIMViz.js interface kit</h1>
+  <p>Every module of <code>fimviz/ui</code> around one Leaflet map. The engine supplies the markup;
+     this page supplies the page.</p>
+  <div id="busy"></div>
+</header>
 
-<div class="grid">
+<div class="page">
 
-  <div class="col">
-    <section>
-      <h2>Layer panel <code>createLayerPanel</code></h2>
-      <div class="body" id="layers"></div>
-    </section>
-
-    <section>
-      <h2>Drop zone <code>createDropzone</code></h2>
-      <div class="body"><div id="drop"></div></div>
-    </section>
-
-    <section>
-      <h2>Region draw <code>createRegionDraw</code></h2>
-      <div class="body">
-        <div class="row">
+  <!-- ── left half: the panels ─────────────────────────────────────────────────── -->
+  <div class="half">
+    <div class="col">
+      <section>
+        <h2>Layer panel <code>createLayerPanel</code></h2>
+        <div class="body" id="layers"></div>
+      </section>
+      <section>
+        <h2>Drop zone <code>createDropzone</code></h2>
+        <div class="body"><div id="drop"></div></div>
+      </section>
+      <section>
+        <h2>Region draw <code>createRegionDraw</code></h2>
+        <div class="body"><div class="row">
           <button data-region="polygon">polygon</button>
           <button data-region="rectangle">rectangle</button>
           <button data-region="freehand">freehand</button>
           <button data-region="brush">brush</button>
           <button data-region="clear">clear</button>
-        </div>
-      </div>
-    </section>
+        </div></div>
+      </section>
+      <section>
+        <h2>Tools panel <code>createToolsPanel</code></h2>
+        <div class="body" id="tools"></div>
+      </section>
+    </div>
+
+    <div class="col">
+      <section>
+        <h2>Legend <code>bindLegend</code></h2>
+        <div class="body" id="legend"></div>
+      </section>
+      <section>
+        <h2>Statistics <code>bindStats</code></h2>
+        <div class="body" id="stats"></div>
+      </section>
+      <section>
+        <h2>Raster metadata <code>bindRasterMetadata</code></h2>
+        <div class="body" id="meta"></div>
+      </section>
+    </div>
   </div>
 
+  <!-- ── right half: the map, and the two panels that read widest ──────────────── -->
   <div class="col">
     <div id="map"></div>
-
     <section>
       <h2>Axis slider <code>createAxisSlider</code></h2>
       <div class="body" id="axis"></div>
     </section>
-
     <section>
       <h2>Operations panel <code>createOperationsPanel</code></h2>
       <div class="body" id="ops"></div>
-    </section>
-
-    <section>
-      <h2>Busy indicator <code>createBusyIndicator</code></h2>
-      <div class="body"><div id="busy"></div></div>
-    </section>
-  </div>
-
-  <div class="col">
-    <section>
-      <h2>Tools panel <code>createToolsPanel</code></h2>
-      <div class="body" id="tools"></div>
-    </section>
-
-    <section>
-      <h2>Legend <code>bindLegend</code></h2>
-      <div class="body" id="legend"></div>
-    </section>
-
-    <section>
-      <h2>Statistics <code>bindStats</code></h2>
-      <div class="body" id="stats"></div>
-    </section>
-
-    <section>
-      <h2>Raster metadata <code>bindRasterMetadata</code></h2>
-      <div class="body" id="meta"></div>
     </section>
   </div>
 
@@ -152,68 +137,72 @@
 <script type="importmap">
 { "imports": {
     "fimviz": "./dist/fimviz.js",
-    "fimviz/ui": "./dist/ui.js"
+    "fimviz/ui": "./dist/ui.js",
+    "sciwrid-toolkit": "./node_modules/sciwrid-toolkit/dist/index.js"
 } }
 </script>
 
 <script type="module">
-import { FimViz, Dataset, RasterGrid } from "fimviz";
+import { FimViz } from "fimviz";
 import {
   createLayerPanel, createDropzone, createToolsPanel, createOperationsPanel,
   createAxisSlider, createRegionDraw, createRegionOverlay,
   bindLegend, bindStats, createToast, connectToast, createBusyIndicator,
-  bindRasterMetadata, createTooltip, bindHoverValue, createInfoWindow,
-  bindFeatureInfo, propsTable,
+  bindRasterMetadata, createTooltip, bindHoverValue,
 } from "fimviz/ui";
 
-// ---------------------------------------------------------------- map
+const $ = (sel) => document.querySelector(sel);
+const sample = async (name) => {
+  const res = await fetch(`./assets/SampleFiles/${name}`);
+  if (!res.ok) throw new Error(`${name}: HTTP ${res.status} — serve the repository root`);
+  return res.arrayBuffer();
+};
+
 const fim = await FimViz.mount("#map", { provider: "leaflet" });
 
-const $ = (sel) => document.querySelector(sel);
-
-// ---------------------------------------------------------------- bus views, mounted first
-// The engine emits `busy`, `notify` and `raster:metadata` as work happens, and nothing replays them.
-// A binding mounted after the data is loaded subscribes to events that already fired, so these three
-// go up before the first addLayer.
-const toast = connectToast(fim, createToast(document.body, { corner: "br" }));
+// Bus views go up first: the engine emits `busy`, `notify` and `raster:metadata` as work happens and
+// replays nothing, so a binding mounted after the data has loaded subscribes to events that fired.
+connectToast(fim, createToast(document.body, { corner: "br" }));
 createBusyIndicator(fim, { root: "#busy", label: "working…" });
 bindRasterMetadata(fim, { root: "#meta" });
 
-// ---------------------------------------------------------------- two synthetic layers
-// A 96 x 64 depth surface, so the tools panel, legend and statistics have real values to read.
-const W = 96, H = 64;
-const bounds = { west: -92.6, east: -92.2, south: 41.6, north: 41.9 };
-const pixels = new Float32Array(W * H);
-for (let y = 0; y < H; y++) {
-  for (let x = 0; x < W; x++) {
-    const dx = (x - W * 0.45) / (W * 0.30);
-    const dy = (y - H * 0.55) / (H * 0.34);
-    const d = 9 * Math.exp(-(dx * dx + dy * dy));
-    pixels[y * W + x] = d < 0.15 ? -99999 : +d.toFixed(3);   // -99999 is the engine's dry sentinel
+// ---------------------------------------------------------------- three real layers
+// A 3-D series first, because it is the one that gives the axis slider something to scrub. The
+// series Dataset is never forced: select() takes one timestep off the same bytes.
+let rain = null, rainLayer = null;
+try {
+  rain = await fim.addDataset(await sample("idalia-nldas2.nc"), { name: "idalia-nldas2.nc" });
+  rainLayer = await fim.addLayer(rain.select(rain.axis.entries[0].coord));
+  await rainLayer.set({ palette: "blues", continuous: true, unit: rain.meta.unit ?? "mm", opacity: 0.85 });
+} catch (e) {
+  console.warn("series layer skipped:", e.message);
+}
+
+// Parsing never reprojects: a Dataset arrives in its native CRS and the caller warps deliberately.
+// The Brazos products are UTM 14N (EPSG:26914) and the Leaflet provider draws WGS84 only, so they
+// are warped here. The warp is a lazy op — it runs when addLayer forces the chain, and that first
+// forced reproject is what pulls gdal3.js in from the CDN.
+async function addRaster(file, name, settings) {
+  try {
+    const ds = await fim.addDataset(await sample(file), { name });
+    const layer = await fim.addLayer(ds.crs === "EPSG:4326" ? ds : ds.reproject("EPSG:4326"));
+    await layer.set(settings);
+    return layer;
+  } catch (e) {
+    // One unreadable sample must not take the page with it: the kit is what this page is showing,
+    // and it mounts against whatever layers did load.
+    console.warn(`${name} skipped:`, e.message);
+    return null;
   }
 }
-const depth = await fim.addLayer(Dataset.fromGrid(
-  new RasterGrid({ pixels, width: W, height: H, bounds, crs: "EPSG:4326", noData: -99999 }),
-  { name: "depth_demo.tif" },
-));
-await depth.set({ palette: "viridis", continuous: true, min: 0, max: 9, unit: "m" });
-depth.fit();
 
-// One polygon, so the vector controls, the info window and zonal statistics have a feature.
-const aoi = {
-  type: "FeatureCollection",
-  features: [{
-    type: "Feature",
-    properties: { name: "Study reach", class: "AE" },
-    geometry: { type: "Polygon", coordinates: [[
-      [-92.52, 41.68], [-92.30, 41.68], [-92.30, 41.83], [-92.52, 41.83], [-92.52, 41.68],
-    ]] },
-  }],
-};
-const aoiFile = new File([JSON.stringify(aoi)], "aoi.geojson", { type: "application/geo+json" });
-const aoiLayer = await fim.addLayer("vector", { source: await fim.addDataset(aoiFile) });
+const depth = await addRaster("Depth/Brazos_RP100_depth.tif", "Brazos_RP100_depth.tif",
+  { palette: "viridis", continuous: true, unit: "m" });
 
-// ---------------------------------------------------------------- kit
+const ensemble = await addRaster("Ensemble/Ensemble.tif", "Ensemble.tif",
+  { palette: "plasma", unit: "members" });
+
+// ---------------------------------------------------------------- the rest of the kit
 let tools = null, legend = null, stats = null, axis = null, ops = null, region = null;
 const overlay = createRegionOverlay(fim);
 
@@ -225,35 +214,34 @@ function bindTo(layer) {
   legend = bindLegend(layer, { root: "#legend", html: true, empty: "no color scale on this layer" });
   stats = bindStats(layer, { root: "#stats", html: true, filter: () => region,
                              empty: "no statistics computed yet" });
-  axis = createAxisSlider("#axis", { layer });
-  // createOperationsPanel captures the layer and its kind at build time and exposes no setLayer,
-  // so switching layers means rebuilding it. Its op list is filtered by dataset kind.
+  // The slider reads the SERIES Dataset, not the single step the layer is currently showing.
+  axis = createAxisSlider("#axis", { layer, dataset: (rainLayer && layer === rainLayer) ? rain : layer.dataset,
+                                     theme: "normal" });
+  // createOperationsPanel captures the layer and its kind at build time and offers no setLayer, so a
+  // switch means rebuilding it. Only "Extent" is open, to keep the page one screen tall.
   ops = createOperationsPanel("#ops", {
-    layer, fim, theme: "normal",
+    layer, fim, theme: "normal", open: ["Extent"],
     region: () => region,
     layers: () => fim.layers,
   });
+  layer.fit();
 }
 
 const panel = createLayerPanel("#layers", { fim, theme: "normal", onSelect: bindTo });
-bindTo(depth);
+const first = rainLayer || depth || ensemble || fim.layers[0] || null;
+if (first) { panel.select(first); bindTo(first); }
 
 createDropzone("#drop", {
   fim, add: "layer",
   label: "Drop a GeoTIFF, GeoJSON, KMZ or NetCDF here, or click to browse",
-  onLoad: (layer) => { layer.fit(); panel.select(layer); bindTo(layer); },
+  onLoad: (layer) => { panel.select(layer); bindTo(layer); },
 });
 
-// ---------------------------------------------------------------- pointer read-outs
 const tooltip = createTooltip(fim);
-bindHoverValue(depth, { tooltip, format: (v) => `${v.toFixed(2)} m` });
-await depth.set({ hover: true });
-
-const info = createInfoWindow(fim);
-bindFeatureInfo(aoiLayer, {
-  infoWindow: info,
-  render: (f) => `<b>${f.properties.name}</b>${propsTable(f.properties)}`,
-});
+if (first) {
+  bindHoverValue(first, { tooltip, format: (v) => v.toFixed(2) });
+  await first.set({ hover: true });
+}
 
 // ---------------------------------------------------------------- region draw
 // freehand and brush read mousedown/mouseup; without these two they fall back to click-to-start.
@@ -272,10 +260,7 @@ const draw = createRegionDraw(fim, {
 document.querySelectorAll("[data-region]").forEach((b) => b.addEventListener("click", () => {
   const mode = b.dataset.region;
   if (mode === "clear") {
-    draw.cancel();
-    overlay.clear();
-    region = null;
-    stats?.update?.();
+    draw.cancel(); overlay.clear(); region = null; stats?.update?.();
     return;
   }
   draw.setMode(mode);      // `mode` is a getter; setMode is the writer

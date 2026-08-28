@@ -604,7 +604,7 @@ createDropzone("#drop", {
   onDone: (results) => show("#o-drop", {
     files: results.length,
     accepted: DROP_EXTENSIONS,
-    order: "sequential — stacking order matches drop order, and one bad file doesn't take the rest down",
+    order: "stacking order matches drop order",
   }),
 });
 show("#o-drop", { accepts: DROP_EXTENSIONS });

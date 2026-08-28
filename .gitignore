@@ -13,3 +13,7 @@ dist
 
 # Working notes for the comment rewrite pass. Not part of the package.
 reformatting/
+
+# Generated test grids for test-performance.html — regenerate with
+# `node scripts/make-perf-data.mjs`. About 89 MB at the four default rungs.
+case-studies/perf-data/

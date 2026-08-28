@@ -1,0 +1,657 @@
+<!doctype html>
+<!--
+  test-performance.html — the measurement harness behind Section 4.
+
+  Companion to test.html, which is the figure page for the interface kit. This one draws nothing and
+  measures instead. It covers the two groups whose numbers belong to the engine rather than to a
+  decoder:
+
+    §4.4  deferred work        one decode against N re-decodes; a chain built against the same chain
+                               forced; the bytes a page that never reprojects never downloads
+    §4.5  analysis throughput  pixel-wise agreement metrics, zonal statistics, grouped statistics and
+                               whole-grid statistics, all reported in cells per second
+
+  Ingest by format (§4.2) and warp cost (§4.3) are not here. Both are dominated by geotiff.js,
+  shpjs, netcdfjs and gdal3.js, so they measure dependencies rather than this engine, and they need
+  the per-format sample files rather than the ladder. The decode baseline below is the exception: the
+  §4.4 ratios need a denominator, so a plain fetch-and-decode is timed at every rung.
+
+  Nothing here mounts a map. `t_paint` therefore has no entry in the output — a paint measurement
+  needs a provider, and raster overlays render on Google Maps only, so it belongs with the case
+  studies rather than in a page that runs anywhere.
+
+  To run:
+      node scripts/make-perf-data.mjs      # writes case-studies/perf-data/ (git-ignored)
+      npm run build                        # writes dist/fimviz.js
+      npx serve .
+      open http://localhost:3000/test-performance.html
+
+  The files are served from localhost, so the cold/warm split below separates HTTP-cache cost rather
+  than network latency, and the ingest numbers carry no transfer time a remote host would add. §4.1
+  has to say so.
+
+  Then press Run, and Download CSV when it finishes. The CSV is long-format, one row per repetition,
+  so the aggregation in the paper is done from the raw values rather than from a summary this page
+  has already collapsed.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FIMViz.js — performance harness</title>
+<style>
+  :root { --line: #d8dde3; --ink: #1a1d21; --muted: #5b6570; --warn: #8a5a00; }
+  body { max-width: 1080px; margin: 0 auto; padding: 16px 18px 60px;
+         font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+         color: var(--ink); background: #fff; }
+  h1 { font-size: 15px; margin: 0 0 2px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted);
+       margin: 22px 0 6px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  p.lede { margin: 0 0 14px; color: var(--muted); }
+  fieldset { border: 1px solid var(--line); margin: 0 0 12px; padding: 8px 10px; }
+  legend { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
+  label { margin-right: 14px; white-space: nowrap; }
+  input[type=number] { width: 58px; }
+  button { font: inherit; padding: 4px 12px; border: 1px solid var(--line); background: #fff;
+           cursor: pointer; }
+  button:hover:enabled { background: #f2f4f6; }
+  button:disabled { color: #9aa3ad; cursor: default; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  th, td { text-align: left; padding: 3px 8px 3px 0; border-bottom: 1px solid #eef1f4; }
+  th { color: var(--muted); font-weight: 600; }
+  td.num, th.num { text-align: right; font-family: ui-monospace, Menlo, monospace; }
+  #charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  #charts figure { margin: 0; }
+  #charts figcaption { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  #maproot { position: absolute; left: -10000px; top: 0; width: 640px; height: 400px; }
+  #log { font: 11px/1.5 ui-monospace, Menlo, monospace; color: var(--muted);
+         max-height: 220px; overflow: auto; white-space: pre-wrap; }
+  .warn { color: var(--warn); }
+</style>
+</head>
+<body>
+
+<h1>FIMViz.js performance harness</h1>
+<p class="lede">Sections 4.4 and 4.5. Five repetitions per case, reported as median and interquartile
+range. Long-format CSV, one row per repetition.</p>
+
+<fieldset>
+  <legend>Run</legend>
+  <label>repetitions <input type="number" id="reps" value="5" min="1" max="25"></label>
+  <label>rungs <input type="text" id="rungs" value="256,512,1024" size="16"></label>
+  <label>layer counts <input type="text" id="ks" value="1,2,4,6,8" size="12"></label>
+  <label><input type="checkbox" id="gdal"> include the GDAL byte measurement (downloads ~38 MB)</label>
+  <label><input type="checkbox" id="decodeOnly"> decode only — the ceiling run over the large rungs</label>
+  <br><br>
+  <label><input type="checkbox" id="mapLeaflet"> map suite: Leaflet</label>
+  <label><input type="checkbox" id="mapGoogle"> Google <input type="text" id="apiKey" size="30"
+    placeholder="Maps API key"></label>
+  <br><br>
+  <button id="run">Run</button>
+  <button id="csv" disabled>Download CSV</button>
+  <span id="status" class="lede"></span>
+</fieldset>
+
+<div id="maproot"></div>
+
+<h2>Environment</h2>
+<div id="env"></div>
+
+<h2>Charts</h2>
+<div id="charts"></div>
+
+<h2>Results</h2>
+<table id="results"><thead><tr>
+  <th>suite</th><th>case</th><th class="num">cells</th><th>metric</th>
+  <th class="num">median</th><th class="num">IQR</th><th>unit</th><th class="num">n</th>
+</tr></thead><tbody></tbody></table>
+
+<h2>Log</h2>
+<div id="log"></div>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "./dist/fimviz.js",
+    "fimviz/ui": "./dist/ui.js",
+    "sciwrid-toolkit": "./node_modules/sciwrid-toolkit/dist/index.js"
+} }
+</script>
+
+<script type="module">
+import { FimViz, Dataset, gridMeta, zonalStats, groupByGrid } from "fimviz";
+// The agreement metrics are not on the package barrel, so this reaches the module directly, the way
+// case_study1_headless.mjs does. comparisonMetrics.js imports only filter.js and colorScale.js, both
+// dependency-free, so a browser loads it as source with no bundling. dist/ is built from the same
+// file; this is the same code, reached by a different path.
+import { compareExtentMetrics } from "./src/package/comparisonMetrics.js";
+
+performance.setResourceTimingBufferSize(2000);   // the byte totals below read the whole buffer
+
+const DATA = "./case-studies/perf-data";
+
+// `Dataset.fromURL` does not read the file's GDAL_NODATA tag. The geotiff materializer takes noData
+// from `ds.meta.noData` (src/io/materializers.js line 54), and only the parseFile path fills that in
+// (src/io/parse.js line 260), so a lazily-rooted Dataset counts -99999 as a value: stats() over the
+// depth ladder returns min -99999, and groupBy collapses to two bins. Declaring it here is what a
+// host has to do today on the fromURL path, and the declaration is part of what the numbers below
+// mean. The extent pair is left alone deliberately — its dry cells are 0, a real value.
+const NODATA = { meta: { noData: -99999 } };
+const $ = (s) => document.querySelector(s);
+const log = (msg, cls = "") => {
+  $("#log").insertAdjacentHTML("beforeend", `<div class="${cls}">${msg}</div>`);
+  $("#log").scrollTop = $("#log").scrollHeight;
+};
+
+// ── the record ────────────────────────────────────────────────────────────────────────────────
+// One row per repetition. Aggregation happens at display time and again in the paper, so a
+// questionable run stays visible in the file rather than being averaged into the summary.
+const rows = [];
+// Repetitions inside one page load share JIT state, allocator state and the HTTP cache, so their
+// spread understates the true one. The session id makes each load identifiable in the CSV, so three
+// loads of five repetitions can be reported as between-session spread rather than as fifteen
+// independent draws.
+const SESSION = Math.random().toString(36).slice(2, 8);
+const record = (suite, kase, cells, rep, metric, value, unit) =>
+  rows.push({ suite, case: kase, cells, rep, metric, value, unit });
+
+const sorted = (a) => [...a].sort((x, y) => x - y);
+const quantile = (a, q) => {
+  const s = sorted(a), i = (s.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i);
+  return s[lo] + (s[hi] - s[lo]) * (i - lo);
+};
+const median = (a) => quantile(a, 0.5);
+const iqr = (a) => quantile(a, 0.75) - quantile(a, 0.25);
+
+const sig = (v) => (v >= 1000 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v >= 1 ? v.toFixed(2) : v.toPrecision(3));
+
+const SEP = "\u0001";                    // case names contain spaces, so the group key cannot split on one
+function renderResults() {
+  const key = (r) => [r.suite, r.case, r.cells, r.metric, r.unit].join(SEP);
+  const groups = new Map();
+  for (const r of rows) (groups.get(key(r)) ?? groups.set(key(r), []).get(key(r))).push(r.value);
+  const body = [...groups].map(([k, vals]) => {
+    const [suite, kase, cells, metric, unit] = k.split(SEP);
+    return `<tr><td>${suite}</td><td>${kase}</td><td class="num">${(+cells || 0).toLocaleString()}</td>` +
+           `<td>${metric}</td><td class="num">${sig(median(vals))}</td>` +
+           `<td class="num">${sig(iqr(vals))}</td><td>${unit}</td><td class="num">${vals.length}</td></tr>`;
+  }).join("");
+  $("#results tbody").innerHTML = body;
+}
+
+// ── timing helpers ────────────────────────────────────────────────────────────────────────────
+const now = () => performance.now();
+const timed = async (fn) => { const t0 = now(); const out = await fn(); return [now() - t0, out]; };
+
+/** Transferred bytes for one URL, from the Resource Timing API rather than from its size on disk. */
+function transferred(url) {
+  const abs = new URL(url, location.href).href;
+  const e = performance.getEntriesByName(abs).at(-1);
+  return e ? { transfer: e.transferSize, encoded: e.encodedBodySize } : { transfer: null, encoded: null };
+}
+
+const uid = () => Math.random().toString(36).slice(2, 10);
+const heap = () => performance.memory?.usedJSHeapSize ?? null;   // Chromium only
+
+// ── environment ───────────────────────────────────────────────────────────────────────────────
+// The machine itself (CPU model, core count, RAM, storage class, OS build) is not readable from a
+// page and belongs in §4.1 from the operator's own record. What is readable is captured here so the
+// CSV carries the browser it came from.
+const ENV = {
+  userAgent: navigator.userAgent,
+  hardwareConcurrency: navigator.hardwareConcurrency ?? null,
+  deviceMemoryGB: navigator.deviceMemory ?? null,
+  devicePixelRatio: devicePixelRatio,
+  heapAPI: heap() !== null,
+  date: new Date().toISOString(),
+};
+$("#env").innerHTML = Object.entries(ENV)
+  .map(([k, v]) => `<div><b>${k}</b> ${v}</div>`).join("") +
+  (ENV.heapAPI ? "" : `<div class="warn">usedJSHeapSize is unavailable in this browser, so the
+   memory column stays empty. Chromium reports it.</div>`);
+
+// ── the suites ────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Decode baseline. Cold is a cache-busted URL, so every repetition pays fetch and decode. Warm
+ * reuses the one URL after a priming call, so the HTTP cache serves the bytes and the number is
+ * decode plus parse. The §4.4 ratios below run warm, and this is their denominator.
+ */
+async function suiteDecode(n, reps) {
+  const url = `${DATA}/dep-${n}.tif`;
+  const cells = n * n;
+
+  for (let r = 0; r < reps; r++) {
+    const u = `${url}?cb=${uid()}`;
+    // A rung large enough to fail is the point of the ceiling run, so a failure is a result: it is
+    // recorded against the rung and the run continues to the next one.
+    let ms;
+    try { [ms] = await timed(() => Dataset.fromURL(u, NODATA).grid()); }
+    catch (e) {
+      record("decode", "cold", cells, r, "failed", 1, e.name || "error");
+      log(`  decode ${n}×${n} failed: ${e.message}`, "warn");
+      return;
+    }
+    const { transfer, encoded } = transferred(u);
+    record("decode", "cold", cells, r, "t_total", ms, "ms");
+    if (transfer != null) record("decode", "cold", cells, r, "bytes_transferred", transfer, "B");
+    if (encoded != null) record("decode", "cold", cells, r, "bytes_encoded", encoded, "B");
+    if (heap() != null) record("decode", "cold", cells, r, "heap_after", heap(), "B");
+  }
+
+  await Dataset.fromURL(url, NODATA).grid();                       // prime the HTTP cache
+  for (let r = 0; r < reps; r++) {
+    const [ms] = await timed(() => Dataset.fromURL(url, NODATA).grid());
+    record("decode", "warm", cells, r, "t_total", ms, "ms");
+  }
+  log(`  decode ${n}×${n}: cold ${sig(median(rows.filter((x) => x.suite === "decode" && x.case === "cold" &&
+      x.cells === cells && x.metric === "t_total").map((x) => x.value)))} ms`);
+}
+
+/**
+ * §4.4a — one decode against N re-decodes.
+ *
+ * Both arms produce the same k derived grids: the source clipped to k different windows, each
+ * forced. They differ only in where the source comes from. The reuse arm builds one Dataset and lets
+ * the memoized decode back all k. The re-decode arm builds a separate Dataset per derived grid,
+ * which is what a host does when a source is not an object it can hold.
+ *
+ * Both run against a warm HTTP cache, so the ratio reports decode reuse rather than saved network
+ * traffic. That is the conservative statement of the claim.
+ */
+async function suiteReuse(n, ks, reps) {
+  const url = `${DATA}/dep-${n}.tif`;
+  const cells = n * n;
+  const W = -89.97988, E = -89.83065, S = 34.32652, N = 34.40204;
+  const window_ = (i, k) => ({                                  // k side-by-side vertical strips
+    west: W + (E - W) * (i / k), east: W + (E - W) * ((i + 1) / k), south: S, north: N,
+  });
+
+  await Dataset.fromURL(url, NODATA).grid();                            // prime the HTTP cache
+
+  for (const k of ks) {
+    // One untimed pass per k. Without it the first repetition carries the JIT compile of clip() and
+    // the allocator's first growth, which is a property of the run rather than of the engine.
+    { const src = Dataset.fromURL(url, NODATA); for (let i = 0; i < k; i++) await src.clip(window_(i, k)).grid(); }
+
+    for (let r = 0; r < reps; r++) {
+      const [msReuse] = await timed(async () => {
+        const src = Dataset.fromURL(url, NODATA);
+        for (let i = 0; i < k; i++) await src.clip(window_(i, k)).grid();
+      });
+      record("reuse", `k=${k}`, cells, r, "t_reuse", msReuse, "ms");
+
+      const [msRedecode] = await timed(async () => {
+        for (let i = 0; i < k; i++) await Dataset.fromURL(url, NODATA).clip(window_(i, k)).grid();
+      });
+      record("reuse", `k=${k}`, cells, r, "t_redecode", msRedecode, "ms");
+      record("reuse", `k=${k}`, cells, r, "ratio", msRedecode / msReuse, "×");
+    }
+    const ratios = rows.filter((x) => x.suite === "reuse" && x.case === `k=${k}` &&
+                                      x.cells === cells && x.metric === "ratio").map((x) => x.value);
+    log(`  reuse ${n}×${n} k=${k}: ${sig(median(ratios))}× `);
+  }
+}
+
+/**
+ * §4.4b — a chain built against the same chain forced.
+ *
+ * Four ops are composed and never forced, then the identical chain is forced. The first number is
+ * what a host pays to describe work; the second is what the work costs. Chain construction is
+ * sub-millisecond, so it is timed over 100 builds and divided.
+ */
+async function suiteDeferral(n, reps) {
+  const url = `${DATA}/dep-${n}.tif`;
+  const cells = n * n;
+  const bbox = { west: -89.95, east: -89.86, south: 34.34, north: 34.39 };
+  const chain = (ds) => ds.clip(bbox)
+                          .reclassify([{ min: 0, max: 0.5, value: 0 }, { min: 0.5, value: 1 }])
+                          .slope()
+                          .reclassify([{ min: 0, max: 5, value: 1 }], { unmatched: "keep" });
+
+  await Dataset.fromURL(url, NODATA).grid();                            // prime the HTTP cache
+  await chain(Dataset.fromURL(url, NODATA)).grid();                     // and the JIT
+
+  for (let r = 0; r < reps; r++) {
+    const [msBuild] = await timed(async () => {
+      for (let i = 0; i < 100; i++) chain(Dataset.fromURL(url, NODATA));
+    });
+    record("deferral", "4-op chain", cells, r, "t_build", msBuild / 100, "ms");
+
+    const [msForce] = await timed(() => chain(Dataset.fromURL(url, NODATA)).grid());
+    record("deferral", "4-op chain", cells, r, "t_force", msForce, "ms");
+  }
+  const b = rows.filter((x) => x.suite === "deferral" && x.cells === cells && x.metric === "t_build").map((x) => x.value);
+  const f = rows.filter((x) => x.suite === "deferral" && x.cells === cells && x.metric === "t_force").map((x) => x.value);
+  log(`  deferral ${n}×${n}: build ${sig(median(b))} ms, force ${sig(median(f))} ms`);
+}
+
+/**
+ * §4.5 — analysis throughput, in cells per second.
+ *
+ * The rate is the reportable quantity: it transfers to grid sizes this ladder does not cover, and a
+ * reader with a 4000 × 4000 product can divide. Every case scores the whole grid, so cells is the
+ * grid's cell count rather than the count of wet cells.
+ *
+ * The extent grids write dry as 0 and carry no nodata tag, so `dryValue: 0` is passed explicitly and
+ * the measurement does not depend on how a decoder maps nodata.
+ */
+async function suiteThroughput(n, reps) {
+  const cells = n * n;
+  const [dep, wse, extM, extO] = await Promise.all([
+    Dataset.fromURL(`${DATA}/dep-${n}.tif`, NODATA).grid(),
+    Dataset.fromURL(`${DATA}/wse-${n}.tif`, NODATA).grid(),
+    Dataset.fromURL(`${DATA}/ext-model-${n}.tif`).grid(),
+    Dataset.fromURL(`${DATA}/ext-obs-${n}.tif`).grid(),
+  ]);
+  const meta = gridMeta(extM);
+
+  // Zones as rings of [lat, lng] — zonalStats takes {lat,lng} or [lat,lng], not GeoJSON order.
+  const W = -89.97988, E = -89.83065, S = 34.32652, N = 34.40204;
+  const grid = (side) => {
+    const zones = [], dx = (E - W) / side, dy = (N - S) / side;
+    for (let r = 0; r < side; r++) for (let c = 0; c < side; c++) {
+      const w = W + c * dx, e = w + dx, s = S + r * dy, nn = s + dy;
+      zones.push({ id: `z${r}${c}`, polygon: [[s, w], [s, e], [nn, e], [nn, w], [s, w]] });
+    }
+    return zones;
+  };
+  const zones4 = grid(2), zones16 = grid(4);
+
+  const cases = [
+    ["agreement metrics", () => compareExtentMetrics(extM.pixels, extO.pixels, meta, { dryValue: 0 })],
+    ["zonal statistics (4 zones)", () => zonalStats(dep, zones4)],
+    ["zonal statistics (16 zones)", () => zonalStats(dep, zones16)],
+    ["grouped statistics (10 bins)", () => groupByGrid(dep, wse, { bins: 10 })],
+    ["whole-grid statistics", () => Dataset.fromGrid(dep).stats()],
+  ];
+
+  // Chrome clamps performance.now() to 100 µs. A single call to compareExtentMetrics over 65,536
+  // cells fell below that floor in the first run and recorded 0.0 ms — an infinite rate — and every
+  // case under about 5 ms carried quantization instead of variance. So each case runs in a loop long
+  // enough to clear the floor: one untimed probe sets the scale, and the loop is sized to a window of
+  // at least TARGET_MS. `t_op` below is the per-call time, `iterations` records the divisor.
+  const TARGET_MS = 50;
+
+  for (const [name, fn] of cases) {
+    const [probe] = await timed(fn);                              // untimed for the record, and the warm-up
+    const iters = Math.min(4000, Math.max(1, Math.ceil(TARGET_MS / Math.max(probe, 0.05))));
+
+    for (let r = 0; r < reps; r++) {
+      const h0 = heap();
+      const [ms] = await timed(async () => { for (let i = 0; i < iters; i++) await fn(); });
+      const per = ms / iters;
+      record("throughput", name, cells, r, "t_op", per, "ms");
+      record("throughput", name, cells, r, "rate", cells / (per / 1000), "cells/s");
+      record("throughput", name, cells, r, "iterations", iters, "count");
+      if (h0 != null && heap() != null) record("throughput", name, cells, r, "heap_delta", heap() - h0, "B");
+    }
+    const rate = rows.filter((x) => x.suite === "throughput" && x.case === name &&
+                                    x.cells === cells && x.metric === "rate").map((x) => x.value);
+    log(`  ${name} ${n}×${n}: ${(median(rate) / 1e6).toFixed(2)} Mcells/s`);
+  }
+}
+
+/**
+ * §4.4c — the bytes a page that never reprojects never downloads.
+ *
+ * Measured rather than asserted: total transferred bytes before the first forced warp, then after.
+ * The difference is gdal3.js and its wasm, which the barrel does not import and the lazy loader
+ * pulls in on first use. One repetition — the second would be served from cache and measure nothing.
+ */
+async function suiteGdalBytes() {
+  const before = performance.getEntriesByType("resource").reduce((s, e) => s + (e.transferSize || 0), 0);
+  record("lazy-load", "before first warp", 0, 0, "bytes_transferred", before, "B");
+  log("  forcing a reproject — this downloads gdal3.js…");
+
+  const t0 = now();
+  await Dataset.fromURL(`${DATA}/dep-256.tif`, NODATA).reproject("EPSG:3857").grid();
+  const ms = now() - t0;
+
+  const after = performance.getEntriesByType("resource").reduce((s, e) => s + (e.transferSize || 0), 0);
+  record("lazy-load", "after first warp", 0, 0, "bytes_transferred", after, "B");
+  record("lazy-load", "gdal", 0, 0, "bytes_deferred", after - before, "B");
+  record("lazy-load", "gdal", 0, 0, "t_first_warp", ms, "ms");
+  log(`  GDAL pulled in ${((after - before) / 1048576).toFixed(1)} MB on the first forced warp (${sig(ms)} ms)`);
+}
+
+
+/**
+ * Map render, one provider at a time. This is §4.2's time-to-first-render rather than a deferral
+ * measurement: the numbers include Leaflet or the Google SDK, so they describe the pair rather than
+ * the engine alone.
+ *
+ * The decode is forced before the timing window opens, so `t_render` is colorize plus overlay attach
+ * over an already-decoded grid — the decode itself is measured by the decode suite. Basemap tiles
+ * are not waited on. `t_restyle` is a palette change on the mounted Layer, which repaints from the
+ * same grid and is the one number here that tests an engine claim rather than an SDK.
+ *
+ * Both built-in providers implement addRasterImage, removeRasterImage, setRasterImageOpacity and
+ * setRasterImageUrl (src/package/mapProvider.js), so a raster Layer renders on Leaflet as well as on
+ * Google and the two are directly comparable. The five Google-only capabilities listed in that
+ * file's header are all off this path.
+ */
+async function suiteMap(n, reps, provider, apiKey) {
+  const cells = n * n;
+  const url = `${DATA}/dep-${n}.tif`;
+
+  // One untimed mount and teardown first. Both providers import their SDK dynamically on the first
+  // mount — Leaflet as a webpack chunk, Google from its CDN — and that download is a per-page cost,
+  // not a per-layer one, so it would otherwise land inside the first repetition.
+  if (!suiteMap.warmed?.[provider]) {
+    const warm = document.createElement("div");
+    warm.id = `map-${uid()}`;
+    warm.style.cssText = "width:640px;height:400px";
+    $("#maproot").appendChild(warm);
+    try {
+      const f = await FimViz.mount(`#${warm.id}`, provider === "google" ? { provider, apiKey } : { provider });
+      f?.destroy?.();
+    } catch { /* the timed loop below reports the failure */ }
+    warm.remove();
+    suiteMap.warmed = { ...(suiteMap.warmed || {}), [provider]: true };
+  }
+
+  for (let r = 0; r < reps; r++) {
+    const host = document.createElement("div");
+    host.id = `map-${uid()}`;
+    host.style.cssText = "width:640px;height:400px";
+    $("#maproot").appendChild(host);
+
+    const ds = Dataset.fromURL(url, NODATA);
+    await ds.grid();                                            // decode outside the window
+
+    let fim = null;
+    try {
+      const opts = provider === "google" ? { provider, apiKey } : { provider };
+      const [tMount, mounted] = await timed(() => FimViz.mount(`#${host.id}`, opts));
+      fim = mounted;
+      const [tRender, layer] = await timed(() => fim.addLayer(ds));
+      const [tRestyle] = await timed(() => layer.set({ palette: r % 2 ? "viridis" : "plasma" }));
+      record("map", provider, cells, r, "t_mount", tMount, "ms");
+      record("map", provider, cells, r, "t_render", tRender, "ms");
+      record("map", provider, cells, r, "t_restyle", tRestyle, "ms");
+    } catch (e) {
+      record("map", provider, cells, r, "failed", 1, e.name || "error");
+      log(`  map ${provider} ${n}×${n} failed: ${e.message}`, "warn");
+      fim?.destroy?.(); host.remove();
+      return;
+    }
+    fim?.destroy?.();
+    host.remove();
+  }
+  const t = rows.filter((x) => x.suite === "map" && x.case === provider && x.cells === cells &&
+                               x.metric === "t_render").map((x) => x.value);
+  if (t.length) log(`  map ${provider} ${n}×${n}: mount ` +
+    `${sig(median(rows.filter((x) => x.suite === "map" && x.case === provider && x.cells === cells &&
+      x.metric === "t_mount").map((x) => x.value)))} ms, render ${sig(median(t))} ms`);
+}
+
+// ── charts ────────────────────────────────────────────────────────────────────────────────────
+// Inline SVG, no library. These are for reading a run at a glance. The manuscript's figures come
+// from scripts/plot-performance.mjs over the CSV, so a rerun regenerates them and every point traces
+// to a row.
+
+const COLORS = ["#1f4e79", "#c0504d", "#4f8a3d", "#8064a2", "#e08a1e", "#3a8f9c"];
+
+function lineChart({ title, xLabel, yLabel, series, logX = false, w = 470, h = 250 }) {
+  const pad = { l: 58, r: 12, t: 10, b: 34 };
+  const pts = series.flatMap((s) => s.points);
+  if (!pts.length) return "";
+  const fx = (v) => (logX ? Math.log10(v) : v);
+  const xs = pts.map((p) => fx(p[0])), ys = pts.map((p) => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const y1 = Math.max(...ys) * 1.08, y0 = 0;
+  const X = (v) => pad.l + ((fx(v) - x0) / ((x1 - x0) || 1)) * (w - pad.l - pad.r);
+  const Y = (v) => h - pad.b - ((v - y0) / ((y1 - y0) || 1)) * (h - pad.t - pad.b);
+
+  const xticks = [...new Set(pts.map((p) => p[0]))].sort((a, b) => a - b);
+  const yticks = [0, 0.25, 0.5, 0.75, 1].map((f) => y0 + f * (y1 - y0));
+  const fmtY = (v) => (v >= 1000 ? (v / 1000).toFixed(1) + "k" : v >= 10 ? v.toFixed(0) : v.toFixed(2));
+  const fmtX = (v) => (v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1000 ? (v / 1000).toFixed(0) + "k" : String(v));
+
+  const grid = yticks.map((t) =>
+    `<line x1="${pad.l}" x2="${w - pad.r}" y1="${Y(t)}" y2="${Y(t)}" stroke="#e8ecf0"/>` +
+    `<text x="${pad.l - 6}" y="${Y(t) + 3.5}" text-anchor="end" font-size="9" fill="#5b6570">${fmtY(t)}</text>`).join("");
+  const xax = xticks.map((t) =>
+    `<text x="${X(t)}" y="${h - pad.b + 13}" text-anchor="middle" font-size="9" fill="#5b6570">${fmtX(t)}</text>`).join("");
+
+  const lines = series.map((s, i) => {
+    const p = [...s.points].sort((a, b) => a[0] - b[0]);
+    const dpath = p.map((q, j) => `${j ? "L" : "M"}${X(q[0]).toFixed(1)},${Y(q[1]).toFixed(1)}`).join("");
+    const dots = p.map((q) => `<circle cx="${X(q[0]).toFixed(1)}" cy="${Y(q[1]).toFixed(1)}" r="2.4" fill="${COLORS[i % 6]}"/>`).join("");
+    return `<path d="${dpath}" fill="none" stroke="${COLORS[i % 6]}" stroke-width="1.6"/>${dots}`;
+  }).join("");
+
+  const legend = series.map((s, i) =>
+    `<g transform="translate(${pad.l + 6},${pad.t + 2 + i * 13})">` +
+    `<line x1="0" x2="14" y1="0" y2="0" stroke="${COLORS[i % 6]}" stroke-width="1.6"/>` +
+    `<text x="19" y="3.5" font-size="9.5" fill="#1a1d21">${s.name}</text></g>`).join("");
+
+  return `<figure><svg viewBox="0 0 ${w} ${h}" width="100%" font-family="system-ui, sans-serif">
+    <line x1="${pad.l}" x2="${w - pad.r}" y1="${h - pad.b}" y2="${h - pad.b}" stroke="#b8c0c8"/>
+    <line x1="${pad.l}" x2="${pad.l}" y1="${pad.t}" y2="${h - pad.b}" stroke="#b8c0c8"/>
+    ${grid}${xax}${lines}${legend}
+    <text x="${(w) / 2}" y="${h - 4}" text-anchor="middle" font-size="10" fill="#5b6570">${xLabel}</text>
+    <text x="12" y="${h / 2}" text-anchor="middle" font-size="10" fill="#5b6570"
+      transform="rotate(-90 12 ${h / 2})">${yLabel}</text>
+  </svg><figcaption>${title}</figcaption></figure>`;
+}
+
+/** median of the values matching a filter, or null when the run produced none */
+function med(filter) {
+  const v = rows.filter(filter).map((r) => r.value);
+  return v.length ? median(v) : null;
+}
+
+function renderCharts() {
+  const cellsRun = [...new Set(rows.map((r) => r.cells))].filter((c) => c > 0).sort((a, b) => a - b);
+  const ks = [...new Set(rows.filter((r) => r.suite === "reuse").map((r) => r.case))]
+    .map((c) => +c.slice(2)).sort((a, b) => a - b);
+  const out = [];
+
+  if (ks.length) {
+    const series = [];
+    for (const c of cellsRun) {
+      const lbl = c >= 1e6 ? `${(c / 1e6).toFixed(1)}M cells` : `${(c / 1000).toFixed(0)}k cells`;
+      for (const arm of ["t_redecode", "t_reuse"]) {
+        const points = ks.map((k) => [k, med((r) => r.suite === "reuse" && r.case === `k=${k}` &&
+          r.cells === c && r.metric === arm)]).filter((p) => p[1] != null);
+        if (points.length) series.push({ name: `${arm === "t_reuse" ? "reuse" : "re-decode"}, ${lbl}`, points });
+      }
+    }
+    out.push(lineChart({ title: "§4.4 One decode against N re-decodes. Re-decode is linear in k; reuse is flat.",
+      xLabel: "derived layers (k)", yLabel: "ms", series }));
+  }
+
+  const tcases = [...new Set(rows.filter((r) => r.suite === "throughput").map((r) => r.case))];
+  if (tcases.length) {
+    const series = tcases.map((name) => ({
+      name, points: cellsRun.map((c) => [c, med((r) => r.suite === "throughput" && r.case === name &&
+        r.cells === c && r.metric === "rate")]).filter((p) => p[1] != null).map(([x, y]) => [x, y / 1e6]),
+    })).filter((s) => s.points.length);
+    out.push(lineChart({ title: "§4.5 Throughput against grid size. A flat line is a rate that transfers.",
+      xLabel: "cells", yLabel: "Mcells/s", series, logX: true }));
+  }
+
+  if (rows.some((r) => r.suite === "decode")) {
+    const series = ["cold", "warm"].map((arm) => ({
+      name: `${arm} cache`, points: cellsRun.map((c) => [c, med((r) => r.suite === "decode" &&
+        r.case === arm && r.cells === c && r.metric === "t_total")]).filter((p) => p[1] != null),
+    })).filter((s) => s.points.length);
+    out.push(lineChart({ title: "Decode against grid size, the denominator for the ratios above.",
+      xLabel: "cells", yLabel: "ms", series, logX: true }));
+  }
+
+  const providers = [...new Set(rows.filter((r) => r.suite === "map").map((r) => r.case))];
+  for (const metric of ["t_mount", "t_render", "t_restyle"]) {
+    const series = providers.map((p) => ({
+      name: p, points: cellsRun.map((c) => [c, med((r) => r.suite === "map" && r.case === p &&
+        r.cells === c && r.metric === metric)]).filter((q) => q[1] != null),
+    })).filter((s) => s.points.length);
+    if (series.length) {
+      const what = { t_mount: "Map boot", t_render: "First render of a decoded raster Layer",
+                     t_restyle: "Palette change on a mounted Layer" }[metric];
+      out.push(lineChart({ title: `${what}, by provider.`, xLabel: "cells", yLabel: "ms", series, logX: true }));
+    }
+  }
+
+  $("#charts").innerHTML = out.join("");
+}
+
+// ── driver ────────────────────────────────────────────────────────────────────────────────────
+async function run() {
+  $("#run").disabled = true;
+  rows.length = 0;
+  const reps = +$("#reps").value;
+  const rungs = $("#rungs").value.split(",").map((s) => parseInt(s.trim(), 10)).filter(Boolean);
+  const ks = $("#ks").value.split(",").map((s) => parseInt(s.trim(), 10)).filter(Boolean);
+
+  try {
+    const manifest = await (await fetch(`${DATA}/manifest.json`)).json();
+    log(`ladder generated ${manifest.generated} — rungs ${manifest.rungs.map((r) => r.size).join(", ")}`);
+  } catch {
+    log(`no manifest at ${DATA}/ — run: node scripts/make-perf-data.mjs`, "warn");
+    $("#run").disabled = false;
+    return;
+  }
+
+  for (const n of rungs) {
+    $("#status").textContent = `rung ${n}×${n}…`;
+    log(`rung ${n}×${n}`);
+    await suiteDecode(n, reps);
+    if (!$("#decodeOnly").checked) {
+      await suiteReuse(n, ks, reps);
+      await suiteDeferral(n, reps);
+      await suiteThroughput(n, reps);
+    }
+    if ($("#mapLeaflet").checked) await suiteMap(n, reps, "leaflet", null);
+    if ($("#mapGoogle").checked) await suiteMap(n, reps, "google", $("#apiKey").value.trim());
+    renderResults();
+    renderCharts();
+  }
+  if ($("#gdal").checked) { $("#status").textContent = "GDAL…"; await suiteGdalBytes(); }
+
+  renderResults();
+  renderCharts();
+  $("#status").textContent = `done — ${rows.length} rows, session ${SESSION}`;
+  $("#csv").disabled = false;
+  $("#run").disabled = false;
+}
+
+function downloadCSV() {
+  const head = ["session", "suite", "case", "cells", "rep", "metric", "value", "unit", "userAgent", "cores", "date"];
+  const body = rows.map((r) => [SESSION, r.suite, r.case, r.cells, r.rep, r.metric, r.value, r.unit,
+                                ENV.userAgent, ENV.hardwareConcurrency, ENV.date]
+    .map((v) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v)).join(","));
+  const blob = new Blob([[head.join(","), ...body].join("\n")], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "performance.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+$("#run").addEventListener("click", run);
+$("#csv").addEventListener("click", downloadCSV);
+</script>
+
+</body>
+</html>
