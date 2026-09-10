@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 520" width="1160" height="520"
+     font-family="Helvetica, Arial, sans-serif">
+  <rect width="1160" height="520" fill="#ffffff"/>
+  <line x1="96" x2="1134" y1="458.0" y2="458.0" stroke="#e8ecf0"/><text x="84" y="463.0" text-anchor="end" font-size="15" fill="#5b6570">0.000</text>
+  <line x1="96" x2="1134" y1="350.0" y2="350.0" stroke="#e8ecf0"/><text x="84" y="355.0" text-anchor="end" font-size="15" fill="#5b6570">332</text>
+  <line x1="96" x2="1134" y1="242.0" y2="242.0" stroke="#e8ecf0"/><text x="84" y="247.0" text-anchor="end" font-size="15" fill="#5b6570">664</text>
+  <line x1="96" x2="1134" y1="134.0" y2="134.0" stroke="#e8ecf0"/><text x="84" y="139.0" text-anchor="end" font-size="15" fill="#5b6570">995</text>
+  <line x1="96" x2="1134" y1="26.0" y2="26.0" stroke="#e8ecf0"/><text x="84" y="31.0" text-anchor="end" font-size="15" fill="#5b6570">1.3k</text>
+  <line x1="96" x2="1134" y1="458" y2="458" stroke="#b8c0c8" stroke-width="1.2"/>
+  <line x1="96" x2="96" y1="26" y2="458" stroke="#b8c0c8" stroke-width="1.2"/>
+  <text x="96.0" y="482" text-anchor="middle" font-size="15" fill="#5b6570">66k</text>
+  <text x="303.6" y="482" text-anchor="middle" font-size="15" fill="#5b6570">262k</text>
+  <text x="511.2" y="482" text-anchor="middle" font-size="15" fill="#5b6570">1.0M</text>
+  <text x="718.8" y="482" text-anchor="middle" font-size="15" fill="#5b6570">4.2M</text>
+  <text x="926.4" y="482" text-anchor="middle" font-size="15" fill="#5b6570">16.8M</text>
+  <text x="1134.0" y="482" text-anchor="middle" font-size="15" fill="#5b6570">67.1M</text>
+  <path d="M96.0,455.2L303.6,449.1L511.2,428.1L718.8,347.1L926.4,90.8L1134.0,65.3" fill="none" stroke="#1f4e79" stroke-width="2.4"/><circle cx="96" cy="455.2" r="4.5" fill="#1f4e79"/><circle cx="303.6" cy="449.1" r="4.5" fill="#1f4e79"/><circle cx="511.2" cy="428.1" r="4.5" fill="#1f4e79"/><circle cx="718.8" cy="347.1" r="4.5" fill="#1f4e79"/><circle cx="926.4" cy="90.8" r="4.5" fill="#1f4e79"/><circle cx="1134" cy="65.3" r="4.5" fill="#1f4e79"/>
+  <path d="M96.0,455.3L303.6,450.0L511.2,428.2L718.8,347.4L926.4,98.0L1134.0,74.9" fill="none" stroke="#c0504d" stroke-width="2.4"/><rect x="92" y="451.3" width="8" height="8" fill="#c0504d"/><rect x="299.6" y="446" width="8" height="8" fill="#c0504d"/><rect x="507.2" y="424.2" width="8" height="8" fill="#c0504d"/><rect x="714.8" y="343.4" width="8" height="8" fill="#c0504d"/><rect x="922.4" y="94" width="8" height="8" fill="#c0504d"/><rect x="1130" y="70.9" width="8" height="8" fill="#c0504d"/>
+  <g transform="translate(114,40)"><line x1="0" x2="26" y1="0" y2="0" stroke="#1f4e79" stroke-width="2.4"/><circle cx="13" cy="0" r="4.5" fill="#1f4e79"/><text x="34" y="5" font-size="15" fill="#1a1d21">leaflet</text></g>
+  <g transform="translate(114,62)"><line x1="0" x2="26" y1="0" y2="0" stroke="#c0504d" stroke-width="2.4"/><rect x="9" y="-4" width="8" height="8" fill="#c0504d"/><text x="34" y="5" font-size="15" fill="#1a1d21">google</text></g>
+  <text x="580" y="504" text-anchor="middle" font-size="16" fill="#5b6570">cells</text>
+  <text x="26" y="260" text-anchor="middle" font-size="16" fill="#5b6570" transform="rotate(-90 26 260)">milliseconds</text>
+</svg>

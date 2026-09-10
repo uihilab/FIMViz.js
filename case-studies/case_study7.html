@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — Case Study 7: rain on the Amite, and the reach that carried it</title>
+<link rel="icon" href="../assets/brand/favicon.png" />
+<link rel="stylesheet" href="../site.css" />
+<style>
+  body { max-width: 96ch; margin: 0 auto; padding: 30px 22px 80px; }
+  h1 { font-size: 23px; margin: 0 0 6px; letter-spacing: -.01em; }
+  h2 { font-size: 15px; margin: 28px 0 9px; }
+  h2 .n { color: var(--dim); font: 600 12px/1 var(--mono); margin-right: 8px; }
+  h3 { font-size: 13px; margin: 0 0 6px; font-weight: 600; }
+  h3 small { color: var(--dim); font-weight: 400; margin-left: 6px; }
+  p { margin: 0 0 11px; }
+  .lead { color: var(--dim); margin-bottom: 16px; }
+  .q { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; margin: 0 0 16px; }
+
+  #status { font-size: 12.5px; color: var(--dim); margin: 0 0 16px; min-height: 18px; }
+  .spin { width: 11px; height: 11px; border: 2px solid var(--line); border-top-color: var(--accent);
+          border-radius: 50%; display: inline-block; animation: sp .8s linear infinite;
+          vertical-align: -1px; margin-right: 7px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  #status.done .spin, #status.fail .spin { display: none; }
+  #status.fail { color: var(--bad); }
+
+  .panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0 0 8px; }
+  @media (max-width: 780px) { .panels { grid-template-columns: 1fr; } }
+  .panel .map { height: 320px; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .mapwrap { position: relative; margin: 0 0 6px; }
+  .lg { position: absolute; right: 9px; bottom: 9px; z-index: 1100; background: var(--panel);
+        border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; font-size: 11px;
+        color: var(--fg); box-shadow: 0 1px 5px rgb(0 0 0 / .25); }
+  .lg .src { color: var(--dim); font-size: 10px; margin: 4px 0 0; }
+
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0 4px; }
+  .hint { font-size: 12px; color: var(--dim); margin: 0 0 14px; }
+  button { background: transparent; color: var(--accent); border: 1px solid var(--control-line);
+           border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  label.ctl { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--dim); }
+  label.ctl select { background: var(--bg); color: var(--fg); font: inherit; font-size: 11.5px;
+      border: 1px solid var(--control-line); border-radius: 4px; padding: 2px 5px; }
+  #tstep { width: 260px; accent-color: var(--accent); }
+  .clock { font: 600 12px/1 var(--mono); color: var(--fg); min-width: 15ch; }
+
+  pre.out { background: var(--panel); color: var(--dim); white-space: pre-wrap;
+            max-height: 190px; font-size: 12px; margin: 0 0 14px; }
+  pre.out:empty { display: none; }
+  table { border-collapse: collapse; font-size: 12.5px; margin: 0 0 8px; width: 100%; }
+  th, td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .bar { display: inline-block; height: 9px; background: var(--accent); vertical-align: 0; }
+  #results:empty, #axiscost:empty, #split:empty { display: none; }
+  #hydro { width: 100%; height: 220px; border: 1px solid var(--line); border-radius: 7px;
+           background: var(--panel); }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px;
+            vertical-align: -1px; }
+</style>
+</head>
+<body>
+
+<h1>Case Study 7 — Rain on the Amite, and the reach that carried it</h1>
+<p class="lead">
+  A 1 km National Water Model forcing grid animated, windowed, reduced and summarised in the browser
+  against a basin fetched live from the USGS Network Linked Data Index, with the simulated reach
+  response beside it. Protocol: <a href="CASE_STUDY_PROTOCOL.md">CASE_STUDY_PROTOCOL.md</a> §0 and §2.
+</p>
+<p class="q">
+  <b>The question.</b> Rain fell on the Amite River basin from 10 to 17 August 2016 and the river at
+  Denham Springs reached a record stage. <b>Where in the basin did the rain fall, how much of the
+  storm total landed inside the drainage area rather than beside it, and how did the simulated reach
+  at the basin outlet respond?</b>
+</p>
+
+<p id="status"><span class="spin"></span><span id="status-text">starting…</span></p>
+
+<h2><span class="n">Fig. 7.1</span>The event, hour by hour, and its total</h2>
+<div class="panels">
+  <div class="panel">
+    <h3 id="t-step">Hourly rainfall <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-step"></div><div class="lg" id="lg-step" hidden></div></div>
+  </div>
+  <div class="panel">
+    <h3 id="t-acc">Event accumulation <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-acc"></div><div class="lg" id="lg-acc" hidden></div></div>
+  </div>
+</div>
+<div class="controls">
+  <label class="ctl">step <input type="range" id="tstep" min="0" max="0" value="0" /></label>
+  <span class="clock" id="clock">—</span>
+  <button id="play">▶ play</button>
+  <label class="ctl">window
+    <select id="win">
+      <option value="168">event, 10–17 Aug (168 h)</option>
+      <option value="72">72 h</option>
+      <option value="48">48 h</option>
+      <option value="24">24 h</option>
+    </select></label>
+  <button id="rain">basin rainfall per hour</button>
+</div>
+<p class="hint">
+  Left: one hour, selected with <code>ds.select(coord)</code>; the slider drives the axis and
+  <b>play</b> scrubs it, each frame a fresh lazy selection forced and painted. Right: the total over
+  the chosen <b>window</b>, built with <code>ds.selectRange(from, to)</code> and
+  <code>reduce("sum")</code>. The basin outline is a live NLDI response, not a mirrored file.
+  RAINRATE is a <b>rate</b>, so the sum is multiplied by the step length to give a depth — the
+  conversion is printed in the log and the factor appears in every table header.
+</p>
+
+<h2><span class="n">Fig. 7.2</span>Forcing and response at the outlet reach</h2>
+<svg id="hydro" viewBox="0 0 960 220" preserveAspectRatio="none"></svg>
+<p class="hint" id="hydro-note">
+  Simulated discharge for the NHDPlus reach that NLDI returns for the gage, read from the NWM
+  retrospective <code>chrtout</code> store at build time. <b>chrtout never enters the engine:</b> it
+  is (time, feature_id) with no latitude or longitude, so <code>addDataset</code> has no extent to
+  place it with, and one reach costs a whole feature_id chunk to read. Both numbers are reported
+  below.
+</p>
+
+<h2><span class="n">Table 7.1</span>Where the rain fell</h2>
+<div id="results"></div>
+<p class="hint" id="results-note" hidden></p>
+
+<h2><span class="n">Table 7.2</span>Inside the basin against outside it</h2>
+<div id="split"></div>
+
+<h2><span class="n">Table 7.3</span>What the axis operations cost</h2>
+<div id="axiscost"></div>
+
+<div class="controls">
+  <button id="dlp">performance.csv</button>
+  <button id="dlm">metrics.csv</button>
+  <button id="dlr">results.csv</button>
+</div>
+
+<pre class="out" id="log"></pre>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js",
+    "sciwrid-toolkit": "../node_modules/sciwrid-toolkit/dist/index.js"
+} }
+</script>
+
+<script type="module">
+import { FimViz, ColorScale, Stats } from "fimviz";
+
+// ── §0 instrumentation ────────────────────────────────────────────────────────────────────────
+const REPS = 1;                       // TODO: 5 before recording.
+const CACHE_STATE = "warm";           // TODO: "cold" for the hard-reload pass.
+const BROWSER = navigator.userAgent;
+
+const perf = [], metrics = [], results = [], axisCost = [];
+
+const log = (...a) => { document.getElementById("log").textContent += a.join(" ") + "\n"; };
+const status = (text, state = "") => {
+  document.getElementById("status-text").textContent = text;
+  document.getElementById("status").className = state;
+};
+
+async function stage(name, fields, fn) {
+  const t = `${name}-${perf.length}`;
+  performance.mark(`${t}:start`);
+  const value = await fn();
+  performance.mark(`${t}:end`);
+  const { duration } = performance.measure(t, `${t}:start`, `${t}:end`);
+  perf.push({ study: "7", stage: name, dataset: "", format: "", bytes: "", width: "", height: "",
+              cache_state: CACHE_STATE, browser: BROWSER, rep: 1, ms: duration.toFixed(2), ...fields });
+  return { value, ms: duration };
+}
+const timed = async (name, fields, fn) => (await stage(name, fields, fn)).value;
+const perfRow = (op, steps, ms) => axisCost.push({ op, steps, ms: ms.toFixed(1) });
+
+const toCsv = (rows) => {
+  const cols = Object.keys(rows[0]);
+  return [cols.join(","), ...rows.map((r) => cols.map((c) => JSON.stringify(r[c] ?? "")).join(","))].join("\n");
+};
+const download = (rows, name) => {
+  if (!rows.length) return log(`${name}: nothing recorded yet`);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv" }));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+};
+
+const gridMeta = (g) => ({ bw: g.bounds.west, bs: g.bounds.south, be: g.bounds.east,
+                           bn: g.bounds.north, width: g.width, height: g.height, noData: g.noData });
+
+const ringsOf = (geom) =>
+  (geom.type === "MultiPolygon" ? geom.coordinates : [geom.coordinates])
+    .flat().map((ring) => ring.map(([lng, lat]) => ({ lat, lng })));
+
+// ── sources ───────────────────────────────────────────────────────────────────────────────────
+// Mirrored by build_case_study7_data.mjs; provenance in data/README.txt (protocol §0.4).
+const FORCING = "./data/amite-2016-RAINRATE.zarr.zip";
+const FLOW_JSON = (comid) => `./data/amite-2016-chrtout-${comid}.json`;
+const GAGE = "USGS-07378500";                     // Amite River near Denham Springs, LA
+const NLDI = "https://api.water.usgs.gov/nldi/linked-data";
+const NWIS = "https://waterservices.usgs.gov/nwis/iv/";
+const WBD12 = "https://hydro.nationalmap.gov/arcgis/rest/services/wbd/MapServer/6/query";
+const GENERALISE = 0.002;                          // ~200 m, well under the 1 km grid
+const EVENT = { from: Date.UTC(2016, 7, 10, 0), to: Date.UTC(2016, 7, 17, 0) };
+
+// ── maps ──────────────────────────────────────────────────────────────────────────────────────
+const maps = {};
+for (const [k, sel] of [["step", "#m-step"], ["acc", "#m-acc"]]) {
+  maps[k] = await FimViz.mount(sel, { provider: "leaflet", isolated: true });
+}
+
+let ds = null, entries = [], unit = "", rateFactor = 1, depthUnit = "mm";
+let stepLayer = null, accumLayer = null, stepScale = null, accScale = null;
+let basin = null, basinRing = null, comid = null, zones = [], zoneRings = [];
+let flow = null, basinRain = null, observed = null;
+let sel = { step: 0, window: 168, first: 0 };
+let playing = false;
+
+const isoOf = (e) => e.meta?.time ?? new Date(e.coord).toISOString();
+
+/** RAINRATE is a rate. A sum over a rate is meaningless until it is multiplied by the step length,
+ *  so the factor is derived from the file's own unit string and the axis spacing, and every number
+ *  the page reports carries it. A depth-per-step product (kg m-2) passes through at 1. */
+function rateFactorOf(unitStr, stepMs) {
+  const perSecond = /s-1|s\^-1|\/s|per second/i.test(unitStr ?? "");
+  if (!perSecond) return { factor: 1, unit: unitStr || "mm", why: "depth per step, summed as is" };
+  const seconds = stepMs / 1000;
+  return { factor: seconds, unit: (unitStr.replace(/\s*(s-1|s\^-1|\/s)\s*/i, "").trim() || "mm"),
+           why: `rate x ${seconds} s per step` };
+}
+
+// ── the basin, its reach, and its subbasins — from NLDI and WBD ────────────────────────────────
+async function loadBasin() {
+  status("fetching the basin from NLDI…");
+  const { value: site } = await stage("t_fetch", { dataset: "nldi-site", format: "geojson" },
+    async () => (await fetch(`${NLDI}/nwissite/${GAGE}`)).json());
+  comid = Number(site.features?.[0]?.properties?.comid);
+
+  const { value: fc, ms } = await stage("t_fetch", { dataset: "nldi-basin", format: "geojson" },
+    async () => (await fetch(`${NLDI}/nwissite/${GAGE}/basin`)).json());
+  basin = fc.features?.[0];
+  if (!basin) throw new Error("NLDI returned no basin polygon");
+  basinRing = ringsOf(basin.geometry);
+  const bytes = JSON.stringify(basin.geometry).length;
+  log(`NLDI basin for ${GAGE}: ${(bytes / 1024).toFixed(0)} kB, ${ms.toFixed(0)} ms, outlet COMID ${comid}`);
+
+  const b = basin.bbox ?? bboxOf(basin.geometry);
+  const q = new URLSearchParams({
+    where: "1=1", geometry: b.join(","), geometryType: "esriGeometryEnvelope",
+    spatialRel: "esriSpatialRelIntersects", inSR: "4326", outSR: "4326",
+    outFields: "huc12,name,areasqkm", returnGeometry: "true", resultRecordCount: "200",
+    maxAllowableOffset: String(GENERALISE), f: "geojson",
+  });
+  const { value: subs } = await stage("t_fetch", { dataset: "wbd-huc12", format: "geojson" },
+    async () => (await fetch(`${WBD12}?${q}`)).json());
+  zones = subs.features ?? [];
+  zoneRings = zones.map((f, i) => ({ id: i, polygon: ringsOf(f.geometry) }));
+  log(`WBD: ${zones.length} HUC12 subbasins over the basin bbox, generalised at ${GENERALISE}°`);
+}
+
+function bboxOf(geom) {
+  const flat = (geom.type === "MultiPolygon" ? geom.coordinates : [geom.coordinates]).flat(2);
+  const lon = flat.map((p) => p[0]), lat = flat.map((p) => p[1]);
+  return [Math.min(...lon), Math.min(...lat), Math.max(...lon), Math.max(...lat)];
+}
+
+// ── the forcing ───────────────────────────────────────────────────────────────────────────────
+async function loadForcing() {
+  status("opening the NWM forcing chunk…");
+  const { value: d, ms: parseMs } = await stage("t_total", { dataset: "nwm-rainrate", format: "zarr" },
+    () => maps.step.addDataset(FORCING, { format: "zarr" }));
+  ds = d;
+  entries = ds.axis?.entries ?? [];
+  if (!entries.length) throw new Error("the mirrored store carries no series axis");
+  unit = ds.meta?.unit ?? "";
+
+  const stepMs = new Date(isoOf(entries[1])) - new Date(isoOf(entries[0]));
+  const r = rateFactorOf(unit, stepMs);
+  rateFactor = r.factor; depthUnit = r.unit;
+  log(`axis "${ds.axis?.name}" x ${entries.length}, variable ${ds.meta?.variable}, unit ${unit || "(none)"}`);
+  log(`accumulation: ${r.why} → totals reported in ${depthUnit}`);
+
+  // The event window inside the mirrored chunk, found from the entries themselves.
+  sel.first = entries.findIndex((e) => new Date(isoOf(e)).getTime() >= EVENT.from);
+  if (sel.first < 0) sel.first = 0;
+  log(`chunk spans ${isoOf(entries[0])} .. ${isoOf(entries.at(-1))}; event starts at index ${sel.first}`);
+
+  const first = await showStep(sel.first, { record: false });
+  const twentieth = await showStep(Math.min(sel.first + 19, entries.length - 1), { record: false });
+  await showStep(sel.first, { record: false });
+
+  const g0 = await ds.select(entries[sel.first].coord).grid();
+  metrics.push({ study: "7", source: "NWM retrospective v2.1 precip/RAINRATE", format: "zarr",
+                 axis_len: entries.length, width: g0.width, height: g0.height,
+                 variable: ds.meta?.variable ?? "", unit: unit || "",
+                 depth_unit: depthUnit, rate_factor: rateFactor,
+                 extent_source: "rewritten to degrees at mirror time",
+                 parse_ms: +parseMs.toFixed(1), select_first_ms: +first.toFixed(1),
+                 select_20th_ms: +twentieth.toFixed(1),
+                 span_start: isoOf(entries[0]), span_end: isoOf(entries.at(-1)) });
+
+  const slider = document.getElementById("tstep");
+  slider.max = String(entries.length - 1);
+  slider.value = String(sel.first);
+  document.getElementById("t-step").innerHTML =
+    `Hourly rainfall <small>NWM 1 km, ${g0.width}×${g0.height}${unit ? ", " + unit : ""}</small>`;
+  return g0;
+}
+
+async function paint(mapKey, dataset, scale, label) {
+  const layer = await timed("t_paint", { dataset: label },
+                            () => maps[mapKey].addLayer("raster", { source: dataset, colorScale: scale }));
+  const host = document.getElementById(`lg-${mapKey}`);
+  host.innerHTML = layer.getLegend().toHtml() + `<p class="src">${label}</p>`;
+  host.hidden = false;
+  return layer;
+}
+
+async function showStep(i, { record = true } = {}) {
+  sel.step = i;
+  const e = entries[i];
+  document.getElementById("clock").textContent = isoOf(e).replace("T", " ").replace(".000Z", "Z");
+  document.getElementById("tstep").value = String(i);
+  const child = ds.select(e.coord);
+  const { value: grid, ms } = await stage("t_op", { dataset: `select:${i}`, format: "zarr" },
+                                          () => child.grid());
+  if (record) log(`select step ${String(i).padStart(3)}  ${isoOf(e)}  ${ms.toFixed(1)} ms`);
+  stepLayer?.remove();
+  maps.step.adoptDataset(child);
+  stepLayer = await paint("step", child, stepScale, `hourly ${unit || ""}`);
+  return ms;
+}
+
+function windowDataset() {
+  const n = Math.min(sel.window, entries.length - sel.first);
+  const from = entries[sel.first].coord, to = entries[sel.first + n - 1].coord;
+  return { n, win: ds.selectRange(from, to) };
+}
+
+async function buildAccumulation() {
+  const { n, win } = windowDataset();
+  status(`reducing ${n} steps…`);
+  const acc = win.reduce("sum", { axis: 0 });
+  const { value: grid, ms } = await stage("t_op", { dataset: `reduce:sum:${n}`, format: "zarr" },
+                                          () => acc.grid());
+  log(`reduce sum over ${n} steps: ${ms.toFixed(0)} ms → ${grid.width}x${grid.height}`);
+  perfRow(`reduce("sum")`, n, ms);
+
+  const s = Stats.raster(grid.pixels, gridMeta(grid), { bins: 32 });
+  accScale = new ColorScale({ palette: "blues", min: 0, max: Math.max(s.max, 1e-9), continuous: true,
+                              unit: unit || "", missingColor: "transparent" });
+  accumLayer?.remove();
+  maps.acc.adoptDataset(acc);
+  accumLayer = await paint("acc", acc, accScale, `${n} h total`);
+  document.getElementById("t-acc").innerHTML =
+    `Event accumulation <small>${n} h, max ${(s.max * rateFactor).toFixed(0)} ${depthUnit}</small>`;
+  return { acc, grid, stats: s, n };
+}
+
+// ── analysis ──────────────────────────────────────────────────────────────────────────────────
+async function summarise(acc) {
+  status("running zonal statistics over the HUC12 subbasins…");
+  const { value: rows, ms } = await stage("t_op", { dataset: "zonalStats:huc12" },
+                                          () => acc.zonalStats(zoneRings));
+  perfRow("zonalStats", zoneRings.length, ms);
+
+  results.length = 0;
+  rows.forEach((r, i) => {
+    if (!r.count) return;
+    const p = zones[i].properties;
+    results.push({ study: "7", huc12: p.huc12, name: p.name, window_h: sel.window,
+                   unit: depthUnit, rate_factor: rateFactor,
+                   mean: +((r.mean ?? 0) * rateFactor).toFixed(2),
+                   max: +((r.max ?? 0) * rateFactor).toFixed(2),
+                   cells: r.count, area_km2: +(p.areasqkm ?? 0).toFixed(1) });
+  });
+  results.sort((a, b) => b.mean - a.mean);
+  renderResults();
+}
+
+/** The payoff: how much of the storm landed inside the drainage area rather than beside it. The
+ *  engine's only domain restriction is a polygon mask, so inside and outside are two masks over the
+ *  same accumulation, and the numbers are comparable because nothing else differs. */
+async function insideOutside(acc) {
+  status("splitting the total inside and outside the basin…");
+  const cells = [];
+  for (const [label, opts] of [["inside", {}], ["outside", { invert: true }]]) {
+    const { value: grid, ms } = await stage("t_op", { dataset: `mask:${label}` },
+                                            () => acc.mask(basinRing, opts).grid());
+    const s = Stats.raster(grid.pixels, gridMeta(grid), { bins: 16 });
+    cells.push({ label, ms, count: s.count ?? 0, mean: (s.mean ?? 0) * rateFactor,
+                 max: (s.max ?? 0) * rateFactor, sum: (s.sum ?? 0) * rateFactor });
+    perfRow(`mask + stats (${label})`, s.count ?? 0, ms);
+  }
+  const total = cells.reduce((t, c) => t + c.sum, 0);
+  document.getElementById("split").innerHTML =
+    `<table><tr><th>domain</th><th>cells</th><th>mean ${depthUnit}</th><th>max ${depthUnit}</th>`
+    + `<th>share of the window's rainfall</th></tr>`
+    + cells.map((c) => `<tr><td>${c.label} the NLDI basin</td><td class="num">${c.count}</td>`
+        + `<td class="num">${c.mean.toFixed(1)}</td><td class="num">${c.max.toFixed(1)}</td>`
+        + `<td class="num">${total > 0 ? (100 * c.sum / total).toFixed(1) : "—"}%`
+        + ` <span class="bar" style="width:${total > 0 ? (90 * c.sum / total).toFixed(0) : 0}px"></span>`
+        + `</td></tr>`).join("")
+    + `</table>`;
+}
+
+/** Basin-mean rainfall per hour, one masked statistic per step. This is the expensive path on
+ *  purpose: it is the per-step cost of a region-scoped number, and it is what the hydrograph needs. */
+async function basinSeries() {
+  const { n } = windowDataset();
+  status(`computing basin-mean rainfall over ${n} hours…`);
+  const t0 = performance.now();
+  const series = [];
+  for (let i = 0; i < n; i++) {
+    const e = entries[sel.first + i];
+    const grid = await ds.select(e.coord).mask(basinRing).grid();
+    const s = Stats.raster(grid.pixels, gridMeta(grid), { bins: 4 });
+    series.push({ t: isoOf(e), mm: (s.mean ?? 0) * rateFactor });
+  }
+  const ms = performance.now() - t0;
+  perfRow("select + mask + stats, per step", n, ms / n);
+  log(`basin-mean rainfall: ${n} steps in ${ms.toFixed(0)} ms (${(ms / n).toFixed(1)} ms per step)`);
+  basinRain = series;
+  drawHydrograph();
+}
+
+// ── the reach response ────────────────────────────────────────────────────────────────────────
+async function loadFlow() {
+  try {
+    const r = await fetch(FLOW_JSON(comid));
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    flow = await r.json();
+    log(`NWM chrtout COMID ${flow.comid}: ${flow.series.length} hourly values, `
+      + `${(flow.bytes_fetched_for_one_reach / 1048576).toFixed(1)} MB fetched at build time for one reach`);
+    document.getElementById("hydro-note").insertAdjacentHTML("beforeend",
+      ` Chunk <code>${flow.chunk}</code> is ${flow.chunk_shape[0]} × ${flow.chunk_shape[1]}, and `
+      + `${(flow.bytes_fetched_for_one_reach / 1048576).toFixed(1)} MB moved to read one of its `
+      + `${flow.chunk_shape[1]} reaches.`);
+  } catch (e) {
+    log(`chrtout companion unavailable (${e.message}) — run build_case_study7_data.mjs first`);
+  }
+  // Observed discharge, live, for the same window. Optional: the study stands without it.
+  try {
+    const q = new URLSearchParams({
+      format: "json", sites: GAGE.replace("USGS-", ""), parameterCd: "00060",
+      startDT: new Date(EVENT.from).toISOString().slice(0, 10),
+      endDT: new Date(EVENT.to).toISOString().slice(0, 10),
+    });
+    const j = await (await fetch(`${NWIS}?${q}`)).json();
+    const vals = j.value?.timeSeries?.[0]?.values?.[0]?.value ?? [];
+    if (vals.length) {
+      // NWIS reports cubic feet per second; the NWM store reports cubic metres per second.
+      observed = vals.map((v) => ({ t: v.dateTime, q: Number(v.value) * 0.0283168 }));
+      log(`NWIS observed discharge: ${observed.length} values, converted ft3/s → m3/s`);
+    }
+  } catch (e) {
+    log(`NWIS observed discharge unavailable (${e.message})`);
+  }
+  drawHydrograph();
+}
+
+function drawHydrograph() {
+  const svg = document.getElementById("hydro");
+  const W = 960, H = 220, pad = { l: 46, r: 46, t: 12, b: 22 };
+  const inWindow = (iso) => {
+    const t = Date.parse(iso);
+    return t >= EVENT.from && t <= EVENT.to;
+  };
+  const sim = (flow?.series ?? []).filter((p) => p.q != null && inWindow(p.t));
+  const obs = (observed ?? []).filter((p) => inWindow(p.t));
+  const rain = (basinRain ?? []).filter((p) => inWindow(p.t));
+  if (!sim.length && !obs.length && !rain.length) { svg.innerHTML = ""; return; }
+
+  const x = (iso) => pad.l + (Date.parse(iso) - EVENT.from) / (EVENT.to - EVENT.from) * (W - pad.l - pad.r);
+  const qMax = Math.max(1, ...sim.map((p) => p.q), ...obs.map((p) => p.q));
+  const rMax = Math.max(1e-9, ...rain.map((p) => p.mm));
+  const yQ = (q) => H - pad.b - (q / qMax) * (H - pad.t - pad.b);
+  const line = (pts) => pts.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${yQ(p.q).toFixed(1)}`).join("");
+
+  const bars = rain.map((p) => {
+    const h = (p.mm / rMax) * (H - pad.t - pad.b) * 0.4;
+    return `<rect x="${(x(p.t) - 1.5).toFixed(1)}" y="${pad.t}" width="3" height="${h.toFixed(1)}"
+             fill="var(--accent)" opacity=".35" />`;
+  }).join("");
+
+  svg.innerHTML = `
+    <rect x="0" y="0" width="${W}" height="${H}" fill="none" />
+    ${bars}
+    ${sim.length ? `<path d="${line(sim)}" fill="none" stroke="var(--accent)" stroke-width="1.6" />` : ""}
+    ${obs.length ? `<path d="${line(obs)}" fill="none" stroke="var(--dim)" stroke-width="1.2"
+                          stroke-dasharray="4 3" />` : ""}
+    <text x="${pad.l}" y="${H - 6}" fill="var(--dim)" font-size="11">
+      ${new Date(EVENT.from).toISOString().slice(0, 10)}</text>
+    <text x="${W - pad.r}" y="${H - 6}" fill="var(--dim)" font-size="11" text-anchor="end">
+      ${new Date(EVENT.to).toISOString().slice(0, 10)}</text>
+    <text x="4" y="${pad.t + 10}" fill="var(--dim)" font-size="11">${qMax.toFixed(0)} m³/s</text>
+    <text x="${W - 4}" y="${pad.t + 10}" fill="var(--dim)" font-size="11" text-anchor="end">
+      ${rMax.toFixed(1)} ${depthUnit}/h</text>`;
+}
+
+// ── tables ────────────────────────────────────────────────────────────────────────────────────
+function renderResults() {
+  const top = results.slice(0, 12);
+  const max = Math.max(...results.map((r) => r.mean), 1);
+  document.getElementById("results").innerHTML =
+    `<table><tr><th>subbasin</th><th>HUC12</th><th>area km²</th><th>mean ${depthUnit}</th>`
+    + `<th>max ${depthUnit}</th><th></th></tr>`
+    + top.map((r) => `<tr><td>${r.name}</td><td>${r.huc12}</td><td class="num">${r.area_km2}</td>`
+        + `<td class="num">${r.mean}</td><td class="num">${r.max}</td>`
+        + `<td><span class="bar" style="width:${(110 * r.mean / max).toFixed(0)}px"></span></td></tr>`).join("")
+    + `</table>`;
+  const note = document.getElementById("results-note");
+  note.textContent = `Top ${top.length} of ${results.length} HUC12 subbasins by mean accumulation over `
+    + `the ${sel.window}-hour window; results.csv carries them all. The subbasins come from the WBD `
+    + `service over the NLDI basin's bounding box, so a subbasin at the edge of that box may lie `
+    + `partly outside the drainage area — Table 7.2 is the drainage-area number.`;
+  note.hidden = false;
+}
+
+function renderAxisCost() {
+  document.getElementById("axiscost").innerHTML =
+    `<table><tr><th>operation</th><th>steps / zones / cells</th><th>ms</th></tr>`
+    + axisCost.map((r) => `<tr><td><code>${r.op}</code></td><td class="num">${r.steps}</td>`
+        + `<td class="num">${r.ms}</td></tr>`).join("") + `</table>`;
+}
+
+// ── controls ──────────────────────────────────────────────────────────────────────────────────
+document.getElementById("tstep").oninput = (e) => { if (!playing) showStep(Number(e.target.value)); };
+document.getElementById("play").onclick = async () => {
+  const btn = document.getElementById("play");
+  if (playing) { playing = false; btn.textContent = "▶ play"; return; }
+  playing = true; btn.textContent = "■ stop";
+  const frames = [];
+  const last = Math.min(sel.first + sel.window, entries.length);
+  for (let i = sel.step; i < last && playing; i++) frames.push(await showStep(i, { record: false }));
+  playing = false; btn.textContent = "▶ play";
+  if (frames.length) {
+    const sorted = [...frames].sort((a, b) => a - b);
+    const med = sorted[sorted.length >> 1];
+    log(`scrub: ${frames.length} frames, median ${med.toFixed(1)} ms/frame`
+      + ` (${(1000 / med).toFixed(1)} fps), max ${Math.max(...frames).toFixed(1)} ms`);
+    perfRow("scrub (median per frame)", frames.length, med);
+    renderAxisCost();
+  }
+};
+document.getElementById("win").onchange = async (e) => {
+  sel.window = Number(e.target.value);
+  const { acc } = await buildAccumulation();
+  await summarise(acc);
+  await insideOutside(acc);
+  renderAxisCost();
+  status("ready", "done");
+};
+document.getElementById("rain").onclick = async () => {
+  const btn = document.getElementById("rain");
+  btn.disabled = true;
+  try { await basinSeries(); renderAxisCost(); status("ready", "done"); }
+  catch (err) { log(`ERROR  ${err.message}`); status(`failed: ${err.message}`, "fail"); }
+  btn.disabled = false;
+};
+document.getElementById("dlp").onclick = () => download(perf, "performance.csv");
+document.getElementById("dlm").onclick = () => download(metrics, "metrics.csv");
+document.getElementById("dlr").onclick = () => download(results, "results.csv");
+
+// ── run ───────────────────────────────────────────────────────────────────────────────────────
+try {
+  await loadBasin();
+  const g0 = await loadForcing();
+  const s0 = Stats.raster(g0.pixels, gridMeta(g0), { bins: 16 });
+  stepScale = new ColorScale({ palette: "blues", min: 0, max: Math.max(s0.max, 1e-9), continuous: true,
+                               unit: unit || "", missingColor: "transparent" });
+  await showStep(sel.first, { record: false });
+
+  // Draw the basin over both maps as a vector Layer, from the same GeoJSON the zonal call uses.
+  const file = new File([JSON.stringify({ type: "FeatureCollection", features: [basin] })],
+                        "nldi-basin.geojson", { type: "application/geo+json" });
+  for (const key of ["step", "acc"]) {
+    const b = await maps[key].addDataset(file);
+    await maps[key].addLayer("vector", { source: b,
+      style: () => ({ fillColor: "transparent", strokeColor: "#ffffff", strokeWidth: 1.5, fillOpacity: 0 }) });
+  }
+
+  // The laziness check: build a five-op chain on the axis and never force it.
+  const t0 = performance.now();
+  const never = ds.selectRange(entries[sel.first].coord, entries[sel.first + 47].coord)
+    .reduce("sum", { axis: 0 })
+    .reclassify([{ min: 1e-6, value: 1 }])
+    .mask(basinRing)
+    // The target comes from the Dataset's own declared bounds, so the chain still forces nothing.
+    .resampleTo({ width: 64, height: 64, bounds: ds.meta?.grid?.bounds ?? ds.bounds });
+  const unforced = performance.now() - t0;
+  log(`chain built on the axis, never forced: ${unforced.toFixed(3)} ms, 0 bytes`);
+  perf.push({ study: "7", stage: "t_op", dataset: "axis-chain(unforced)", format: "zarr", bytes: 0,
+              width: "", height: "", cache_state: CACHE_STATE, browser: BROWSER, rep: 1,
+              ms: unforced.toFixed(3) });
+
+  const { acc } = await buildAccumulation();
+  await summarise(acc);
+  await insideOutside(acc);
+  await loadFlow();
+  renderAxisCost();
+  status("ready", "done");
+} catch (e) {
+  console.error(e);
+  log(`ERROR  ${e.message}`);
+  status(`failed: ${e.message}`, "fail");
+}
+</script>
+</body>
+</html>

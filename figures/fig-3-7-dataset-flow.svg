@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="776" viewBox="0 0 1180 776"
+     font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
+  <title>FIMViz.js — from a source to a rendered Layer and a read-model</title>
+  <desc>A Dataset is built from a local file, a URL or a stored recipe. Ops and axis verbs return
+        further Datasets without computing. One terminal forces the chain once. The same Dataset
+        backs Layers on more than one map, and the read-models carry the values an interface would
+        display.</desc>
+
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#475569"/>
+    </marker>
+    <marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#ea580c"/>
+    </marker>
+  </defs>
+
+  <rect width="1180" height="776" fill="#ffffff"/>
+
+  <!-- ══════ sources ══════ -->
+  <rect x="60" y="40" width="250" height="64" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="1.6"/>
+  <text x="185" y="67" font-size="13" font-weight="700" fill="#0f172a" text-anchor="middle">Local file</text>
+  <text x="185" y="88" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569" text-anchor="middle">parseFile()</text>
+
+  <rect x="370" y="40" width="250" height="64" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="1.6"/>
+  <text x="495" y="67" font-size="13" font-weight="700" fill="#0f172a" text-anchor="middle">Remote source</text>
+  <text x="495" y="88" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#475569" text-anchor="middle">Dataset.fromURL()</text>
+
+  <rect x="680" y="40" width="250" height="64" rx="8" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.6"/>
+  <text x="805" y="67" font-size="13" font-weight="700" fill="#0f172a" text-anchor="middle">Storage — IndexedDB</text>
+  <text x="805" y="88" font-size="10.5" fill="#475569" text-anchor="middle">a recipe: source + ops</text>
+
+  <path d="M185,106 V158" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#a)"/>
+  <path d="M495,106 V158" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#a)"/>
+  <path d="M745,106 V158" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#a)"/>
+  <text x="738" y="130" font-size="10" fill="#475569" text-anchor="end">fromRecord()</text>
+  <path d="M865,161 V108" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#a)"/>
+  <text x="874" y="130" font-size="10" fill="#475569">toRecord() — no force</text>
+
+  <!-- ══════ dataset ══════ -->
+  <rect x="60" y="162" width="1080" height="96" rx="10" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+  <text x="600" y="196" font-size="19" font-weight="700" fill="#0f172a" text-anchor="middle">Dataset</text>
+  <text x="600" y="218" font-size="12" fill="#1e40af" text-anchor="middle">an immutable source description plus an ordered op chain</text>
+  <text x="600" y="240" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#334155" text-anchor="middle">geotiff · geojson · shapefile · netcdf · grib2 · zarr</text>
+
+  <!-- ══════ ops and axis verbs ══════ -->
+  <path d="M260,260 V276" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#a)"/>
+  <path d="M815,260 V276" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#a)"/>
+  <path d="M60,330 H36 V210 H56" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#a)"/>
+
+  <rect x="60" y="280" width="400" height="104" rx="9" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="78" y="303" font-size="12" font-weight="700" fill="#0f172a">ops — each returns a new Dataset</text>
+  <text x="78" y="328" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#334155">clip · mask · reclassify · reproject</text>
+  <text x="78" y="352" font-size="10.5" fill="#475569">nothing is fetched, decoded or computed</text>
+  <text x="78" y="370" font-size="10.5" fill="#475569">until a terminal below asks for a result</text>
+
+  <rect x="490" y="280" width="650" height="104" rx="9" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="508" y="303" font-size="12" font-weight="700" fill="#0f172a">axes[] — the axis decides which verbs are legal</text>
+
+  <line x1="508" y1="313" x2="1122" y2="313" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="508" y="329" font-size="10" font-weight="700" fill="#334155">declared dimension</text>
+  <text x="830" y="329" font-size="10" font-weight="700" fill="#334155" text-anchor="middle">ordered → selectRange()</text>
+  <text x="1020" y="329" font-size="10" font-weight="700" fill="#334155" text-anchor="middle">commensurable → reduce()</text>
+
+  <text x="508" y="348" font-size="10.5" fill="#0f172a">time · level · stage</text>
+  <text x="830" y="348" font-size="10.5" font-weight="700" fill="#15803d" text-anchor="middle">yes</text>
+  <text x="1020" y="348" font-size="10.5" font-weight="700" fill="#15803d" text-anchor="middle">yes</text>
+
+  <text x="508" y="364" font-size="10.5" fill="#0f172a">ensemble member</text>
+  <text x="830" y="364" font-size="10.5" font-weight="700" fill="#b91c1c" text-anchor="middle">no</text>
+  <text x="1020" y="364" font-size="10.5" font-weight="700" fill="#15803d" text-anchor="middle">yes</text>
+
+  <text x="508" y="380" font-size="10.5" fill="#0f172a">spectral band</text>
+  <text x="830" y="380" font-size="10.5" font-weight="700" fill="#15803d" text-anchor="middle">yes</text>
+  <text x="1020" y="380" font-size="10.5" font-weight="700" fill="#b91c1c" text-anchor="middle">no</text>
+
+  <!-- ══════ force ══════ -->
+  <line x1="40" y1="414" x2="1140" y2="414" stroke="#ea580c" stroke-width="1.8" stroke-dasharray="7 5"/>
+  <rect x="375" y="402" width="430" height="24" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="590" y="418" font-size="11" font-weight="700" fill="#9a3412" text-anchor="middle">force — the chain runs once, and the grid is memoized</text>
+
+  <rect x="432" y="438" width="150" height="26" rx="13" fill="#ffedd5" stroke="#ea580c" stroke-width="1.2"/>
+  <text x="507" y="455" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#7c2d12" text-anchor="middle">grid()</text>
+  <rect x="598" y="438" width="150" height="26" rx="13" fill="#ffedd5" stroke="#ea580c" stroke-width="1.2"/>
+  <text x="673" y="455" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#7c2d12" text-anchor="middle">stats()</text>
+  <text x="760" y="456" font-size="10.5" fill="#9a3412">terminals</text>
+
+  <!-- ══════ maps ══════ -->
+  <path d="M590,466 V500" fill="none" stroke="#ea580c" stroke-width="2" marker-end="url(#o)"/>
+  <text x="602" y="490" font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#7c2d12">addLayer()</text>
+
+  <rect x="40" y="504" width="1100" height="160" rx="12" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.6" stroke-dasharray="8 5"/>
+  <text x="60" y="528" font-size="12.5" font-weight="700" fill="#334155">one app <tspan font-weight="400" fill="#64748b">— one decode backs the Layers on both maps, and is released when the last of them lets go</tspan></text>
+
+  <rect x="70" y="540" width="510" height="112" rx="9" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="88" y="564" font-size="12.5" font-weight="700" fill="#0f172a">FimMap A <tspan font-weight="400" font-size="11" fill="#64748b">— provider: leaflet</tspan></text>
+  <rect x="88" y="576" width="230" height="62" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="203" y="601" font-size="12" font-weight="700" fill="#7c2d12" text-anchor="middle">Layer · raster</text>
+  <text x="203" y="621" font-size="10" fill="#9a3412" text-anchor="middle">one Dataset in</text>
+  <rect x="334" y="576" width="230" height="62" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="449" y="601" font-size="12" font-weight="700" fill="#7c2d12" text-anchor="middle">Layer · comparison</text>
+  <text x="449" y="621" font-size="10" fill="#9a3412" text-anchor="middle">two Datasets in</text>
+
+  <rect x="610" y="540" width="510" height="112" rx="9" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="628" y="564" font-size="12.5" font-weight="700" fill="#0f172a">FimMap B <tspan font-weight="400" font-size="11" fill="#64748b">— provider: google</tspan></text>
+  <rect x="628" y="576" width="230" height="62" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="743" y="601" font-size="12" font-weight="700" fill="#7c2d12" text-anchor="middle">Layer · raster</text>
+  <text x="743" y="621" font-size="10" fill="#9a3412" text-anchor="middle">the same Dataset</text>
+  <rect x="874" y="576" width="230" height="62" rx="8" fill="#ffffff" stroke="#a8bdd4" stroke-width="1.4" stroke-dasharray="5 4"/>
+  <text x="989" y="601" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">Layer · depth</text>
+  <text x="989" y="621" font-size="10" fill="#64748b" text-anchor="middle">opt-in barrel, Google only</text>
+
+  <!-- ══════ read-models ══════ -->
+  <rect x="40" y="690" width="1100" height="76" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="60" y="710" font-size="11.5" font-weight="700" fill="#334155">read-models <tspan font-weight="400" fill="#64748b">— layer.getLegend() and layer.getStats(filter) return plain objects, so a headless script reads what a panel would display</tspan></text>
+
+  <rect x="60" y="720" width="190" height="36" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="155" y="737" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="middle">Legend</text>
+  <text x="155" y="751" font-size="9.5" fill="#64748b" text-anchor="middle">stops and unit</text>
+
+  <rect x="320" y="720" width="230" height="36" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="435" y="737" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="middle">ColorScale</text>
+  <text x="435" y="751" font-size="9.5" fill="#64748b" text-anchor="middle">palette or explicit stops</text>
+
+  <rect x="630" y="720" width="230" height="36" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="745" y="737" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="middle">Stats</text>
+  <text x="745" y="751" font-size="9.5" fill="#64748b" text-anchor="middle">histogram · area · byClass</text>
+
+  <rect x="940" y="720" width="180" height="36" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4"/>
+  <text x="1030" y="737" font-size="11.5" font-weight="700" fill="#0f172a" text-anchor="middle">Filter</text>
+  <text x="1030" y="751" font-size="9.5" fill="#64748b" text-anchor="middle">spatial or predicate</text>
+
+  <line x1="316" y1="738" x2="256" y2="738" stroke="#475569" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="286" y="731" font-size="9.5" fill="#475569" text-anchor="middle">derives</text>
+  <line x1="554" y1="738" x2="624" y2="738" stroke="#475569" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="589" y="731" font-size="9.5" fill="#475569" text-anchor="middle">classifies</text>
+  <line x1="936" y1="738" x2="866" y2="738" stroke="#475569" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="901" y="731" font-size="9.5" fill="#475569" text-anchor="middle">scopes</text>
+</svg>
