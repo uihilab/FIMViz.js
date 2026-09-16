@@ -438,3 +438,66 @@ describe("sciwrid adapter: unmodelled dimensions", () => {
     assert.equal(ok.meta.shape, "3x4x5", "the shape is kept so a consumer can see what was dropped");
   });
 });
+
+// A NetCDF4 file whose leading dimension is not a CF time coordinate, like DWR's weather generator
+// grids (dimension `date`, integer day numbers, no `units`). The decoder returns step 0 for any index
+// on such a file, so parseSciwrid refuses to build a series over it.
+describe("sciwrid adapter: NetCDF4 without a CF time coordinate", async () => {
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const h5wasm = await import("h5wasm/node");
+  await h5wasm.ready;
+  const NT = 3, NY = 4, NX = 5;
+
+  /** Three steps whose values are step * 100 + cell index, on a 4 x 5 north-up grid. */
+  const writeNetcdf4 = (path, { cfTime }) => {
+    const f = new h5wasm.File(path, "w");
+    const tName = cfTime ? "time" : "date";
+    const t = cfTime
+      ? f.create_dataset({ name: "time", data: new Float64Array([0, 1, 2]), shape: [NT], dtype: "<f8" })
+      : f.create_dataset({ name: "date", data: new BigInt64Array([42004n, 42005n, 42006n]), shape: [NT], dtype: "<q" });
+    if (cfTime) t.create_attribute("units", "days since 2015-01-01");
+    const lat = f.create_dataset({ name: "lat", data: new Float64Array([32, 32.5, 33, 33.5]), shape: [NY], dtype: "<f8" });
+    lat.create_attribute("units", "degrees_north");
+    const lon = f.create_dataset({ name: "lon", data: new Float64Array([-124, -123.75, -123.5, -123.25, -123]), shape: [NX], dtype: "<f8" });
+    lon.create_attribute("units", "degrees_east");
+    t.make_scale(tName); lat.make_scale("lat"); lon.make_scale("lon");
+    const data = new Float32Array(NT * NY * NX);
+    for (let k = 0; k < NT; k++) for (let c = 0; c < NY * NX; c++) data[k * NY * NX + c] = k * 100 + c;
+    const v = f.create_dataset({ name: "pr", data, shape: [NT, NY, NX], dtype: "<f4" });
+    v.create_attribute("units", "mm");
+    v.attach_scale(0, tName); v.attach_scale(1, "lat"); v.attach_scale(2, "lon");
+    f.close();
+    const b = readFileSync(path);
+    return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+  };
+
+  const dir = mkdtempSync(join(tmpdir(), "fimviz-nc4-"));
+  const dateOnly = writeNetcdf4(join(dir, "date-only.nc"), { cfTime: false });
+  const cfTime = writeNetcdf4(join(dir, "cf-time.nc"), { cfTime: true });
+  rmSync(dir, { recursive: true, force: true });
+  // Row 3 of a north-up grid is lat 32, column 0 is lon -124: native cell 0.
+  const southWest = (grid) => grid.pixels[(NY - 1) * NX];
+
+  test("refuses a series it would decode as the first step at every position", async () => {
+    await assert.rejects(parseSciwrid(dateOnly, { name: "date-only.nc" }), /no CF time coordinate/);
+    await assert.rejects(parseSciwrid(dateOnly, { name: "date-only.nc", series: { coords: [0, 1, 2] } }),
+      /no CF time coordinate/, "caller coordinates do not change what the decoder indexes");
+  });
+
+  test("series: false reads the first step on purpose", async () => {
+    const ds = await parseSciwrid(dateOnly, { name: "date-only.nc", series: false, allowExtraDims: true });
+    assert.equal(ds.axis, null);
+    assert.equal(southWest(await ds.grid()), 0);
+  });
+
+  test("with a CF time coordinate, each step decodes its own values", async () => {
+    const ds = await parseSciwrid(cfTime, { name: "cf-time.nc" });
+    assert.equal(ds.axis.entries.length, NT);
+    assert.equal(ds.meta.axisSource, "scan");
+    for (let k = 0; k < NT; k++) {
+      assert.equal(southWest(await ds.select(ds.axis.entries[k].coord).grid()), k * 100, `step ${k}`);
+    }
+  });
+});

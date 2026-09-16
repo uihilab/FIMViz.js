@@ -25,6 +25,9 @@ import { RasterGrid } from "../package/materialize.js";
 // timestamps SciWrid's NetCDF3 path does not surface. Pure, dependency-free, and self-limiting: it
 // declines any bytes that are not NetCDF-3 classic. See io/netcdf3.js's header for the full rationale.
 import { describeNetcdf3 } from "./netcdf3.js";
+// SciWrid misplaces GRIB2 Lambert conformal grids (template 3.30). io/grib2Lambert.js reads the grid
+// definition and places the native array instead.
+import { readLambertGrid, lambertBbox, resampleLambert } from "./grib2Lambert.js";
 
 /** Formats this adapter can decode. Registered by `registerSciwridFormats()`. @type {string[]} */
 export const SCIWRID_FORMATS = ["netcdf4", "netcdf3", "grib2", "zarr"];
@@ -58,6 +61,26 @@ async function sciwrid() {
     }
   }
   return _mod;
+}
+
+let _wasm = null;
+/**
+ * A `wasmFactory` that hands every SciWrid call the same wasm instance.
+ *
+ * SciWrid's `scan()` and `extractGrid()` build a new reader per call, and the reader's `init()`
+ * instantiates a new Emscripten module before it reads the format. The browser frees that module's
+ * memory only on garbage collection, so forcing a few hundred slices in a row (a time-series loop or
+ * axis playback) fails with "Cannot allocate Wasm memory for new instance". A reader's `close()`
+ * frees only its own scan, so readers can share one module; SciWrid's GRIB2 range path does the same.
+ * @param {Object} sw - the loaded sciwrid-toolkit module
+ * @returns {() => Promise<Object>}
+ */
+function sharedWasm(sw) {
+  return () => (_wasm ||= (async () => {
+    const holder = new sw.SciWridToolkit();
+    await holder.init();
+    return holder.wasm;
+  })().catch((e) => { _wasm = null; throw e; }));
 }
 
 const boundsOf = (bbox) =>
@@ -378,19 +401,21 @@ async function materializeSciwrid(root, ds) {
     throw new Error(`parseFile: "${ds.name}" has no target grid on meta.grid ({width, height, bbox}) — ` +
       "the reader resamples, so it cannot run without one. addDataset() derives it from the file's scan.");
   }
-  const { extractGrid } = await sciwrid();
+  const sw = await sciwrid();
+  if (ds.meta?.gridTemplate === 30) return materializeLambert(sw, root, ds, select, grid);
   const source = root.kind === "url" ? root.url : new Uint8Array(root.data);
   const opts = {
     variable: select.variable,
     time: select.time ?? 0,
     bbox: grid.bbox, width: grid.width, height: grid.height,
+    wasmFactory: sharedWasm(sw),
   };
   // extractGrid fans out over Web Workers (SciWrid's default: 5) — the point of it in a browser, and
   // a HANG under Node, where there is no Worker global and the pool never resolves (no error, just an
   // unsettled promise). So force inline off-browser. `meta.workers` overrides either way.
   const workers = ds.meta?.workers ?? (typeof Worker === "undefined" ? 0 : undefined);
   if (workers !== undefined) opts.workers = workers;
-  const out = await extractGrid(source, opts);
+  const out = await sw.extractGrid(source, opts);
   // The longitude re-expression, applied HERE rather than by asking the reader for a shifted bbox —
   // that request comes back as the same pixels wearing a different label (see lonConvention above).
   // `meta.lon` carries the {bounds, shiftCols} computed once at parse time, so every timestep of a
@@ -407,11 +432,76 @@ async function materializeSciwrid(root, ds) {
     crs: "EPSG:4326",       // extractGrid resamples onto a geographic bbox — already renderable
     noData: null,           // missing is NaN, which colorize/Stats already treat as absent
     meta: {
-      unit: out.units ?? null,
+      // extractGrid returns "" for units it does not surface, so fall back to the parse-time unit.
+      unit: out.units || ds.meta?.unit || null,
       variable: select.variable,
       time: ds.meta?.time ?? out.time ?? null,
     },
   });
+}
+
+/**
+ * Forces one slice of a GRIB2 field on a Lambert conformal grid.
+ *
+ * SciWrid's extractGrid would place these pixels by interpolating between the grid corners, which
+ * moves cells between them by several degrees. This reads SciWrid's native array and hands it to
+ * resampleLambert, which projects each output pixel with the grid definition from section 3.
+ * @param {Object} sw - the loaded sciwrid-toolkit module
+ * @param {{kind: 'inline'|'url', data?: ArrayBuffer, url?: string}} root
+ * @param {Dataset} ds
+ * @param {{variable: string, time?: number}} select
+ * @param {{bbox: number[], width: number, height: number}} grid
+ * @returns {Promise<RasterGrid>}
+ */
+async function materializeLambert(sw, root, ds, select, grid) {
+  let bytes;
+  if (root.kind === "url") {
+    const res = await fetch(root.url);
+    if (!res.ok) throw new Error(`parseFile: fetch failed (${res.status}) for ${root.url}`);
+    bytes = new Uint8Array(await res.arrayBuffer());
+  } else {
+    bytes = new Uint8Array(root.data);
+  }
+  // parseSciwrid records the grid for inline bytes. A URL source is read here, from the fetched bytes.
+  const lambert = ds.meta.lambert ?? readLambertGrid(bytes);
+  if (!lambert) {
+    throw new Error(`parseFile: "${ds.name}" was scanned as grid template 3.30, but no message carries one.`);
+  }
+  const reader = new sw.SciWridToolkit({ wasmFactory: sharedWasm(sw) });
+  try {
+    await reader.read(bytes);
+    const variable = reader.vars.find((v) => v.name === select.variable);
+    if (!variable) throw new Error(`parseFile: variable "${select.variable}" not found in "${ds.name}"`);
+    // `_extractArrays` is SciWrid's internal native-array read, present in the vendored 0.1.0.
+    if (typeof reader._extractArrays !== "function") {
+      throw new Error("parseFile: the installed GRIB2 reader has no native-array read, which Lambert " +
+        "conformal grids need.");
+    }
+    const native = await reader._extractArrays(variable, select.time ?? 0);
+    if (native.nx !== lambert.nx || native.ny !== lambert.ny) {
+      throw new Error(`parseFile: "${ds.name}" decoded to ${native.nx} x ${native.ny}, but its GRIB2 ` +
+        `section 3 declares ${lambert.nx} x ${lambert.ny}.`);
+    }
+    // resampleLambert indexes the array in the file's scanning order. SciWrid keeps that order, and
+    // its first row and column carry the first grid point, La1 and Lo1. Check both before trusting it.
+    const lonGap = Math.abs((((native.lons[0] - lambert.lo1) % 360) + 540) % 360 - 180);
+    if (Math.abs(native.lats[0] - lambert.la1) > 1e-3 || lonGap > 1e-3) {
+      throw new Error(`parseFile: the decoded array for "${ds.name}" does not start at the first grid point ` +
+        `(${lambert.la1}, ${lambert.lo1}), so the Lambert resample cannot index it.`);
+    }
+    const resampled = resampleLambert(native.sliceData, lambert, grid);
+    const lon = ds.meta?.lon;
+    const pixels = lon?.shiftCols ? rollColumns(resampled, grid.width, grid.height, lon.shiftCols) : resampled;
+    return new RasterGrid({
+      pixels, width: grid.width, height: grid.height,
+      bounds: lon?.bounds || boundsOf(grid.bbox),
+      crs: "EPSG:4326",
+      noData: null,
+      meta: { unit: native.units || ds.meta?.unit || null, variable: select.variable, time: ds.meta?.time ?? null },
+    });
+  } finally {
+    try { reader.close(); } catch { /* the slice is already copied out */ }
+  }
 }
 
 /**
@@ -510,7 +600,7 @@ export async function parseSciwrid(source, opts = {}) {
   // same way `parseSource`'s fetch does. The Dataset below keeps the ORIGINAL url plus the resolver,
   // because dataset.js applies it again at force time — resolving here as well would double-wrap it.
   const scanUrl = isUrl && typeof opts.resolveUrl === "function" ? opts.resolveUrl(url) : url;
-  const scanned = await sw.scan(isUrl ? scanUrl : new Uint8Array(data));
+  const scanned = await sw.scan(isUrl ? scanUrl : new Uint8Array(data), { wasmFactory: sharedWasm(sw) });
 
   const vars = scanned.variables || [];
   const variable = opts.variable
@@ -530,13 +620,31 @@ export async function parseSciwrid(source, opts = {}) {
   // useful range request to make. `header: false` opts out entirely.
   const header = (opts.header === false || !data) ? null : describeNetcdf3(data);
 
-  const grid = nativeGridOf(scanned, variable, opts.grid, opts.dims?.order, header);
+  // A Lambert conformal GRIB2 grid carries its definition in each message's section 3. From inline
+  // bytes it is read now, and it gives the extent scan() never reports for GRIB2.
+  const lambert = scanned.format === "grib2" && variable.grid_template === 30 && data
+    ? readLambertGrid(new Uint8Array(data))
+    : null;
+  const gridOption = lambert && !opts.grid?.bbox ? { ...opts.grid, bbox: lambertBbox(lambert) } : opts.grid;
+  const grid = nativeGridOf(scanned, variable, gridOption, opts.dims?.order, header);
 
   const name = opts.name || (isUrl ? url.split("/").pop().split("?")[0] : null) ||
     `${variable.name}.${scanned.format}`;
 
   const dims = usableDims(variable);
   const series = seriesOf(scanned, variable, dims, opts.series, header);
+
+  // The NetCDF4 decoder selects a step through the file's CF time coordinate. Without one it decodes
+  // step 0 for any index it is given, so a series over such a file would show its first step at every
+  // position. `series.coords` cannot help, because the labels are not what the decoder indexes.
+  if (series && scanned.format === "netcdf4" && timesOf(scanned, variable).length === 0) {
+    throw new Error(
+      `parseFile: "${variable.name}" has ${dims[0]} steps along its leading dimension, but the file has ` +
+      "no CF time coordinate (a variable with `units` like \"days since 2015-01-01\"), and a NetCDF4 " +
+      "step can only be selected through one. Every step would decode as the first. Either add a CF " +
+      "time coordinate to the file, or read the first step alone on purpose:\n" +
+      "  addDataset(file, { series: false, allowExtraDims: true })");
+  }
 
   // Re-express the extent in the requested longitude convention. Computed once here so that every
   // timestep of a series rolls identically; the materializer applies it to each decoded grid.
@@ -575,9 +683,13 @@ export async function parseSciwrid(source, opts = {}) {
   // file-level facts a UI wants without forcing anything.
   const meta = {
     grid, variable: variable.name,
-    unit: variable.units ?? null,
+    // zarr and netcdf4 scans report the CF `units` attribute under `attrs`, not as `units`.
+    unit: variable.units ?? variable.attrs?.units ?? null,
     timeRange: scanned.timeRange ?? null,
     sourceFormat: scanned.format,
+    // The materializer routes grid template 30 through materializeLambert.
+    ...(variable.grid_template == null ? {} : { gridTemplate: variable.grid_template }),
+    ...(lambert ? { lambert } : {}),
     ...(opts.workers === undefined ? {} : { workers: opts.workers }),
     ...(lon ? { lon } : {}),
     // Recorded, not silent: which slice of these the reader picked is its business, but a consumer

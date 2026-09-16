@@ -200,7 +200,9 @@ const FORCING = "./data/amite-2016-RAINRATE.zarr.zip";
 const FLOW_JSON = (comid) => `./data/amite-2016-chrtout-${comid}.json`;
 const GAGE = "USGS-07378500";                     // Amite River near Denham Springs, LA
 const NLDI = "https://api.water.usgs.gov/nldi/linked-data";
-const NWIS = "https://waterservices.usgs.gov/nwis/iv/";
+// USGS Water Data OGC API. It replaces the legacy waterservices.usgs.gov IV service, which answered
+// some browsers with 403. CORS-open, no key needed at this request rate.
+const USGS_IV = "https://api.waterdata.usgs.gov/ogcapi/v0/collections/continuous/items";
 const WBD12 = "https://hydro.nationalmap.gov/arcgis/rest/services/wbd/MapServer/6/query";
 const GENERALISE = 0.002;                          // ~200 m, well under the 1 km grid
 const EVENT = { from: Date.UTC(2016, 7, 10, 0), to: Date.UTC(2016, 7, 17, 0) };
@@ -444,19 +446,20 @@ async function loadFlow() {
   // Observed discharge, live, for the same window. Optional: the study stands without it.
   try {
     const q = new URLSearchParams({
-      format: "json", sites: GAGE.replace("USGS-", ""), parameterCd: "00060",
-      startDT: new Date(EVENT.from).toISOString().slice(0, 10),
-      endDT: new Date(EVENT.to).toISOString().slice(0, 10),
+      f: "json", monitoring_location_id: GAGE, parameter_code: "00060", limit: "10000",
+      time: `${new Date(EVENT.from).toISOString()}/${new Date(EVENT.to).toISOString()}`,
     });
-    const j = await (await fetch(`${NWIS}?${q}`)).json();
-    const vals = j.value?.timeSeries?.[0]?.values?.[0]?.value ?? [];
-    if (vals.length) {
-      // NWIS reports cubic feet per second; the NWM store reports cubic metres per second.
-      observed = vals.map((v) => ({ t: v.dateTime, q: Number(v.value) * 0.0283168 }));
-      log(`NWIS observed discharge: ${observed.length} values, converted ft3/s → m3/s`);
+    const r = await fetch(`${USGS_IV}?${q}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const rows = ((await r.json()).features ?? []).map((f) => f.properties);
+    if (rows.length) {
+      // The gage reports ft^3/s; the NWM store reports m^3/s.
+      const toCms = (p) => (p.unit_of_measure === "m^3/s" ? 1 : 0.0283168);
+      observed = rows.map((p) => ({ t: p.time, q: Number(p.value) * toCms(p) }));
+      log(`USGS observed discharge: ${observed.length} values (${rows[0].unit_of_measure} → m3/s)`);
     }
   } catch (e) {
-    log(`NWIS observed discharge unavailable (${e.message})`);
+    log(`USGS observed discharge unavailable (${e.message})`);
   }
   drawHydrograph();
 }

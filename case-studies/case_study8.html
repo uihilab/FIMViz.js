@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — Case Study 8: the Oroville storms, replayed warmer</title>
+<link rel="icon" href="../assets/brand/favicon.png" />
+<link rel="stylesheet" href="../site.css" />
+<style>
+  body { max-width: 96ch; margin: 0 auto; padding: 30px 22px 80px; }
+  h1 { font-size: 23px; margin: 0 0 6px; letter-spacing: -.01em; }
+  h2 { font-size: 15px; margin: 28px 0 9px; }
+  h2 .n { color: var(--dim); font: 600 12px/1 var(--mono); margin-right: 8px; }
+  h3 { font-size: 13px; margin: 0 0 6px; font-weight: 600; }
+  h3 small { color: var(--dim); font-weight: 400; margin-left: 6px; }
+  p { margin: 0 0 11px; }
+  .lead { color: var(--dim); margin-bottom: 16px; }
+  .q { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; margin: 0 0 16px; }
+
+  #status { font-size: 12.5px; color: var(--dim); margin: 0 0 16px; min-height: 18px; }
+  .spin { width: 11px; height: 11px; border: 2px solid var(--line); border-top-color: var(--accent);
+          border-radius: 50%; display: inline-block; animation: sp .8s linear infinite;
+          vertical-align: -1px; margin-right: 7px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  #status.done .spin, #status.fail .spin { display: none; }
+  #status.fail { color: var(--bad); }
+
+  .panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0 0 8px; }
+  @media (max-width: 780px) { .panels { grid-template-columns: 1fr; } }
+  .panel .map { height: 320px; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .mapwrap { position: relative; margin: 0 0 6px; }
+  .lg { position: absolute; right: 9px; bottom: 9px; z-index: 1100; background: var(--panel);
+        border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; font-size: 11px;
+        color: var(--fg); box-shadow: 0 1px 5px rgb(0 0 0 / .25); }
+  .lg .src { color: var(--dim); font-size: 10px; margin: 4px 0 0; }
+
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0 4px; }
+  .hint { font-size: 12px; color: var(--dim); margin: 0 0 14px; }
+  button { background: transparent; color: var(--accent); border: 1px solid var(--control-line);
+           border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  label.ctl { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--dim); }
+  label.ctl select, label.ctl input[type=number] { background: var(--bg); color: var(--fg); font: inherit;
+      font-size: 11.5px; border: 1px solid var(--control-line); border-radius: 4px; padding: 2px 5px; }
+  label.ctl input[type=number] { width: 5ch; }
+  #tstep { width: 260px; accent-color: var(--accent); }
+  .clock { font: 600 12px/1 var(--mono); color: var(--fg); min-width: 12ch; }
+
+  pre.out { background: var(--panel); color: var(--dim); white-space: pre-wrap;
+            max-height: 190px; font-size: 12px; margin: 0 0 14px; }
+  pre.out:empty { display: none; }
+  table { border-collapse: collapse; font-size: 12.5px; margin: 0 0 8px; width: 100%; }
+  th, td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .bar { display: inline-block; height: 9px; background: var(--accent); vertical-align: 0; }
+  #scenarios:empty, #cost:empty { display: none; }
+</style>
+</head>
+<body>
+
+<h1>Case Study 8 — The Oroville storms, replayed warmer</h1>
+<p class="lead">
+  California DWR's gridded weather generator read as NetCDF4 in the browser: the same January and
+  February 2017 daily weather under six climate scenarios, split into rain and snow per cell and day,
+  and summarized over the Feather River basin above Oroville. Protocol:
+  <a href="CASE_STUDY_PROTOCOL.md">CASE_STUDY_PROTOCOL.md</a> §0 and §2.
+</p>
+<p class="q">
+  <b>The question.</b> Storms in January and February 2017 filled Lake Oroville and led to the
+  Oroville Dam spillway emergency. <b>How much of that precipitation over the Feather River basin fell
+  as rain, and how much of the snow would have fallen as rain if the same weather had been 1 to 5 °C
+  warmer?</b>
+</p>
+
+<p id="status"><span class="spin"></span><span id="status-text">starting…</span></p>
+
+<h2><span class="n">Fig. 8.1</span>The baseline, day by day</h2>
+<div class="panels">
+  <div class="panel">
+    <h3 id="t-pr">Daily precipitation <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-pr"></div><div class="lg" id="lg-pr" hidden></div></div>
+  </div>
+  <div class="panel">
+    <h3 id="t-temp">Daily mean temperature <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-temp"></div><div class="lg" id="lg-temp" hidden></div></div>
+  </div>
+</div>
+<div class="controls">
+  <label class="ctl">day <input type="range" id="tstep" min="0" max="0" value="0" /></label>
+  <span class="clock" id="clock">—</span>
+  <button id="play">▶ play</button>
+</div>
+<p class="hint">
+  Scenario 1, which leaves the detrended historical weather unperturbed. Each day is one
+  <code>ds.select(coord)</code> on the CF time axis of a NetCDF4 file; the mean temperature is
+  <code>tmin.combine([tmax], { op: "mean" })</code>. The white outline is the Feather River basin above
+  USGS gage 11407000, from NLDI.
+</p>
+
+<h2><span class="n">Fig. 8.2</span>Snow over the window, baseline against a warmer scenario</h2>
+<div class="panels">
+  <div class="panel">
+    <h3 id="t-snowbase">Snow, baseline <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-snowbase"></div><div class="lg" id="lg-snowbase" hidden></div></div>
+  </div>
+  <div class="panel">
+    <h3 id="t-snowwarm">Snow, warmer <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-snowwarm"></div><div class="lg" id="lg-snowwarm" hidden></div></div>
+  </div>
+</div>
+<div class="controls">
+  <label class="ctl">scenario <select id="scenario"></select></label>
+  <label class="ctl">window
+    <select id="window">
+      <option value="2017-01-01/2017-02-28">1 Jan – 28 Feb 2017 (59 days)</option>
+      <option value="2017-01-01/2017-01-31">1 – 31 Jan 2017</option>
+      <option value="2017-02-01/2017-02-12">1 – 12 Feb 2017</option>
+    </select></label>
+  <label class="ctl">rain when mean temperature &gt; <input type="number" id="threshold" value="0" min="-5" max="5" step="0.5" /> °C</label>
+  <button id="apply">apply</button>
+</div>
+<p class="hint" id="rule-note">
+  A day's precipitation counts as rain in a cell when that day's mean temperature there is above the
+  threshold, and as snow otherwise. Per day and cell: <code>pr.combine([mask], { op: "min" })</code> keeps
+  the precipitation where the mask is open, <code>pr.difference(rain)</code> is the snow, and a
+  <code>combine(days, { op: "sum" })</code> totals the window. The rule is one daily threshold per
+  6 km cell; it does not model snow within a day or across elevations inside a cell.
+</p>
+
+<h2><span class="n">Table 8.1</span>Basin totals by scenario</h2>
+<div id="scenarios"></div>
+<p class="hint" id="scen-note" hidden></p>
+
+<h2><span class="n">Table 8.2</span>What the NetCDF4 path cost</h2>
+<div id="cost"></div>
+
+<div class="controls">
+  <button id="dlp">performance.csv</button>
+  <button id="dlm">metrics.csv</button>
+  <button id="dlr">results.csv</button>
+</div>
+
+<pre class="out" id="log"></pre>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js",
+    "sciwrid-toolkit": "../node_modules/sciwrid-toolkit/dist/index.js"
+} }
+</script>
+
+<script type="module">
+import { FimViz, ColorScale, Stats, gridMeta } from "fimviz";
+
+// ── §0 instrumentation ────────────────────────────────────────────────────────────────────────
+const REPS = 1;                       // TODO: 5 before recording.
+const CACHE_STATE = "warm";           // TODO: "cold" for the hard-reload pass.
+const BROWSER = navigator.userAgent;
+
+const perf = [], metrics = [], results = [], cost = [];
+
+const log = (...a) => { document.getElementById("log").textContent += a.join(" ") + "\n"; };
+const status = (text, state = "") => {
+  document.getElementById("status-text").textContent = text;
+  document.getElementById("status").className = state;
+};
+
+async function stage(name, fields, fn) {
+  const t = `${name}-${perf.length}`;
+  performance.mark(`${t}:start`);
+  const value = await fn();
+  performance.mark(`${t}:end`);
+  const { duration } = performance.measure(t, `${t}:start`, `${t}:end`);
+  perf.push({ study: "8", stage: name, dataset: "", format: "", bytes: "", width: "", height: "",
+              cache_state: CACHE_STATE, browser: BROWSER, rep: 1, ms: duration.toFixed(2), ...fields });
+  return { value, ms: duration };
+}
+const costRow = (op, n, ms) => cost.push({ op, n, ms: ms.toFixed(1) });
+
+const toCsv = (rows) => {
+  const cols = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+  return [cols.join(","), ...rows.map((r) => cols.map((c) => JSON.stringify(r[c] ?? "")).join(","))].join("\n");
+};
+const download = (rows, name) => {
+  if (!rows.length) return log(`${name}: nothing recorded yet`);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv" }));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+};
+
+const ringsOf = (geom) =>
+  (geom.type === "MultiPolygon" ? geom.coordinates : [geom.coordinates])
+    .flat().map((ring) => ring.map(([lng, lat]) => ({ lat, lng })));
+
+// ── sources ───────────────────────────────────────────────────────────────────────────────────
+// Mirrored by build_case_study8_data.mjs; provenance in data/README.txt (protocol §0.4).
+const DATA = "./data/";
+const MANIFEST = `${DATA}oroville-2017-manifest.json`;
+const VARIABLES = ["pr", "tmin", "tmax"];
+// Larger than any daily precipitation, so min(pr, OPEN) is the precipitation itself.
+const OPEN = 1e9;
+const DAY_MS = 86400e3;
+
+let man = null, FIT = null, basin = null, basinRing = null;
+const scenarios = [];                 // { def, vars: { pr, tmin, tmax }, days: [{ coord, pr, tmin, tmax }] }
+const layers = {};
+let sel = { step: 0, scenario: null, window: "2017-01-01/2017-02-28", threshold: 0 };
+let playing = false;
+
+const maps = {};
+for (const k of ["pr", "temp", "snowbase", "snowwarm"]) {
+  maps[k] = await FimViz.mount(`#m-${k}`, { provider: "leaflet", isolated: true });
+}
+
+const dayLabel = (ms) => new Date(ms).toISOString().slice(0, 10);
+const scenarioLabel = (d) => d.n === 1 ? "1 · baseline" : `${d.n} · +${d.dT} °C`;
+
+// ── color scales ──────────────────────────────────────────────────────────────────────────────
+const prScale = new ColorScale({ missingColor: "transparent", stops: [
+  { min: 0.1, max: 5, color: "#d6e6f4", label: "0.1–5 mm" },
+  { min: 5, max: 20, color: "#8fbde0", label: "5–20 mm" },
+  { min: 20, max: 50, color: "#3d86c3", label: "20–50 mm" },
+  { min: 50, max: 1e9, color: "#16466f", label: "≥ 50 mm" }] });
+const tempScale = new ColorScale({ missingColor: "transparent", stops: [
+  { min: -40, max: -5, color: "#3b4cc0", label: "< −5 °C" },
+  { min: -5, max: 0, color: "#9abbff", label: "−5–0 °C" },
+  { min: 0, max: 5, color: "#f7b89c", label: "0–5 °C" },
+  { min: 5, max: 60, color: "#b40426", label: "> 5 °C" }] });
+const snowScale = new ColorScale({ missingColor: "transparent", stops: [
+  { min: 1, max: 50, color: "#e3eef8", label: "1–50 mm" },
+  { min: 50, max: 200, color: "#a9c9e8", label: "50–200 mm" },
+  { min: 200, max: 500, color: "#5b93c9", label: "200–500 mm" },
+  { min: 500, max: 1e9, color: "#1d4f86", label: "≥ 500 mm" }] });
+
+async function paint(key, dataset, scale, label) {
+  layers[key]?.remove();
+  maps[key].adoptDataset(dataset);
+  const { value: layer } = await stage("t_paint", { dataset: label },
+    () => maps[key].addLayer("raster", { source: dataset, colorScale: scale }));
+  layers[key] = layer;
+  const host = document.getElementById(`lg-${key}`);
+  host.innerHTML = layer.getLegend().toHtml() + `<p class="src">${label}</p>`;
+  host.hidden = false;
+  return layer;
+}
+
+// ── loading ───────────────────────────────────────────────────────────────────────────────────
+async function loadScenario(def) {
+  const { value: bytes, ms: fetchMs } = await stage("t_fetch", { dataset: def.name, format: "netcdf4", bytes: def.bytes },
+    async () => {
+      const r = await fetch(DATA + def.name);
+      if (!r.ok) throw new Error(`${def.name}: HTTP ${r.status} — run node case-studies/build_case_study8_data.mjs`);
+      return r.arrayBuffer();
+    });
+  costRow(`fetch ${def.name}`, 1, fetchMs);
+  const file = new File([bytes], def.name, { type: "application/x-netcdf" });
+  const vars = {};
+  let parseMs = 0;
+  for (const v of VARIABLES) {
+    // workers: 0 decodes on the page's thread. Each grid here is a few hundred cells, which costs less
+    // than starting a pool of workers for every decode.
+    const { value: ds, ms } = await stage("t_total", { dataset: `${def.name}:${v}`, format: "netcdf4", bytes: def.bytes },
+      () => maps.pr.addDataset(file, { variable: v, workers: 0 }));
+    if (ds.axis?.entries?.length !== def.nt) {
+      throw new Error(`${def.name}:${v}: expected ${def.nt} days on the time axis, got ${ds.axis?.entries?.length}`);
+    }
+    vars[v] = ds;
+    parseMs += ms;
+  }
+  // One held select node per variable and day, so repeated chains reuse the decoded grids.
+  const days = vars.pr.axis.entries.map((e, k) => ({
+    coord: e.coord,
+    pr: vars.pr.select(e.coord),
+    tmin: vars.tmin.select(vars.tmin.axis.entries[k].coord),
+    tmax: vars.tmax.select(vars.tmax.axis.entries[k].coord),
+  }));
+  days.forEach((d) => { d.tavg = d.tmin.combine([d.tmax], { op: "mean" }); });
+  const scenario = { def, vars, days };
+  scenarios.push(scenario);
+  log(`scenario ${def.n}: ${(def.bytes / 1024).toFixed(0)} kB, ${def.nt} days × ${def.ny} × ${def.nx}, `
+    + `3 variables parsed in ${parseMs.toFixed(0)} ms`);
+  metrics.push({ study: "8", source: "DWR weather generator ProductA_100yr", format: "netcdf4", scenario: def.n,
+                 dT_degC: def.dT, pct_mean: def.pctMean, pct_quantile: def.pctQuantile, bytes: def.bytes,
+                 axis_len: def.nt, width: def.nx, height: def.ny, parse_ms: +parseMs.toFixed(1),
+                 fetch_ms: +fetchMs.toFixed(1), unit_pr: vars.pr.meta?.unit ?? "", unit_t: vars.tmin.meta?.unit ?? "" });
+  return scenario;
+}
+
+async function decodeAll(scenario) {
+  const nodes = scenario.days.flatMap((d) => [d.pr, d.tmin, d.tmax]);
+  const { ms } = await stage("t_op", { dataset: `decode:${scenario.def.name}`, format: "netcdf4" },
+    async () => { for (const n of nodes) await n.grid(); });
+  costRow(`decode ${nodes.length} day-slices (scenario ${scenario.def.n})`, nodes.length, ms);
+  return ms;
+}
+
+// ── Fig. 8.1: the baseline day by day ─────────────────────────────────────────────────────────
+async function showStep(i, { record = true } = {}) {
+  const base = scenarios[0];
+  sel.step = i;
+  const d = base.days[i];
+  document.getElementById("clock").textContent = dayLabel(d.coord);
+  document.getElementById("tstep").value = String(i);
+  const { ms: prMs } = await stage("t_op", { dataset: `select:pr:${i}`, format: "netcdf4" }, () => d.pr.grid());
+  const { ms: tMs } = await stage("t_op", { dataset: `combine:mean:${i}`, format: "netcdf4" }, () => d.tavg.grid());
+  if (record) log(`day ${dayLabel(d.coord)}  pr ${prMs.toFixed(1)} ms, tavg ${tMs.toFixed(1)} ms`);
+  await paint("pr", d.pr, prScale, "pr, mm/day");
+  await paint("temp", d.tavg, tempScale, "(tmin + tmax) / 2, °C");
+  return prMs;
+}
+
+// ── Fig. 8.2 and Table 8.1: rain and snow ─────────────────────────────────────────────────────
+function windowDays(scenario) {
+  const [from, to] = sel.window.split("/").map((s) => Date.parse(`${s}T00:00:00Z`));
+  return scenario.days.filter((d) => d.coord >= from && d.coord <= to);
+}
+
+/** Lazy totals over the window for one scenario: precipitation, rain and snow. */
+function partition(scenario) {
+  const days = windowDays(scenario).map((d) => {
+    const open = d.tavg.reclassify((v) => (v > sel.threshold ? OPEN : 0));
+    const rain = d.pr.combine([open], { op: "min" });
+    return { pr: d.pr, rain, snow: d.pr.difference(rain) };
+  });
+  const total = (key) => days[0][key].combine(days.slice(1).map((d) => d[key]), { op: "sum" });
+  return { n: days.length, pr: total("pr"), rain: total("rain"), snow: total("snow") };
+}
+
+async function basinMean(dataset) {
+  const grid = await dataset.mask(basinRing).grid();
+  const s = Stats.raster(grid.pixels, gridMeta(grid), { bins: 4 });
+  return { mean: s.mean ?? NaN, cells: s.count ?? 0 };
+}
+
+async function scenarioTable() {
+  status("partitioning rain and snow for each scenario…");
+  const rows = [];
+  let baseSnow = null;
+  for (const sc of scenarios) {
+    const p = partition(sc);
+    const { value: sums, ms } = await stage("t_op", { dataset: `partition:${sc.def.name}:${sel.window}` },
+      async () => ({ pr: await basinMean(p.pr), rain: await basinMean(p.rain), snow: await basinMean(p.snow) }));
+    costRow(`rain/snow partition + basin means (scenario ${sc.def.n}, ${p.n} days)`, p.n, ms);
+    if (sc.def.n === 1) baseSnow = sums.snow.mean;
+    rows.push({ study: "8", scenario: sc.def.n, dT_degC: sc.def.dT, pct_mean: sc.def.pctMean,
+                pct_quantile: sc.def.pctQuantile, window: sel.window, days: p.n, threshold_degC: sel.threshold,
+                basin_cells: sums.pr.cells,
+                pr_mm: +sums.pr.mean.toFixed(1), rain_mm: +sums.rain.mean.toFixed(1), snow_mm: +sums.snow.mean.toFixed(1),
+                rain_share_pct: +(100 * sums.rain.mean / sums.pr.mean).toFixed(1),
+                snow_vs_baseline_pct: baseSnow > 0 ? +(100 * (sums.snow.mean / baseSnow - 1)).toFixed(1) : null });
+  }
+  results.length = 0;
+  results.push(...rows);
+  document.getElementById("scenarios").innerHTML =
+    `<table><tr><th>scenario</th><th>ΔT</th><th>Δ mean pr</th><th>Δ quantile</th><th>precipitation</th>`
+    + `<th>rain</th><th>snow</th><th>rain share</th><th>snow vs baseline</th></tr>`
+    + rows.map((r) => `<tr><td>${r.scenario}</td><td class="num">+${r.dT_degC} °C</td>`
+        + `<td class="num">${r.pct_mean} %</td><td class="num">${r.pct_quantile} %</td>`
+        + `<td class="num">${r.pr_mm} mm</td><td class="num">${r.rain_mm} mm</td><td class="num">${r.snow_mm} mm</td>`
+        + `<td class="num">${r.rain_share_pct} % <span class="bar" style="width:${(0.6 * r.rain_share_pct).toFixed(0)}px"></span></td>`
+        + `<td class="num">${r.snow_vs_baseline_pct == null ? "—" : `${r.snow_vs_baseline_pct > 0 ? "+" : ""}${r.snow_vs_baseline_pct} %`}</td></tr>`).join("")
+    + `</table>`;
+  const note = document.getElementById("scen-note");
+  note.textContent = `Basin means over ${rows[0].basin_cells} cells of the 1/16° grid, ${rows[0].days} days `
+    + `(${sel.window.replace("/", " to ")}), rain when the daily mean temperature is above ${sel.threshold} °C. `
+    + `Δ mean pr and Δ quantile are the scenario definitions from DWR's scenario list; scenarios 11–15 hold `
+    + `mean precipitation and change the quantile term, so the precipitation column moves between them too.`;
+  note.hidden = false;
+}
+
+async function showSnowMaps() {
+  const base = scenarios[0], warm = scenarios.find((s) => String(s.def.n) === String(sel.scenario));
+  const pb = partition(base), pw = partition(warm);
+  await paint("snowbase", pb.snow, snowScale, `snow, ${pb.n} days, scenario 1`);
+  await paint("snowwarm", pw.snow, snowScale, `snow, ${pw.n} days, scenario ${warm.def.n}`);
+  document.getElementById("t-snowbase").innerHTML = `Snow, baseline <small>scenario 1, ${sel.window.replace("/", " to ")}</small>`;
+  document.getElementById("t-snowwarm").innerHTML =
+    `Snow, +${warm.def.dT} °C <small>scenario ${warm.def.n}, mean pr ${warm.def.pctMean} %, quantile ${warm.def.pctQuantile} %</small>`;
+}
+
+function renderCost() {
+  document.getElementById("cost").innerHTML =
+    `<table><tr><th>operation</th><th>n</th><th>ms</th></tr>`
+    + cost.map((r) => `<tr><td><code>${r.op}</code></td><td class="num">${r.n}</td>`
+        + `<td class="num">${r.ms}</td></tr>`).join("") + `</table>`;
+}
+
+// ── controls ──────────────────────────────────────────────────────────────────────────────────
+document.getElementById("tstep").oninput = (e) => { if (!playing) showStep(Number(e.target.value)); };
+document.getElementById("play").onclick = async () => {
+  const btn = document.getElementById("play");
+  if (playing) { playing = false; btn.textContent = "▶ play"; return; }
+  playing = true; btn.textContent = "■ stop";
+  const frames = [];
+  for (let i = sel.step; i < scenarios[0].days.length && playing; i++) frames.push(await showStep(i, { record: false }));
+  playing = false; btn.textContent = "▶ play";
+  if (frames.length) {
+    const sorted = [...frames].sort((a, b) => a - b);
+    costRow("scrub: pr per frame (median)", frames.length, sorted[sorted.length >> 1]);
+    renderCost();
+  }
+};
+async function apply() {
+  const btn = document.getElementById("apply");
+  btn.disabled = true;
+  try {
+    sel.scenario = document.getElementById("scenario").value;
+    sel.window = document.getElementById("window").value;
+    sel.threshold = Number(document.getElementById("threshold").value);
+    await showSnowMaps();
+    await scenarioTable();
+    renderCost();
+    status("ready", "done");
+  } catch (err) {
+    console.error(err); log(`ERROR  ${err.message}`); status(`failed: ${err.message}`, "fail");
+  }
+  btn.disabled = false;
+}
+document.getElementById("apply").onclick = apply;
+for (const id of ["scenario", "window"]) document.getElementById(id).onchange = apply;
+document.getElementById("dlp").onclick = () => download(perf, "performance.csv");
+document.getElementById("dlm").onclick = () => download(metrics, "metrics.csv");
+document.getElementById("dlr").onclick = () => download(results, "results.csv");
+
+// ── run ───────────────────────────────────────────────────────────────────────────────────────
+try {
+  const r = await fetch(MANIFEST);
+  if (!r.ok) throw new Error(`no manifest at ${MANIFEST} (HTTP ${r.status}) — run node case-studies/build_case_study8_data.mjs`);
+  man = await r.json();
+  log(`manifest: ${man.scenarios.length} scenarios, ${man.window.from} to ${man.window.to}; ${man.date_rule}`);
+
+  basin = await (await fetch(DATA + man.basin)).json();
+  basinRing = ringsOf(basin.features[0].geometry);
+  const [w, s, e, n] = man.basin_bbox, pad = man.pad_deg;
+  FIT = [[s - pad, w - pad], [n + pad, e + pad]];
+
+  for (const def of man.scenarios) {
+    status(`loading scenario ${def.n}…`);
+    await loadScenario(def);
+  }
+  const scenarioSelect = document.getElementById("scenario");
+  scenarioSelect.innerHTML = man.scenarios.filter((d) => d.n !== 1)
+    .map((d) => `<option value="${d.n}">${scenarioLabel(d)}</option>`).join("");
+  sel.scenario = String(man.scenarios.at(-1).n);
+  scenarioSelect.value = sel.scenario;
+
+  status("decoding the baseline…");
+  await decodeAll(scenarios[0]);
+  const slider = document.getElementById("tstep");
+  slider.max = String(scenarios[0].days.length - 1);
+  // Open on the wettest basin day of the baseline.
+  let wettest = 0, wettestMm = -1;
+  for (let i = 0; i < scenarios[0].days.length; i++) {
+    const { mean } = await basinMean(scenarios[0].days[i].pr);
+    if (mean > wettestMm) { wettestMm = mean; wettest = i; }
+  }
+  log(`wettest baseline basin day: ${dayLabel(scenarios[0].days[wettest].coord)}, ${wettestMm.toFixed(1)} mm basin mean`);
+  await showStep(wettest, { record: false });
+  const g0 = await scenarios[0].days[wettest].pr.grid();
+  document.getElementById("t-pr").innerHTML = `Daily precipitation <small>1/16°, ${g0.width}×${g0.height}, mm</small>`;
+  document.getElementById("t-temp").innerHTML = `Daily mean temperature <small>same day</small>`;
+
+  for (const sc of scenarios.slice(1)) {
+    status(`decoding scenario ${sc.def.n}…`);
+    await decodeAll(sc);
+  }
+  for (const key of Object.keys(maps)) {
+    const file = new File([JSON.stringify(basin)], "basin.geojson", { type: "application/geo+json" });
+    const b = await maps[key].addDataset(file);
+    await maps[key].addLayer("vector", { source: b,
+      style: () => ({ fillColor: "transparent", strokeColor: "#ffffff", strokeWidth: 1.5, fillOpacity: 0 }) });
+    maps[key].map.fitBounds(FIT);
+  }
+  await apply();
+} catch (e) {
+  console.error(e);
+  log(`ERROR  ${e.message}`);
+  status(`failed: ${e.message}`, "fail");
+}
+</script>
+</body>
+</html>

@@ -176,11 +176,16 @@ async function mirrorForcing({ lat, lon, bbox }) {
     throw new Error(`event ${new Date(EVENT_FROM).toISOString()} lies outside the store ("${t.units}")`);
   }
 
-  // Spatial chunk: project the gage into the store's own GeoTransform.
+  // Spatial chunk: project the gage into the store's grid. Columns follow the GeoTransform. Rows
+  // follow the store's own y array: the GeoTransform says north-up (py < 0), but y and the data run
+  // south to north (y[0] is the southern edge), so a GeoTransform row lands on the mirror latitude.
   const gt = md["crs/.zattrs"].GeoTransform.trim().split(/\s+/).map(Number);
-  const [ox, px, , oy, , py] = gt;
+  const [ox, px] = gt;
+  const yM = await chunkValues(store, md, "y", "0");
+  if (yM.length !== ny) throw new Error(`y has ${yM.length} values, expected ${ny}`);
   const [gx, gy] = proj4("EPSG:4326", NWM_LCC, [lon, lat]);
-  const col = Math.floor((gx - ox) / px), row = Math.floor((gy - oy) / py);
+  const col = Math.floor((gx - ox) / px);
+  const row = Math.round((gy - yM[0]) / (yM[1] - yM[0]));
   if (col < 0 || row < 0 || col >= nx || row >= ny) throw new Error("gage falls outside the NWM grid");
   const chunkCol = Math.floor(col / cx), chunkRow = Math.floor(row / cy);
 
@@ -195,10 +200,10 @@ async function mirrorForcing({ lat, lon, bbox }) {
   // Coordinates in DEGREES for the whole chunk, sampled along the grid midlines — exact for the
   // centre row and column, off by the LCC trapezoid residual (~0.4 km) at the corners.
   const col0 = chunkCol * cx, row0 = chunkRow * cy;
-  const midY = oy + (row0 + cy / 2) * py, midX = ox + (col0 + cx / 2) * px;
+  const midY = yM[Math.min(ny - 1, row0 + Math.floor(cy / 2))], midX = ox + (col0 + cx / 2) * px;
   const xsAll = new Float64Array(cx), ysAll = new Float64Array(cy);
   for (let i = 0; i < cx; i++) xsAll[i] = proj4(NWM_LCC, "EPSG:4326", [ox + (col0 + i + 0.5) * px, midY])[0];
-  for (let j = 0; j < cy; j++) ysAll[j] = proj4(NWM_LCC, "EPSG:4326", [midX, oy + (row0 + j + 0.5) * py])[1];
+  for (let j = 0; j < cy; j++) ysAll[j] = proj4(NWM_LCC, "EPSG:4326", [midX, yM[Math.min(ny - 1, row0 + j)]])[1];
 
   // Crop to the basin plus a margin. The whole chunk decoded is 1.3 GB of float32 at 1 km, and the
   // browser decodes a chunk per select, so the mirror carries the basin and nothing else.

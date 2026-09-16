@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 520" width="1160" height="520"
+     font-family="Helvetica, Arial, sans-serif">
+  <title>Basin precipitation split into rain and snow, by scenario</title>
+  <desc>Stacked bars of basin mean precipitation for 6 scenarios over 59 days.
+        Snow falls from 194.9 to 12.0 mm while the total rises.</desc>
+  <defs><pattern id="sn" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+    <rect width="7" height="7" fill="#cfe0ef"/><line x1="0" y1="0" x2="0" y2="7" stroke="#4a7fb0" stroke-width="1.6"/>
+  </pattern></defs>
+  <rect width="1160" height="520" fill="#ffffff"/>
+  <line x1="96" x2="912" y1="442.0" y2="442.0" stroke="#e8ecf0"/><text x="84" y="447.0" text-anchor="end" font-size="15" fill="#5b6570">0</text>
+  <line x1="96" x2="912" y1="384.6" y2="384.6" stroke="#e8ecf0"/><text x="84" y="389.6" text-anchor="end" font-size="15" fill="#5b6570">200</text>
+  <line x1="96" x2="912" y1="327.1" y2="327.1" stroke="#e8ecf0"/><text x="84" y="332.1" text-anchor="end" font-size="15" fill="#5b6570">400</text>
+  <line x1="96" x2="912" y1="269.7" y2="269.7" stroke="#e8ecf0"/><text x="84" y="274.7" text-anchor="end" font-size="15" fill="#5b6570">600</text>
+  <line x1="96" x2="912" y1="212.3" y2="212.3" stroke="#e8ecf0"/><text x="84" y="217.3" text-anchor="end" font-size="15" fill="#5b6570">800</text>
+  <line x1="96" x2="912" y1="154.9" y2="154.9" stroke="#e8ecf0"/><text x="84" y="159.9" text-anchor="end" font-size="15" fill="#5b6570">1000</text>
+  <line x1="96" x2="912" y1="97.4" y2="97.4" stroke="#e8ecf0"/><text x="84" y="102.4" text-anchor="end" font-size="15" fill="#5b6570">1200</text>
+  <line x1="96" x2="912" y1="40.0" y2="40.0" stroke="#e8ecf0"/><text x="84" y="45.0" text-anchor="end" font-size="15" fill="#5b6570">1400</text>
+  <line x1="96" x2="912" y1="442" y2="442" stroke="#b8c0c8" stroke-width="1.2"/>
+  <line x1="96" x2="96" y1="40" y2="442" stroke="#b8c0c8" stroke-width="1.2"/>
+  <text x="84" y="26" text-anchor="end" font-size="14" fill="#5b6570">mm</text>
+  <line x1="96" x2="912" y1="128.8" y2="128.8" stroke="#5b6570" stroke-width="1.3" stroke-dasharray="6 4"/>
+  <text x="922" y="133.8" font-size="13" fill="#5b6570">baseline total 1090.6 mm</text>
+  <rect x="125.9" y="128.8" width="76.2" height="56.0" fill="url(#sn)" stroke="#4a7fb0" stroke-width="1.2"/>
+  <rect x="125.9" y="184.8" width="76.2" height="257.2" fill="#1f4e79"/>
+  <text x="164.0" y="104.8" text-anchor="middle" font-size="14" fill="#4a7fb0">194.9 mm snow</text>
+  <text x="164.0" y="120.8" text-anchor="middle" font-size="13" fill="#5b6570">82.1 % rain</text>
+  <text x="164.0" y="468.0" text-anchor="middle" font-size="16" fill="#2b3440">+0 °C</text>
+  <text x="164.0" y="488.0" text-anchor="middle" font-size="13" fill="#5b6570">scenario 1</text>
+  <rect x="261.9" y="121.9" width="76.2" height="31.6" fill="url(#sn)" stroke="#4a7fb0" stroke-width="1.2"/>
+  <rect x="261.9" y="153.4" width="76.2" height="288.6" fill="#1f4e79"/>
+  <text x="300.0" y="97.9" text-anchor="middle" font-size="14" fill="#4a7fb0">109.9 mm snow</text>
+  <text x="300.0" y="113.9" text-anchor="middle" font-size="13" fill="#5b6570">90.1 % rain</text>
+  <text x="300.0" y="468.0" text-anchor="middle" font-size="16" fill="#2b3440">+1 °C</text>
+  <text x="300.0" y="488.0" text-anchor="middle" font-size="13" fill="#5b6570">scenario 11</text>
+  <rect x="397.9" y="114.7" width="76.2" height="18.1" fill="url(#sn)" stroke="#4a7fb0" stroke-width="1.2"/>
+  <rect x="397.9" y="132.9" width="76.2" height="309.1" fill="#1f4e79"/>
+  <text x="436.0" y="90.7" text-anchor="middle" font-size="14" fill="#4a7fb0">63.2 mm snow</text>
+  <text x="436.0" y="106.7" text-anchor="middle" font-size="13" fill="#5b6570">94.5 % rain</text>
+  <text x="436.0" y="468.0" text-anchor="middle" font-size="16" fill="#2b3440">+2 °C</text>
+  <text x="436.0" y="488.0" text-anchor="middle" font-size="13" fill="#5b6570">scenario 12</text>
+  <rect x="533.9" y="107.4" width="76.2" height="10.9" fill="url(#sn)" stroke="#4a7fb0" stroke-width="1.2"/>
+  <rect x="533.9" y="118.3" width="76.2" height="323.7" fill="#1f4e79"/>
+  <text x="572.0" y="83.4" text-anchor="middle" font-size="14" fill="#4a7fb0">37.8 mm snow</text>
+  <text x="572.0" y="99.4" text-anchor="middle" font-size="13" fill="#5b6570">96.8 % rain</text>
+  <text x="572.0" y="468.0" text-anchor="middle" font-size="16" fill="#2b3440">+3 °C</text>
+  <text x="572.0" y="488.0" text-anchor="middle" font-size="13" fill="#5b6570">scenario 13</text>
+  <rect x="669.9" y="100.0" width="76.2" height="6.3" fill="url(#sn)" stroke="#4a7fb0" stroke-width="1.2"/>
+  <rect x="669.9" y="106.3" width="76.2" height="335.7" fill="#1f4e79"/>
+  <text x="708.0" y="76.0" text-anchor="middle" font-size="14" fill="#4a7fb0">22.1 mm snow</text>
+  <text x="708.0" y="92.0" text-anchor="middle" font-size="13" fill="#5b6570">98.1 % rain</text>
+  <text x="708.0" y="468.0" text-anchor="middle" font-size="16" fill="#2b3440">+4 °C</text>
+  <text x="708.0" y="488.0" text-anchor="middle" font-size="13" fill="#5b6570">scenario 14</text>
+  <rect x="805.9" y="92.5" width="76.2" height="3.4" fill="url(#sn)" stroke="#4a7fb0" stroke-width="1.2"/>
+  <rect x="805.9" y="95.9" width="76.2" height="346.1" fill="#1f4e79"/>
+  <text x="844.0" y="68.5" text-anchor="middle" font-size="14" fill="#4a7fb0">12.0 mm snow</text>
+  <text x="844.0" y="84.5" text-anchor="middle" font-size="13" fill="#5b6570">99.0 % rain</text>
+  <text x="844.0" y="468.0" text-anchor="middle" font-size="16" fill="#2b3440">+5 °C</text>
+  <text x="844.0" y="488.0" text-anchor="middle" font-size="13" fill="#5b6570">scenario 15</text>
+  <rect x="928" y="64" width="18" height="18" fill="#1f4e79"/>
+  <text x="954" y="78" font-size="15" fill="#2b3440">rain</text>
+  <rect x="928" y="92" width="18" height="18" fill="url(#sn)" stroke="#4a7fb0" stroke-width="1.2"/>
+  <text x="954" y="106" font-size="15" fill="#2b3440">snow</text>
+  <text x="928" y="160" font-size="13" fill="#5b6570">basin mean over 270 cells</text>
+  <text x="928" y="178" font-size="13" fill="#5b6570">59 days, 2017-01-01 to 2017-02-28</text>
+  <text x="928" y="196" font-size="13" fill="#5b6570">rain when the daily mean</text>
+  <text x="928" y="214" font-size="13" fill="#5b6570">temperature &gt; 0 °C</text>
+  <text x="96" y="504" font-size="13" fill="#5b6570">Scenarios 11-15 raise the precipitation quantile term by 7 %, so the total rises as the snow falls.</text>
+</svg>
