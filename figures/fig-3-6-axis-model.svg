@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="500" viewBox="0 0 1120 500"
-     font-family="Inter, 'Helvetica Neue', Arial, sans-serif" xmlns:c2pa="http://c2pa.org/manifest"><metadata><c2pa:manifest>AAAWgmp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZcanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYTo2ZTJhNGE4Ny0yZGMyLTRlZGUtOTAyZC00NGU5Y2I1NDlmOTAAAAADl2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaK/Vn/Gc8GxiI1t5vEz2boAAAABwY2JvcqNpZGM6Zm9ybWF0bWltYWdlL3N2Zyt4bWxqaW5zdGFuY2VJRHgseG1wOmlpZDo2ZjAxNGFkOS0wYjVmLTQxYWUtOThiMS01ODVkZTkyNTQxZjJscmVsYXRpb25zaGlwaHBhcmVudE9mAAAB4mp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNoCBHPpollbQ+D2+hLBGUWowAAAZljYm9yomdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFgg4pitr9elZAK5fBdx//ei+DF1L1ciHGBLIY/lBM772VSkZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMubXNvZnR3YXJlQWdlbnShZG5hbWVmQ2xhdWRlcmFsbEFjdGlvbnNJbmNsdWRlZPUAAADIanVtYgAAAEBqdW1kY2JvcgARABCAAACqADibcRNjMnBhLmhhc2guZGF0YQAAAAAYYzJzaKuJpW4PtWJC7i99wXy17uYAAACAY2JvcqVjYWxnZnNoYTI1NmNwYWRNAAAAAAAAAAAAAAAAAGRoYXNoWCDWTDuZtCn+FN0OaAd0TUHN9IYCuxPO7KoZv1CYs00JDWRuYW1lbmp1bWJmIG1hbmlmZXN0amV4Y2x1c2lvbnOBomVzdGFydBj9Zmxlbmd0aBkeBAAAAj5qdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACD2Nib3KlY2FsZ2ZzaGEyNTZpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOjZlMmE0YTg3LTJkYzItNGVkZS05MDJkLTQ0ZTljYjU0OWY5MC9jMnBhLnNpZ25hdHVyZWppbnN0YW5jZUlEeCx4bXA6aWlkOjVmNGI4NmI1LWVjNWMtNDkyMC05NGIyLWY1NjRkYWFkN2MzMnJjcmVhdGVkX2Fzc2VydGlvbnODomN1cmx4LXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaW5ncmVkaWVudC52M2RoYXNoWCDimK2v16VkArl8F3H/96L4MXUvVyIcYEshj+UEzvvZVKJjdXJseCpzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmFjdGlvbnMudjJkaGFzaFggcphrVoINg/iN8+IA4ilTL+hLCzBouBILJuHsmxjh57eiY3VybHgpc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5oYXNoLmRhdGFkaGFzaFggulFkKQexSVmjF140etEk5X5eQflxyzqLK7eYxlvygId0Y2xhaW1fZ2VuZXJhdG9yX2luZm+jZG5hbWVvQW50aHJvcGljIEZpbGVzZ3ZlcnNpb25lMS4wLjBrc3BlY1ZlcnNpb25lMi40LjAAABA4anVtYgAAAChqdW1kYzJjcwARABCAAACqADibcQNjMnBhLnNpZ25hdHVyZQAAABAIY2JvctKEWQISogEmGCFZAgowggIGMIIBjaADAgECAhRA5aAK7sI50L64g/oGQgU9Z1UTADAKBggqhkjOPQQDAzBJMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEuMCwGA1UEAxMlQW50aHJvcGljIENvbnRlbnQgQ3JlZGVudGlhbHMgUm9vdCBDQTAeFw0yNjA4MDcxODQzNTZaFw0yODA4MDYxOTQzNTZaMEQxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMSkwJwYDVQQDEyBBbnRocm9waWMgQ2xhdWRlIENvbnRlbnQgU2lnbmluZzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJh6CmvLUBgFFNU0vUKlOVtE6djd17L5SuwX0LemFisBM3dkd/3cyjxFA3Qo5S46fX0/ihY0VZ7mfb9KF703t5OjWDBWMA4GA1UdDwEB/wQEAwIHgDAVBgNVHSUEDjAMBgorBgEEAYPoXgIBMAwGA1UdEwEB/wQCMAAwHwYDVR0jBBgwFoAUzlHiBIFOZFsj+OPEz5o+nMHXXMIwCgYIKoZIzj0EAwMDZwAwZAIwMXMdFJ4BetLLVY7ORuE9noqbbAZOZn/aArXyTwFAZfKrPzxF2vPoJNf1+UCdg1XGAjBwX1zd9WGqYkqmL5SFqw1QySjr1zJfpJM9+1rdDwSPLMOPOjKuiXjoU/pUUeG9RwmhY3BhZFkNngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPZYQETkaEvYeLG/taDeiTfi1jiRx3ZDTgUR3OBd2hnKosdwsMRHDyhRngYG2oztoGl6zbArAKB9rYEbbXaKc7ocBpg=</c2pa:manifest></metadata>
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="654" viewBox="0 0 720 654"
+     font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
   <title>Axis model</title>
   <desc>Three source shapes produce one axis object. Two flags on that object, ordered and
-        commensurable, decide which operations are legal. Four reader overrides set the extent, the axis labels, the dimension
-        order, and the longitude range.</desc>
+        commensurable, decide which axis operations are legal. Four reader options set the extent,
+        the axis coordinates, the dimension order, and the longitude range.</desc>
 
   <defs>
     <marker id="ax" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
@@ -12,106 +12,104 @@
     </marker>
   </defs>
 
-  <rect width="1120" height="500" fill="#ffffff"/>
+  <rect width="720" height="654" fill="#ffffff"/>
 
-  <!-- column headers -->
-  <text x="24" y="34" font-size="11.5" font-weight="700" fill="#0f172a">Three source shapes</text>
-  <text x="348" y="34" font-size="11.5" font-weight="700" fill="#0f172a">One axis object</text>
-  <text x="732" y="34" font-size="11.5" font-weight="700" fill="#0f172a">Two flags</text>
+  <!-- three source shapes -->
+  <text x="20" y="30" font-size="11.5" font-weight="700" fill="#0f172a">Three source shapes</text>
 
-  <!-- sources -->
-  <rect x="24" y="48" width="300" height="58" rx="7" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.4"/>
-  <text x="38" y="68" font-size="10.5" font-weight="700" fill="#0f172a">One multi-dimensional file</text>
-  <text x="38" y="84" font-size="9.5" fill="#475569">NetCDF3, NetCDF4, GRIB2, Zarr</text>
-  <text x="38" y="100" font-size="9" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#1e40af">ref: { select: … }</text>
+  <rect x="20" y="44" width="290" height="56" rx="7" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.4"/>
+  <text x="32" y="63" font-size="10.5" font-weight="700" fill="#0f172a">One multi-dimensional file</text>
+  <text x="32" y="78" font-size="9.5" fill="#475569">NetCDF3, GRIB2, or Zarr; the series is one dimension</text>
+  <text x="32" y="94" font-size="9" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#1e40af">ref: { select: … }</text>
 
-  <rect x="24" y="114" width="300" height="58" rx="7" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.4"/>
-  <text x="38" y="134" font-size="10.5" font-weight="700" fill="#0f172a">One file per coordinate</text>
-  <text x="38" y="150" font-size="9.5" fill="#475569">a stage set, one product per step</text>
-  <text x="38" y="166" font-size="9" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#1e40af">ref: 'stage_19.5.tif'</text>
+  <rect x="20" y="110" width="290" height="56" rx="7" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.4"/>
+  <text x="32" y="129" font-size="10.5" font-weight="700" fill="#0f172a">Separate files, one per coordinate</text>
+  <text x="32" y="144" font-size="9.5" fill="#475569">an ordered scenario series (stage 19.0, 19.5, 20.0 ft)</text>
+  <text x="32" y="160" font-size="9" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#1e40af">ref: 'stage_19.5.tif'</text>
 
-  <rect x="24" y="180" width="300" height="58" rx="7" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.4"/>
-  <text x="38" y="200" font-size="10.5" font-weight="700" fill="#0f172a">Named variants at one coordinate</text>
-  <text x="38" y="216" font-size="9.5" fill="#475569">two encodings of one datum</text>
-  <text x="38" y="232" font-size="9" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#1e40af">ref: { raster: …, vector: … }</text>
+  <rect x="20" y="176" width="290" height="56" rx="7" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.4"/>
+  <text x="32" y="195" font-size="10.5" font-weight="700" fill="#0f172a">Named variants at one coordinate</text>
+  <text x="32" y="210" font-size="9.5" fill="#475569">one datum encoded as a raster and as a vector</text>
+  <text x="32" y="226" font-size="9" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#1e40af">ref: { raster: …, vector: … }</text>
 
-  <path d="M326,77 L336,77 L336,133 L344,133" fill="none" stroke="#2563eb" stroke-width="1.4" marker-end="url(#ax)"/>
-  <path d="M326,143 L344,143" fill="none" stroke="#2563eb" stroke-width="1.4" marker-end="url(#ax)"/>
-  <path d="M326,209 L336,209 L336,153 L344,153" fill="none" stroke="#2563eb" stroke-width="1.4" marker-end="url(#ax)"/>
+  <path d="M312,72 L320,72 L320,100 L326,100" fill="none" stroke="#2563eb" stroke-width="1.4" marker-end="url(#ax)"/>
+  <path d="M312,138 L326,138" fill="none" stroke="#2563eb" stroke-width="1.4" marker-end="url(#ax)"/>
+  <path d="M312,204 L320,204 L320,176 L326,176" fill="none" stroke="#2563eb" stroke-width="1.4" marker-end="url(#ax)"/>
 
-  <!-- axis object -->
-  <rect x="348" y="48" width="360" height="190" rx="7" fill="#dbeafe" stroke="#60a5fa" stroke-width="1.6"/>
-  <text x="364" y="70" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">ds.axes[0] = {</text>
-  <text x="364" y="86" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">  name:          'time',</text>
-  <text x="364" y="102" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">  unit:          'ms',</text>
-  <text x="364" y="118" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">  ordered:       true,</text>
-  <text x="364" y="134" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">  commensurable: true,</text>
-  <text x="364" y="150" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">  entries: [{ coord, ref, meta }, …]</text>
-  <text x="364" y="166" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">}</text>
-  <line x1="364" y1="180" x2="692" y2="180" stroke="#93c5fd" stroke-width="1.1"/>
-  <text x="364" y="199" font-size="9.5" fill="#1e3a8a">The three shapes differ in what an entry's <tspan font-family="ui-monospace, Menlo, Consolas, monospace">ref</tspan> holds.</text>
-  <text x="364" y="215" font-size="9.5" fill="#1e3a8a">An unlabeled file yields integer coordinates and</text>
-  <text x="364" y="229" font-size="9.5" fill="#1e3a8a"><tspan font-family="ui-monospace, Menlo, Consolas, monospace">unit === 'index'</tspan>.</text>
+  <!-- one axis object -->
+  <text x="330" y="30" font-size="11.5" font-weight="700" fill="#0f172a">One axis object</text>
+  <rect x="330" y="44" width="370" height="132" rx="7" fill="#dbeafe" stroke="#60a5fa" stroke-width="1.6"/>
+  <text x="344" y="64" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">ds.axes[0] = {</text>
+  <text x="344" y="80" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">  name:          'time',</text>
+  <text x="344" y="96" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">  unit:          'ms',</text>
+  <text x="344" y="112" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">  ordered:       true,</text>
+  <text x="344" y="128" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">  commensurable: true,</text>
+  <text x="344" y="144" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">  entries: [{ coord, ref, meta }, …]</text>
+  <text x="344" y="160" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">}</text>
 
-  <!-- flag table -->
-  <rect x="732" y="48" width="364" height="190" rx="7" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4"/>
-  <text x="748" y="72" font-size="10" font-weight="700" fill="#0f172a">axis</text>
-  <text x="985" y="72" font-size="10" font-weight="700" fill="#0f172a" text-anchor="middle">ordered</text>
-  <text x="1068" y="72" font-size="10" font-weight="700" fill="#0f172a" text-anchor="middle">commensurable</text>
-  <line x1="748" y1="80" x2="1080" y2="80" stroke="#cbd5e1" stroke-width="1.2"/>
+  <!-- two flags -->
+  <text x="330" y="198" font-size="11.5" font-weight="700" fill="#0f172a">Two flags</text>
+  <rect x="330" y="212" width="370" height="166" rx="7" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.4"/>
+  <text x="344" y="234" font-size="10" font-weight="700" fill="#0f172a">axis</text>
+  <text x="575" y="234" font-size="10" font-weight="700" fill="#0f172a" text-anchor="middle">ordered</text>
+  <text x="655" y="234" font-size="10" font-weight="700" fill="#0f172a" text-anchor="middle">commensurable</text>
+  <line x1="344" y1="242" x2="686" y2="242" stroke="#cbd5e1" stroke-width="1.2"/>
 
-  <text x="748" y="102" font-size="10" fill="#334155">time, level, stage</text>
-  <text x="985" y="102" font-size="11" fill="#166534" text-anchor="middle">✓</text>
-  <text x="1068" y="102" font-size="11" fill="#166534" text-anchor="middle">✓</text>
-  <line x1="748" y1="112" x2="1080" y2="112" stroke="#eef2f6" stroke-width="1"/>
+  <text x="344" y="264" font-size="10" fill="#334155">time, level, stage</text>
+  <text x="575" y="264" font-size="11" fill="#166534" text-anchor="middle">✓</text>
+  <text x="655" y="264" font-size="11" fill="#166534" text-anchor="middle">✓</text>
+  <line x1="344" y1="274" x2="686" y2="274" stroke="#eef2f6" stroke-width="1"/>
 
-  <text x="748" y="134" font-size="10" fill="#334155">ensemble member</text>
-  <text x="985" y="134" font-size="11" fill="#b91c1c" text-anchor="middle">✗</text>
-  <text x="1068" y="134" font-size="11" fill="#166534" text-anchor="middle">✓</text>
-  <line x1="748" y1="144" x2="1080" y2="144" stroke="#eef2f6" stroke-width="1"/>
+  <text x="344" y="296" font-size="10" fill="#334155">ensemble member</text>
+  <text x="575" y="296" font-size="11" fill="#b91c1c" text-anchor="middle">✗</text>
+  <text x="655" y="296" font-size="11" fill="#166534" text-anchor="middle">✓</text>
+  <line x1="344" y1="306" x2="686" y2="306" stroke="#eef2f6" stroke-width="1"/>
 
-  <text x="748" y="166" font-size="10" fill="#334155">band (red, green, near-infrared)</text>
-  <text x="985" y="166" font-size="11" fill="#166534" text-anchor="middle">✓</text>
-  <text x="1068" y="166" font-size="11" fill="#b91c1c" text-anchor="middle">✗</text>
-  <line x1="748" y1="176" x2="1080" y2="176" stroke="#eef2f6" stroke-width="1"/>
+  <text x="344" y="328" font-size="10" fill="#334155">band (red, green, near-infrared)</text>
+  <text x="575" y="328" font-size="11" fill="#166534" text-anchor="middle">✓</text>
+  <text x="655" y="328" font-size="11" fill="#b91c1c" text-anchor="middle">✗</text>
+  <line x1="344" y1="338" x2="686" y2="338" stroke="#eef2f6" stroke-width="1"/>
 
-  <text x="748" y="198" font-size="10" fill="#334155">variable (rainfall, air temperature)</text>
-  <text x="985" y="198" font-size="11" fill="#b91c1c" text-anchor="middle">✗</text>
-  <text x="1068" y="198" font-size="11" fill="#b91c1c" text-anchor="middle">✗</text>
-  <line x1="748" y1="208" x2="1080" y2="208" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="344" y="360" font-size="10" fill="#334155">variable (rainfall, air temperature)</text>
+  <text x="575" y="360" font-size="11" fill="#b91c1c" text-anchor="middle">✗</text>
+  <text x="655" y="360" font-size="11" fill="#b91c1c" text-anchor="middle">✗</text>
+  <line x1="344" y1="370" x2="686" y2="370" stroke="#cbd5e1" stroke-width="1.2"/>
 
-  <text x="748" y="226" font-size="9" fill="#64748b">Both flags default to true.</text>
+  <!-- axis operations -->
+  <rect x="20" y="398" width="330" height="236" rx="9" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="36" y="420" font-size="11.5" font-weight="700" fill="#0f172a">Axis operations</text>
 
-  <!-- operations gated by the flags -->
-  <rect x="24" y="262" width="1072" height="110" rx="9" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
-  <text x="40" y="285" font-size="11.5" font-weight="700" fill="#0f172a">The flags gate these operations</text>
+  <rect x="32" y="430" width="306" height="58" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="44" y="448" font-size="9.5" font-weight="700" fill="#1e40af">No flag</text>
+  <text x="44" y="464" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">select(coord)</text>
+  <text x="44" y="480" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">variantsAt(coord)</text>
 
-  <text x="40" y="309" font-size="9.5" font-weight="700" fill="#166534">No flag</text>
-  <text x="40" y="329" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">select(coord)</text>
-  <text x="40" y="347" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">variantsAt(coord)</text>
+  <rect x="32" y="496" width="306" height="58" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="44" y="514" font-size="9.5" font-weight="700" fill="#1e40af">Requires ordered</text>
+  <text x="44" y="530" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">selectRange(from, to)</text>
+  <text x="44" y="546" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">selectAxisEntry(coord, { nearest })</text>
 
-  <text x="420" y="309" font-size="9.5" font-weight="700" fill="#1e40af">Requires ordered</text>
-  <text x="420" y="329" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">selectRange(from, to)</text>
-  <text x="420" y="347" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">selectAxisEntry(coord, { nearest })</text>
+  <rect x="32" y="562" width="306" height="42" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="44" y="580" font-size="9.5" font-weight="700" fill="#1e40af">Requires commensurable</text>
+  <text x="44" y="596" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">reduce(op, { axis })</text>
 
-  <text x="800" y="309" font-size="9.5" font-weight="700" fill="#1e40af">Requires commensurable</text>
-  <text x="800" y="329" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#0f172a">reduce(op, { axis })</text>
-  <text x="800" y="347" font-size="9.5" fill="#475569">A call against a false flag throws</text>
-  <text x="800" y="361" font-size="9.5" fill="#475569">and names the flag.</text>
+  <!-- reader options -->
+  <rect x="370" y="398" width="330" height="236" rx="9" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="386" y="420" font-size="11.5" font-weight="700" fill="#0f172a">Reader options that override file metadata</text>
 
-  <!-- reader overrides -->
-  <rect x="24" y="392" width="1072" height="92" rx="9" fill="#fffbeb" stroke="#d97706" stroke-width="1.5"/>
-  <text x="40" y="415" font-size="11.5" font-weight="700" fill="#0f172a">Reader overrides</text>
+  <rect x="382" y="430" width="306" height="42" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="394" y="448" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#1e40af">grid: { bbox }</text>
+  <text x="394" y="464" font-size="9.5" fill="#475569">sets the geographic extent</text>
 
-  <text x="40" y="443" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#9a3412">grid: { bbox }</text>
-  <text x="40" y="461" font-size="9.5" fill="#475569">supplies the extent</text>
+  <rect x="382" y="480" width="306" height="42" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="394" y="498" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#1e40af">series: { coords }</text>
+  <text x="394" y="514" font-size="9.5" fill="#475569">sets the coordinate of each entry</text>
 
-  <text x="306" y="443" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#9a3412">series: { coords }</text>
-  <text x="306" y="461" font-size="9.5" fill="#475569">labels the axis entries</text>
+  <rect x="382" y="530" width="306" height="42" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="394" y="548" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#1e40af">dims: { order: 'yx' }</text>
+  <text x="394" y="564" font-size="9.5" fill="#475569">names the latitude and longitude dimensions</text>
 
-  <text x="572" y="443" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#9a3412">dims: { order: 'yx' }</text>
-  <text x="572" y="461" font-size="9.5" fill="#475569">names the latitude, longitude pair</text>
-
-  <text x="838" y="443" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#9a3412">lon: '-180..180'</text>
-  <text x="838" y="461" font-size="9.5" fill="#475569">rolls a global grid to that range</text>
+  <rect x="382" y="580" width="306" height="42" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="394" y="598" font-size="9.5" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#1e40af">lon: '-180..180'</text>
+  <text x="394" y="614" font-size="9.5" fill="#475569">rolls a global grid to that range</text>
 </svg>
