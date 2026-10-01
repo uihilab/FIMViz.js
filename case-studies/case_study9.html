@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — Case Study 9: March 2019 on the Missouri, from gridMET</title>
+<link rel="icon" href="../assets/brand/favicon.png" />
+<link rel="stylesheet" href="../site.css" />
+<style>
+  body { max-width: 104ch; margin: 0 auto; padding: 30px 22px 80px; }
+  h1 { font-size: 23px; margin: 0 0 6px; letter-spacing: -.01em; }
+  h2 { font-size: 15px; margin: 28px 0 9px; }
+  h2 .n { color: var(--dim); font: 600 12px/1 var(--mono); margin-right: 8px; }
+  h3 { font-size: 13px; margin: 0 0 6px; font-weight: 600; }
+  h3 small { color: var(--dim); font-weight: 400; margin-left: 6px; }
+  p { margin: 0 0 11px; }
+  .lead { color: var(--dim); margin-bottom: 16px; }
+  .q { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; margin: 0 0 16px; }
+
+  #status { font-size: 12.5px; color: var(--dim); margin: 0 0 16px; min-height: 18px; }
+  .spin { width: 11px; height: 11px; border: 2px solid var(--line); border-top-color: var(--accent);
+          border-radius: 50%; display: inline-block; animation: sp .8s linear infinite;
+          vertical-align: -1px; margin-right: 7px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  #status.done .spin, #status.fail .spin { display: none; }
+  #status.fail { color: var(--bad); }
+
+  .panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0 0 8px; }
+  .panel.wide { grid-column: 1 / -1; }
+  @media (max-width: 780px) { .panels { grid-template-columns: 1fr; } }
+  .panel .map { height: 340px; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .panel.wide .map { height: 420px; }
+  .mapwrap { position: relative; margin: 0 0 6px; }
+  .lg { position: absolute; right: 9px; bottom: 9px; z-index: 1100; background: var(--panel);
+        border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; font-size: 11px;
+        color: var(--fg); box-shadow: 0 1px 5px rgb(0 0 0 / .25); }
+  .lg .src { color: var(--dim); font-size: 10px; margin: 4px 0 0; }
+
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0 4px; }
+  .hint { font-size: 12px; color: var(--dim); margin: 0 0 14px; }
+  button { background: transparent; color: var(--accent); border: 1px solid var(--control-line);
+           border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  label.ctl { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--dim); }
+  label.ctl input[type=number] { background: var(--bg); color: var(--fg); font: inherit; width: 6ch;
+      font-size: 11.5px; border: 1px solid var(--control-line); border-radius: 4px; padding: 2px 5px; }
+  #tstep { width: 260px; accent-color: var(--accent); }
+  .clock { font: 600 12px/1 var(--mono); color: var(--fg); min-width: 12ch; }
+
+  pre.out { background: var(--panel); color: var(--dim); white-space: pre-wrap;
+            max-height: 220px; font-size: 12px; margin: 0 0 14px; }
+  pre.out:empty { display: none; }
+  table { border-collapse: collapse; font-size: 12.5px; margin: 0 0 8px; width: 100%; }
+  th, td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  #basins:empty, #ros:empty, #cost:empty { display: none; }
+  .finding { margin: 4px 0 16px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 7px;
+             background: var(--panel); font-size: 13.5px; }
+  .finding:empty, .tbl:empty { display: none; }
+  .finding b { font-weight: 600; }
+  .src-list { font-size: 12.5px; color: var(--dim); }
+  .src-list li { margin: 0 0 4px; }
+
+  /* Fig. 9.4. Series colors match the rain and snow maps, validated for CVD and contrast in both themes. */
+  .lines-root { --rain: #3fa464; --snow: #5b8fd6; position: relative; margin: 0 0 6px; }
+  @media (prefers-color-scheme: light) { .lines-root { --rain: #2f8a4f; --snow: #3a6db5; } }
+  .lines-legend { display: flex; gap: 16px; font-size: 12px; color: var(--dim); margin: 0 0 6px; }
+  .lines-legend i { display: inline-block; width: 16px; height: 2px; vertical-align: 4px; margin-right: 6px; }
+  .lines-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 780px) { .lines-grid { grid-template-columns: 1fr; } }
+  .lines-grid svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .lines-grid svg text { font: 11px var(--sans); fill: var(--dim); }
+  .lines-grid svg .ttl { font-weight: 600; fill: var(--fg); font-size: 12px; }
+  .lines-tip { position: absolute; pointer-events: none; background: var(--panel); color: var(--fg);
+               border: 1px solid var(--line); border-radius: 5px; padding: 5px 8px; font-size: 11.5px;
+               box-shadow: 0 1px 5px rgb(0 0 0 / .25); white-space: nowrap; z-index: 5; }
+  .lines-tip i { display: inline-block; width: 10px; height: 2px; vertical-align: 3px; margin-right: 5px; }
+</style>
+</head>
+<body>
+
+<h1>Case Study 9 — March 2019 on the Missouri, from gridMET</h1>
+<p class="lead">
+  Three gridMET year files (daily precipitation, minimum and maximum temperature at 1/24° over the
+  conterminous US) read as NetCDF4 in the browser, byte for byte as the agency serves them. March 2019
+  is split into rain and snow per cell and day, and summarized over the Missouri River basin above
+  Hermann, MO, and the Platte River basin above Louisville, NE. Protocol:
+  <a href="CASE_STUDY_PROTOCOL.md">CASE_STUDY_PROTOCOL.md</a> §0 and §2.
+</p>
+<p class="q">
+  <b>The question.</b> The mid-March 2019 storm produced record flooding on the Platte and lower
+  Missouri. <b>How much of the basin's March precipitation fell as rain, and how much of the
+  13–17 March rain fell on cells that had received snow in the preceding twelve days?</b>
+</p>
+
+<p id="status"><span class="spin"></span><span id="status-text">starting…</span></p>
+
+<h2><span class="n">§</span>Data and method</h2>
+<p>
+  <b>Weather.</b> gridMET (Abatzoglou, 2013) is a daily surface-meteorology dataset for the conterminous
+  United States on a 1/24° grid (about 4 km), from 1979 to the present, released under CC0. It blends the
+  spatial detail of the PRISM climate grids with the daily timing and additional variables of the NLDAS-2
+  regional reanalysis by climatologically aided interpolation (Drought.gov, n.d.). This study reads three
+  of its variables for 2019: daily precipitation total (<code>pr</code>, mm) and daily minimum and maximum
+  air temperature (<code>tmmn</code>, <code>tmmx</code>, K). Each variable ships as one NetCDF4 file per year
+  holding 365 daily grids; the page reads the three files as the agency serves them, packed as 16-bit
+  integers with a scale factor and an offset, which the reader unpacks. Table 9.0 lists what the builder
+  recorded about each file.
+</p>
+<p>
+  <b>Basins.</b> The USGS Network Linked Data Index returns the drainage area above a streamgage as a
+  polygon. This study uses two: the Missouri River at Hermann, Missouri (USGS 06934500), which drains a large
+  part of the northern Great Plains, and the Platte River at Louisville, Nebraska (USGS 06805500), a
+  tributary basin inside it that includes the Nebraska rivers that flooded in March 2019. Both polygons carry hundreds of holes (areas that do not drain to
+  the gage), which the page masks out.
+</p>
+<p>
+  <b>The phase rule.</b> A day's precipitation in a cell counts as rain when that day's mean of
+  <code>tmmn</code> and <code>tmmx</code> is above a threshold, 0 °C by default, and as snow otherwise. It is
+  the simplest rule a daily dataset supports: it has no knowledge of when in the day precipitation fell
+  or of the elevation range inside a 4 km cell. Three windows frame the event: 1–12 March before the
+  storm, 13–17 March during it, and the whole month. The storm dates are this study's framing, not a
+  field in the data. Basin figures are means over the cells whose centers fall inside a basin, so they
+  are depths in millimeters, not volumes.
+</p>
+<div id="inputs-table" class="tbl"></div>
+
+<h2><span class="n">Fig. 9.1</span>The month, day by day, over the conterminous US</h2>
+<div class="panels">
+  <div class="panel">
+    <h3 id="t-pr">Daily precipitation <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-pr"></div><div class="lg" id="lg-pr" hidden></div></div>
+  </div>
+  <div class="panel">
+    <h3 id="t-temp">Daily mean temperature <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-temp"></div><div class="lg" id="lg-temp" hidden></div></div>
+  </div>
+</div>
+<div class="controls">
+  <label class="ctl">day <input type="range" id="tstep" min="0" max="0" value="0" /></label>
+  <span class="clock" id="clock">—</span>
+  <button id="play">▶ play</button>
+</div>
+<p class="hint">
+  Each day is one <code>ds.select(coord)</code> on the CF time axis of a full-year CONUS file; the mean
+  temperature is <code>tmin.combine([tmax], { op: "mean" })</code>. A day is decoded when it is shown and
+  released after, so scrubbing never holds the month. White outlines: the two NLDI basins.
+</p>
+<p class="finding" id="f-91"></p>
+
+<h2><span class="n">Fig. 9.2</span>Snow before the storm, rain during it</h2>
+<div class="panels">
+  <div class="panel">
+    <h3 id="t-snow">Snow, 1–12 March <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-snow"></div><div class="lg" id="lg-snow" hidden></div></div>
+  </div>
+  <div class="panel">
+    <h3 id="t-rain">Rain, 13–17 March <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-rain"></div><div class="lg" id="lg-rain" hidden></div></div>
+  </div>
+</div>
+<div class="controls">
+  <label class="ctl">rain when mean temperature &gt; <input type="number" id="threshold" value="0" min="-5" max="5" step="0.5" /> °C</label>
+  <label class="ctl">recent snowfall ≥ <input type="number" id="snowmin" value="10" min="1" max="100" step="1" /> mm</label>
+  <button id="apply">apply</button>
+</div>
+<p class="hint">
+  A day's precipitation counts as rain in a cell when that day's mean temperature there is above the
+  threshold, and as snow otherwise: <code>tavg.reclassify()</code> gives an open mask,
+  <code>pr.combine([mask], { op: "min" })</code> keeps the rain, and a window total is a running
+  <code>combine([day], { op: "sum" })</code>. Snow is <code>pr.difference(rain)</code> over the window.
+  The rule is one daily threshold per 1/24° cell; it models neither snow within a day nor snowpack,
+  melt, or frozen ground.
+</p>
+<p class="finding" id="f-92"></p>
+
+<h2><span class="n">Fig. 9.3</span>Storm rain on recent snowfall</h2>
+<div class="panels">
+  <div class="panel wide">
+    <h3 id="t-ros">Rain 13–17 March where 1–12 March snowfall reached the minimum <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-ros"></div><div class="lg" id="lg-ros" hidden></div></div>
+  </div>
+</div>
+<p class="hint">
+  <code>snowBefore.reclassify(v =&gt; v &gt;= min ? OPEN : 0)</code> opens the cells that received the minimum
+  snowfall, and a <code>min</code> combine keeps the event rain there. Snowfall is a proxy for snow on the
+  ground: gridMET carries no snow water equivalent, so snow that melted before 13 March still counts.
+</p>
+<p class="finding" id="f-93"></p>
+
+<h2><span class="n">Fig. 9.4</span>Rain and snow day by day, basin means</h2>
+<div class="lines-root" id="lines-root">
+  <div class="lines-legend"><span><i style="background:var(--rain)"></i>rain</span><span><i style="background:var(--snow)"></i>snow</span></div>
+  <div class="lines-grid" id="lines"></div>
+  <div class="lines-tip" id="lines-tip" hidden></div>
+</div>
+<p class="hint">
+  Daily basin-mean rain and snow over March 2019, at the threshold above, from the same pass that builds
+  the window totals. The basin cells come from the engine's <code>mask</code> over the outline with the
+  holes masked out; the daily means are sums over those cells. The shaded band is 13–17 March, the
+  vertical rule the day on the slider. Both panels share one scale. The rows are in
+  <code>results.csv</code> as table 9.4.
+</p>
+<p class="finding" id="f-94"></p>
+
+<h2><span class="n">Table 9.1</span>Basin totals by window</h2>
+<div id="basins"></div>
+<h2><span class="n">Table 9.2</span>Rain on recent snowfall, by basin</h2>
+<div id="ros"></div>
+<p class="hint" id="basin-note" hidden></p>
+
+<p class="finding" id="f-tables"></p>
+
+<h2><span class="n">Table 9.3</span>What the NetCDF4 path cost</h2>
+<div id="cost"></div>
+
+<h2><span class="n">§</span>Conclusion</h2>
+<div id="conclusion"><p class="hint">Written when the page finishes.</p></div>
+
+<h2><span class="n">§</span>Sources</h2>
+<ul class="src-list">
+  <li>Abatzoglou, J. T. (2013). Development of gridded surface meteorological data for ecological applications
+    and modelling. <i>International Journal of Climatology</i>, 33: 121–131.
+    <a href="https://www.climatologylab.org/gridmet.html">climatologylab.org/gridmet</a></li>
+  <li>Drought.gov (n.d.). Gridded Surface Meteorological (gridMET) Dataset.
+    <a href="https://www.drought.gov/data-maps-tools/gridded-surface-meteorological-gridmet-dataset">drought.gov</a></li>
+  <li>U.S. Geological Survey. Network Linked Data Index (NLDI), basin service for USGS 06934500 and 06805500.
+    <a href="https://api.water.usgs.gov/nldi/">api.water.usgs.gov/nldi</a></li>
+</ul>
+
+<div class="controls">
+  <button id="dlp">performance.csv</button>
+  <button id="dlm">metrics.csv</button>
+  <button id="dlr">results.csv</button>
+</div>
+
+<pre class="out" id="log"></pre>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js",
+    "sciwrid-toolkit": "../node_modules/sciwrid-toolkit/dist/index.js"
+} }
+</script>
+
+<script type="module">
+import { FimViz, ColorScale, Stats, Dataset, gridMeta } from "fimviz";
+
+// ── §0 instrumentation ────────────────────────────────────────────────────────────────────────
+// Query parameters, so a recorded run states its conditions instead of editing the file:
+//   ?source=mirror|live   mirror (default) reads case-studies/data; live reads northwestknowledge.net,
+//                         which works only if that host sends CORS headers (the builder records it)
+//   ?cache=warm|cold      a label for the run; a cold pass is a hard reload with the cache disabled
+//   ?rep=N                the repetition number to write on each row
+//   ?workers=N            extractGrid's worker count; omitted uses SciWrid's browser default
+const Q = new URLSearchParams(location.search);
+const SOURCE = Q.get("source") === "live" ? "live" : "mirror";
+const CACHE_STATE = Q.get("cache") === "cold" ? "cold" : "warm";
+const REP = Number(Q.get("rep") ?? 1);
+const WORKERS = Q.has("workers") ? Number(Q.get("workers")) : undefined;
+// The phase threshold and the snowfall minimum, so a recorded run states its settings in its URL.
+const THRESHOLD_0 = Q.has("threshold") ? Number(Q.get("threshold")) : 0;
+const SNOW_MIN_0 = Q.has("snow") ? Number(Q.get("snow")) : 10;
+const BROWSER = navigator.userAgent;
+
+const perf = [], metrics = [], results = [], cost = [];
+
+const log = (...a) => { document.getElementById("log").textContent += a.join(" ") + "\n"; };
+const status = (text, state = "") => {
+  document.getElementById("status-text").textContent = text;
+  document.getElementById("status").className = state;
+};
+const heapMB = () => (performance.memory ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(0) : null);
+
+async function stage(name, fields, fn) {
+  const t = `${name}-${perf.length}`;
+  performance.mark(`${t}:start`);
+  const value = await fn();
+  performance.mark(`${t}:end`);
+  const { duration } = performance.measure(t, `${t}:start`, `${t}:end`);
+  perf.push({ study: "9", stage: name, dataset: "", format: "", bytes: "", width: "", height: "",
+              cache_state: CACHE_STATE, browser: BROWSER, rep: REP, ms: duration.toFixed(2), ...fields });
+  return { value, ms: duration };
+}
+const costRow = (op, n, ms) => cost.push({ op, n, ms: ms.toFixed(1) });
+
+const toCsv = (rows) => {
+  const cols = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+  return [cols.join(","), ...rows.map((r) => cols.map((c) => JSON.stringify(r[c] ?? "")).join(","))].join("\n");
+};
+const download = (rows, name) => {
+  if (!rows.length) return log(`${name}: nothing recorded yet`);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv" }));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+};
+
+// A GeoJSON polygon's first ring is its outline and the rest are holes. SpatialFilter takes a list of
+// rings as a UNION, so passing every ring fills the holes. The NLDI basins here carry hundreds of holes
+// (non-contributing areas), so the outlines and the holes are kept apart: mask by the outlines, then
+// mask the holes out with `invert`.
+const toLatLng = (ring) => ring.map(([lng, lat]) => ({ lat, lng }));
+const partsOf = (geom) => (geom.type === "MultiPolygon" ? geom.coordinates : [geom.coordinates]);
+const outlinesOf = (geom) => partsOf(geom).map((rings) => toLatLng(rings[0]));
+const holesOf = (geom) => partsOf(geom).flatMap((rings) => rings.slice(1).map(toLatLng));
+
+// ── sources and the analysis windows ──────────────────────────────────────────────────────────
+// Mirrored by build_case_study9_data.mjs; provenance in data/README.txt (protocol §0.4).
+const DATA = "./data/";
+const MANIFEST = `${DATA}gridmet-2019-manifest.json`;
+// Larger than any daily precipitation, so min(pr, OPEN) is the precipitation itself.
+const OPEN = 1e9;
+const MONTH = { from: "2019-03-01", to: "2019-03-31" };
+// Analysis windows, chosen for this study. The storm dates are the author's framing, not a data field.
+const WINDOWS = [
+  { key: "before", label: "1–12 Mar", from: "2019-03-01", to: "2019-03-12" },
+  { key: "event", label: "13–17 Mar", from: "2019-03-13", to: "2019-03-17" },
+  { key: "month", label: "1–31 Mar", from: "2019-03-01", to: "2019-03-31" },
+];
+const ms = (iso) => Date.parse(`${iso}T00:00:00Z`);
+const inWindow = (coord, w) => coord >= ms(w.from) && coord <= ms(w.to);
+const dayLabel = (t) => new Date(t).toISOString().slice(0, 10);
+
+let man = null, FIT = null, basins = [], KELVIN = false;
+const vars = {};                      // { pr, tmmn, tmmx } → Dataset with a 365-step time axis
+let march = [];                       // [{ coord, k }] for the 31 March days, k indexing each file's axis
+let windows = null;                   // { before|event|month: { pr, rain } } forced window totals
+let daily = [];                       // [{ coord, byBasin: { gage: { pr, rain } } }] for Fig. 9.4
+let sel = { step: 0, threshold: THRESHOLD_0, snowMin: SNOW_MIN_0 };
+let playing = false;
+const layers = {};
+
+const maps = {};
+for (const k of ["pr", "temp", "snow", "rain", "ros"]) {
+  maps[k] = await FimViz.mount(`#m-${k}`, { provider: "leaflet", isolated: true });
+}
+
+// ── color scales ──────────────────────────────────────────────────────────────────────────────
+const prScale = new ColorScale({ missingColor: "transparent", stops: [
+  { min: 0.1, max: 5, color: "#d6e6f4", label: "0.1–5 mm" },
+  { min: 5, max: 20, color: "#8fbde0", label: "5–20 mm" },
+  { min: 20, max: 50, color: "#3d86c3", label: "20–50 mm" },
+  { min: 50, max: 1e9, color: "#16466f", label: "≥ 50 mm" }] });
+const tempScale = new ColorScale({ missingColor: "transparent", stops: [
+  { min: -60, max: -10, color: "#3b4cc0", label: "< −10 °C" },
+  { min: -10, max: 0, color: "#9abbff", label: "−10–0 °C" },
+  { min: 0, max: 10, color: "#f7b89c", label: "0–10 °C" },
+  { min: 10, max: 60, color: "#b40426", label: "> 10 °C" }] });
+const depthStops = (fill) => new ColorScale({ missingColor: "transparent", stops: [
+  { min: 1, max: 10, color: fill[0], label: "1–10 mm" },
+  { min: 10, max: 25, color: fill[1], label: "10–25 mm" },
+  { min: 25, max: 50, color: fill[2], label: "25–50 mm" },
+  { min: 50, max: 1e9, color: fill[3], label: "≥ 50 mm" }] });
+const snowScale = depthStops(["#eef3fb", "#bcd3ee", "#6d9fd6", "#1f4f8f"]);
+const rainScale = depthStops(["#e5f5e0", "#a1d99b", "#41ab5d", "#00682a"]);
+
+async function paint(key, dataset, scale, label) {
+  layers[key]?.remove();
+  maps[key].adoptDataset(dataset);
+  const { value: layer } = await stage("t_paint", { dataset: label },
+    () => maps[key].addLayer("raster", { source: dataset, colorScale: scale }));
+  layers[key] = layer;
+  const host = document.getElementById(`lg-${key}`);
+  host.innerHTML = layer.getLegend().toHtml() + `<p class="src">${label}</p>`;
+  host.hidden = false;
+  return layer;
+}
+
+// ── loading ───────────────────────────────────────────────────────────────────────────────────
+async function loadFile(f) {
+  const url = SOURCE === "live" ? f.url : DATA + f.mirror;
+  const { value: bytes, ms: fetchMs } = await stage("t_fetch", { dataset: f.name, format: "netcdf4", bytes: f.bytes },
+    async () => {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`${f.name}: HTTP ${r.status} from ${url}` + (SOURCE === "mirror"
+        ? " — run node case-studies/build_case_study9_data.mjs" : " — the host may not allow CORS; try ?source=mirror"));
+      return r.arrayBuffer();
+    });
+  const entry = performance.getEntriesByName(new URL(url, location.href).href).at(-1);
+  costRow(`fetch ${f.name} (${SOURCE})`, 1, fetchMs);
+  const opts = { variable: f.variable };
+  if (WORKERS !== undefined) opts.workers = WORKERS;
+  const { value: ds, ms: parseMs } = await stage("t_total", { dataset: `${f.name}:${f.variable}`, format: "netcdf4", bytes: f.bytes },
+    () => maps.pr.addDataset(new File([bytes], f.name, { type: "application/x-netcdf" }), opts));
+  costRow(`parse ${f.name} (scan, no decode)`, 1, parseMs);
+  const n = ds.axis?.entries?.length;
+  if (n !== f.time.n) throw new Error(`${f.name}: the manifest records ${f.time.n} days, the engine found ${n}`);
+  if (ds.axis.unit && ds.axis.unit !== "ms") throw new Error(`${f.name}: time axis unit is "${ds.axis.unit}", expected CF dates`);
+  metrics.push({ study: "9", source: "gridMET", format: "netcdf4", file: f.name, variable: f.variable, fetched_from: SOURCE,
+                 bytes: f.bytes, transfer_bytes: entry?.transferSize ?? "", axis_len: n, width: f.lon.n, height: f.lat.n,
+                 dtype: f.dtype, chunks: JSON.stringify(f.chunks), unit: f.attrs.units ?? "", scale_factor: f.attrs.scale_factor ?? "",
+                 fetch_ms: +fetchMs.toFixed(1), parse_ms: +parseMs.toFixed(1), workers: WORKERS ?? "default", heap_mb: heapMB() });
+  log(`${f.name}: ${(f.bytes / 1048576).toFixed(1)} MiB, ${f.variable} [${f.shape.join(" × ")}], ${f.attrs.units ?? "?"}, `
+    + `fetched ${fetchMs.toFixed(0)} ms, scanned ${parseMs.toFixed(0)} ms`);
+  return ds;
+}
+
+/** One day's nodes, built on demand and not held, so a forced day is released once it is off screen. */
+function day(k) {
+  const pick = (ds) => ds.select(ds.axis.entries[k].coord);
+  const pr = pick(vars.pr), tmin = pick(vars.tmmn), tmax = pick(vars.tmmx);
+  return { pr, tavg: tmin.combine([tmax], { op: "mean" }) };
+}
+const toCelsius = (ds) => (KELVIN ? ds.reclassify((v) => v - 273.15) : ds);
+
+// ── Fig. 9.1: the month, day by day ───────────────────────────────────────────────────────────
+async function showStep(i, { record = true } = {}) {
+  sel.step = i;
+  const { coord, k } = march[i];
+  document.getElementById("clock").textContent = dayLabel(coord);
+  document.getElementById("tstep").value = String(i);
+  const d = day(k);
+  const tC = toCelsius(d.tavg);
+  const { ms: prMs } = await stage("t_op", { dataset: `select:pr:${dayLabel(coord)}`, format: "netcdf4" }, () => d.pr.grid());
+  const { ms: tMs } = await stage("t_op", { dataset: `combine:mean:${dayLabel(coord)}`, format: "netcdf4" }, () => tC.grid());
+  if (record) log(`day ${dayLabel(coord)}  pr ${prMs.toFixed(0)} ms, tavg (2 slices + mean) ${tMs.toFixed(0)} ms`);
+  await paint("pr", d.pr, prScale, "pr, mm");
+  await paint("temp", tC, tempScale, "(tmin + tmax) / 2, °C");
+  moveCursor(i);
+  return prMs + tMs;
+}
+
+// ── Fig. 9.2 and Table 9.1: rain and snow by window ───────────────────────────────────────────
+/** Adds a forced grid into a running window total, keeping the chain one node deep. */
+async function addInto(total, grid) {
+  const g = Dataset.fromGrid(grid);
+  return total ? Dataset.fromGrid(await total.combine([g], { op: "sum" }).grid()) : g;
+}
+
+async function partition() {
+  const thr = sel.threshold + (KELVIN ? 273.15 : 0);
+  const acc = Object.fromEntries(WINDOWS.map((w) => [w.key, { pr: null, rain: null }]));
+  daily = [];
+  const t0 = performance.now();
+  for (const [i, { coord, k }] of march.entries()) {
+    status(`partitioning ${dayLabel(coord)} (${i + 1} of ${march.length})…`);
+    const d = day(k);
+    const open = d.tavg.reclassify((v) => (v > thr ? OPEN : 0));
+    const rain = d.pr.combine([open], { op: "min" });
+    const { value: [prG, rainG] } = await stage("t_op", { dataset: `day:${dayLabel(coord)}`, format: "netcdf4" },
+      async () => [await d.pr.grid(), await rain.grid()]);
+    for (const w of WINDOWS) {
+      if (!inWindow(coord, w)) continue;
+      acc[w.key].pr = await addInto(acc[w.key].pr, prG);
+      acc[w.key].rain = await addInto(acc[w.key].rain, rainG);
+    }
+    // Fig. 9.4: the basin's cells are found once, with the engine's mask, then each day is a mean
+    // over those indices. The same cells as Table 9.1, so the daily means sum to the window means.
+    for (const b of basins) if (!b.idx) b.idx = await basinIndex(prG, b);
+    const tG = await d.tavg.grid();            // already forced by the rain chain, so this is the memoized grid
+    const byBasin = {};
+    for (const b of basins) {
+      let p = 0, r = 0, t = 0, n = 0, nt = 0;
+      for (const i of b.idx) {
+        const vp = prG.pixels[i], vr = rainG.pixels[i], vt = tG.pixels[i];
+        if (!Number.isNaN(vt)) { t += vt; nt++; }
+        if (Number.isNaN(vp) || Number.isNaN(vr)) continue;
+        p += vp; r += vr; n++;
+      }
+      byBasin[b.gage] = { pr: n ? p / n : NaN, rain: n ? r / n : NaN, cells: n,
+                          tavgC: nt ? t / nt - (KELVIN ? 273.15 : 0) : NaN };
+    }
+    daily.push({ coord, byBasin });
+  }
+  const dt = performance.now() - t0;
+  costRow(`decode 3 CONUS slices, split rain/snow, add into 3 windows (per day, mean)`, march.length, dt / march.length);
+  costRow(`the whole month at ${sel.threshold} °C`, march.length, dt);
+  metrics.push({ study: "9", stage: "partition", days: march.length, threshold_degC: sel.threshold, ms: +dt.toFixed(0), heap_mb: heapMB() });
+  return acc;
+}
+
+/** Flat indices of a basin's cells on the CONUS grid, from the engine's mask of one forced grid. */
+async function basinIndex(grid, basin) {
+  const inside = Dataset.fromGrid(grid).mask(basin.outline);
+  const g = await (basin.holes.length ? inside.mask(basin.holes, { invert: true }) : inside).grid();
+  const idx = [];
+  for (let i = 0; i < g.pixels.length; i++) if (!Number.isNaN(g.pixels[i])) idx.push(i);
+  return Int32Array.from(idx);
+}
+
+async function basinMean(dataset, basin) {
+  const inside = dataset.mask(basin.outline);
+  const grid = await (basin.holes.length ? inside.mask(basin.holes, { invert: true }) : inside).grid();
+  const s = Stats.raster(grid.pixels, gridMeta(grid), { bins: 4 });
+  return { mean: s.mean ?? NaN, cells: s.count ?? 0 };
+}
+
+async function basinTables() {
+  const rows = [], rosRows = [];
+  const snowBefore = windows.before.pr.difference(windows.before.rain);
+  const flag = snowBefore.reclassify((v) => (v >= sel.snowMin ? 1 : 0));
+  const ros = windows.event.rain.combine([snowBefore.reclassify((v) => (v >= sel.snowMin ? OPEN : 0))], { op: "min" });
+  const { ms: maskMs } = await stage("t_op", { dataset: "basin statistics" }, async () => {
+    for (const b of basins) {
+      const byWindow = {};
+      for (const w of WINDOWS) {
+        const pr = await basinMean(windows[w.key].pr, b);
+        const rain = await basinMean(windows[w.key].rain, b);
+        if (pr.cells !== rain.cells) log(`WARN ${b.name}, ${w.label}: ${pr.cells} precipitation cells, ${rain.cells} rain cells`);
+        byWindow[w.key] = { pr, rain };
+        rows.push({ study: "9", table: "9.1", basin: b.gage, basin_name: b.name, window: `${w.from}/${w.to}`, window_label: w.label,
+                    threshold_degC: sel.threshold, basin_cells: pr.cells, pr_mm: +pr.mean.toFixed(1), rain_mm: +rain.mean.toFixed(1),
+                    snow_mm: +(pr.mean - rain.mean).toFixed(1), rain_share_pct: +(100 * rain.mean / pr.mean).toFixed(1) });
+      }
+      const f = await basinMean(flag, b);
+      const r = await basinMean(ros, b);
+      // The two must cover the same cells, or the per-cell mean below divides by the wrong denominator.
+      if (f.cells !== r.cells) log(`WARN ${b.name}: ${f.cells} snowfall cells, ${r.cells} event-rain cells`);
+      const eventRain = byWindow.event.rain.mean;
+      rosRows.push({ study: "9", table: "9.2", basin: b.gage, basin_name: b.name, threshold_degC: sel.threshold, snow_min_mm: sel.snowMin,
+                     basin_cells: f.cells, snow_cells_pct: +(100 * f.mean).toFixed(1),
+                     event_rain_mm: +eventRain.toFixed(1),
+                     event_rain_on_snow_cells_mm: f.mean > 0 ? +(r.mean / f.mean).toFixed(1) : null,
+                     event_rain_on_snow_share_pct: eventRain > 0 ? +(100 * r.mean / eventRain).toFixed(1) : null });
+    }
+  });
+  costRow(`mask outline, mask holes out, Stats.raster: ${basins.length} basins × ${WINDOWS.length * 2 + 2} grids`, basins.length * (WINDOWS.length * 2 + 2), maskMs);
+  const dailyRows = daily.flatMap((d) => basins.map((b) => ({
+    study: "9", table: "9.4", basin: b.gage, basin_name: b.name, window: dayLabel(d.coord), threshold_degC: sel.threshold,
+    basin_cells: d.byBasin[b.gage].cells, pr_mm: +d.byBasin[b.gage].pr.toFixed(2), rain_mm: +d.byBasin[b.gage].rain.toFixed(2),
+    snow_mm: +(d.byBasin[b.gage].pr - d.byBasin[b.gage].rain).toFixed(2) })));
+  // The daily means must add up to Table 9.1's window means, since both are over the same cells.
+  for (const r of rows) {
+    const w = WINDOWS.find((x) => `${x.from}/${x.to}` === r.window);
+    const sum = daily.filter((d) => inWindow(d.coord, w)).reduce((a, d) => a + d.byBasin[r.basin].pr, 0);
+    if (Math.abs(sum - r.pr_mm) > 0.06) log(`WARN ${r.basin_name}, ${r.window_label}: daily means sum to ${sum.toFixed(2)} mm, the window mean is ${r.pr_mm} mm`);
+  }
+  results.length = 0;
+  results.push(...rows, ...rosRows, ...dailyRows);
+  drawLines();
+  writeFindings(rows, rosRows);
+
+  document.getElementById("basins").innerHTML =
+    `<table><tr><th>basin</th><th>window</th><th>cells</th><th>precipitation</th><th>rain</th><th>snow</th><th>rain share</th></tr>`
+    + rows.map((r) => `<tr><td>${r.basin_name}</td><td>${r.window_label}</td><td class="num">${r.basin_cells}</td>`
+        + `<td class="num">${r.pr_mm} mm</td><td class="num">${r.rain_mm} mm</td><td class="num">${r.snow_mm} mm</td>`
+        + `<td class="num">${r.rain_share_pct} %</td></tr>`).join("") + `</table>`;
+  document.getElementById("ros").innerHTML =
+    `<table><tr><th>basin</th><th>cells with ≥ ${sel.snowMin} mm snow, 1–12 Mar</th><th>rain 13–17 Mar, basin mean</th>`
+    + `<th>rain 13–17 Mar on those cells</th><th>share of basin event rain on those cells</th></tr>`
+    + rosRows.map((r) => `<tr><td>${r.basin_name}</td><td class="num">${r.snow_cells_pct} %</td><td class="num">${r.event_rain_mm} mm</td>`
+        + `<td class="num">${r.event_rain_on_snow_cells_mm ?? "—"} mm</td><td class="num">${r.event_rain_on_snow_share_pct ?? "—"} %</td></tr>`).join("")
+    + `</table>`;
+  const note = document.getElementById("basin-note");
+  note.textContent = `Basin means over the 1/24° cells whose centers fall inside each NLDI polygon and outside its holes (simplified to `
+    + `${(man.simplify_deg * 24).toFixed(2)} cell). Rain when the daily mean temperature is above ${sel.threshold} °C; `
+    + `snow is precipitation minus rain over the same cells. Depths are basin means, not volumes.`;
+  note.hidden = false;
+
+  await paint("snow", snowBefore, snowScale, `snow, 1–12 Mar, > ${sel.threshold} °C is rain`);
+  await paint("rain", windows.event.rain, rainScale, "rain, 13–17 Mar");
+  await paint("ros", ros, rainScale, `rain 13–17 Mar on cells with ≥ ${sel.snowMin} mm snow 1–12 Mar`);
+  document.getElementById("t-snow").innerHTML = `Snow, 1–12 March <small>threshold ${sel.threshold} °C</small>`;
+  document.getElementById("t-rain").innerHTML = `Rain, 13–17 March <small>threshold ${sel.threshold} °C</small>`;
+  document.getElementById("t-ros").innerHTML =
+    `Rain 13–17 March where 1–12 March snowfall reached ${sel.snowMin} mm <small>threshold ${sel.threshold} °C</small>`;
+}
+
+// ── Fig. 9.4: daily basin means as lines ─────────────────────────────────────────────────────
+const SVGNS = "http://www.w3.org/2000/svg";
+const svgEl = (tag, attrs = {}, parent) => {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+  if (parent) parent.appendChild(e);
+  return e;
+};
+const niceCeil = (v) => { const m = 10 ** Math.floor(Math.log10(v || 1)); return Math.ceil(v / m) * m; };
+const chartState = { panels: [] };
+
+function drawLines() {
+  const host = document.getElementById("lines");
+  host.innerHTML = "";
+  chartState.panels = [];
+  if (!daily.length) return;
+  const W = 520, H = 262, P = { l: 40, r: 14, t: 40, b: 30 };
+  const n = daily.length;
+  const yMax = niceCeil(Math.max(...daily.flatMap((d) => basins.flatMap((b) =>
+    [d.byBasin[b.gage].rain, d.byBasin[b.gage].pr - d.byBasin[b.gage].rain]))));
+  const x = (i) => P.l + (i / (n - 1)) * (W - P.l - P.r);
+  const y = (v) => H - P.b - (v / yMax) * (H - P.t - P.b);
+  const ev = WINDOWS.find((w) => w.key === "event");
+  const e0 = daily.findIndex((d) => inWindow(d.coord, ev)), e1 = daily.findLastIndex((d) => inWindow(d.coord, ev));
+
+  for (const b of basins) {
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img",
+      "aria-label": `Daily basin-mean rain and snow, ${b.name}, March 2019` }, host);
+    svgEl("text", { x: 0, y: 14, class: "ttl" }, svg).textContent = b.name;
+    // storm window
+    svgEl("rect", { x: x(e0) - 3, y: P.t, width: x(e1) - x(e0) + 6, height: H - P.t - P.b,
+      fill: "var(--line)", opacity: 0.45 }, svg);
+    svgEl("text", { x: (x(e0) + x(e1)) / 2, y: P.t + 12, "text-anchor": "middle" }, svg).textContent = "13–17 Mar";
+    // grid and axes
+    for (let k = 0; k <= 4; k++) {
+      const v = (yMax * k) / 4;
+      svgEl("line", { x1: P.l, x2: W - P.r, y1: y(v), y2: y(v), stroke: "var(--line)", "stroke-width": k ? 1 : 1.5 }, svg);
+      svgEl("text", { x: P.l - 6, y: y(v) + 4, "text-anchor": "end" }, svg).textContent = String(+v.toFixed(1));
+    }
+    svgEl("text", { x: 0, y: P.t - 12 }, svg).textContent = "mm/day";
+    daily.forEach((d, i) => {
+      const day = new Date(d.coord).getUTCDate();
+      if (![1, 8, 15, 22, 29].includes(day)) return;
+      svgEl("text", { x: x(i), y: H - P.b + 16, "text-anchor": "middle" }, svg).textContent = `${day} Mar`;
+    });
+    // series
+    const path = (f) => daily.map((d, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(f(d)).toFixed(1)}`).join("");
+    const rainOf = (d) => d.byBasin[b.gage].rain, snowOf = (d) => d.byBasin[b.gage].pr - d.byBasin[b.gage].rain;
+    svgEl("path", { d: path(snowOf), fill: "none", stroke: "var(--snow)", "stroke-width": 2, "stroke-linejoin": "round" }, svg);
+    svgEl("path", { d: path(rainOf), fill: "none", stroke: "var(--rain)", "stroke-width": 2, "stroke-linejoin": "round" }, svg);
+    // cursor and hover crosshair
+    const cursor = svgEl("line", { y1: P.t, y2: H - P.b, stroke: "var(--fg)", "stroke-width": 1, opacity: 0.55 }, svg);
+    const cross = svgEl("line", { y1: P.t, y2: H - P.b, stroke: "var(--dim)", "stroke-width": 1, "stroke-dasharray": "3 3", visibility: "hidden" }, svg);
+    const dots = [["rain", rainOf], ["snow", snowOf]].map(([k]) => svgEl("circle", { r: 4, fill: `var(--${k})`,
+      stroke: "var(--bg)", "stroke-width": 2, visibility: "hidden" }, svg));
+    const hit = svgEl("rect", { x: P.l, y: P.t, width: W - P.l - P.r, height: H - P.t - P.b, fill: "transparent" }, svg);
+    const panel = { svg, cursor, x };
+    chartState.panels.push(panel);
+    const tip = document.getElementById("lines-tip");
+    hit.addEventListener("pointermove", (e) => {
+      const r = svg.getBoundingClientRect();
+      const px = ((e.clientX - r.left) / r.width) * W;
+      const i = Math.max(0, Math.min(n - 1, Math.round(((px - P.l) / (W - P.l - P.r)) * (n - 1))));
+      const d = daily[i], rv = rainOf(d), sv = snowOf(d);
+      cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("visibility", "visible");
+      [[rv, 0], [sv, 1]].forEach(([v, k]) => { dots[k].setAttribute("cx", x(i)); dots[k].setAttribute("cy", y(v)); dots[k].setAttribute("visibility", "visible"); });
+      tip.innerHTML = `<b>${b.name.split(",")[0]}</b> · ${dayLabel(d.coord)}<br>`
+        + `<i style="background:var(--rain)"></i>rain ${rv.toFixed(1)} mm<br>`
+        + `<i style="background:var(--snow)"></i>snow ${sv.toFixed(1)} mm<br>precipitation ${(rv + sv).toFixed(1)} mm`;
+      const root = document.getElementById("lines-root").getBoundingClientRect();
+      const left = e.clientX - root.left + 14;
+      tip.style.left = `${Math.min(left, root.width - 170)}px`;
+      tip.style.top = `${e.clientY - root.top - 10}px`;
+      tip.hidden = false;
+    });
+    hit.addEventListener("pointerleave", () => {
+      tip.hidden = true; cross.setAttribute("visibility", "hidden");
+      dots.forEach((dd) => dd.setAttribute("visibility", "hidden"));
+    });
+  }
+  moveCursor(sel.step);
+}
+
+function moveCursor(i) {
+  for (const p of chartState.panels) {
+    const on = i >= 0 && i < daily.length;
+    p.cursor.setAttribute("visibility", on ? "visible" : "hidden");
+    if (on) { p.cursor.setAttribute("x1", p.x(i)); p.cursor.setAttribute("x2", p.x(i)); }
+  }
+}
+
+function renderCost() {
+  document.getElementById("cost").innerHTML =
+    `<table><tr><th>operation</th><th>n</th><th>ms</th></tr>`
+    + cost.map((r) => `<tr><td><code>${r.op}</code></td><td class="num">${r.n}</td>`
+        + `<td class="num">${r.ms}</td></tr>`).join("") + `</table>`;
+}
+
+// ── the write-up, from this run's numbers ─────────────────────────────────────────────────────
+const pct = (x, d = 1) => `${(100 * x).toFixed(d)} %`;
+const mm = (x, d = 1) => `${x.toFixed(d)} mm`;
+const shortName = (b) => b.name.split(" at ")[0].replace(" River", "");
+const dm = (t) => { const d = new Date(t); return `${d.getUTCDate()} ${d.toLocaleString("en-US", { month: "long", timeZone: "UTC" })}`; };
+const DTYPE = { "<H": "uint16", "<h": "int16", "<i": "int32", "<f": "float32", "<f4": "float32", "<d": "float64", "<f8": "float64" };
+
+function renderInputs() {
+  const mib = (b) => (b / 1048576).toFixed(1);
+  document.getElementById("inputs-table").innerHTML = `<table><tr><th>file</th><th>variable</th><th>units</th>`
+    + `<th>days × rows × columns</th><th>stored as</th><th>chunks</th><th>size</th><th>CORS</th></tr>`
+    + man.files.map((f) => `<tr><td><code>${f.name}</code></td><td>${f.variable}</td><td>${f.attrs.units ?? "?"}</td>`
+      + `<td class="num">${f.shape.join(" × ")}</td><td>${DTYPE[f.dtype] ?? f.dtype.replace(/</g, "&lt;")}, × ${f.attrs.scale_factor ?? 1} + ${f.attrs.add_offset ?? 0}</td>`
+      + `<td class="num">${f.chunks ? f.chunks.join(" × ") : "—"}</td><td class="num">${mib(f.bytes)} MiB</td>`
+      + `<td>${f.cors?.allow_origin ?? "none"}</td></tr>`).join("")
+    + `</table><p class="hint">Table 9.0 — The three gridMET files for ${man.year}, read with h5wasm by the builder.
+      Grid ${man.grid.lat.n} × ${man.grid.lon.n} at 1/24°, ${man.files[0].time.first.slice(0, 10)} to ${man.files[0].time.last.slice(0, 10)}.
+      Each chunk spans ${man.files[0].chunks?.[0] ?? "?"} days, so decoding one day inflates the ${man.files[0].chunks?.[0] ?? "?"}-day
+      blocks that cover it.</p>`;
+}
+
+function writeFindings(rows, rosRows) {
+  const set = (id, html) => { document.getElementById(id).innerHTML = html; };
+  const row = (g, key) => rows.find((r) => r.basin === g && r.window === `${WINDOWS.find((w) => w.key === key).from}/${WINDOWS.find((w) => w.key === key).to}`);
+  const [bigB, smallB] = basins;                      // Missouri at Hermann, Platte at Louisville
+  const dOf = (g) => daily.map((d) => ({ coord: d.coord, ...d.byBasin[g], snow: d.byBasin[g].pr - d.byBasin[g].rain }));
+  const peak = (arr, k) => arr.reduce((a, b) => (b[k] > a[k] ? b : a));
+  const ev = WINDOWS.find((w) => w.key === "event"), evStart = ms(ev.from);
+
+  // Fig. 9.1: the day on the slider when the page opens, and each basin's wettest day.
+  const d13 = daily.find((d) => d.coord === evStart);
+  const wet = basins.map((b) => ({ b, p: peak(dOf(b.gage), "pr") }));
+  const sameWet = wet.every((w) => w.p.coord === wet[0].p.coord);
+  set("f-91", `<b>What the figure shows.</b> The page opens on ${dm(evStart)}, the first day of the storm window.
+    That day the Missouri basin above Hermann averages ${mm(d13.byBasin[bigB.gage].pr)} of precipitation at a mean temperature of
+    ${d13.byBasin[bigB.gage].tavgC.toFixed(1)} °C, and the Platte basin above Louisville ${mm(d13.byBasin[smallB.gage].pr)} at
+    ${d13.byBasin[smallB.gage].tavgC.toFixed(1)} °C. `
+    + (sameWet ? `${dm(wet[0].p.coord)} is the wettest day of the month on both basins. `
+       : `The wettest basin-mean day of the month is ${wet.map((w) => `${dm(w.p.coord)} on the ${shortName(w.b)} (${mm(w.p.pr)})`).join(" and ")}. `)
+    + `The two panels share one view, so the
+    precipitation band and the temperature panel can be read against each other: at the ${sel.threshold} °C threshold, precipitating
+    cells warmer than ${sel.threshold} °C contribute rain on that day and colder cells snow.`);
+
+  // Fig. 9.2: snow before against rain during.
+  const b1 = row(bigB.gage, "before"), s1 = row(smallB.gage, "before"), b2 = row(bigB.gage, "event"), s2 = row(smallB.gage, "event");
+  set("f-92", `<b>What the figure shows.</b> The left panel sums the snow that fell from 1 to 12 March, the right panel the rain
+    from 13 to 17 March, at the ${sel.threshold} °C threshold. Before the storm, snow is ${mm(b1.snow_mm)} of ${mm(b1.pr_mm)} on the
+    Missouri (${pct(1 - b1.rain_share_pct / 100)}) and ${mm(s1.snow_mm)} of ${mm(s1.pr_mm)} on the Platte
+    (${pct(1 - s1.rain_share_pct / 100)}). During the storm window rain is ${pct(b2.rain_share_pct / 100)} of the Missouri's
+    ${mm(b2.pr_mm)} and ${pct(s2.rain_share_pct / 100)} of the Platte's ${mm(s2.pr_mm)}. The Platte's basin means are higher in both
+    windows (${mm(s1.pr_mm)} and ${mm(s2.pr_mm)} against ${mm(b1.pr_mm)} and ${mm(b2.pr_mm)}).`);
+
+  // Fig. 9.3: rain on recent snowfall.
+  const rb = rosRows.find((r) => r.basin === bigB.gage), rs = rosRows.find((r) => r.basin === smallB.gage);
+  const conc = (r) => (r.event_rain_on_snow_cells_mm ?? 0) > r.event_rain_mm;
+  set("f-93", `<b>What the figure shows.</b> Green cells received at least ${sel.snowMin} mm of snow over 1–12 March and then rain
+    during 13–17 March; the shade is the rain. Those cells cover ${rb.snow_cells_pct} % of the Missouri basin and ${rs.snow_cells_pct} %
+    of the Platte, and they took ${rb.event_rain_on_snow_share_pct} % and ${rs.event_rain_on_snow_share_pct} % of each basin's storm
+    rain. On the Missouri the storm rain ${conc(rb) ? "concentrates on" : "does not concentrate on"} the snow-covered cells
+    (${mm(rb.event_rain_on_snow_cells_mm)} there against a basin mean of ${mm(rb.event_rain_mm)}); on the Platte it
+    ${conc(rs) ? "concentrates on them" : "does not"} (${mm(rs.event_rain_on_snow_cells_mm)} against ${mm(rs.event_rain_mm)}).
+    Snowfall stands in for snow on the ground here, so the map marks where rain fell on recent snow, not where snowpack melted.`);
+
+  // Fig. 9.4: the daily series and the window boundary.
+  const before = WINDOWS.find((w) => w.key === "before");
+  const dayBefore = daily.find((d) => d.coord === evStart - 864e5);
+  const rp = basins.map((b) => ({ b, r: peak(dOf(b.gage), "rain"), s: peak(dOf(b.gage), "snow"),
+    eve: dayBefore?.byBasin[b.gage], beforeRain: row(b.gage, "before").rain_mm }));
+  const evEnd = ms(ev.to);
+  const sums = basins.map((b) => {
+    const a = dOf(b.gage), pre = a.filter((d) => d.coord < evStart), post = a.filter((d) => d.coord > evEnd);
+    const s0 = (arr, k) => arr.reduce((t, d) => t + d[k], 0);
+    return { b, preRain: s0(pre, "rain"), preSnow: s0(pre, "snow"), postRain: s0(post, "rain"), postSnow: s0(post, "snow") };
+  });
+  const phaseLine = sums.map((x) => `on the ${shortName(x.b)}, ${x.preSnow > x.preRain ? "snow" : "rain"} leads before the storm
+    (${mm(x.preSnow)} snow, ${mm(x.preRain)} rain) and ${x.postRain > x.postSnow ? "rain" : "snow"} after it
+    (${mm(x.postRain)} rain, ${mm(x.postSnow)} snow)`).join("; ");
+  set("f-94", `<b>What the figure shows.</b> The two lines trace the phase change through the month: ${phaseLine}.
+    The largest daily basin-mean rain is ${rp.map((x) => `${mm(x.r.rain)} on the ${shortName(x.b)} (${dm(x.r.coord)})`).join(" and ")},
+    and the largest daily snow ${rp.map((x) => `${mm(x.s.snow)} on the ${shortName(x.b)} (${dm(x.s.coord)})`).join(" and ")}.`
+    + (dayBefore ? ` The day before the storm window opens, ${dm(dayBefore.coord)}, carries
+    ${rp.map((x) => `${pct(x.eve.rain / Math.max(x.beforeRain, 1e-9), 0)} of the ${shortName(x.b)}'s before-window rain`).join(" and ")};
+    starting the storm window a day earlier would move that rain from "before" to "during".` : ""));
+
+  set("f-tables", `<b>What the tables show.</b> Over the whole month, rain is ${pct(row(bigB.gage, "month").rain_share_pct / 100)} of the
+    Missouri basin's ${mm(row(bigB.gage, "month").pr_mm)} and ${pct(row(smallB.gage, "month").rain_share_pct / 100)} of the Platte's
+    ${mm(row(smallB.gage, "month").pr_mm)}. The basin means cover ${fmtInt(b1.basin_cells)} and ${fmtInt(s1.basin_cells)} cells. The
+    split depends on the threshold: the sweep in <code>cs9-sensitivity.csv</code> moves the month's rain share by about five points
+    per degree, and <code>?threshold=</code> reruns this page at another value.`);
+
+  writeConclusion(rows, rosRows);
+}
+const fmtInt = (n) => Math.round(n).toLocaleString("en-US");
+
+function writeConclusion(rows, rosRows) {
+  const [bigB, smallB] = basins;
+  const month = (g) => rows.find((r) => r.basin === g && r.window === "2019-03-01/2019-03-31");
+  const ev = (g) => rows.find((r) => r.basin === g && r.window === "2019-03-13/2019-03-17");
+  const bef = (g) => rows.find((r) => r.basin === g && r.window === "2019-03-01/2019-03-12");
+  const ros = (g) => rosRows.find((r) => r.basin === g);
+  const partitionMs = metrics.filter((m) => m.stage === "partition").at(-1)?.ms;
+  document.getElementById("conclusion").innerHTML = `
+    <p>At a ${sel.threshold} °C threshold, March 2019 delivered ${mm(month(bigB.gage).pr_mm)} of precipitation over the Missouri basin
+    above Hermann and ${mm(month(smallB.gage).pr_mm)} over the Platte above Louisville, of which ${pct(month(bigB.gage).rain_share_pct / 100)}
+    and ${pct(month(smallB.gage).rain_share_pct / 100)} fell as rain. The phase turns with the storm: rain rises from
+    ${pct(bef(bigB.gage).rain_share_pct / 100)} of precipitation before 13 March to ${pct(ev(bigB.gage).rain_share_pct / 100)} during it on the
+    Missouri, and from ${pct(bef(smallB.gage).rain_share_pct / 100)} to ${pct(ev(smallB.gage).rain_share_pct / 100)} on the Platte. Of
+    each basin's storm rain, ${ros(bigB.gage).event_rain_on_snow_share_pct} % on the Missouri and ${ros(smallB.gage).event_rain_on_snow_share_pct} % on the Platte fell on cells that had
+    received at least ${sel.snowMin} mm of snow in the preceding twelve days, and that share depends on the snowfall minimum far more than on
+    the phase threshold (<code>cs9-sensitivity.csv</code>).</p>
+    <p>For the engine, the study reads three unmodified agency files covering the conterminous United States for a year, about
+    ${(man.files.reduce((s0, f) => s0 + f.bytes, 0) / 1048576).toFixed(0)} MiB, through the same <code>addDataset</code> call as a single image.
+    Each becomes a Dataset with a 365-step CF time axis; <code>select</code> resolves a day, and <code>combine</code>, <code>reclassify</code>,
+    <code>difference</code>, and <code>mask</code> build the rain, the snow, and the basin statistics. No server-side subsetting is involved, and
+    the host serves the files with a CORS header, so the page can read them from the agency directly. One pass over the month took
+    ${partitionMs ? `${(partitionMs / 1000).toFixed(0)} s` : "the time in Table 9.3"} in this browser, most of it decoding: the files are chunked
+    in ${man.files[0].chunks?.[0] ?? "?"}-day blocks, so each day's decode inflates a block that spans two months.</p>
+    <p>The numbers inherit four limits. The phase rule applies one daily threshold per 4 km cell, so it models neither the change of
+    phase within a day nor the elevation range inside a cell, and it moves the rain share by about five points per degree. Snowfall
+    stands in for snowpack, which gridMET does not carry, so snow that melted before the storm still counts. The storm window is this
+    study's framing, and it leaves 12 March, which carries most of the before-window rain, in the "before" window (Fig. 9.4). Two engine properties shaped
+    the page: <code>SpatialFilter</code> treats a list of rings as a union, so the basins' holes had to be masked out separately, and the
+    NetCDF4 path places the grid by its outermost cell centers, which stretches it by one cell across the conterminous United States
+    and changes basin cell counts by about 0.1 %.</p>`;
+}
+
+// ── controls ──────────────────────────────────────────────────────────────────────────────────
+document.getElementById("tstep").oninput = (e) => { if (!playing) showStep(Number(e.target.value)); };
+document.getElementById("play").onclick = async () => {
+  const btn = document.getElementById("play");
+  if (playing) { playing = false; btn.textContent = "▶ play"; return; }
+  playing = true; btn.textContent = "■ stop";
+  const frames = [];
+  for (let i = sel.step; i < march.length && playing; i++) frames.push(await showStep(i, { record: false }));
+  playing = false; btn.textContent = "▶ play";
+  if (frames.length) {
+    const sorted = [...frames].sort((a, b) => a - b);
+    costRow("scrub: one CONUS day, 3 slices decoded (median)", frames.length, sorted[sorted.length >> 1]);
+    renderCost();
+  }
+};
+async function apply() {
+  const btn = document.getElementById("apply");
+  btn.disabled = true;
+  try {
+    const threshold = Number(document.getElementById("threshold").value);
+    const snowMin = Number(document.getElementById("snowmin").value);
+    // The month is re-partitioned only when the phase rule changes; a new snowfall minimum reuses it.
+    if (!windows || threshold !== sel.threshold) { sel.threshold = threshold; windows = await partition(); }
+    document.title = `Case Study 9 — ${sel.threshold} °C, ${snowMin} mm`;
+    sel.snowMin = snowMin;
+    status("basin statistics…");
+    await basinTables();
+    renderCost();
+    status(`ready — ${SOURCE} source, heap ${heapMB() ?? "n/a"} MB`, "done");
+  } catch (err) {
+    console.error(err); log(`ERROR  ${err.message}`); status(`failed: ${err.message}`, "fail");
+  }
+  btn.disabled = false;
+}
+document.getElementById("apply").onclick = apply;
+document.getElementById("dlp").onclick = () => download(perf, "performance.csv");
+document.getElementById("dlm").onclick = () => download(metrics, "metrics.csv");
+document.getElementById("dlr").onclick = () => download(results, "results.csv");
+
+// ── run ───────────────────────────────────────────────────────────────────────────────────────
+try {
+  const r = await fetch(MANIFEST);
+  if (!r.ok) throw new Error(`no manifest at ${MANIFEST} (HTTP ${r.status}) — run node case-studies/build_case_study9_data.mjs`);
+  man = await r.json();
+  const liveOk = man.files.every((f) => f.cors?.allow_origin === "*" || f.cors?.allow_origin === location.origin);
+  log(`manifest: gridMET ${man.year}, ${man.files.length} files, grid ${man.grid.lat.n} × ${man.grid.lon.n}; `
+    + `source ${SOURCE}; the host ${liveOk ? "sends" : "does not send"} a CORS header for this origin`);
+  if (SOURCE === "live" && !liveOk) log("WARN  ?source=live requested, and the builder's probe found no matching CORS header");
+
+  const fc = await (await fetch(DATA + man.basins)).json();
+  basins = fc.features.map((f) => ({ gage: f.properties.gage, name: f.properties.name,
+    outline: outlinesOf(f.geometry), holes: holesOf(f.geometry) }));
+  for (const b of basins) log(`${b.name}: ${b.outline.length} outline ring(s), ${b.holes.length} hole(s)`);
+  const la = man.grid.lat, lo = man.grid.lon;
+  FIT = [[Math.min(la.first, la.last), Math.min(lo.first, lo.last)], [Math.max(la.first, la.last), Math.max(lo.first, lo.last)]];
+
+  for (const f of man.files) {
+    status(`loading ${f.name}…`);
+    vars[f.key] = await loadFile(f);
+  }
+  const tUnits = [...new Set(["tmmn", "tmmx"].map((k) => man.files.find((f) => f.key === k).attrs.units ?? ""))];
+  if (tUnits.length !== 1) throw new Error(`tmmn and tmmx carry different units (${tUnits.join(", ")}), so their mean is not a temperature`);
+  KELVIN = /^k(elvin)?$/i.test(tUnits[0]);
+  renderInputs();
+  log(`temperature units: ${KELVIN ? "K, converted to °C for display and the threshold" : "°C"}`);
+
+  march = vars.pr.axis.entries.map((e, k) => ({ coord: e.coord, k })).filter(({ coord }) => coord >= ms(MONTH.from) && coord <= ms(MONTH.to));
+  if (march.length !== 31) throw new Error(`expected 31 March days on the time axis, found ${march.length}`);
+  for (const key of ["tmmn", "tmmx"]) {
+    const bad = march.find(({ coord, k }) => vars[key].axis.entries[k].coord !== coord);
+    if (bad) throw new Error(`${key}: day ${bad.k} is ${dayLabel(vars[key].axis.entries[bad.k].coord)}, pr has ${dayLabel(bad.coord)}`);
+  }
+  const slider = document.getElementById("tstep");
+  slider.max = String(march.length - 1);
+  document.getElementById("threshold").value = String(sel.threshold);
+  document.getElementById("snowmin").value = String(sel.snowMin);
+
+  for (const key of Object.keys(maps)) {
+    const file = new File([JSON.stringify(fc)], "basins.geojson", { type: "application/geo+json" });
+    const b = await maps[key].addDataset(file);
+    await maps[key].addLayer("vector", { source: b,
+      style: () => ({ fillColor: "transparent", strokeColor: "#ffffff", strokeWidth: 1.5, fillOpacity: 0 }) });
+    maps[key].map.fitBounds(FIT);
+  }
+
+  status("decoding 13 March…");
+  const open = march.findIndex(({ coord }) => coord === ms("2019-03-13"));
+  const { ms: firstMs } = await stage("t_op", { dataset: "first CONUS day" }, () => showStep(open, { record: true }));
+  costRow("first CONUS day shown (3 slices, first decode of the session)", 1, firstMs);
+  const g0 = await day(march[open].k).pr.grid();
+  document.getElementById("t-pr").innerHTML = `Daily precipitation <small>1/24°, ${g0.width}×${g0.height}, mm</small>`;
+  document.getElementById("t-temp").innerHTML = `Daily mean temperature <small>same day, °C</small>`;
+  metrics.push({ study: "9", stage: "loaded", heap_mb: heapMB(), width: g0.width, height: g0.height });
+
+  await apply();
+} catch (e) {
+  console.error(e);
+  log(`ERROR  ${e.message}`);
+  status(`failed: ${e.message}`, "fail");
+}
+</script>
+</body>
+</html>

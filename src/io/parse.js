@@ -270,7 +270,7 @@ async function parseGeoTIFF(blob, name) {
 
 // GDAL_NODATA is a string that often carries a trailing NUL ("-99999\0"); strip it and
 // coerce to a number when possible.
-function cleanNoData(v) {
+export function cleanNoData(v) {
   if (v == null) return null;
   const s = String(v).replace(/\0/g, "").trim();
   if (s === "") return null;

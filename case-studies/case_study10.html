@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIMViz — Case Study 10: Riverine flood exposure in Louisiana, today and in 2050</title>
+<link rel="icon" href="../assets/brand/favicon.png" />
+<link rel="stylesheet" href="../site.css" />
+<style>
+  body { max-width: 108ch; margin: 0 auto; padding: 30px 22px 80px; }
+  h1 { font-size: 23px; margin: 0 0 6px; letter-spacing: -.01em; }
+  h2 { font-size: 15px; margin: 28px 0 9px; }
+  h2 .n { color: var(--dim); font: 600 12px/1 var(--mono); margin-right: 8px; }
+  h3 { font-size: 13px; margin: 0 0 6px; font-weight: 600; }
+  h3 small { color: var(--dim); font-weight: 400; margin-left: 6px; }
+  p { margin: 0 0 11px; }
+  .lead { color: var(--dim); margin-bottom: 16px; }
+  .q { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; margin: 0 0 16px; }
+  #status { font-size: 12.5px; color: var(--dim); margin: 0 0 16px; min-height: 18px; }
+  .spin { width: 11px; height: 11px; border: 2px solid var(--line); border-top-color: var(--accent);
+          border-radius: 50%; display: inline-block; animation: sp .8s linear infinite; vertical-align: -1px; margin-right: 7px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  #status.done .spin, #status.fail .spin { display: none; }
+  #status.fail { color: var(--bad); }
+  .panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0 0 8px; }
+  .panel.wide { grid-column: 1 / -1; }
+  @media (max-width: 780px) { .panels { grid-template-columns: 1fr; } }
+  .panel .map { height: 330px; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .panel.wide .map { height: 420px; }
+  .mapwrap { position: relative; margin: 0 0 6px; }
+  .lg { position: absolute; right: 9px; bottom: 9px; z-index: 1100; background: var(--panel);
+        border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; font-size: 11px;
+        color: var(--fg); box-shadow: 0 1px 5px rgb(0 0 0 / .25); max-width: 220px; }
+  .lg .src { color: var(--dim); font-size: 10px; margin: 4px 0 0; }
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 6px 0 4px; }
+  .hint { font-size: 12px; color: var(--dim); margin: 0 0 14px; }
+  button { background: transparent; color: var(--accent); border: 1px solid var(--control-line);
+           border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  label.ctl { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--dim); }
+  #rp { width: 260px; accent-color: var(--accent); }
+  .clock { font: 600 12px/1 var(--mono); color: var(--fg); min-width: 10ch; }
+  pre.out { background: var(--panel); color: var(--dim); white-space: pre-wrap; max-height: 220px; font-size: 12px; margin: 0 0 14px; }
+  pre.out:empty { display: none; }
+  pre.recipe { background: var(--panel); color: var(--fg); white-space: pre; overflow: auto; max-height: 260px;
+               font-size: 11.5px; margin: 0 0 10px; }
+  pre.recipe:empty { display: none; }
+  table { border-collapse: collapse; font-size: 12.5px; margin: 0 0 8px; width: 100%; }
+  th, td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .tbl:empty { display: none; }
+  .finding { margin: 4px 0 16px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 7px;
+             background: var(--panel); font-size: 13.5px; }
+  .finding:empty { display: none; }
+  .finding b { font-weight: 600; }
+  .src-list { font-size: 12.5px; color: var(--dim); }
+  .src-list li { margin: 0 0 4px; }
+</style>
+</head>
+<body>
+
+<h1 id="h1">Case Study 10 — Riverine flood exposure in Louisiana, today and in 2050</h1>
+<p class="lead">
+  One scene composed from public files by a short chain of engine ops: WRI Aqueduct Floods riverine
+  depth at nine return periods and under five climate models, WorldPop 2020 population, and
+  geoBoundaries parishes. The page draws every layer type the engine has, then saves the scene as a
+  recipe and rebuilds it from that recipe. <code>?region=&lt;slug&gt;</code> reads any other region the same
+  script has built. Protocol: <a href="CASE_STUDY_PROTOCOL.md">CASE_STUDY_PROTOCOL.md</a> §0.
+</p>
+<p class="q" id="question">
+  <b>The question.</b> <b>How many people in <span class="rg">Louisiana</span> live inside the 100-year
+  riverine flood extent today, how does that change by 2050 under RCP8.5, and how far do five climate
+  models agree on where?</b>
+</p>
+
+<p id="status"><span class="spin"></span><span id="status-text">starting…</span></p>
+
+<h2><span class="n">§</span>Data and models</h2>
+<p>
+  <b>Flood hazard.</b> WRI's Aqueduct Floods, version 2 (Ward et al., 2020), publishes riverine flood depth
+  in meters on a global 30 arc-second grid, about 0.9 km north–south and 0.8 km east–west at this
+  latitude. The depths come from the GLOFRIS model cascade: the PCR-GLOBWB global hydrological model, with a
+  river and floodplain routing scheme, simulates long runs of discharge and flood volume, and the flood
+  volume for each return period is spread over the terrain as a depth. The historical maps are driven by
+  the EU-WATCH reanalysis for 1960–1999 and are labelled 1980; nine return periods from 2 to 1,000 years
+  are used here. The future maps rerun the same cascade with five CMIP5 global climate models
+  (NorESM1-M, GFDL-ESM2M, HadGEM2-ES, IPSL-CM5A-LR, and MIROC-ESM-CHEM); this study takes RCP8.5 in 2050
+  at the 100-year return period. Aqueduct applies flood protection in its risk estimates rather than in
+  these depth maps (Society of Actuaries, 2021), and this study applies none, so a cell behind a levee
+  counts as wet wherever the depth map says so.
+</p>
+<p>
+  <b>Population.</b> WorldPop's 2020 population counts at 1 km (CC BY 4.0) redistribute each country's
+  census counts to grid cells with a random-forest model over settlement, land-cover, road, night-light,
+  and other covariates (WorldPop, 2020). The unconstrained variant used here can place people in any land
+  cell, so rural totals are spread thinly rather than concentrated on mapped buildings.
+</p>
+<p>
+  <b>Boundaries.</b> geoBoundaries (Runfola et al., 2020) supplies the <span class="rg">Louisiana</span>
+  outline and its <span id="n-units">64</span> <span class="un">parish</span> polygons, which it takes from
+  <span id="gb-source">the US Census Bureau's MAF/TIGER database</span> (<span id="gb-license">public domain</span>).
+</p>
+<p>
+  <b>Preparation.</b> <code>build_case_study10_data.mjs</code> reads each global file with HTTP range
+  requests and keeps only the window over the state plus a 0.1° margin, on the source grid, so nothing is
+  resampled before the page opens it. Cells the source marks as missing become NaN. Table 10.0 lists the
+  fifteen files the page reads.
+</p>
+<div id="inputs-table" class="tbl"></div>
+
+<h2><span class="n">Fig. 10.1</span>Depth by return period, and the hazard classes it implies</h2>
+<div class="panels">
+  <div class="panel">
+    <h3 id="t-depth">Riverine depth <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-depth"></div><div class="lg" id="lg-depth" hidden></div></div>
+  </div>
+  <div class="panel">
+    <h3 id="t-bands">Hazard class <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-bands"></div><div class="lg" id="lg-bands" hidden></div></div>
+  </div>
+</div>
+<div class="controls">
+  <label class="ctl">return period <input type="range" id="rp" min="0" max="0" value="0" /></label>
+  <span class="clock" id="rp-label">—</span>
+</div>
+<p class="hint">
+  The nine historical files form one Dataset with a <code>return_period</code> axis: each entry is its own
+  GeoTIFF, and <code>ds.select(rp)</code> fetches only the one on the slider. The hazard class is
+  <code>depth.reclassify([{min: wet, max: 0.5, value: 1}, {min: 0.5, max: 1.5, value: 2}, {min: 1.5, value: 3}])</code>,
+  written as range rules so the recipe below can carry it; cells below the wet threshold match no rule
+  and become transparent.
+</p>
+<div id="rp-table" class="tbl"></div>
+<p class="finding" id="f-101"></p>
+
+<h2><span class="n">Fig. 10.2</span>What changes by 2050</h2>
+<div class="panels">
+  <div class="panel">
+    <h3 id="t-change">Change in 100-year depth <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-change"></div><div class="lg" id="lg-change" hidden></div></div>
+  </div>
+  <div class="panel">
+    <h3 id="t-compare">100-year extent, today against 2050 <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-compare"></div><div class="lg" id="lg-compare" hidden></div></div>
+  </div>
+</div>
+<p class="hint">
+  The five 2050 files form a second Dataset with an unordered, reducible <code>gcm</code> axis.
+  <code>future.reduce("mean")</code> is the ensemble-mean depth, and
+  <code>.combine([today], { op: "difference" })</code> is the change. The right panel is a
+  <code>ComparisonLayer</code> over the two wet extents, with today as the reference.
+</p>
+<div id="compare-table" class="tbl"></div>
+<p class="finding" id="f-102"></p>
+
+<h2><span class="n">Fig. 10.3</span>How far the five climate models agree</h2>
+<div class="panels">
+  <div class="panel wide">
+    <h3 id="t-agree">Models calling a cell wet at the 100-year return period, 2050 <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-agree"></div><div class="lg" id="lg-agree" hidden></div></div>
+  </div>
+</div>
+<p class="hint">
+  An <code>EnsembleAggregationLayer</code> over the five 2050 wet extents counts, per cell, how many models
+  flood it. Cells at 5 are robust to the choice of model; cells at 1 or 2 exist in the ensemble mean
+  only because one or two models put water there.
+</p>
+<div id="agree-table" class="tbl"></div>
+<div id="gcm-table" class="tbl"></div>
+<p class="finding" id="f-103"></p>
+
+<h2><span class="n">Fig. 10.4</span>People inside the 100-year extent, by <span class="un">parish</span></h2>
+<div class="panels">
+  <div class="panel wide">
+    <h3 id="t-district">People in the 100-year extent, 2050 ensemble mean <small>loading…</small></h3>
+    <div class="mapwrap"><div class="map" id="m-district"></div><div class="lg" id="lg-district" hidden></div></div>
+  </div>
+</div>
+<p class="hint">
+  The population is first masked to the state outline. <code>pop.combine([wetOpen], { op: "min" })</code>
+  then keeps the population of wet cells, where <code>wetOpen</code> is the depth reclassified to 0 for dry
+  and a large number for wet. <code>min</code> skips an absent input, so each side is made gap-free over the
+  other's footprint first (a sum with a zero raster); otherwise a cell with no population value would pass
+  the large number through, and a populated cell with no depth value would count as wet.
+  <code>zonalStats(units)</code> sums the result per <span class="un">parish</span>, and the choropleth is a
+  vector layer colored by that sum. <code>pop.groupBy(depth, { bins })</code> gives the same people by
+  hazard class.
+</p>
+<div id="district-table" class="tbl"></div>
+<div id="band-table" class="tbl"></div>
+<p class="finding" id="f-104"></p>
+
+<h2><span class="n">§</span>The scene as a recipe</h2>
+<p class="hint">
+  <code>toRecord()</code> writes each product as its sources and its ops, with no pixels.
+  <code>Dataset.fromRecord()</code> rebuilds the chain, which fetches the same files again and recomputes;
+  the table compares the rebuilt totals with the originals.
+</p>
+<div class="controls">
+  <button id="rebuild" disabled>rebuild from recipe</button>
+  <button id="dlrecipe" disabled>recipe.json</button>
+</div>
+<div id="recipe-table" class="tbl"></div>
+<p class="finding" id="f-recipe"></p>
+<pre class="recipe" id="recipe"></pre>
+
+<h2><span class="n">§</span>Conclusion</h2>
+<div id="conclusion"><p class="hint">Written when the page finishes.</p></div>
+
+<h2><span class="n">§</span>Sources</h2>
+<ul class="src-list">
+  <li>Ward, P. J., Winsemius, H. C., Kuzma, S., et al. (2020). <i>Aqueduct Floods Methodology</i>. Technical
+    note, World Resources Institute. <a href="https://www.wri.org/research/aqueduct-floods-methodology">wri.org</a></li>
+  <li>World Resources Institute (2020). Aqueduct Floods Hazard Maps, version 2. Files at
+    <code>aqueduct.wridata.org/AqueductFloods20</code>; catalog entry
+    <a href="https://developers.google.com/earth-engine/datasets/catalog/WRI_Aqueduct_Flood_Hazard_Maps_V2">WRI/Aqueduct_Flood_Hazard_Maps/V2</a>.</li>
+  <li>Society of Actuaries (2021). <i>Potential Impacts of Climate Change on U.S. Inland Flood Risk</i>.
+    <a href="https://www.soa.org/globalassets/assets/files/resources/research-report/2021/2021-climate-change-impact-us-flooding.pdf">soa.org</a></li>
+  <li>WorldPop (2020). Global 1 km population counts, 2020, unconstrained.
+    <a href="https://www.worldpop.org/methods/">Methods</a>; <a href="https://data.worldpop.org/GIS/Population/Global_2000_2020_1km/2020/">files</a>.</li>
+  <li>Runfola, D., et al. (2020). geoBoundaries: A global database of political administrative boundaries.
+    <i>PLOS ONE</i> 15(4): e0231866. <a href="https://www.geoboundaries.org/">geoboundaries.org</a></li>
+</ul>
+
+<div class="controls">
+  <button id="dlr">results.csv</button>
+</div>
+<pre class="out" id="log"></pre>
+
+<script type="importmap">
+{ "imports": {
+    "fimviz": "../dist/fimviz.js",
+    "fimviz/ui": "../dist/ui.js",
+    "sciwrid-toolkit": "../node_modules/sciwrid-toolkit/dist/index.js"
+} }
+</script>
+
+<script type="module">
+import { FimViz, ColorScale, Dataset, RasterGrid, Stats, Legend, gridMeta,
+         ComparisonLayer, EnsembleAggregationLayer } from "fimviz";
+
+// ── settings ──────────────────────────────────────────────────────────────────────────────────
+// ?wet=<m> sets the depth above which a cell counts as flooded (default 0.1 m).
+const Q = new URLSearchParams(location.search);
+const WET = Q.has("wet") ? Number(Q.get("wet")) : 0.1;
+const RP_FOCUS = 100;
+const OPEN = 1e12;                      // larger than any cell's population, so min(pop, OPEN) = pop
+const BANDS = [WET, 0.5, 1.5, 1e6];     // depth edges for the hazard classes, meters
+const DATA = "./data/";
+// ?region=<slug> picks which build of build_case_study10_data.mjs to read (default louisiana).
+const REGION = (Q.get("region") || "louisiana").toLowerCase();
+const MANIFEST = `${DATA}${REGION}-flood-manifest.json`;
+
+const results = [];
+const log = (...a) => { document.getElementById("log").textContent += a.join(" ") + "\n"; };
+const status = (text, state = "") => {
+  document.getElementById("status-text").textContent = text;
+  document.getElementById("status").className = state;
+};
+const fmt = (n) => Math.round(n).toLocaleString("en-US");
+const toCsv = (rows) => {
+  const cols = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+  return [cols.join(","), ...rows.map((r) => cols.map((c) => JSON.stringify(r[c] ?? "")).join(","))].join("\n");
+};
+const save = (text, name, type) => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+};
+
+// ── maps, one view for all ────────────────────────────────────────────────────────────────────
+const maps = {};
+for (const k of ["depth", "bands", "change", "compare", "agree", "district"]) {
+  maps[k] = await FimViz.mount(`#m-${k}`, { provider: "leaflet", isolated: true });
+}
+let syncing = false;
+for (const m of Object.values(maps).map((f) => f.map)) {
+  m.on("move zoom", () => {
+    if (syncing) return;
+    syncing = true;
+    for (const o of Object.values(maps).map((f) => f.map)) if (o !== m) o.setView(m.getCenter(), m.getZoom(), { animate: false });
+    syncing = false;
+  });
+}
+
+const layers = {};
+async function paint(key, dataset, scale, caption) {
+  layers[key]?.remove();
+  maps[key].adoptDataset(dataset);
+  const layer = await maps[key].addLayer("raster", { source: dataset, colorScale: scale });
+  layers[key] = layer;
+  const host = document.getElementById(`lg-${key}`);
+  host.innerHTML = layer.getLegend().toHtml() + `<p class="src">${caption}</p>`;
+  host.hidden = false;
+  return layer;
+}
+
+// ── color scales ──────────────────────────────────────────────────────────────────────────────
+const depthScale = new ColorScale({ missingColor: "transparent", stops: [
+  { min: WET, max: 0.5, color: "#c6dbef", label: `${WET}–0.5 m` },
+  { min: 0.5, max: 1, color: "#6baed6", label: "0.5–1 m" },
+  { min: 1, max: 2, color: "#2171b5", label: "1–2 m" },
+  { min: 2, max: 1e6, color: "#08306b", label: "≥ 2 m" }] });
+const bandScale = new ColorScale({ missingColor: "transparent", stops: [
+  { min: 0.5, max: 1.5, color: "#fdd49e", label: `low (${WET}–0.5 m)` },
+  { min: 1.5, max: 2.5, color: "#fc8d59", label: "medium (0.5–1.5 m)" },
+  { min: 2.5, max: 3.5, color: "#b30000", label: "high (≥ 1.5 m)" }] });
+const changeScale = new ColorScale({ missingColor: "transparent", stops: [
+  { min: -1e6, max: -0.5, color: "#2166ac", label: "shallower by ≥ 0.5 m" },
+  { min: -0.5, max: -0.1, color: "#92c5de", label: "shallower by 0.1–0.5 m" },
+  { min: 0.1, max: 0.5, color: "#f4a582", label: "deeper by 0.1–0.5 m" },
+  { min: 0.5, max: 1e6, color: "#b2182b", label: "deeper by ≥ 0.5 m" }] });
+const CMP = { both: "#2c66a5", futureOnly: "#c0392b", todayOnly: "#e0a33b" };
+const compareScale = new ColorScale({ missingColor: "transparent", stops: [
+  { min: 0.5, max: 1.5, color: CMP.both, label: "wet in both" },
+  { min: 1.5, max: 2.5, color: CMP.futureOnly, label: "wet in 2050 only" },
+  { min: 2.5, max: 3.5, color: CMP.todayOnly, label: "wet today only" }] });
+const agreeColors = ["#e7e1ef", "#c994c7", "#df65b0", "#ce1256", "#67001f"];
+const agreeScale = (n) => new ColorScale({ missingColor: "transparent", stops:
+  agreeColors.slice(0, n).map((color, i) => ({ min: i + 0.5, max: i + 1.5, color, label: `${i + 1} of ${n}` })) });
+const districtScale = new ColorScale({ missingColor: "transparent", stops: [
+  { min: 0, max: 10e3, color: "#fee5d9", label: "< 10,000" },
+  { min: 10e3, max: 50e3, color: "#fcae91", label: "10,000–50,000" },
+  { min: 50e3, max: 200e3, color: "#fb6a4a", label: "50,000–200,000" },
+  { min: 200e3, max: 500e3, color: "#de2d26", label: "200,000–500,000" },
+  { min: 500e3, max: 1e12, color: "#a50f15", label: "≥ 500,000" }] });
+
+// ── the chain ─────────────────────────────────────────────────────────────────────────────────
+// Range rules only, so every product below survives toRecord().
+const wet01 = (depth) => depth.reclassify([{ max: WET, value: 0 }, { min: WET, value: 1 }]);
+const wetOpen = (depth) => depth.reclassify([{ max: WET, value: 0 }, { min: WET, value: OPEN }]);
+const hazardBands = (depth) => depth.reclassify([{ min: WET, max: 0.5, value: 1 }, { min: 0.5, max: 1.5, value: 2 }, { min: 1.5, value: 3 }]);
+// combine's min, sum, and mean skip an absent input rather than propagating it. min(pop, OPEN) on a cell
+// with no population value would return OPEN, and min(pop, <absent depth>) on a populated cell with no
+// depth value would return the population. So each side is made gap-free over the other's footprint first:
+// a sum with a zero raster turns an absent value into 0 wherever the other raster has one.
+const zeroOver = (ds) => ds.reclassify([{ value: 0 }]);
+const popGapFree = (pop, depth) => pop.combine([zeroOver(depth)], { op: "sum" });
+const wetGapFree = (depth, pop) => wetOpen(depth).combine([zeroOver(pop)], { op: "sum" });
+const exposed = (pop, depth) => popGapFree(pop, depth).combine([wetGapFree(depth, pop)], { op: "min" });
+
+/** A RasterGrid with NaN set to 0, since the comparison and agreement layers count any non-dry value as wet. */
+const dryNaN = (g) => new RasterGrid({ ...g, pixels: Float32Array.from(g.pixels, (v) => (Number.isNaN(v) ? 0 : v)), noData: null });
+const catGrid = (grid, pixels) => new RasterGrid({ pixels, width: grid.width, height: grid.height, noData: null,
+  crs: "EPSG:4326", bounds: { north: grid.bn, south: grid.bs, east: grid.be, west: grid.bw } });
+
+let man, hist, future, pop, districts, FIT;
+const F = {};                           // numbers the findings and the conclusion are written from
+const pct = (x, d = 1) => `${(100 * x).toFixed(d)} %`;
+const signed = (x, d = 1) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(d)}`;
+const list3 = (a) => a.length < 3 ? a.join(" and ") : `${a.slice(0, -1).join(", ")}, and ${a.at(-1)}`;
+
+function renderInputs() {
+  const mib = (b) => (b / 1048576).toFixed(2);
+  const arcs = (r) => (r * 3600).toFixed(0);
+  const row = (what, f, extra = "") => `<tr><td>${what}</td><td><code>${f.file.split("/").pop()}</code></td>`
+    + `<td class="num">${f.width} × ${f.height}</td><td class="num">${arcs(f.res_deg[0])}″</td>`
+    + `<td class="num">${extra}</td><td class="num">${mib(f.bytes)} MiB</td><td>${f.read_mode ?? "range"}</td></tr>`;
+  document.getElementById("inputs-table").innerHTML = `<table><tr><th>input</th><th>file</th><th>cells</th><th>grid</th>`
+    + `<th>cells above 0.05 m</th><th>size</th><th>read from source by</th></tr>`
+    + man.historical.map((h) => row(`Aqueduct historical, ${h.rp}-year`, h, fmt(h.cells_above_0_05m))).join("")
+    + man.future.map((f) => row(`Aqueduct RCP8.5 2050, 100-year, ${f.gcm}`, f, fmt(f.cells_above_0_05m))).join("")
+    + row("WorldPop 2020 population", man.population, "")
+    + `</table><p class="hint">Table 10.0 — The inputs, cropped from the global files by the builder. The source files are
+      ${man.historical[0].source_size?.join(" × ") ?? "?"} cells each; Aqueduct was read from <code>${man.sources.aqueduct.base}</code>.</p>`;
+}
+const products = {};                    // name -> Dataset, the scene the recipe carries
+const totals = {};                      // name -> number, compared after the rebuild
+
+async function showRp(i) {
+  const e = hist.axis.entries[i];
+  document.getElementById("rp").value = String(i);
+  document.getElementById("rp-label").textContent = `${e.coord}-year`;
+  const depth = hist.select(e.coord);
+  await paint("depth", depth, depthScale, `Aqueduct historical, RP${e.coord}`);
+  await paint("bands", hazardBands(depth), bandScale, `reclassify, RP${e.coord}`);
+  document.getElementById("t-depth").innerHTML = `Riverine depth <small>${e.coord}-year, historical (WATCH, 1980)</small>`;
+  document.getElementById("t-bands").innerHTML = `Hazard class <small>${e.coord}-year</small>`;
+}
+
+async function sumOf(ds) {
+  const s = await ds.stats({ bins: 4 });
+  return s.sum ?? 0;
+}
+
+/** Douglas–Peucker over one closed [lng, lat] ring; keeps the ring closed. */
+function simplifyRing(ring, tol) {
+  if (ring.length <= 4) return ring;
+  const keep = new Uint8Array(ring.length); keep[0] = keep[ring.length - 1] = 1;
+  const d2 = ([x, y], [x1, y1], [x2, y2]) => {
+    const dx = x2 - x1, dy = y2 - y1, L = dx * dx + dy * dy;
+    const u = L ? Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / L)) : 0;
+    return Math.hypot(x - (x1 + u * dx), y - (y1 + u * dy));
+  };
+  const stack = [[0, ring.length - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop();
+    let max = 0, idx = -1;
+    for (let i = a + 1; i < b; i++) { const d = d2(ring[i], ring[a], ring[b]); if (d > max) { max = d; idx = i; } }
+    if (idx > 0 && max > tol) { keep[idx] = 1; stack.push([a, idx], [idx, b]); }
+  }
+  const out = ring.filter((_, i) => keep[i]);
+  return out.length >= 4 ? out : ring;
+}
+const plural = (w) => (/(s|sh|ch|x)$/.test(w) ? `${w}es` : `${w}s`);
+
+// ── the write-up, from this run's numbers ─────────────────────────────────────────────────────
+function writeFindings() {
+  const { RG, UN } = F;
+  const set = (id, html) => { document.getElementById(id).innerHTML = html; };
+  const rps = F.rp.filter((r) => r.wetCells > 0);
+  const lo = rps[0], hi = rps.at(-1), r100 = F.rp.find((r) => r.rp === RP_FOCUS);
+  const dry = F.rp.filter((r) => r.wetCells === 0).map((r) => `${r.rp}-year`);
+  const c = F.cls.today, cSum = c.reduce((a, b) => a + b, 0) || 1;
+  set("f-101", `<b>What the figure shows.</b> The left panel is the historical depth at the return period on the slider,
+    and the right panel is the same map cut into three hazard classes. `
+    + (dry.length ? `The ${list3(dry)} map has no cell above ${WET} m in this crop, so its panels are empty. ` : "")
+    + `From the ${fmt(lo.rp)}-year to the ${fmt(hi.rp)}-year map the wet area grows from ${fmt(lo.wetCells)} to ${fmt(hi.wetCells)} cells
+    (${signed(100 * (hi.wetCells / lo.wetCells - 1), 0)} %), and the people inside it from ${fmt(lo.people)} to ${fmt(hi.people)} (Table 10.1).
+    At the 100-year return period the extent holds ${fmt(r100.people)} people, ${pct(r100.people / F.statePop)} of ${RG}'s ${fmt(F.statePop)};
+    ${pct(c[0] / cSum, 0)} of them are in the low class (${WET}–0.5 m), ${pct(c[1] / cSum, 0)} in the medium class (0.5–1.5 m),
+    and ${pct(c[2] / cSum, 0)} in the high class (1.5 m or more).`);
+
+  const ch = F.change, m = F.cmp;
+  set("f-102", `<b>What the figure shows.</b> On the ${fmt(ch.n)} cells wet in either map, the five-model mean of the 2050
+    100-year depth differs from today's by ${signed(ch.mean, 2)} m on average; ${pct(ch.deeper)} of those cells are more than
+    0.1 m deeper and ${pct(ch.shallower)} more than 0.1 m shallower (left panel, where changes smaller than 0.1 m are left blank).
+    The extent moves less than the depth: the 2050 ensemble-mean extent covers ${m.b.toFixed(3)} times today's cells,
+    ${pct(m.h)} of today's wet cells stay wet, ${fmt(m.fp)} cells are wet only in 2050 and ${fmt(m.fn)} only today
+    (critical success index ${m.f.toFixed(3)}; right panel). The ensemble mean averages five depth maps cell by cell, which pulls
+    down the deepest cells and trims each model's margins, so Fig. 10.3 and Table 10.3 carry the spread between models.`);
+
+  const a = F.agree, all = a.hist[a.n] / Math.max(a.wetAny, 1), few = (a.hist[1] + (a.hist[2] ?? 0)) / Math.max(a.wetAny, 1);
+  const g = [...F.gcm].sort((p, q) => p.people - q.people), today100 = r100.people;
+  const up = F.gcm.filter((r) => r.people > today100).length;
+  set("f-103", `<b>What the figure shows.</b> Dark cells are flooded by all ${a.n} models and light cells by one or two.
+    ${pct(all)} of the cells any model floods are flooded by all ${a.n}, and ${pct(few)} by only one or two, so the models
+    place the 100-year floodplain in nearly the same cells. Exposure varies by model: 2050 exposure runs from
+    ${fmt(g[0].people)} (${g[0].gcm}) to ${fmt(g.at(-1).people)} (${g.at(-1).gcm}), against ${fmt(today100)} today
+    (${signed(100 * (g[0].people / today100 - 1))} % to ${signed(100 * (g.at(-1).people / today100 - 1))} %), and ${up} of the ${a.n}
+    models put more people in the extent than today (Table 10.3). The sign of the change therefore depends on the model.`);
+
+  const u = F.units, top = u.rows.slice(0, 3), topShare = top.reduce((s0, r) => s0 + r.y2050, 0) / Math.max(u.tot.y2050, 1);
+  const hiT = F.cls.today[2], hi50 = F.cls.y2050[2], hiModels = F.gcm.map((r) => r.high);
+  const hiMin = Math.min(...hiModels), hiMax = Math.max(...hiModels);
+  set("f-104", `<b>What the figure shows.</b> Darker ${plural(UN)} hold more people inside the 2050 ensemble-mean 100-year extent.
+    Summed over the ${u.rows.length} ${plural(UN)}, today's extent holds ${fmt(u.tot.today)} people, ${pct(u.tot.today / Math.max(u.popTotal, 1))}
+    of their ${fmt(u.popTotal)}, and the 2050 ensemble mean holds ${fmt(u.tot.y2050)} (${signed(100 * (u.tot.y2050 / Math.max(u.tot.today, 1) - 1))} %).
+    ${list3(top.map((r) => r.district))} carry ${pct(topShare, 0)} of the 2050 total. `
+    + (RG === "Louisiana" ? `No levee protection is applied, so ${plural(UN)} behind the federal levee system, Orleans and Jefferson among them,
+    count their population wherever the depth map is wet. ` : "")
+    + `In the high class (1.5 m or more) the ensemble mean holds ${fmt(hi50)} people against ${fmt(hiT)} today`
+    + (hi50 < hiMin ? `, fewer than any single model (${fmt(hiMin)}–${fmt(hiMax)}), which is the averaging in Fig. 10.2 at work rather than a projected change.`
+       : `; the single models give ${fmt(hiMin)}–${fmt(hiMax)}.`));
+
+  const r = F.recipe;
+  set("f-recipe", `<b>What the table shows.</b> The ${r.products} products above take ${r.ops} engine ops over ${r.files} source files.
+    Their recipe is ${(r.bytes / 1024).toFixed(1)} kB of JSON, against ${(r.fetched / 1048576).toFixed(1)} MiB of GeoTIFF the scene reads.
+    The largest part is the state outline that masks the population (${fmt(F.mask.after)} vertices, simplified from
+    ${fmt(F.mask.before)}). The masked population enters each exposure chain twice, once as the population and once as the
+    zero raster that fills gaps in the depth, and <code>toRecord()</code> writes a tree, so a shared input is written once per
+    use and the outline appears four times in the recipe. `
+    + (F.rebuilt == null ? "" : F.rebuilt ? "Rebuilt from the recipe, the four checksums match the originals to the last digit."
+       : "Rebuilt from the recipe, at least one checksum differs from the original; see the table."));
+}
+
+function writeConclusion() {
+  const { RG, UN } = F;
+  const r100 = F.rp.find((r) => r.rp === RP_FOCUS), g = [...F.gcm].sort((p, q) => p.people - q.people);
+  const a = F.agree, all = a.hist[a.n] / Math.max(a.wetAny, 1);
+  document.getElementById("conclusion").innerHTML = `
+    <p>In Aqueduct's historical baseline, ${fmt(r100.people)} of ${RG}'s ${fmt(F.statePop)} people (${pct(r100.people / F.statePop)}) live
+    inside the 100-year riverine flood extent at a ${WET} m wet threshold. Under RCP8.5 in 2050 the five-model mean moves that to
+    ${fmt(F.exposed.y2050)}, and the single models span ${fmt(g[0].people)} to ${fmt(g.at(-1).people)}, so the sign of the change
+    depends on the model. The models place the floodplain in nearly the same cells (${pct(all)} of the cells any model floods are
+    flooded by all ${a.n}); their spread appears in depth and in the population at the floodplain's margins. The ensemble mean averages
+    depth cell by cell, so a planner reading exposure by hazard class should use the per-model range in Table 10.3.</p>
+    <p>For the engine, the study is a single HTML page over public files. Fourteen GeoTIFFs become two Datasets with selection axes,
+    an ordered return-period axis and an unordered, reducible climate-model axis, and ${F.recipe.ops} ops (<code>select</code>,
+    <code>reduce</code>, <code>combine</code>, <code>reclassify</code>, and <code>mask</code>) plus two terminals (<code>zonalStats</code> and
+    <code>groupBy</code>) produce every number on the page. The same chain drives six kinds of layer: continuous and categorical rasters,
+    a diverging change raster, a comparison layer, an ensemble-agreement layer, and a vector choropleth. The scene travels as a
+    ${(F.recipe.bytes / 1024).toFixed(1)} kB recipe and rebuilds to ${F.rebuilt ? "identical" : "different"} totals.</p>
+    <p>The numbers inherit four limits. Aqueduct's 1 km global model does not resolve small channels or local topography, and a
+    lidar-based regulatory map would draw a different extent. No levee protection is applied. WorldPop's unconstrained counts spread
+    people over every land cell, which inflates the count in thinly settled floodplain cells. The ${UN} sums count people by cell
+    center, and ${F.units.holes ? `the ${F.units.holes} holes in the ${UN} polygons are counted inside their ${UN}` : `no ${UN} polygon has a hole`}.
+    One property of the engine shaped the chain: <code>combine</code>'s min skips an absent input, so the page had to make both rasters
+    gap-free before masking, and a cross-check against <code>groupBy</code> is what caught it.</p>`;
+}
+
+async function run() {
+  status("reading the manifest…");
+  const r = await fetch(MANIFEST);
+  if (!r.ok) throw new Error(`no manifest at ${MANIFEST} (HTTP ${r.status}) — run node case-studies/build_case_study10_data.mjs`);
+  man = await r.json();
+  const a = man.aoi;
+  FIT = [[a[1], a[0]], [a[3], a[2]]];
+  const RG = man.region?.adm1 ?? REGION, UN = man.region?.unit ?? "unit";
+  document.querySelectorAll(".rg").forEach((e) => { e.textContent = RG; });
+  document.querySelectorAll(".un").forEach((e) => { e.textContent = UN; });
+  document.getElementById("h1").textContent = `Case Study 10 — Riverine flood exposure in ${RG}, today and in 2050`;
+  document.title = `FIMViz — Case Study 10: ${RG}`;
+  log(`manifest: ${RG} (${man.region?.country ?? "?"}), ${man.historical.length} return periods, ${man.future.length} GCMs`
+    + (man.missing_gcms?.length ? ` (missing: ${man.missing_gcms.map((m) => m.gcm).join(", ")})` : "")
+    + `, ${man.n_districts} ${UN} units, wet above ${WET} m`);
+
+  // Two Datasets with selection axes. Each entry is its own file, fetched only when selected.
+  hist = new Dataset({ name: "aqueduct-historical", kind: "raster", format: "geotiff",
+    axes: [{ name: "return_period", unit: "years", ordered: true, commensurable: true,
+             entries: man.historical.map((h) => ({ coord: h.rp, ref: DATA + h.file })) }] });
+  future = new Dataset({ name: "aqueduct-rcp85-2050-rp100", kind: "raster", format: "geotiff",
+    axes: [{ name: "gcm", unit: null, ordered: false, commensurable: true,
+             entries: man.future.map((f) => ({ coord: f.gcm, ref: DATA + f.file })) }] });
+  // `format` is stated because fromURL infers it from `name` when a name is given, and this name has
+  // no extension.
+  const popAll = Dataset.fromURL(DATA + man.population.file, { name: "worldpop-2020", format: "geotiff" });
+  // Everything below counts people inside the state: mask by the outline, then mask its holes out,
+  // since SpatialFilter treats a list of rings as a union.
+  const outline = (await (await fetch(DATA + man.outline)).json()).features[0].geometry;
+  const parts = outline.type === "MultiPolygon" ? outline.coordinates : [outline.coordinates];
+  // Coordinates are rounded to 1e-5° (about 1 m), far below a 30″ cell, to keep the recipe short.
+  const r5 = (v) => Math.round(v * 1e5) / 1e5;
+  const ll = (ring) => ring.map(([lng, lat]) => ({ lat: r5(lat), lng: r5(lng) }));
+  // The mask polygon travels in the recipe, so it is simplified first (Douglas–Peucker at a quarter
+  // of a cell); the published outline carries far more vertices than a 30″ grid can resolve.
+  const tol = (man.population.res_deg?.[0] ?? 1 / 120) / 4;
+  const nV = (rs) => rs.reduce((n, r) => n + r.length, 0);
+  const rawOuter = parts.map((rings) => rings[0]), rawInner = parts.flatMap((rings) => rings.slice(1));
+  const outer = rawOuter.map((r) => ll(simplifyRing(r, tol)));
+  const inner = rawInner.map((r) => simplifyRing(r, tol)).filter((r) => r.length >= 4).map(ll);
+  F.mask = { before: nV(rawOuter) + nV(rawInner), after: nV(outer) + nV(inner), tol };
+  log(`state mask: ${F.mask.before} vertices simplified to ${F.mask.after} at ${(tol * 3600).toFixed(1)}″`);
+  pop = inner.length ? popAll.mask(outer).mask(inner, { invert: true }) : popAll.mask(outer);
+  document.getElementById("n-units").textContent = String(man.n_districts);
+  if (man.sources?.geoboundaries?.source_adm2) document.getElementById("gb-source").textContent = man.sources.geoboundaries.source_adm2;
+  if (man.sources?.geoboundaries?.license_adm2) document.getElementById("gb-license").textContent = man.sources.geoboundaries.license_adm2;
+  renderInputs();
+
+  const fc = await (await fetch(DATA + man.districts)).json();
+  window.__UN = UN; window.__RG = RG;
+  districts = fc;
+  const dry = man.historical.filter((h) => h.all_dry).map((h) => `RP${h.rp}`);
+  if (dry.length) log(`note: ${dry.join(", ")} has no cell above 0.05 m in this crop, so its depth panel is empty`);
+  const slider = document.getElementById("rp");
+  slider.max = String(hist.axis.entries.length - 1);
+  slider.oninput = () => showRp(Number(slider.value));
+
+  for (const k of Object.keys(maps)) {
+    const b = await maps[k].addDataset(new File([JSON.stringify(fc)], "units.geojson", { type: "application/geo+json" }));
+    if (k !== "district") {
+      await maps[k].addLayer("vector", { source: b, style: () => ({ fillColor: "transparent", fillOpacity: 0, strokeColor: "#8a8f98", strokeWidth: 0.6 }) });
+    }
+    maps[k].map.fitBounds(FIT);
+  }
+
+  status("drawing the 100-year depth…");
+  await showRp(hist.axis.entries.findIndex((e) => e.coord === RP_FOCUS));
+
+  status("tabulating exposure by return period…");
+  F.statePop = (await pop.stats({ bins: 4 })).sum ?? 0;
+  F.rp = [];
+  for (const e of hist.axis.entries) {
+    const d = hist.select(e.coord);
+    const wetCells = (await wet01(d).stats({ bins: 4 })).sum ?? 0;
+    const g = await pop.groupBy(d, { bins: [WET, 1e6] });
+    F.rp.push({ rp: e.coord, wetCells, people: g[0]?.sum ?? 0 });
+  }
+  document.getElementById("rp-table").innerHTML = `<table><tr><th>return period</th><th>wet cells in the crop</th>`
+    + `<th>people inside the extent, ${RG}</th><th>share of ${RG}'s population</th></tr>`
+    + F.rp.map((r) => `<tr><td>${r.rp}-year</td><td class="num">${fmt(r.wetCells)}</td><td class="num">${fmt(r.people)}</td>`
+      + `<td class="num">${pct(r.people / Math.max(F.statePop, 1))}</td></tr>`).join("")
+    + `</table><p class="hint">Table 10.1 — Extent and exposure by return period, historical baseline, wet above ${WET} m.
+      Population inside ${RG}: ${fmt(F.statePop)} (WorldPop 2020).</p>`;
+  for (const r of F.rp) results.push({ table: "10.1", wet_m: WET, rp: r.rp, wet_cells: r.wetCells, people: Math.round(r.people) });
+
+  // ── Fig. 10.2 ──
+  status("reducing the five climate models…");
+  const today = hist.select(RP_FOCUS);
+  const ensMean = future.reduce("mean");
+  products.change2050 = ensMean.combine([today], { op: "difference" });
+  await paint("change", products.change2050, changeScale, "reduce(mean) over 5 GCMs − today, RP100");
+  document.getElementById("t-change").innerHTML = `Change in 100-year depth <small>2050 ensemble mean − today</small>`;
+  {
+    const [chG, tG, fG] = await Promise.all([products.change2050.grid(), today.grid(), ensMean.grid()]);
+    const same = chG.width === tG.width && chG.height === tG.height && tG.width === fG.width;
+    let n = 0, sum = 0, deeper = 0, shallower = 0;
+    if (same) for (let i = 0; i < chG.pixels.length; i++) {
+      const ch = chG.pixels[i];
+      if (Number.isNaN(ch) || !(tG.pixels[i] >= WET || fG.pixels[i] >= WET)) continue;
+      n++; sum += ch; if (ch > 0.1) deeper++; else if (ch < -0.1) shallower++;
+    }
+    else log("WARN the change grid and the depth grids differ in shape; change statistics skipped");
+    F.change = { n, mean: n ? sum / n : NaN, deeper: n ? deeper / n : NaN, shallower: n ? shallower / n : NaN };
+  }
+
+  const [todayWet, futureWet] = await Promise.all([wet01(today).grid(), wet01(ensMean).grid()]);
+  const cmp = new ComparisonLayer({ prediction: dryNaN(futureWet), observation: dryNaN(todayWet) });
+  const c = cmp.compute({ policy: "low", method: "nearest", dryValue: 0 });
+  const [pf, pt] = c.aligned;
+  const cat = new Float32Array(pf.length);
+  for (let i = 0; i < pf.length; i++) {
+    const f = pf[i] !== 0, t = pt[i] !== 0;
+    cat[i] = f && t ? 1 : f ? 2 : t ? 3 : NaN;
+  }
+  await paint("compare", Dataset.fromGrid(catGrid(c.grid, cat)), compareScale, "ComparisonLayer, today as reference");
+  document.getElementById("t-compare").innerHTML = `100-year extent, today against 2050 <small>wet above ${WET} m</small>`;
+  const m = c.metrics;
+  const cmpRows = [
+    ["wet in both", fmt(m.tp)], ["wet in 2050 only", fmt(m.fp)], ["wet today only", fmt(m.fn)],
+    ["2050 extent ÷ today's extent (frequency bias)", m.b.toFixed(3)],
+    ["share of today's extent still wet in 2050", `${(100 * m.h).toFixed(1)} %`],
+    ["critical success index", m.f.toFixed(3)],
+  ];
+  document.getElementById("compare-table").innerHTML = `<table><tr><th>ComparisonLayer, 2050 against today</th><th>cells</th></tr>`
+    + cmpRows.map(([k, v]) => `<tr><td>${k}</td><td class="num">${v}</td></tr>`).join("") + `</table>`;
+  results.push({ table: "10.2", wet_m: WET, tp: m.tp, fp: m.fp, fn: m.fn, bias: +m.b.toFixed(4), pod: +m.h.toFixed(4), csi: +m.f.toFixed(4) });
+  F.cmp = m;
+
+  // ── Fig. 10.3 ──
+  status("counting model agreement…");
+  const memberGrids = [];
+  for (const e of future.axis.entries) memberGrids.push(dryNaN(await wet01(future.select(e.coord)).grid()));
+  const ens = new EnsembleAggregationLayer({ sources: memberGrids });
+  const agree = ens.compute({ policy: "low", method: "nearest", dryValue: 0 });
+  const perPixel = Float32Array.from(agree.perPixel, (v) => (v > 0 ? v : NaN));
+  await paint("agree", Dataset.fromGrid(catGrid(agree.grid, perPixel)), agreeScale(agree.nLayers), `EnsembleAggregationLayer · ${agree.nLayers} models`);
+  document.getElementById("t-agree").innerHTML = `Models calling a cell wet at the 100-year return period, 2050 <small>RCP8.5, wet above ${WET} m</small>`;
+  const hist5 = [...agree.histogram];
+  const wetAny = hist5.slice(1).reduce((s, v) => s + v, 0);
+  document.getElementById("agree-table").innerHTML = `<table><tr><th>models calling the cell wet</th>`
+    + hist5.slice(1).map((_, i) => `<th>${i + 1}</th>`).join("") + `</tr><tr><td>cells (share of cells wet in any model)</td>`
+    + hist5.slice(1).map((v) => `<td class="num">${fmt(v)} (${(100 * v / Math.max(wetAny, 1)).toFixed(1)} %)</td>`).join("") + `</tr></table>`;
+  results.push({ table: "10.3", wet_m: WET, ...Object.fromEntries(hist5.map((v, i) => [`models_${i}`, v])) });
+  F.agree = { hist: hist5, wetAny, n: agree.nLayers };
+
+  // Exposure under each model on its own: the spread the ensemble mean hides.
+  status("counting people under each climate model…");
+  F.gcm = [];
+  for (const e of future.axis.entries) {
+    const d = future.select(e.coord);
+    const g = await pop.groupBy(d, { bins: BANDS });
+    const byCls = Object.fromEntries(g.map((r) => [r.class, r.sum]));
+    F.gcm.push({ gcm: e.coord, people: g.reduce((s0, r) => s0 + r.sum, 0), high: byCls[2] ?? 0,
+                 wetCells: (await wet01(d).stats({ bins: 4 })).sum ?? 0 });
+  }
+  const todayPeople = F.rp.find((r) => r.rp === RP_FOCUS)?.people ?? 0;
+  document.getElementById("gcm-table").innerHTML = `<table><tr><th>climate model, RCP8.5 2050</th><th>wet cells in the crop</th>`
+    + `<th>people inside the 100-year extent</th><th>against today</th><th>people in the high class</th></tr>`
+    + F.gcm.map((r) => `<tr><td>${r.gcm}</td><td class="num">${fmt(r.wetCells)}</td><td class="num">${fmt(r.people)}</td>`
+      + `<td class="num">${todayPeople ? `${signed(100 * (r.people / todayPeople - 1))} %` : "—"}</td><td class="num">${fmt(r.high)}</td></tr>`).join("")
+    + `</table><p class="hint">Table 10.3 — Each model on its own. Today's 100-year extent holds ${fmt(todayPeople)} people.</p>`;
+  for (const r of F.gcm) results.push({ table: "10.3b", wet_m: WET, gcm: r.gcm, wet_cells: r.wetCells, people: Math.round(r.people), people_high: Math.round(r.high) });
+
+  // ── Fig. 10.4 ──
+  status("counting people in the flood extent…");
+  products.exposedToday = exposed(pop, today);
+  products.exposed2050 = exposed(pop, ensMean);
+  products.bandsToday = hazardBands(today);
+  const zones = fc.features.map((f) => ({ id: f.properties.name,
+    polygon: (f.geometry.type === "MultiPolygon" ? f.geometry.coordinates : [f.geometry.coordinates])
+      .map((rings) => rings[0].map(([lng, lat]) => ({ lat, lng }))) }));
+  const holes = fc.features.reduce((n, f) => n + (f.geometry.type === "MultiPolygon" ? f.geometry.coordinates : [f.geometry.coordinates])
+    .reduce((k, rings) => k + rings.length - 1, 0), 0);
+  if (holes) log(`WARN the ${UN} polygons carry ${holes} hole(s); zonalStats counts a hole's cells inside the ${UN}`);
+  const [zToday, z2050] = await Promise.all([products.exposedToday.zonalStats(zones), products.exposed2050.zonalStats(zones)]);
+  const byName = new Map(z2050.map((z) => [z.id, z.sum]));
+  for (const f of fc.features) f.properties.exposed_2050 = Math.round(byName.get(f.properties.name) ?? 0);
+  const dDs = await maps.district.addDataset(new File([JSON.stringify(fc)], "units-exposed.geojson", { type: "application/geo+json" }));
+  const styleOf = (arg) => {
+    const f = arg?.feature ?? arg;
+    const v = Number(f?.properties?.exposed_2050 ?? f?.getProperty?.("exposed_2050"));
+    return { fillColor: districtScale.getColor(v) || "transparent", fillOpacity: 0.8, strokeColor: "#555", strokeWidth: 0.8 };
+  };
+  await maps.district.addLayer("vector", { source: dDs, style: styleOf });
+  const lgD = document.getElementById("lg-district");
+  lgD.innerHTML = Legend.fromColorScale(districtScale).toHtml() + `<p class="src">zonalStats sum, people</p>`;
+  lgD.hidden = false;
+  document.getElementById("t-district").innerHTML = `People in the 100-year extent, 2050 ensemble mean <small>WorldPop 2020, wet above ${WET} m</small>`;
+
+  const rows = zToday.map((z, i) => ({ district: z.id, today: z.sum, y2050: z2050[i].sum }))
+    .sort((p, q) => q.y2050 - p.y2050);
+  const tot = rows.reduce((s, r) => ({ today: s.today + r.today, y2050: s.y2050 + r.y2050 }), { today: 0, y2050: 0 });
+  const popTotal = zones.length ? (await pop.zonalStats(zones)).reduce((s, z) => s + z.sum, 0) : 0;
+  document.getElementById("district-table").innerHTML = `<table><tr><th>${UN}</th><th>people in the 100-year extent, today</th>`
+    + `<th>2050, ensemble mean</th><th>change</th></tr>`
+    + rows.slice(0, 10).map((r) => `<tr><td>${r.district}</td><td class="num">${fmt(r.today)}</td><td class="num">${fmt(r.y2050)}</td>`
+      + `<td class="num">${r.today > 0 ? `${r.y2050 >= r.today ? "+" : ""}${(100 * (r.y2050 / r.today - 1)).toFixed(0)} %` : "—"}</td></tr>`).join("")
+    + `<tr><td><b>${RG}, ${rows.length} ${UN} units</b></td><td class="num"><b>${fmt(tot.today)}</b></td><td class="num"><b>${fmt(tot.y2050)}</b></td>`
+    + `<td class="num"><b>${tot.today > 0 ? `${(100 * (tot.y2050 / tot.today - 1)).toFixed(0)} %` : "—"}</b></td></tr></table>`
+    + `<p class="hint">Top 10 of ${rows.length} ${UN} units by 2050 exposure. Population of the ${rows.length} units: ${fmt(popTotal)}; `
+    + `today's 100-year extent holds ${(100 * tot.today / Math.max(popTotal, 1)).toFixed(1)} % of it.</p>`;
+  for (const r of rows) results.push({ table: "10.4", wet_m: WET, region: RG, unit: r.district, people_today: Math.round(r.today), people_2050: Math.round(r.y2050) });
+  F.units = { rows, tot, popTotal, holes };
+
+  // People by hazard class, today and 2050, straight from groupBy.
+  const [gToday, g2050] = await Promise.all([pop.groupBy(today, { bins: BANDS }), pop.groupBy(ensMean, { bins: BANDS })]);
+  const label = ["low", "medium", "high"];
+  // groupBy returns one row per non-empty class, keyed by `class`, so index by that and not by position.
+  const cls = (g) => Object.fromEntries(g.map((row) => [row.class, row]));
+  const [cT, c50] = [cls(gToday), cls(g2050)];
+  document.getElementById("band-table").innerHTML = `<table><tr><th>hazard class (100-year)</th><th>people today</th><th>people 2050</th></tr>`
+    + label.map((l, i) => `<tr><td>${l} (${i === 2 ? `≥ ${BANDS[i]}` : `${BANDS[i]}–${BANDS[i + 1]}`} m)</td><td class="num">${fmt(cT[i]?.sum ?? 0)}</td>`
+      + `<td class="num">${fmt(c50[i]?.sum ?? 0)}</td></tr>`).join("") + `</table>`;
+  const gSum = (g) => g.reduce((s, r) => s + (r.sum ?? 0), 0);
+  totals.exposedToday = await sumOf(products.exposedToday);
+  totals.exposed2050 = await sumOf(products.exposed2050);
+  // Two routes to the same number: the wet-cell population from combine(min), and from groupBy's
+  // classes. They must agree, or a nodata cell is being counted as wet on one of them.
+  for (const [k, g] of [["exposedToday", gToday], ["exposed2050", g2050]]) {
+    const d = Math.abs(totals[k] - gSum(g));
+    if (d > 1) log(`WARN ${k}: combine(min) gives ${fmt(totals[k])} people, groupBy gives ${fmt(gSum(g))}`);
+  }
+  label.forEach((l, i) => results.push({ table: "10.5", wet_m: WET, hazard_class: l, people_today: Math.round(cT[i]?.sum ?? 0), people_2050: Math.round(c50[i]?.sum ?? 0) }));
+  F.cls = { today: [0, 1, 2].map((i) => cT[i]?.sum ?? 0), y2050: [0, 1, 2].map((i) => c50[i]?.sum ?? 0) };
+  F.exposed = { today: gSum(gToday), y2050: gSum(g2050) };
+  if (Math.abs(F.units.tot.today - F.exposed.today) > 0.01 * Math.max(F.exposed.today, 1)) {
+    log(`note: the ${UN} sums (${fmt(F.units.tot.today)}) and the state-mask total (${fmt(F.exposed.today)}) differ by more than 1 %`);
+  }
+  totals.change2050 = (await products.change2050.stats({ bins: 4 })).mean ?? 0;
+  totals.bandsToday = await sumOf(products.bandsToday);
+
+  // ── recipe ──
+  status("writing the recipe…");
+  const recipe = Object.fromEntries(Object.entries(products).map(([k, ds]) => [k, ds.toRecord()]));
+  const text = JSON.stringify(recipe);
+  const pretty = JSON.stringify(recipe, null, 1);
+  document.getElementById("recipe").textContent = pretty.length > 6000 ? pretty.slice(0, 6000) + "\n…" : pretty;
+  const fetched = [...man.historical.filter((h) => h.rp === RP_FOCUS), ...man.future, man.population].reduce((s, f) => s + (f.bytes || 0), 0);
+  const opsOf = (rec) => (rec.op ? 1 + rec.inputs.reduce((s, x) => s + opsOf(x), 0) : 0);
+  const filesOf = (rec, acc = new Set()) => { if (rec.url) acc.add(rec.url); (rec.inputs || []).forEach((x) => filesOf(x, acc)); return acc; };
+  document.getElementById("recipe-table").innerHTML = `<table><tr><th>product</th><th>ops</th><th>source files</th><th>recipe</th></tr>`
+    + Object.entries(recipe).map(([k, rec]) => `<tr><td><code>${k}</code></td><td class="num">${opsOf(rec)}</td>`
+      + `<td class="num">${filesOf(rec).size}</td><td class="num">${fmt(JSON.stringify(rec).length)} B</td></tr>`).join("")
+    + `<tr><td>the scene</td><td></td><td class="num">${fetched ? `${(fetched / 1048576).toFixed(1)} MiB fetched` : ""}</td>`
+    + `<td class="num">${fmt(text.length)} B</td></tr></table>`;
+  for (const [k, rec] of Object.entries(recipe)) results.push({ table: "10.6", product: k, ops: opsOf(rec), files: filesOf(rec).size, recipe_bytes: JSON.stringify(rec).length });
+  const allFiles = new Set(); Object.values(recipe).forEach((rec) => filesOf(rec, allFiles));
+  const outlineBytes = JSON.stringify(outer).length + JSON.stringify(inner).length;
+  F.recipe = { bytes: text.length, fetched, products: Object.keys(recipe).length,
+               ops: Object.values(recipe).reduce((n, rec) => n + opsOf(rec), 0), files: allFiles.size,
+               outlineShare: Math.min(1, (outlineBytes * 3) / text.length) };
+
+  const rb = document.getElementById("rebuild"), dl = document.getElementById("dlrecipe");
+  rb.disabled = false; dl.disabled = false;
+  dl.onclick = () => save(text, `${REGION}-recipe.json`, "application/json");
+  const doRebuild = async () => {
+    rb.disabled = true; status("rebuilding from the recipe…");
+    try {
+      const rebuilt = Object.fromEntries(Object.entries(JSON.parse(text)).map(([k, rec]) => [k, Dataset.fromRecord(rec)]));
+      const again = {
+        exposedToday: await sumOf(rebuilt.exposedToday), exposed2050: await sumOf(rebuilt.exposed2050),
+        change2050: (await rebuilt.change2050.stats({ bins: 4 })).mean ?? 0, bandsToday: await sumOf(rebuilt.bandsToday),
+      };
+      const rowsR = Object.keys(again).map((k) => `<tr><td><code>${k}</code></td><td class="num">${totals[k].toFixed(3)}</td>`
+        + `<td class="num">${again[k].toFixed(3)}</td><td>${Math.abs(again[k] - totals[k]) < 1e-6 ? "identical" : "DIFFERS"}</td></tr>`).join("");
+      document.getElementById("recipe-table").insertAdjacentHTML("beforeend",
+        `<table><tr><th>rebuilt product</th><th>original (sum, or mean for change2050)</th><th>from recipe</th><th></th></tr>${rowsR}</table>`);
+      for (const k of Object.keys(again)) results.push({ table: "10.7", product: k, original: totals[k], rebuilt: again[k] });
+      F.rebuilt = Object.keys(again).every((k) => Math.abs(again[k] - totals[k]) < 1e-6);
+      writeFindings(); writeConclusion();
+      status("rebuilt from the recipe", "done");
+    } catch (err) { console.error(err); log(`ERROR  ${err.message}`); status(`failed: ${err.message}`, "fail"); }
+    rb.disabled = false;
+  };
+  rb.onclick = doRebuild;
+
+  log(`people in the 100-year extent: today ${fmt(totals.exposedToday)}, 2050 ${fmt(totals.exposed2050)}`);
+  F.RG = RG; F.UN = UN;
+  writeFindings(); writeConclusion();
+  // Rebuild once on load, so the conclusion can state whether the recipe reproduces the scene.
+  await doRebuild();
+  status("ready", "done");
+}
+
+document.getElementById("dlr").onclick = () => results.length ? save(toCsv(results), "results.csv", "text/csv") : log("results.csv: nothing yet");
+try { await run(); } catch (e) { console.error(e); log(`ERROR  ${e.message}`); status(`failed: ${e.message}`, "fail"); }
+</script>
+</body>
+</html>

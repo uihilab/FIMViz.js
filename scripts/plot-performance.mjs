@@ -6,6 +6,7 @@
 //
 //     node scripts/plot-performance.mjs performance.csv
 //     node scripts/plot-performance.mjs performance.csv --out=figures --prefix=fig-4
+//     node scripts/plot-performance.mjs run1.csv run2.csv run3.csv   # several exports, pooled
 //
 // One SVG per figure, 1160 units wide to match the Section 3 figures at a 190 mm double-column
 // placement, with no external fonts and no color carrying information that lightness does not also
@@ -16,6 +17,9 @@
 //     <prefix>-throughput.svg   cells per second against grid size, per analysis case
 //     <prefix>-decode.svg       decode time against grid size, cold and warm
 //     <prefix>-map-<metric>.svg map boot, first render and restyle against grid size, per provider
+//     <prefix>-ingest.svg       warm decode and first render (both providers) against grid size, on
+//                               log-log axes, so linear scaling reads as a straight line and the
+//                               render plateau at the draw cap reads as a flat one (Table 3 as a figure)
 //
 // The reuse figure also prints the least-squares fit of each series to the console: re-decode is
 // linear in k with a slope equal to the decode time, and reuse is flat. Those two numbers are the
@@ -25,7 +29,10 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 const args = process.argv.slice(2);
-const CSV = args.find((a) => !a.startsWith("--")) ?? "performance.csv";
+// Each harness export is one page load's worth of sessions, so a full run is several files. They share
+// a header and are pooled here rather than concatenated by hand.
+const CSVS = args.filter((a) => !a.startsWith("--"));
+if (!CSVS.length) CSVS.push("performance.csv");
 const opt = (name, dflt) => args.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? dflt;
 const OUT = opt("out", "figures");
 const PREFIX = opt("prefix", "fig-4");
@@ -53,7 +60,7 @@ function parseCSV(text) {
   });
 }
 
-const rows = parseCSV(readFileSync(CSV, "utf8")).map((r) => ({
+const rows = CSVS.flatMap((f) => parseCSV(readFileSync(f, "utf8"))).map((r) => ({
   ...r, cells: +r.cells, value: +r.value, session: r.session ?? "",
 }));
 
@@ -208,6 +215,21 @@ for (const metric of ["t_mount", "t_render", "t_restyle"]) {
     write(`${PREFIX}-map-${metric.slice(2)}.svg`,
           chart({ xLabel: "cells", yLabel: "milliseconds", logX: true, series }));
   }
+}
+
+// Table 3 as one figure. Both axes are logarithmic: decode spans 3 ms to 2.7 s, so a linear y axis
+// would flatten the four smaller grids onto zero.
+if (rows.some((r) => r.suite === "decode") && providers.length) {
+  const pick = (suite, kase, metric) => cellsRun.map((c) => [c, med((r) => r.suite === suite &&
+    r.case === kase && r.cells === c && r.metric === metric)]).filter((p) => p[1] != null);
+  const name = { leaflet: "first render, Leaflet", google: "first render, Google Maps" };
+  write(`${PREFIX}-ingest.svg`, chart({
+    xLabel: "cells", yLabel: "milliseconds (median)", logX: true, logY: true,
+    series: [
+      { name: "fetch and decode", points: pick("decode", "warm", "t_total") },
+      ...providers.map((p) => ({ name: name[p] ?? p, points: pick("map", p, "t_render") })),
+    ].filter((s) => s.points.length > 1),
+  }));
 }
 
 const sessions = [...new Set(rows.map((r) => r.session))].filter(Boolean);

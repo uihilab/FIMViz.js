@@ -11,14 +11,19 @@
     §4.5  analysis throughput  pixel-wise agreement metrics, zonal statistics, grouped statistics and
                                whole-grid statistics, all reported in cells per second
 
-  Ingest by format (§4.2) and warp cost (§4.3) are not here. Both are dominated by geotiff.js,
-  shpjs, netcdfjs and gdal3.js, so they measure dependencies rather than this engine, and they need
-  the per-format sample files rather than the ladder. The decode baseline below is the exception: the
-  §4.4 ratios need a denominator, so a plain fetch-and-decode is timed at every rung.
+  Ingest by format (§4.2) is not here. It is dominated by geotiff.js, shpjs and netcdfjs, so it
+  measures dependencies rather than this engine, and it needs per-format sample files rather than
+  the ladder. The decode baseline below is the exception: the §4.4 ratios need a denominator, so a
+  plain fetch-and-decode is timed at every rung.
 
-  Nothing here mounts a map. `t_paint` therefore has no entry in the output — a paint measurement
-  needs a provider, and raster overlays render on Google Maps only, so it belongs with the case
-  studies rather than in a page that runs anywhere.
+  The map suite (§4.2) mounts Leaflet or Google Maps and times `t_render` and `t_restyle` over an
+  already-decoded grid. Both providers implement the raster-image methods, so the two compare
+  directly.
+
+  Two optional suites cover §4.3 and §4.4c. The warp ladder times a forced reproject at each rung
+  after GDAL is loaded, so the GDAL download and compile stay in the lazy-load row. The recipe suite
+  writes toRecord() for a depth-to-extent chain, compares its bytes with the decoded buffer, and
+  rehydrates it with fromRecord() to check that the pixels match.
 
   To run:
       node scripts/make-perf-data.mjs      # writes case-studies/perf-data/ (git-ignored)
@@ -71,7 +76,7 @@
 <body>
 
 <h1>FIMViz.js performance harness</h1>
-<p class="lede">Sections 4.4 and 4.5. Five repetitions per case, reported as median and interquartile
+<p class="lede">Sections 4.2 to 4.5. Five repetitions per case, reported as median and interquartile
 range. Long-format CSV, one row per repetition.</p>
 
 <fieldset>
@@ -80,6 +85,8 @@ range. Long-format CSV, one row per repetition.</p>
   <label>rungs <input type="text" id="rungs" value="256,512,1024" size="16"></label>
   <label>layer counts <input type="text" id="ks" value="1,2,4,6,8" size="12"></label>
   <label><input type="checkbox" id="gdal"> include the GDAL byte measurement (downloads ~38 MB)</label>
+  <label><input type="checkbox" id="warp"> warp ladder (§4.3; loads GDAL)</label>
+  <label><input type="checkbox" id="recipe"> recipe size and round trip (§4.4c)</label>
   <label><input type="checkbox" id="decodeOnly"> decode only — the ceiling run over the large rungs</label>
   <br><br>
   <label><input type="checkbox" id="mapLeaflet"> map suite: Leaflet</label>
@@ -128,12 +135,10 @@ performance.setResourceTimingBufferSize(2000);   // the byte totals below read t
 
 const DATA = "./case-studies/perf-data";
 
-// `Dataset.fromURL` does not read the file's GDAL_NODATA tag. The geotiff materializer takes noData
-// from `ds.meta.noData` (src/io/materializers.js line 54), and only the parseFile path fills that in
-// (src/io/parse.js line 260), so a lazily-rooted Dataset counts -99999 as a value: stats() over the
-// depth ladder returns min -99999, and groupBy collapses to two bins. Declaring it here is what a
-// host has to do today on the fromURL path, and the declaration is part of what the numbers below
-// mean. The extent pair is left alone deliberately — its dry cells are 0, a real value.
+// The geotiff materializer now falls back to the file's GDAL_NODATA tag (src/io/materializers.js).
+// Runs before that fix depended on this declaration, because `Dataset.fromURL` counted -99999 as a
+// value. The declaration matches the tag, so it is kept and the old and new runs stay comparable.
+// The extent pair is left alone deliberately — its dry cells are 0, a real value.
 const NODATA = { meta: { noData: -99999 } };
 const $ = (s) => document.querySelector(s);
 const log = (msg, cls = "") => {
@@ -218,6 +223,13 @@ $("#env").innerHTML = Object.entries(ENV)
 async function suiteDecode(n, reps) {
   const url = `${DATA}/dep-${n}.tif`;
   const cells = n * n;
+
+  // One untimed cold decode first. The first decode in a page load pays JIT compile and allocator
+  // growth, which earlier runs removed by deleting rep 0 from the CSV by hand. Skipped for the large
+  // rungs, where a second full-size decode would itself move the heap toward the ceiling.
+  if (cells <= 4194304) {
+    try { await Dataset.fromURL(`${url}?cb=${uid()}`, NODATA).grid(); } catch { /* the loop records it */ }
+  }
 
   for (let r = 0; r < reps; r++) {
     const u = `${url}?cb=${uid()}`;
@@ -413,6 +425,91 @@ async function suiteGdalBytes() {
   log(`  GDAL pulled in ${((after - before) / 1048576).toFixed(1)} MB on the first forced warp (${sig(ms)} ms)`);
 }
 
+
+/**
+ * §4.3 — warp cost against grid size.
+ *
+ * One untimed reproject at the smallest rung first, so the GDAL download and WebAssembly compile are
+ * paid outside the window; suiteGdalBytes reports that cost on its own. `t_force` is the whole chain
+ * (warm fetch, decode, warp), and the decode suite's warm `t_total` at the same rung is the
+ * denominator to subtract. The valid-cell count and mean on each side show what the warp did to the
+ * values, since a fast warp that drops cells is not a saving.
+ */
+const validSummary = (g) => {
+  let n = 0, sum = 0;
+  for (let i = 0; i < g.pixels.length; i++) {
+    const v = g.pixels[i];
+    if (Number.isFinite(v) && v !== g.noData) { n++; sum += v; }
+  }
+  return { n, mean: n ? sum / n : null };
+};
+
+async function suiteWarp(n, reps) {
+  const url = `${DATA}/dep-${n}.tif`;
+  const cells = n * n;
+  if (!suiteWarp.loaded) {
+    await Dataset.fromURL(`${DATA}/dep-256.tif`, NODATA).reproject("EPSG:3857").grid();
+    suiteWarp.loaded = true;
+  }
+  const src = await Dataset.fromURL(url, NODATA).grid();
+  const before = validSummary(src);
+  let out = null;
+  for (let r = 0; r < reps; r++) {
+    let ms;
+    try { [ms, out] = await timed(() => Dataset.fromURL(url, NODATA).reproject("EPSG:3857").grid()); }
+    catch (e) {
+      record("warp", "4326→3857", cells, r, "failed", 1, e.name || "error");
+      log(`  warp ${n}×${n} failed: ${e.message}`, "warn");
+      return;
+    }
+    record("warp", "4326→3857", cells, r, "t_force", ms, "ms");
+  }
+  const after = validSummary(out);
+  record("warp", "4326→3857", cells, 0, "cells_out", out.width * out.height, "count");
+  record("warp", "4326→3857", cells, 0, "valid_in", before.n, "count");
+  record("warp", "4326→3857", cells, 0, "valid_out", after.n, "count");
+  record("warp", "4326→3857", cells, 0, "mean_in", before.mean, "m");
+  record("warp", "4326→3857", cells, 0, "mean_out", after.mean, "m");
+  const t = rows.filter((x) => x.suite === "warp" && x.cells === cells && x.metric === "t_force").map((x) => x.value);
+  log(`  warp ${n}×${n}: ${sig(median(t))} ms, ${out.width}×${out.height} out, mean ${sig(before.mean)} → ${sig(after.mean)}`);
+}
+
+/**
+ * §4.4c — recipe bytes against decoded bytes, and the round trip.
+ *
+ * The chain is a depth-to-extent threshold, the case §3 describes. `bytes_recipe` is the UTF-8
+ * length of JSON.stringify(toRecord()); `bytes_grid` is the decoded buffer the recipe replaces.
+ * `pixels_match` is 1 when the rehydrated grid equals the original cell for cell.
+ */
+async function suiteRecipe(n, reps) {
+  const url = `${DATA}/dep-${n}.tif`;
+  const cells = n * n;
+  const build = () => Dataset.fromURL(url, NODATA).reclassify([{ min: 0.3, max: Infinity, value: 1 }]);
+  try {
+    const ds = build();
+    const g = await ds.grid();
+    const rec = await ds.toRecord();
+    const bytes = new TextEncoder().encode(JSON.stringify(rec)).length;
+    record("recipe", "depth→extent", cells, 0, "bytes_recipe", bytes, "B");
+    record("recipe", "depth→extent", cells, 0, "bytes_grid", g.pixels.byteLength, "B");
+    for (let r = 0; r < reps; r++) {
+      const [ms, g2] = await timed(async () => (await Dataset.fromRecord(rec)).grid());
+      record("recipe", "depth→extent", cells, r, "t_rehydrate", ms, "ms");
+      if (r === 0) {
+        let same = g2.pixels.length === g.pixels.length;
+        for (let i = 0; same && i < g.pixels.length; i++) {
+          const a = g.pixels[i], b = g2.pixels[i];
+          if (a !== b && !(Number.isNaN(a) && Number.isNaN(b))) same = false;
+        }
+        record("recipe", "depth→extent", cells, 0, "pixels_match", same ? 1 : 0, "bool");
+      }
+    }
+    log(`  recipe ${n}×${n}: ${bytes} B against ${g.pixels.byteLength} B (${sig(g.pixels.byteLength / bytes)}×)`);
+  } catch (e) {
+    record("recipe", "depth→extent", cells, 0, "failed", 1, e.name || "error");
+    log(`  recipe ${n}×${n} failed: ${e.message}`, "warn");
+  }
+}
 
 /**
  * Map render, one provider at a time. This is §4.2's time-to-first-render rather than a deferral
@@ -622,6 +719,8 @@ async function run() {
       await suiteDeferral(n, reps);
       await suiteThroughput(n, reps);
     }
+    if ($("#warp").checked) await suiteWarp(n, reps);
+    if ($("#recipe").checked) await suiteRecipe(n, reps);
     if ($("#mapLeaflet").checked) await suiteMap(n, reps, "leaflet", null);
     if ($("#mapGoogle").checked) await suiteMap(n, reps, "google", $("#apiKey").value.trim());
     renderResults();

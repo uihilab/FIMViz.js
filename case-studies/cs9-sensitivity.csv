@@ -1,0 +1,29 @@
+table,threshold_degC,snow_min_mm,basin,basin_cells,window,pr_mm,rain_mm,snow_mm,rain_share_pct,snow_cells_pct,event_rain_mm,event_rain_on_snow_cells_mm,event_rain_on_snow_share_pct
+5.3a,0,,"Missouri River at Hermann, MO",81438,1–12 Mar,18.1,7.9,10.2,43.6,,,,
+5.3a,0,,"Missouri River at Hermann, MO",81438,13–17 Mar,13.3,7.8,5.5,58.5,,,,
+5.3a,0,,"Missouri River at Hermann, MO",81438,1–31 Mar,46.2,28.6,17.6,61.9,,,,
+5.3a,0,,"Platte River at Louisville, NE",13104,1–12 Mar,28.1,12.3,15.9,43.6,,,,
+5.3a,0,,"Platte River at Louisville, NE",13104,13–17 Mar,23.9,15.6,8.3,65.2,,,,
+5.3a,0,,"Platte River at Louisville, NE",13104,1–31 Mar,71.9,43.6,28.3,60.6,,,,
+5.3a,-1,,"Missouri River at Hermann, MO",81438,1–12 Mar,18.1,8.4,9.8,46.1,,,,
+5.3a,-1,,"Missouri River at Hermann, MO",81438,13–17 Mar,13.3,8.7,4.6,65.6,,,,
+5.3a,-1,,"Missouri River at Hermann, MO",81438,1–31 Mar,46.2,30.9,15.2,67.0,,,,
+5.3a,-1,,"Platte River at Louisville, NE",13104,1–12 Mar,28.1,13.5,14.7,47.8,,,,
+5.3a,-1,,"Platte River at Louisville, NE",13104,13–17 Mar,23.9,16.5,7.4,68.9,,,,
+5.3a,-1,,"Platte River at Louisville, NE",13104,1–31 Mar,71.9,48.1,23.8,66.9,,,,
+5.3a,1,,"Missouri River at Hermann, MO",81438,1–12 Mar,18.1,7.5,10.6,41.3,,,,
+5.3a,1,,"Missouri River at Hermann, MO",81438,13–17 Mar,13.3,6.8,6.5,51.4,,,,
+5.3a,1,,"Missouri River at Hermann, MO",81438,1–31 Mar,46.2,26.3,19.9,57.0,,,,
+5.3a,1,,"Platte River at Louisville, NE",13104,1–12 Mar,28.1,11.3,16.8,40.2,,,,
+5.3a,1,,"Platte River at Louisville, NE",13104,13–17 Mar,23.9,13.8,10.1,57.6,,,,
+5.3a,1,,"Platte River at Louisville, NE",13104,1–31 Mar,71.9,38.3,33.6,53.3,,,,
+5.3b,0,10,"Missouri River at Hermann, MO",81438,,,,,,39.1,7.8,10.1,50.8
+5.3b,0,10,"Platte River at Louisville, NE",13104,,,,,,63.7,15.6,13.9,56.7
+5.3b,0,5,"Missouri River at Hermann, MO",81438,,,,,,67.4,7.8,9.9,85.8
+5.3b,0,5,"Platte River at Louisville, NE",13104,,,,,,94.0,15.6,15.8,95.2
+5.3b,0,25,"Missouri River at Hermann, MO",81438,,,,,,6.0,7.8,13.4,10.3
+5.3b,0,25,"Platte River at Louisville, NE",13104,,,,,,9.9,15.6,2.1,1.3
+5.3b,-1,10,"Missouri River at Hermann, MO",81438,,,,,,37.1,8.7,12.0,50.8
+5.3b,-1,10,"Platte River at Louisville, NE",13104,,,,,,58.4,16.5,15.3,54.2
+5.3b,1,10,"Missouri River at Hermann, MO",81438,,,,,,40.7,6.8,8.6,51.0
+5.3b,1,10,"Platte River at Louisville, NE",13104,,,,,,66.5,13.8,11.8,56.8

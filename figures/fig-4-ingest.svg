@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 520" width="1160" height="520"
+     font-family="Helvetica, Arial, sans-serif">
+  <rect width="1160" height="520" fill="#ffffff"/>
+  <line x1="96" x2="1134" y1="458.0" y2="458.0" stroke="#e8ecf0"/><text x="84" y="463.0" text-anchor="end" font-size="15" fill="#5b6570">1.0</text>
+  <line x1="96" x2="1134" y1="350.0" y2="350.0" stroke="#e8ecf0"/><text x="84" y="355.0" text-anchor="end" font-size="15" fill="#5b6570">10</text>
+  <line x1="96" x2="1134" y1="242.0" y2="242.0" stroke="#e8ecf0"/><text x="84" y="247.0" text-anchor="end" font-size="15" fill="#5b6570">100</text>
+  <line x1="96" x2="1134" y1="134.0" y2="134.0" stroke="#e8ecf0"/><text x="84" y="139.0" text-anchor="end" font-size="15" fill="#5b6570">1.0k</text>
+  <line x1="96" x2="1134" y1="26.0" y2="26.0" stroke="#e8ecf0"/><text x="84" y="31.0" text-anchor="end" font-size="15" fill="#5b6570">10k</text>
+  <line x1="96" x2="1134" y1="458" y2="458" stroke="#b8c0c8" stroke-width="1.2"/>
+  <line x1="96" x2="96" y1="26" y2="458" stroke="#b8c0c8" stroke-width="1.2"/>
+  <text x="96.0" y="482" text-anchor="middle" font-size="15" fill="#5b6570">66k</text>
+  <text x="269.0" y="482" text-anchor="middle" font-size="15" fill="#5b6570">262k</text>
+  <text x="442.0" y="482" text-anchor="middle" font-size="15" fill="#5b6570">1.0M</text>
+  <text x="615.0" y="482" text-anchor="middle" font-size="15" fill="#5b6570">4.2M</text>
+  <text x="788.0" y="482" text-anchor="middle" font-size="15" fill="#5b6570">16.8M</text>
+  <text x="961.0" y="482" text-anchor="middle" font-size="15" fill="#5b6570">67.1M</text>
+  <text x="1062.2" y="482" text-anchor="middle" font-size="15" fill="#5b6570">151.0M</text>
+  <text x="1134.0" y="482" text-anchor="middle" font-size="15" fill="#5b6570">268.4M</text>
+  <path d="M96.0,404.9L269.0,359.3L442.0,310.9L615.0,251.1L788.0,179.2L961.0,124.8L1062.2,88.3L1134.0,62.1" fill="none" stroke="#1f4e79" stroke-width="2.4"/><circle cx="96" cy="404.9" r="4.5" fill="#1f4e79"/><circle cx="269" cy="359.3" r="4.5" fill="#1f4e79"/><circle cx="442" cy="310.9" r="4.5" fill="#1f4e79"/><circle cx="615" cy="251.1" r="4.5" fill="#1f4e79"/><circle cx="788" cy="179.2" r="4.5" fill="#1f4e79"/><circle cx="961" cy="124.8" r="4.5" fill="#1f4e79"/><circle cx="1062.2" cy="88.3" r="4.5" fill="#1f4e79"/><circle cx="1134" cy="62.1" r="4.5" fill="#1f4e79"/>
+  <path d="M96.0,356.0L269.0,308.0L442.0,247.0L615.0,184.1L788.0,127.6L961.0,126.1L1062.2,123.8L1134.0,117.7" fill="none" stroke="#c0504d" stroke-width="2.4"/><rect x="92" y="352" width="8" height="8" fill="#c0504d"/><rect x="265" y="304" width="8" height="8" fill="#c0504d"/><rect x="438" y="243" width="8" height="8" fill="#c0504d"/><rect x="611" y="180.1" width="8" height="8" fill="#c0504d"/><rect x="784" y="123.6" width="8" height="8" fill="#c0504d"/><rect x="957" y="122.1" width="8" height="8" fill="#c0504d"/><rect x="1058.2" y="119.8" width="8" height="8" fill="#c0504d"/><rect x="1130" y="113.7" width="8" height="8" fill="#c0504d"/>
+  <path d="M96.0,362.9L269.0,308.4L442.0,247.5L615.0,184.8L788.0,129.6L961.0,127.0L1062.2,123.8L1134.0,115.5" fill="none" stroke="#4f8a3d" stroke-width="2.4"/><polygon points="96,357.9 100.6,366.4 91.4,366.4" fill="#4f8a3d"/><polygon points="269,303.4 273.6,311.9 264.4,311.9" fill="#4f8a3d"/><polygon points="442,242.5 446.6,251 437.4,251" fill="#4f8a3d"/><polygon points="615,179.8 619.6,188.3 610.4,188.3" fill="#4f8a3d"/><polygon points="788,124.6 792.6,133.1 783.4,133.1" fill="#4f8a3d"/><polygon points="961,122 965.6,130.5 956.4,130.5" fill="#4f8a3d"/><polygon points="1062.2,118.8 1066.8,127.3 1057.6000000000001,127.3" fill="#4f8a3d"/><polygon points="1134,110.5 1138.6,119 1129.4,119" fill="#4f8a3d"/>
+  <g transform="translate(114,40)"><line x1="0" x2="26" y1="0" y2="0" stroke="#1f4e79" stroke-width="2.4"/><circle cx="13" cy="0" r="4.5" fill="#1f4e79"/><text x="34" y="5" font-size="15" fill="#1a1d21">fetch and decode</text></g>
+  <g transform="translate(114,62)"><line x1="0" x2="26" y1="0" y2="0" stroke="#c0504d" stroke-width="2.4"/><rect x="9" y="-4" width="8" height="8" fill="#c0504d"/><text x="34" y="5" font-size="15" fill="#1a1d21">first render, Leaflet</text></g>
+  <g transform="translate(114,84)"><line x1="0" x2="26" y1="0" y2="0" stroke="#4f8a3d" stroke-width="2.4"/><polygon points="13,-5 17.6,3.5 8.4,3.5" fill="#4f8a3d"/><text x="34" y="5" font-size="15" fill="#1a1d21">first render, Google Maps</text></g>
+  <text x="580" y="504" text-anchor="middle" font-size="16" fill="#5b6570">cells</text>
+  <text x="26" y="260" text-anchor="middle" font-size="16" fill="#5b6570" transform="rotate(-90 26 260)">milliseconds (median)</text>
+</svg>

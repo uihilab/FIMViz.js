@@ -10,7 +10,7 @@
 
 import { fromArrayBuffer } from "geotiff";
 import { readCrs } from "../geo/crs.js";
-import { boundsOf } from "./parse.js";
+import { boundsOf, cleanNoData } from "./parse.js";
 import {
   RasterGrid, VectorFeatures, registerMaterializer,
 } from "../package/materialize.js";
@@ -51,7 +51,9 @@ async function geotiffMaterializer(root, ds) {
     bounds: { north, south, east, west },
     // Prefer the Dataset's declared CRS (parse.js already read it); fall back to the geokeys.
     crs: ds.crs || readCrs(image),
-    noData: ds.meta?.noData ?? null,
+    // A host-declared value wins. Otherwise the file's GDAL_NODATA tag applies, so a URL-rooted
+    // Dataset gets the same sentinel parseFile reads (parse.js) instead of counting it as data.
+    noData: ds.meta?.noData ?? cleanNoData(image.fileDirectory.GDAL_NODATA),
     bands: image.getSamplesPerPixel(),
     meta: ds.meta || {},
   });
